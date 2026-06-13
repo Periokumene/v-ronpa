@@ -1,0 +1,14 @@
+{
+  "name": "@v-ronpa/story-engine",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/nani-parser": "workspace:*",
+    "@v-ronpa/presentation-contracts": "workspace:*"
+  }
+}

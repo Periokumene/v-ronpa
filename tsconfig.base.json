@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@v-ronpa/contracts": ["packages/contracts/src/index.ts"],
+      "@v-ronpa/nani-parser": ["packages/nani-parser/src/index.ts"],
+      "@v-ronpa/story-engine": ["packages/story-engine/src/index.ts"],
+      "@v-ronpa/game-flow-machine": ["packages/game-flow-machine/src/index.ts"],
+      "@v-ronpa/gameplay": ["packages/gameplay/src/index.ts"],
+      "@v-ronpa/media-save": ["packages/media-save/src/index.ts"],
+      "@v-ronpa/navi-director": ["packages/navi-director/src/index.ts"],
+      "@v-ronpa/presentation-contracts": ["packages/presentation-contracts/src/index.ts"],
+      "@v-ronpa/pixi-presenter": ["packages/pixi-presenter/src/index.ts"],
+      "@v-ronpa/r3f-adapter": ["packages/r3f-adapter/src/index.ts"],
+      "@v-ronpa/trial-director": ["packages/trial-director/src/index.ts"],
+      "@v-ronpa/ui-kit": ["packages/ui-kit/src/index.ts"]
+    }
+  }
+}

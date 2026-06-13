@@ -1,0 +1,14 @@
+{
+  "name": "@v-ronpa/pixi-presenter",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/presentation-contracts": "workspace:*",
+    "pixi.js": "^8.0.0"
+  }
+}

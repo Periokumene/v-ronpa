@@ -1,0 +1,13 @@
+{
+  "name": "@v-ronpa/trial-director",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/gameplay": "workspace:*"
+  }
+}

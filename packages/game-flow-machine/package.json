@@ -1,0 +1,13 @@
+{
+  "name": "@v-ronpa/game-flow-machine",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/contracts": "workspace:*",
+    "xstate": "^5.0.0"
+  }
+}

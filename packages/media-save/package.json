@@ -1,0 +1,17 @@
+{
+  "name": "@v-ronpa/media-save",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/contracts": "workspace:*",
+    "dexie": "^4.0.0",
+    "howler": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/howler": "^2.2.0"
+  }
+}

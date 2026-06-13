@@ -1,0 +1,15 @@
+{
+  "name": "@v-ronpa/ui-kit",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.0",
+    "@radix-ui/react-tabs": "^1.1.0",
+    "@v-ronpa/contracts": "workspace:*",
+    "react": "^19.0.0"
+  }
+}

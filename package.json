@@ -1,0 +1,28 @@
+{
+  "name": "v-ronpa",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@11.6.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:smoke": "playwright test",
+    "validate:contracts": "vitest run packages/contracts packages/nani-parser packages/story-engine packages/gameplay packages/navi-director packages/trial-director packages/media-save packages/presentation-contracts",
+    "validate:boundaries": "node scripts/validate-boundaries.mjs",
+    "validate:ccr": "node scripts/validate-ccr.mjs",
+    "setup:worktree-env": "node scripts/setup-worktree-env.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0",
+    "vitest": "^4.0.0"
+  }
+}
