@@ -21,6 +21,9 @@
 - Unit tests: `pnpm test`
 - Contract validation: `pnpm validate:contracts`
 - Boundary checks: `pnpm validate:boundaries`
+- Task path checks: `BASE_REF=integration/v-ronpa-baseline pnpm validate:task-boundaries -- --task docs/tasks/<name>.md`
+- Subsystem gate: `BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/<name>.md`
+- Baseline gate: `pnpm validate:baseline`
 - App dev server: `pnpm --filter @v-ronpa/game dev`
 - Playwright smoke: `pnpm test:smoke`
 - App production build: `pnpm --filter @v-ronpa/game build`
@@ -32,5 +35,7 @@
 - Contract snapshots are updated intentionally.
 - Visual changes include Playwright screenshot evidence when they affect harness scenes.
 - Diff stays inside assigned paths, unless the task explicitly includes a CCR.
+- `package.json` and `pnpm-lock.yaml` stay unchanged unless the task card explicitly allows dependency changes.
+- Subsystem branches run `validate:subsystem` with `BASE_REF=integration/v-ronpa-baseline`.
 
 Detailed workflow: [docs/architecture/worktree-flow.md](docs/architecture/worktree-flow.md).

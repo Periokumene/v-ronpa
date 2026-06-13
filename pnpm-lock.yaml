@@ -187,9 +187,6 @@ importers:
       '@v-ronpa/nani-parser':
         specifier: workspace:*
         version: link:../nani-parser
-      '@v-ronpa/presentation-contracts':
-        specifier: workspace:*
-        version: link:../presentation-contracts
 
   packages/trial-director:
     dependencies:

@@ -15,3 +15,16 @@ Use this after the contract and harness baseline is frozen.
 | harness | `apps/game/**`, `tests/smoke/**` | Playwright report |
 
 Shared contracts require a CCR.
+
+Each subsystem task must use a dedicated task card and run:
+
+```bash
+BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/<name>.md
+```
+
+`validate:subsystem` enforces task allowed paths, CCR requirements, dependency
+boundaries, typecheck, contract tests, unit tests, app build, and smoke tests.
+
+Dependency changes are forbidden by default. If a subsystem truly needs
+`package.json` or `pnpm-lock.yaml` edits, its task card must mark
+`Dependency Changes` as `Allowed` and explain why before work begins.

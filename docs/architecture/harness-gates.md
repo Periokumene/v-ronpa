@@ -2,15 +2,21 @@
 
 ## Hard Gates
 
+- `pnpm validate:baseline`
 - `pnpm validate:contracts`
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm validate:boundaries`
+- `BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/<name>.md`
 
 Hard gates verify public contracts, input/camera/asset schemas, parser IR,
 StoryEngine state and StoryEffect bridge outputs, gameplay outcomes,
 Navi/Trial director flow, Trial graph diagnostics, save migration validation,
-and dependency boundaries.
+task path boundaries, CCR requirements, and dependency boundaries.
+
+`validate:boundaries` checks source imports, `package.json` dependency
+direction, and `tsconfig.json` project references against the same workspace
+dependency matrix.
 
 ## Smoke And Evidence Gates
 

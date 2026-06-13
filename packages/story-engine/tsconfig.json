@@ -9,8 +9,7 @@
   },
   "references": [
     { "path": "../contracts" },
-    { "path": "../nani-parser" },
-    { "path": "../presentation-contracts" }
+    { "path": "../nani-parser" }
   ],
   "include": ["src"]
 }

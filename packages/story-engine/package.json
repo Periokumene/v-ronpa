@@ -8,7 +8,6 @@
   },
   "dependencies": {
     "@v-ronpa/contracts": "workspace:*",
-    "@v-ronpa/nani-parser": "workspace:*",
-    "@v-ronpa/presentation-contracts": "workspace:*"
+    "@v-ronpa/nani-parser": "workspace:*"
   }
 }
