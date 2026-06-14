@@ -15,11 +15,11 @@
 
 ## Status
 
-- State: `Ready` (`Draft | Ready | In Progress | Blocked | Review | Done | Archived`)
+- State: `Archived` (`Draft | Ready | In Progress | Blocked | Review | Done | Archived`)
 - Owner: `TBD`
 - Created: `2026-06-14`
 - Updated: `2026-06-14`
-- Completed Commit: `TBD`
+- Completed Commit: `ce35942`
 - Archive Target: `docs/archive/completed-tasks/gameplay-domain-p1.md`
 
 ## Goal
