@@ -79,6 +79,8 @@ export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
     statements.push(parseText(trimmed, loc));
   });
 
+  collectLocalLabelReferenceDiagnostics(statements, labels, diagnostics);
+
   return {
     scenario: {
       scriptPath: input.scriptPath,
@@ -337,6 +339,68 @@ function collectCommandMetadata(
   if ((command.commandId === "goto" || command.commandId === "call") && command.primary?.type === "raw") {
     const endpoint = command.primary.value;
     if (!endpoint.startsWith("#")) dependencies.push({ endpoint });
+  }
+}
+
+function collectLocalLabelReferenceDiagnostics(
+  statements: StatementIR[],
+  labels: Record<string, number>,
+  diagnostics: Diagnostic[]
+): void {
+  for (const statement of statements) {
+    if (statement.kind === "command") {
+      collectCommandLocalLabelReferenceDiagnostics(statement, labels, diagnostics);
+      continue;
+    }
+
+    if (statement.kind === "text") {
+      for (const token of statement.tokens) {
+        if (token.kind === "inline-command") {
+          collectCommandLocalLabelReferenceDiagnostics(token.command, labels, diagnostics);
+        }
+      }
+    }
+  }
+}
+
+function collectCommandLocalLabelReferenceDiagnostics(
+  command: CommandIR,
+  labels: Record<string, number>,
+  diagnostics: Diagnostic[]
+): void {
+  for (const target of localLabelTargetsForCommand(command)) {
+    const label = target.slice(1);
+    if (labels[label] === undefined) {
+      diagnostics.push({
+        severity: "error",
+        message: `Missing local label reference: ${target}`,
+        loc: command.loc
+      });
+    }
+  }
+}
+
+function localLabelTargetsForCommand(command: CommandIR): string[] {
+  const targets: string[] = [];
+
+  if (command.primary?.type === "raw" && command.primary.value.startsWith("#")) {
+    targets.push(command.primary.value);
+  }
+
+  const goto = command.params.goto;
+  if (goto) collectLocalLabelTargetsFromValue(goto, targets);
+
+  return targets;
+}
+
+function collectLocalLabelTargetsFromValue(value: NaniValue, targets: string[]): void {
+  if (value.type === "raw" && value.value.startsWith("#")) {
+    targets.push(value.value);
+    return;
+  }
+
+  if (value.type === "list") {
+    for (const item of value.value) collectLocalLabelTargetsFromValue(item, targets);
   }
 }
 

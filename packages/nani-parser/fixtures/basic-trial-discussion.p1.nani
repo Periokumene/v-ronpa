@@ -1,0 +1,28 @@
+; basic-trial-discussion.p1.nani
+; P1 parser fixture for Trial discussion presentation anchors without
+; debate keywords, evidence submission, or Trial segment routing rules.
+
+#TrialOpening
+@set trialMood:"opening"
+@back bg:trial-room effect:fade
+@charEnter character:felix portrait:portrait:felix:serious slot:center
+@charEnter character:mira portrait:portrait:mira:calm slot:right
+Felix.Serious: The testimony starts before the evidence does.[>]
+@focus character:mira duration:420
+Mira.Calm: Then listen for the contradiction before naming it.[< speed:0.8][>]
+
+@choice "Press the question" goto:#PressQuestion
+@choice "Listen longer" goto:#ListenLonger
+
+#PressQuestion
+@flash color:#ffe66d duration:160
+Narrator: The room turns toward Felix.[>]
+@goto #TrialEnd
+
+#ListenLonger
+@shake character:mira intensity:0.25 duration:180
+Felix.Serious: Waiting changes the rhythm of the room.[>]
+@goto #TrialEnd
+
+#TrialEnd
+@end

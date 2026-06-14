@@ -116,18 +116,18 @@ should not introduce unsupported command placeholders.
 These syntax concepts are recognized as relevant to visual-novel style scripts
 but are intentionally unused in the P1 fixtures.
 
-| Feature area | Reason not in P1 | Future owner |
-|---|---|---|
-| Text localization IDs and text references | Requires stable localization and voice/backlog identity design | StoryEngine + tooling |
-| Indentation child blocks | Requires block tree construction, not just line-oriented IR | nani-parser + StoryEngine |
-| Block control flow | Requires expression semantics and runtime execution model | StoryEngine |
-| Subroutine flow | Requires call stack semantics | StoryEngine |
-| Input/save/unlock/toast style app commands | Requires UI, save, achievement, or notification contracts | app/harness + media-save + ui-kit |
-| Multi-speaker text | Requires dialogue presentation and backlog policy | StoryEngine + ui-kit |
-| Async, await, and track control | Requires scheduler/runtime track model | StoryEngine |
-| Managed text and automatic voice mapping | Requires content tooling and asset pipeline | tooling + media-save |
-| Rich reveal events | Requires text reveal runtime and presentation ports | StoryEngine + presentation |
-| Unity scene/timeline/effect commands | Not part of the browser-first V-Ronpa contract | out of scope unless a future ADR adds them |
+| Feature area | Reason not in P1 | Suggested phase | Owning subsystem |
+|---|---|---|---|
+| Text localization IDs and text references | Requires stable localization and voice/backlog identity design | P2 | StoryEngine + tooling |
+| Indentation child blocks | Requires block tree construction, not just line-oriented IR | P2 | nani-parser + StoryEngine |
+| Block control flow | Requires expression semantics and runtime execution model | P2 | StoryEngine |
+| Subroutine flow | Requires call stack semantics | P2 | StoryEngine |
+| Input/save/unlock/toast style app commands | Requires UI, save, achievement, or notification contracts | P3 | app/harness + media-save + ui-kit |
+| Multi-speaker text | Requires dialogue presentation and backlog policy | P2 | StoryEngine + ui-kit |
+| Async, await, and track control | Requires scheduler/runtime track model | P3 | StoryEngine |
+| Managed text and automatic voice mapping | Requires content tooling and asset pipeline | P3 | tooling + media-save |
+| Rich reveal events | Requires text reveal runtime and presentation ports | P3 | StoryEngine + presentation |
+| Unity scene/timeline/effect command families | Not part of the browser-first V-Ronpa contract | P3 / Future ADR | out of scope unless a future ADR adds them |
 
 No P1 acceptance test should depend on these features.
 
@@ -136,7 +136,8 @@ No P1 acceptance test should depend on these features.
 P2 candidates are features that could extend the parser after the P1 IR baseline
 is stable:
 
-- local label reference diagnostics beyond `@goto` and `goto:#Label`
+- local label reference diagnostics for endpoint params beyond command primary
+  `#Label` and `goto:#Label`
 - explicit parse support for indentation blocks
 - stable text identity syntax after localization requirements are approved
 - richer inline token classification for wait markers and print parameter
