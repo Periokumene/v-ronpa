@@ -39,12 +39,12 @@ adapters and apps
 - `navi-director` owns Navi substates: `walk`, `interacting`, `vn2d-overlay`,
   `inventory`, and `event`.
 - `trial-director` owns Trial segment flow, presentation profile selection,
-  keyword resolution, timeout handling, and evidence submission outcomes.
+  timeout handling, evidence submission outcomes, and segment transitions.
 - `StoryEngine` owns script semantics, variables, backlog, choices, performs,
   serializable Story snapshots, and story-generated `StoryEffect` bridge
   events.
-- `gameplay` owns domain reducers for exploration, inventory/evidence,
-  character state, and trial outcomes.
+- `gameplay` owns domain reducers for exploration, inventory, evidence
+  ownership, character state, and pure trial rule judgments.
 - `media-save` owns Dexie IndexedDB save storage, Howler audio playback,
   HTMLVideo playback, and future WebAudio rhythm adapter notes.
 - `presentation-contracts` owns renderer-independent visual commands and
@@ -81,6 +81,11 @@ state patches, game events, and presentation commands. Presentation commands
 are renderer-independent, so a command like `@shake target:hero` never knows
 whether Pixi, DOM, or another future presenter executes the motion.
 
+Story scripts can emit typed gameplay events, for example
+`@gameplay grant-evidence id:evidence:keycard`. These events can update
+saveable gameplay state, but they do not submit evidence during Trial. Evidence
+submission remains a Trial UI action routed through `trial-director`.
+
 ```text
 .nani source
   -> nani-parser AST/IR
@@ -90,12 +95,25 @@ whether Pixi, DOM, or another future presenter executes the motion.
   -> Pixi, R3F, DOM adapters
 ```
 
+## Evidence And Trial Rules
+
+Evidence is not an inventory item. Gifts and tools live in `ItemDef` and
+`InventoryState.items`; case evidence lives in `EvidenceDef` and
+`EvidenceState.ownedEvidenceIds`.
+
+`TrialDefinition` owns the rule graph: debate truth bullets, breakable
+keywords, accepted evidence, timeout/miss/correct branches, evidence-submit
+branches, and minigame transitions. `.nani` scripts provide the narrative and
+visual timing for those segments, while TrialDirector applies graph transitions
+after Gameplay returns pure rule judgments.
+
 ## First-Round Thin Slices
 
 - Parse labels, comments, commands, text, inline commands, choices, and jumps.
 - Validate fixtures with Zod.
 - Run a headless story reducer snapshot.
-- Resolve trial keyword outcomes with evidence.
+- Resolve trial keyword outcomes with evidence without putting segment flow in
+  gameplay helpers.
 - Render harness scenes for Navi walk/VN2D/inventory and Trial VN3D/debate.
 - Capture Playwright smoke screenshots for visual evidence.
 - Validate Trial graph references before subsystem fanout.

@@ -19,7 +19,8 @@ Scripts use preset commands rather than renderer-specific instructions:
 @flash color:#ffffff duration:160
 @focus target:witness duration:500
 @cameraFocus character:felix framing:close duration:500
-@trialKeyword id:kw-lie text:"the door was locked" evidence:evidence:keycard
+@trialKeyword id:kw-lie text:"the door was locked" speaker:character:felix
+@gameplay grant-evidence id:evidence:keycard
 ```
 
 The public contract is `PresentationCommand` and `PresentationPerform`; Pixi,
@@ -29,6 +30,11 @@ Story scripts emit `StoryEffect` bridge records. A presentation effect wraps a
 `PresentationCommand`; Trial, Navi, gameplay, and media effects keep their own
 typed channel names so directors can consume them without coupling to parser
 internals.
+
+`trial-keyword` is a visual anchor for overlays and subtitles. It may carry
+debug metadata, but it is not the rule source for which evidence breaks which
+statement. Debate rules, accepted evidence, and next-segment transitions live in
+`TrialDefinition`.
 
 ## Pixi In Scope
 
@@ -77,3 +83,13 @@ In other words, Trial may reuse the same 3D staging and presentation commands
 as `vn3d`, but it is not just `vn3d` with a different camera. Trial requires a
 `TrialDefinition`, `TrialRuntimeState`, and `trial-director` logic on top of
 story presentation.
+
+## Evidence Ownership Boundary
+
+Evidence display data is declared in the content manifest as `EvidenceDef`.
+Evidence ownership is stored in `EvidenceState.ownedEvidenceIds`. Inventory
+items remain limited to gifts and tools.
+
+`.nani` can grant evidence through a typed gameplay event, but evidence
+submission is not a script command. Submit actions originate from Trial UI,
+flow through `trial-director`, and are resolved against `TrialDefinition`.

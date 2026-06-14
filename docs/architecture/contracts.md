@@ -4,8 +4,9 @@
 
 - `packages/contracts`: source of truth for schemas, fixtures, save data, top
   modes, Navi runtime state, Trial runtime state, inventory, trial definitions,
-  input bindings, camera modes, runtime assets, Story snapshots, Story effects,
-  and presentation command wire shapes.
+  evidence definitions, input bindings, camera modes, runtime assets, Story
+  snapshots, Story effects, typed gameplay events, and presentation command wire
+  shapes.
 - `packages/presentation-contracts`: runtime ports for presenter adapters.
 - `packages/nani-parser`: `.nani` AST and IR shape.
 
@@ -27,6 +28,29 @@ and merge the change through the integration baseline first.
   modes; VN2D/VN3D belong to Navi substates or Trial presentation profiles.
 - Renderer-specific objects must not appear in contracts.
 - Script source locations must be preserved through parse and compile outputs.
+- `ItemDef` is limited to gifts and tools. Evidence is modeled separately as
+  `EvidenceDef` and stored in `EvidenceState`.
+- `EvidenceState.ownedEvidenceIds` is the save/runtime ownership list for
+  evidence. Evidence must not be duplicated into `InventoryState.items`.
+- `GameplayEvent` is the typed bridge for story-triggered gameplay changes.
+  Story scripts may grant evidence, but evidence submission is a Trial UI action
+  consumed by `trial-director`, not a `.nani` gameplay event.
+- `TrialDefinition` is the rule source for debate truth bullets, breakable
+  keywords, accepted evidence, and segment transitions. Presentation commands
+  may visually mark keywords, but they must not define trial rules.
+
+## Evidence / Trial Rule Ownership
+
+- Content manifests declare evidence objects through `EvidenceDef`, including
+  display fields and stable visual asset references.
+- `.nani` scripts declare narrative timing and presentation anchors such as
+  `@trialKeyword`; they can emit typed gameplay events such as
+  `@gameplay grant-evidence id:evidence:keycard`.
+- `Gameplay` consumes evidence ownership and returns pure rule judgments such
+  as correct, miss, timeout, or accepted evidence.
+- `TrialDirector` consumes the `TrialDefinition` graph and gameplay rule
+  judgments to move between discussion, debate, evidence-submit, minigame, and
+  failure segments.
 
 ## Snapshots
 

@@ -163,7 +163,7 @@ export const RuntimeAssetSchema = z.object({
 });
 export type RuntimeAsset = z.infer<typeof RuntimeAssetSchema>;
 
-export const ItemCategorySchema = z.enum(["gift", "tool", "evidence"]);
+export const ItemCategorySchema = z.enum(["gift", "tool"]);
 export type ItemCategory = z.infer<typeof ItemCategorySchema>;
 
 export const ItemDefSchema = z.object({
@@ -176,13 +176,38 @@ export const ItemDefSchema = z.object({
 });
 export type ItemDef = z.infer<typeof ItemDefSchema>;
 
+export const EvidenceDetailSchema = z.object({
+  label: z.string().min(1),
+  value: z.string().min(1)
+});
+export type EvidenceDetail = z.infer<typeof EvidenceDetailSchema>;
+
+export const EvidenceVisualSchema = z.object({
+  iconAssetId: IdSchema.optional(),
+  thumbnailAssetId: IdSchema.optional(),
+  accentColor: z.string().optional()
+});
+export type EvidenceVisual = z.infer<typeof EvidenceVisualSchema>;
+
+export const EvidenceDefSchema = z.object({
+  id: IdSchema,
+  name: z.string(),
+  shortLabel: z.string().min(1),
+  description: z.string(),
+  details: z.array(EvidenceDetailSchema).default([]),
+  chapterScope: z.string().optional(),
+  visual: EvidenceVisualSchema.default({}),
+  tags: z.array(z.string()).default([])
+});
+export type EvidenceDef = z.infer<typeof EvidenceDefSchema>;
+
 export const InventoryStateSchema = z.object({
   items: z.record(IdSchema, z.number().int().nonnegative()).default({})
 });
 export type InventoryState = z.infer<typeof InventoryStateSchema>;
 
 export const EvidenceStateSchema = z.object({
-  availableEvidenceIds: z.array(IdSchema),
+  ownedEvidenceIds: z.array(IdSchema).default([]),
   submittedEvidenceIds: z.array(IdSchema).default([])
 });
 export type EvidenceState = z.infer<typeof EvidenceStateSchema>;
@@ -203,6 +228,7 @@ export const InteractableDefSchema = z.object({
   action: z.discriminatedUnion("type", [
     z.object({ type: z.literal("start-script"), script: z.string(), label: z.string().optional() }),
     z.object({ type: z.literal("grant-item"), itemId: IdSchema, quantity: z.number().int().positive().default(1) }),
+    z.object({ type: z.literal("grant-evidence"), evidenceId: IdSchema }),
     z.object({ type: z.literal("set-character-state"), characterId: IdSchema, affinityDelta: z.number().int().default(0) })
   ])
 });
@@ -266,7 +292,7 @@ export const PresentationCommandSchema = z.discriminatedUnion("type", [
     type: z.literal("trial-keyword"),
     keywordId: IdSchema,
     text: z.string(),
-    evidenceId: IdSchema,
+    evidenceId: IdSchema.optional(),
     speakerId: IdSchema.optional()
   }),
   z.object({
@@ -364,6 +390,19 @@ export const StoryChoiceOptionSchema = z.object({
 });
 export type StoryChoiceOption = z.infer<typeof StoryChoiceOptionSchema>;
 
+export const GameplayEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("grant-item"), itemId: IdSchema, quantity: z.number().int().positive().default(1) }),
+  z.object({ type: z.literal("remove-item"), itemId: IdSchema, quantity: z.number().int().positive().default(1) }),
+  z.object({ type: z.literal("consume-item"), itemId: IdSchema, quantity: z.number().int().positive().default(1) }),
+  z.object({ type: z.literal("grant-evidence"), evidenceId: IdSchema }),
+  z.object({ type: z.literal("remove-evidence"), evidenceId: IdSchema }),
+  z.object({ type: z.literal("change-character-affinity"), characterId: IdSchema, affinityDelta: z.number().int() }),
+  z.object({ type: z.literal("add-character-status"), characterId: IdSchema, status: z.string().min(1) }),
+  z.object({ type: z.literal("remove-character-status"), characterId: IdSchema, status: z.string().min(1) }),
+  z.object({ type: z.literal("unlock-character-skill"), characterId: IdSchema, skillId: IdSchema })
+]);
+export type GameplayEvent = z.infer<typeof GameplayEventSchema>;
+
 export const StoryRuntimeSnapshotSchema = z.object({
   currentScriptPath: z.string(),
   instructionPointer: z.number().int().nonnegative(),
@@ -378,7 +417,7 @@ export const StoryEffectSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("presentation"), command: PresentationCommandSchema }),
   z.object({ type: z.literal("navi-event"), eventType: z.string().min(1), payload: z.unknown().optional() }),
   z.object({ type: z.literal("trial-event"), eventType: z.string().min(1), payload: z.unknown().optional() }),
-  z.object({ type: z.literal("gameplay-event"), eventType: z.string().min(1), payload: z.unknown().optional() }),
+  z.object({ type: z.literal("gameplay-event"), event: GameplayEventSchema }),
   z.object({
     type: z.literal("media-event"),
     eventType: z.enum(["play-bgm", "play-sfx", "play-video", "stop-media"]),
@@ -429,6 +468,7 @@ export const ContentManifestSchema = z.object({
   input: InputBindingMapSchema.optional(),
   maps: z.array(WorldMapDefSchema),
   items: z.array(ItemDefSchema),
+  evidence: z.array(EvidenceDefSchema).default([]),
   trials: z.array(TrialDefinitionSchema)
 });
 export type ContentManifest = z.infer<typeof ContentManifestSchema>;

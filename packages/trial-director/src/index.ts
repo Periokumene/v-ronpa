@@ -27,11 +27,12 @@ export interface TrialDefinitionDiagnostic {
 }
 
 export type EvidenceSubmitOutcome = { type: "evidence"; accepted: boolean; nextSegmentId?: string };
+export type DebateDirectorOutcome = DebateOutcome & { nextSegmentId?: string };
 export type SegmentOutcome = { type: "segment"; segmentId: string };
 export type MinigameOutcome = { type: "minigame"; success: boolean; nextSegmentId?: string };
 export type NoopOutcome = { type: "none" };
 export type TrialDirectorOutcome =
-  | DebateOutcome
+  | DebateDirectorOutcome
   | EvidenceSubmitOutcome
   | SegmentOutcome
   | MinigameOutcome
@@ -224,7 +225,8 @@ export function resolveTrialKeyword(
   keywordId: string,
   evidenceId: string
 ): TrialResolution {
-  const outcome = resolveDebateKeyword(trial, state.currentSegmentId, keywordId, evidenceId);
+  const ruleOutcome = resolveDebateKeyword(trial, state.currentSegmentId, keywordId, evidenceId);
+  const outcome = withDebateNextSegment(trial, state.currentSegmentId, ruleOutcome);
   const keywordState = outcome.type === "correct" ? "broken" : "missed";
   return {
     trial: applyTrialOutcome(trial, state, outcome, { [keywordId]: keywordState }, evidenceId),
@@ -233,7 +235,8 @@ export function resolveTrialKeyword(
 }
 
 export function resolveTrialTimer(trial: TrialDefinition, state: TrialRuntimeState): TrialResolution {
-  const outcome = resolveTrialTimeout(trial, state.currentSegmentId);
+  const ruleOutcome = resolveTrialTimeout(trial, state.currentSegmentId);
+  const outcome = withDebateNextSegment(trial, state.currentSegmentId, ruleOutcome);
   return {
     trial: applyTrialOutcome(trial, state, outcome, undefined, state.selectedEvidenceId),
     outcome
@@ -247,13 +250,15 @@ export function submitTrialEvidence(
 ): TrialResolution {
   const segment = findTrialSegment(trial, state.currentSegmentId);
   const result = segment ? submitEvidence(segment, evidenceId) : { accepted: false };
-  const outcome = result.nextSegmentId
-    ? { type: "evidence" as const, accepted: result.accepted, nextSegmentId: result.nextSegmentId }
+  const nextSegmentId =
+    segment?.kind === "evidence-submit" ? (result.accepted ? segment.onAccepted : segment.onRejected) : undefined;
+  const outcome = nextSegmentId
+    ? { type: "evidence" as const, accepted: result.accepted, nextSegmentId }
     : { type: "evidence" as const, accepted: result.accepted };
 
   return {
-    trial: result.nextSegmentId
-      ? forceTrialSegment(trial, { ...state, selectedEvidenceId: evidenceId }, result.nextSegmentId)
+    trial: nextSegmentId
+      ? forceTrialSegment(trial, { ...state, selectedEvidenceId: evidenceId }, nextSegmentId)
       : { ...state, selectedEvidenceId: evidenceId },
     outcome
   };
@@ -283,7 +288,7 @@ export function completeTrialMinigame(
 function applyTrialOutcome(
   trial: TrialDefinition,
   state: TrialRuntimeState,
-  outcome: DebateOutcome,
+  outcome: DebateDirectorOutcome,
   keywordPatch: Record<string, "pending" | "broken" | "missed"> | undefined,
   selectedEvidenceId: string | undefined
 ): TrialRuntimeState {
@@ -297,6 +302,18 @@ function applyTrialOutcome(
   };
   if (selectedEvidenceId) updated.selectedEvidenceId = selectedEvidenceId;
   return updated;
+}
+
+function withDebateNextSegment(
+  trial: TrialDefinition,
+  segmentId: string,
+  outcome: DebateOutcome
+): DebateDirectorOutcome {
+  const segment = findTrialSegment(trial, segmentId);
+  if (segment?.kind !== "debate") return outcome;
+  const nextSegmentId =
+    outcome.type === "correct" ? segment.onCorrect : outcome.type === "miss" ? segment.onMiss : segment.onTimeout;
+  return nextSegmentId ? { ...outcome, nextSegmentId } : outcome;
 }
 
 function inputLockForPresentation(presentation: TrialPresentationProfile): TrialRuntimeState["inputLock"] {

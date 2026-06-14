@@ -15,8 +15,8 @@ describe("media save contracts", () => {
         pendingChoices: [],
         ended: false
       },
-      inventory: { items: { "evidence:keycard": 1 } },
-      evidence: { availableEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] },
+      inventory: { items: { "gift:coffee": 1 } },
+      evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] },
       characters: {},
       trial: {
         trialId: "trial:case-01",

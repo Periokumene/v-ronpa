@@ -6,7 +6,7 @@ const script = `#Start
 @back bg:court effect:fade
 @charEnter character:felix portrait:portrait:felix:neutral slot:center
 Felix: The door was locked.[>]
-@trialKeyword kw:locked text:"locked" evidence:evidence:keycard speaker:character:felix
+@trialKeyword kw:locked text:"locked" speaker:character:felix
 @choice "Object with the keycard" goto:#Object
 @choice "Stay silent" goto:#End
 #Object
@@ -60,5 +60,20 @@ describe("story engine", () => {
     expect(state.variables.route).toBe("objected");
     expect(state.presentationCommands.at(-1)).toMatchObject({ type: "shake" });
     expect(state.effects.at(-1)).toMatchObject({ type: "presentation", command: { type: "shake" } });
+  });
+
+  it("emits typed gameplay events without handling evidence submission", () => {
+    const { scenario } = parseScenario({
+      sourceText: "@gameplay grant-evidence id:evidence:keycard",
+      scriptPath: "grant-evidence.nani"
+    });
+    const state = storyReducer(createInitialStoryState(scenario), { type: "STEP", scenario });
+
+    expect(state.effects).toEqual([
+      {
+        type: "gameplay-event",
+        event: { type: "grant-evidence", evidenceId: "evidence:keycard" }
+      }
+    ]);
   });
 });

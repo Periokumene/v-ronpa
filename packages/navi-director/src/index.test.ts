@@ -30,7 +30,7 @@ describe("navi director", () => {
           label: "Case File",
           position: [1, 0, 0],
           radius: 1,
-          action: { type: "grant-item", itemId: "evidence:keycard", quantity: 1 }
+          action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
         }
       ],
       assetRefs: []
@@ -39,8 +39,8 @@ describe("navi director", () => {
     const result = resolveNaviInteractable(createInitialNaviState(map.id), map, createGameplayState(), "i:file");
     expect(result).toMatchObject({
       navi: { substate: "walk", activeInteractableId: "i:file" },
-      gameplay: { inventory: { items: { "evidence:keycard": 1 } } },
-      outcome: { type: "grant-item" }
+      gameplay: { evidence: { ownedEvidenceIds: ["evidence:keycard"] } },
+      outcome: { type: "grant-evidence" }
     });
   });
 });

@@ -8,7 +8,7 @@ import {
   type TrialPresentationProfile
 } from "@v-ronpa/contracts";
 import { gameFlowMachine, modeFromSnapshotValue, type GameFlowEvent } from "@v-ronpa/game-flow-machine";
-import { createGameplayState, grantItem } from "@v-ronpa/gameplay";
+import { createGameplayState, grantEvidence, grantItem } from "@v-ronpa/gameplay";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { createInitialNaviState, naviReducer, resolveNaviInteractable } from "@v-ronpa/navi-director";
 import { ExplorationStage3D, TrialRoundTableStage } from "@v-ronpa/r3f-adapter";
@@ -42,7 +42,7 @@ export function App() {
   const [navi, setNavi] = useState(() => createInitialNaviState(harnessMap.id));
   const [trial, setTrial] = useState(() => createInitialTrialState(harnessTrial));
   const [story, setStory] = useState<StoryRuntimeState>(() => createInitialStoryState(parsed.scenario));
-  const [gameplay, setGameplay] = useState(() => grantItem(createGameplayState(), "evidence:keycard"));
+  const [gameplay, setGameplay] = useState(() => grantEvidence(createGameplayState(), "evidence:keycard"));
   const [notice, setNotice] = useState("Navi walk: 3D exploration baseline");
 
   const activeDialog = story.backlog.at(-1) ?? {
@@ -119,7 +119,13 @@ export function App() {
     const resolution = resolveNaviInteractable(navi, harnessMap, gameplay, "interactable:case-file");
     setNavi(resolution.navi);
     setGameplay(resolution.gameplay);
-    setNotice(resolution.outcome.type === "grant-item" ? `Navi granted ${resolution.outcome.itemId}` : `Navi outcome: ${resolution.outcome.type}`);
+    setNotice(
+      resolution.outcome.type === "grant-item"
+        ? `Navi granted ${resolution.outcome.itemId}`
+        : resolution.outcome.type === "grant-evidence"
+          ? `Navi granted ${resolution.outcome.evidenceId}`
+          : `Navi outcome: ${resolution.outcome.type}`
+    );
   }
 
   function setTrialProfile(profile: TrialPresentationProfile) {
@@ -278,11 +284,21 @@ export function App() {
         {mode === "navi" && navi.substate === "inventory" && (
           <section className="inventory-panel" data-testid="inventory-panel">
             <h1>Inventory / Evidence</h1>
+            <h2>Items</h2>
             <ul>
               {Object.entries(gameplay.inventory.items).map(([itemId, quantity]) => (
                 <li key={itemId}>
                   <span>{itemId}</span>
                   <strong>{quantity}</strong>
+                </li>
+              ))}
+            </ul>
+            <h2>Evidence</h2>
+            <ul>
+              {gameplay.evidence.ownedEvidenceIds.map((evidenceId) => (
+                <li key={evidenceId}>
+                  <span>{evidenceId}</span>
+                  <strong>owned</strong>
                 </li>
               ))}
             </ul>
@@ -299,10 +315,11 @@ export function App() {
         scriptPointer={story.instructionPointer}
         variables={story.variables}
         inventoryItems={gameplay.inventory.items}
-        evidenceIds={gameplay.evidence.availableEvidenceIds}
+        evidenceIds={gameplay.evidence.ownedEvidenceIds}
         trialSegmentId={trial.currentSegmentId}
         presentationCommands={presentationCommands}
         onGrantItem={(itemId) => setGameplay((current) => grantItem(current, itemId))}
+        onGrantEvidence={(evidenceId) => setGameplay((current) => grantEvidence(current, evidenceId))}
         onJumpLabel={(label) => setStory((current) => storyReducer(current, { type: "JUMP", scenario: parsed.scenario, label }))}
         onForceOutcome={breakKeyword}
       />

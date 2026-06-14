@@ -18,7 +18,7 @@ export const harnessMap: WorldMapDef = {
       label: "Case File",
       position: [1.2, 0.2, -0.8],
       radius: 1.2,
-      action: { type: "grant-item", itemId: "evidence:keycard", quantity: 1 }
+      action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
     },
     {
       id: "interactable:witness",
@@ -77,7 +77,7 @@ export const harnessScript = `#Start
 @back bg:harness effect:fade
 @charEnter character:felix portrait:portrait:felix:neutral slot:center
 Felix: This room is a contract harness, not a final scene.[>]
-@trialKeyword kw:locked text:"the door was locked" evidence:evidence:keycard speaker:character:felix
+@trialKeyword kw:locked text:"the door was locked" speaker:character:felix
 @choice "Object with the keycard" goto:#Object
 @choice "Inspect inventory" goto:#Inventory
 

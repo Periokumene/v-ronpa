@@ -1,4 +1,5 @@
 import type {
+  GameplayEvent,
   PresentationCommand,
   StoryBacklogEntry,
   StoryChoiceOption,
@@ -34,7 +35,8 @@ export type CommandResult =
   | { type: "end" }
   | { type: "presentation"; command: PresentationCommand }
   | { type: "choice"; choice: ChoiceRuntimeOption }
-  | { type: "set"; key: string; value: string | number | boolean };
+  | { type: "set"; key: string; value: string | number | boolean }
+  | { type: "gameplay"; event: GameplayEvent };
 
 export interface CommandDefinition {
   id: string;
@@ -175,6 +177,11 @@ function applyCommandResult(state: StoryRuntimeState, scenario: ScenarioIR, resu
       return { ...state, pendingChoices: [...state.pendingChoices, result.choice] };
     case "set":
       return { ...state, variables: { ...state.variables, [result.key]: result.value } };
+    case "gameplay":
+      return {
+        ...state,
+        effects: [...state.effects, { type: "gameplay-event", event: result.event }]
+      };
   }
 }
 
@@ -221,6 +228,15 @@ const builtinCommands: CommandDefinition[] = [
       const key = command.primary ? String(scalarValue(command.primary)) : Object.keys(command.params)[0] ?? "";
       const value = command.params[key] ?? command.primary;
       return { type: "set", key, value: scalarValue(value) ?? true };
+    }
+  },
+  {
+    id: "gameplay",
+    aliases: ["gameplay-event"],
+    category: "state",
+    execute: ({ command }) => {
+      const event = createGameplayEvent(command);
+      return event ? { type: "gameplay", event } : { type: "none" };
     }
   },
   {
@@ -327,10 +343,34 @@ function createTrialKeywordCommand(command: CommandIR): PresentationCommand {
   const stageCommand: PresentationCommand = {
     type: "trial-keyword",
     keywordId: String(scalarValue(command.primary) ?? stringParam(command, "id") ?? "kw:unknown"),
-    text: stringParam(command, "text") ?? "keyword",
-    evidenceId: stringParam(command, "evidence") ?? "evidence:unknown"
+    text: stringParam(command, "text") ?? "keyword"
   };
+  const evidenceId = stringParam(command, "evidence") ?? stringParam(command, "evidenceId");
+  if (evidenceId) stageCommand.evidenceId = evidenceId;
   const speakerId = stringParam(command, "speaker");
   if (speakerId) stageCommand.speakerId = speakerId;
   return stageCommand;
+}
+
+function createGameplayEvent(command: CommandIR): GameplayEvent | undefined {
+  const type = String(scalarValue(command.primary) ?? stringParam(command, "type") ?? "");
+  const quantity = numberParam(command, "quantity", 1);
+  const itemId = stringParam(command, "item") ?? stringParam(command, "itemId") ?? stringParam(command, "id");
+  const evidenceId = stringParam(command, "evidence") ?? stringParam(command, "evidenceId") ?? stringParam(command, "id");
+  const characterId = stringParam(command, "character") ?? stringParam(command, "characterId");
+  const status = stringParam(command, "status");
+  const skillId = stringParam(command, "skill") ?? stringParam(command, "skillId");
+
+  if (type === "grant-item" && itemId) return { type, itemId, quantity };
+  if (type === "remove-item" && itemId) return { type, itemId, quantity };
+  if (type === "consume-item" && itemId) return { type, itemId, quantity };
+  if (type === "grant-evidence" && evidenceId) return { type, evidenceId };
+  if (type === "remove-evidence" && evidenceId) return { type, evidenceId };
+  if (type === "change-character-affinity" && characterId) {
+    return { type, characterId, affinityDelta: numberParam(command, "delta", numberParam(command, "affinityDelta", 0)) };
+  }
+  if (type === "add-character-status" && characterId && status) return { type, characterId, status };
+  if (type === "remove-character-status" && characterId && status) return { type, characterId, status };
+  if (type === "unlock-character-skill" && characterId && skillId) return { type, characterId, skillId };
+  return undefined;
 }

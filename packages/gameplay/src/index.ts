@@ -19,17 +19,18 @@ export type ExplorationOutcome =
   | { type: "none" }
   | { type: "start-script"; script: string; label?: string }
   | { type: "grant-item"; itemId: string; quantity: number }
+  | { type: "grant-evidence"; evidenceId: string }
   | { type: "character-state"; characterId: string; affinityDelta: number };
 
 export type DebateOutcome =
-  | { type: "correct"; nextSegmentId?: string; keywordId: string }
-  | { type: "miss"; nextSegmentId?: string; keywordId: string }
-  | { type: "timeout"; nextSegmentId?: string };
+  | { type: "correct"; keywordId: string }
+  | { type: "miss"; keywordId: string }
+  | { type: "timeout" };
 
 export function createGameplayState(): GameplayState {
   return {
     inventory: { items: {} },
-    evidence: { availableEvidenceIds: [], submittedEvidenceIds: [] },
+    evidence: { ownedEvidenceIds: [], submittedEvidenceIds: [] },
     characters: {}
   };
 }
@@ -39,14 +40,17 @@ export function grantItem(state: GameplayState, itemId: string, quantity = 1): G
   const inventory = {
     items: { ...state.inventory.items, [itemId]: current + quantity }
   };
-  const evidence = itemId.startsWith("evidence:")
-    ? {
-        ...state.evidence,
-        availableEvidenceIds: [...new Set([...state.evidence.availableEvidenceIds, itemId])]
-      }
-    : state.evidence;
+  return { ...state, inventory };
+}
 
-  return { ...state, inventory, evidence };
+export function grantEvidence(state: GameplayState, evidenceId: string): GameplayState {
+  return {
+    ...state,
+    evidence: {
+      ...state.evidence,
+      ownedEvidenceIds: [...new Set([...state.evidence.ownedEvidenceIds, evidenceId])]
+    }
+  };
 }
 
 export function changeCharacterAffinity(
@@ -88,6 +92,10 @@ export function resolveInteractable(interactable: InteractableDef | undefined): 
     return { type: "grant-item", itemId: action.itemId, quantity: action.quantity };
   }
 
+  if (action.type === "grant-evidence") {
+    return { type: "grant-evidence", evidenceId: action.evidenceId };
+  }
+
   return {
     type: "character-state",
     characterId: action.characterId,
@@ -107,33 +115,27 @@ export function resolveDebateKeyword(
   }
 
   const keyword = segment.keywords.find((candidate) => candidate.id === keywordId);
-  if (!keyword) return withOptionalNext({ type: "miss", keywordId }, segment.onMiss);
+  if (!keyword) return { type: "miss", keywordId };
 
   if (keyword.correctEvidenceId === evidenceId) {
-    return withOptionalNext({ type: "correct", keywordId }, segment.onCorrect);
+    return { type: "correct", keywordId };
   }
 
-  return withOptionalNext({ type: "miss", keywordId }, segment.onMiss);
+  return { type: "miss", keywordId };
 }
 
 export function resolveTrialTimeout(trial: TrialDefinition, segmentId: string): DebateOutcome {
   const segment = findSegment(trial, segmentId);
   if (segment?.kind !== "debate") return { type: "timeout" };
-  return withOptionalNext({ type: "timeout" }, segment.onTimeout);
+  return { type: "timeout" };
 }
 
 export function submitEvidence(
   segment: TrialSegment,
   evidenceId: string
-): { accepted: boolean; nextSegmentId?: string } {
+): { accepted: boolean } {
   if (segment.kind !== "evidence-submit") return { accepted: false };
-  const accepted = segment.acceptedEvidenceIds.includes(evidenceId);
-  const nextSegmentId = accepted ? segment.onAccepted : segment.onRejected;
-  return nextSegmentId ? { accepted, nextSegmentId } : { accepted };
-}
-
-function withOptionalNext<T extends DebateOutcome>(outcome: T, nextSegmentId: string | undefined): T {
-  return (nextSegmentId ? { ...outcome, nextSegmentId } : outcome) as T;
+  return { accepted: segment.acceptedEvidenceIds.includes(evidenceId) };
 }
 
 function findSegment(trial: TrialDefinition, segmentId: string): TrialSegment | undefined {

@@ -13,6 +13,7 @@ export function InspectorLite({
   trialSegmentId,
   presentationCommands,
   onGrantItem,
+  onGrantEvidence,
   onJumpLabel,
   onForceOutcome
 }: InspectorLiteProps) {
@@ -61,7 +62,8 @@ export function InspectorLite({
         <pre>{JSON.stringify(inventoryItems, null, 2)}</pre>
       </section>
       <div className="inspector-actions">
-        <button onClick={() => onGrantItem?.("evidence:keycard")}>Grant evidence</button>
+        <button onClick={() => onGrantItem?.("gift:coffee")}>Grant item</button>
+        <button onClick={() => onGrantEvidence?.("evidence:keycard")}>Grant evidence</button>
         <button onClick={() => onJumpLabel?.("Start")}>Jump Start</button>
         <button onClick={() => onForceOutcome?.("correct")}>Force correct</button>
       </div>

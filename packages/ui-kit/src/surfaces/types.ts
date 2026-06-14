@@ -18,6 +18,7 @@ export interface InspectorLiteProps {
   trialSegmentId?: string;
   presentationCommands: PresentationCommand[];
   onGrantItem?: (itemId: string) => void;
+  onGrantEvidence?: (evidenceId: string) => void;
   onJumpLabel?: (label: string) => void;
   onForceOutcome?: (outcome: string) => void;
 }

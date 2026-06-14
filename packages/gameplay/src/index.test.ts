@@ -3,6 +3,7 @@ import type { TrialDefinition, WorldMapDef } from "@v-ronpa/contracts";
 import {
   changeCharacterAffinity,
   createGameplayState,
+  grantEvidence,
   grantItem,
   nearestInteractable,
   resolveDebateKeyword,
@@ -23,19 +24,20 @@ describe("gameplay domain", () => {
           label: "Case File",
           position: [1, 0, 0],
           radius: 1.5,
-          action: { type: "grant-item", itemId: "evidence:keycard", quantity: 1 }
+          action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
         }
       ],
       assetRefs: []
     };
 
     const outcome = resolveInteractable(nearestInteractable(map, [1.2, 0, 0]));
-    expect(outcome).toEqual({ type: "grant-item", itemId: "evidence:keycard", quantity: 1 });
+    expect(outcome).toEqual({ type: "grant-evidence", evidenceId: "evidence:keycard" });
   });
 
   it("updates inventory, evidence, and character state", () => {
     let state = createGameplayState();
-    state = grantItem(state, "evidence:keycard");
+    state = grantItem(state, "gift:coffee");
+    state = grantEvidence(state, "evidence:keycard");
     state = changeCharacterAffinity(state, "character:felix", 12);
 
     expect(state).toMatchInlineSnapshot(`
@@ -49,14 +51,14 @@ describe("gameplay domain", () => {
           },
         },
         "evidence": {
-          "availableEvidenceIds": [
+          "ownedEvidenceIds": [
             "evidence:keycard",
           ],
           "submittedEvidenceIds": [],
         },
         "inventory": {
           "items": {
-            "evidence:keycard": 1,
+            "gift:coffee": 1,
           },
         },
       }
@@ -84,12 +86,10 @@ describe("gameplay domain", () => {
 
     expect(resolveDebateKeyword(trial, "debate:door", "kw:locked", "evidence:keycard")).toEqual({
       type: "correct",
-      keywordId: "kw:locked",
-      nextSegmentId: "discussion:after"
+      keywordId: "kw:locked"
     });
     expect(resolveTrialTimeout(trial, "debate:door")).toEqual({
-      type: "timeout",
-      nextSegmentId: "discussion:fail"
+      type: "timeout"
     });
   });
 });

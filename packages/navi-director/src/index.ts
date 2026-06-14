@@ -1,6 +1,7 @@
 import type { NaviRuntimeState, NaviSubstate, WorldMapDef } from "@v-ronpa/contracts";
 import {
   changeCharacterAffinity,
+  grantEvidence,
   grantItem,
   type ExplorationOutcome,
   type GameplayState,
@@ -86,6 +87,14 @@ export function resolveNaviInteractable(
     return {
       navi: naviReducer(state, { type: "FOCUS_INTERACTABLE", interactableId }),
       gameplay: grantItem(gameplay, outcome.itemId, outcome.quantity),
+      outcome
+    };
+  }
+
+  if (outcome.type === "grant-evidence") {
+    return {
+      navi: naviReducer(state, { type: "FOCUS_INTERACTABLE", interactableId }),
+      gameplay: grantEvidence(gameplay, outcome.evidenceId),
       outcome
     };
   }

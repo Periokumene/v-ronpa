@@ -17,7 +17,13 @@ describe("contracts", () => {
     const manifest = ContentManifestSchema.parse({
       version: 1,
       assets: [
-        { id: "portrait:hero:neutral", kind: "portrait", uri: "/assets/hero.png", tags: ["placeholder"] }
+        { id: "portrait:hero:neutral", kind: "portrait", uri: "/assets/hero.png", tags: ["placeholder"] },
+        {
+          id: "texture:evidence:keycard-icon",
+          kind: "texture",
+          uri: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='14' fill='%23ffe66d'/%3E%3Crect x='18' y='34' width='60' height='28' rx='6' fill='%231f2937'/%3E%3Ccircle cx='31' cy='48' r='5' fill='%23ffffff'/%3E%3C/svg%3E",
+          tags: ["placeholder", "evidence"]
+        }
       ],
       runtimeAssets: [
         {
@@ -63,24 +69,43 @@ describe("contracts", () => {
               label: "Case File",
               position: [1, 1, 0],
               radius: 1,
-              action: { type: "grant-item", itemId: "evidence:keycard", quantity: 1 }
+              action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
             }
           ]
         }
       ],
       items: [
         {
+          id: "gift:coffee",
+          name: "Canned Coffee",
+          category: "gift",
+          description: "A safe placeholder gift item.",
+          tags: ["placeholder"]
+        }
+      ],
+      evidence: [
+        {
           id: "evidence:keycard",
-          name: "Keycard",
-          category: "evidence",
-          description: "A redacted access card.",
+          name: "Redacted Keycard",
+          shortLabel: "Keycard",
+          description: "A redacted access card found near the locked door.",
+          details: [
+            { label: "Access Level", value: "Dormitory wing" },
+            { label: "Condition", value: "Scratched magnetic strip" }
+          ],
+          visual: {
+            iconAssetId: "texture:evidence:keycard-icon",
+            thumbnailAssetId: "texture:evidence:keycard-icon",
+            accentColor: "#ffe66d"
+          },
           tags: ["case-01"]
         }
       ],
       trials: []
     });
 
-    expect(manifest.maps[0]?.interactables[0]?.action.type).toBe("grant-item");
+    expect(manifest.maps[0]?.interactables[0]?.action.type).toBe("grant-evidence");
+    expect(manifest.evidence[0]?.shortLabel).toBe("Keycard");
     expect(manifest.input?.bindings[1]?.action).toBe("fire-truth-bullet");
   });
 
@@ -188,6 +213,13 @@ describe("contracts", () => {
         payload: { keywordId: "kw:locked", evidenceId: "evidence:keycard" }
       })
     ).toMatchObject({ eventType: "break-keyword" });
+
+    expect(
+      StoryEffectSchema.parse({
+        type: "gameplay-event",
+        event: { type: "grant-evidence", evidenceId: "evidence:keycard" }
+      })
+    ).toMatchObject({ type: "gameplay-event", event: { type: "grant-evidence" } });
   });
 
   it("validates versioned save data", () => {
@@ -204,8 +236,8 @@ describe("contracts", () => {
         pendingChoices: [],
         ended: false
       },
-      inventory: { items: { "evidence:keycard": 1 } },
-      evidence: { availableEvidenceIds: ["evidence:keycard"] },
+      inventory: { items: { "gift:coffee": 1 } },
+      evidence: { ownedEvidenceIds: ["evidence:keycard"] },
       characters: {}
     });
 
