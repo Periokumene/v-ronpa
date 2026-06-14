@@ -12,6 +12,9 @@ Create or update the integration baseline with:
 - AGENTS guidance
 - task card templates
 
+Reusable task-card templates live in `docs/templates/`. Concrete assigned
+worktree task cards live in `docs/tasks/`.
+
 ## Phase 2: Integration Baseline
 
 Merge the contract branch into an integration branch. Future module worktrees
@@ -24,10 +27,14 @@ Preferred fan-out:
 - `nani-parser`
 - `story-engine`
 - `gameplay`
+- `navi-director`
+- `trial-director`
 - `pixi-presenter`
 - `r3f-adapter`
 - `ui-kit`
 - `harness`
+
+See `docs/architecture/subsystem-fanout.md` for the first fan-out table.
 
 Each worktree gets a strict task card. Worktrees should not share writable
 paths unless the task card explicitly says so.

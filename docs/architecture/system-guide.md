@@ -16,8 +16,14 @@ AGENTS.md
 docs/architecture/*
   -> system design, package ownership, gates, worktree flow
 
+docs/templates/*
+  -> reusable templates, not assigned work
+
 docs/tasks/*
-  -> strict worktree task cards
+  -> concrete active or pending worktree task cards only
+
+docs/archive/completed-tasks/*
+  -> completed task records kept out of the active task queue
 
 packages/contracts
   -> public schemas and semantic contracts

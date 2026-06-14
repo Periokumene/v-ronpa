@@ -65,7 +65,7 @@ Allowed: remove the stale `@v-ronpa/presentation-contracts` dependency from
 ## Required Gates
 
 ```bash
-BASE_REF=8017a50 pnpm validate:subsystem -- --task docs/tasks/baseline-tooling-gates.md
+BASE_REF=8017a50 pnpm validate:subsystem -- --task docs/archive/completed-tasks/baseline-tooling-gates.md
 pnpm validate:baseline
 ```
 

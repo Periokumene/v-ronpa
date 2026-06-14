@@ -37,5 +37,6 @@
 - Diff stays inside assigned paths, unless the task explicitly includes a CCR.
 - `package.json` and `pnpm-lock.yaml` stay unchanged unless the task card explicitly allows dependency changes.
 - Subsystem branches run `validate:subsystem` with `BASE_REF=integration/v-ronpa-baseline`.
+- Put only concrete worktree task cards in `docs/tasks/`; use `docs/templates/worktree-task-card.md` as the source template.
 
 Detailed workflow: [docs/architecture/worktree-flow.md](docs/architecture/worktree-flow.md).
