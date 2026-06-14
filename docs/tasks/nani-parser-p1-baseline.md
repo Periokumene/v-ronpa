@@ -10,7 +10,8 @@
 
 ## Worktree Path
 
-- `.worktrees/nani-parser-p1`
+- Manual Git worktree suggestion: `.worktrees/nani-parser-p1`
+- Codex App may assign a managed path under `$CODEX_HOME/worktrees`; use the assigned path if launched from Codex App.
 
 ## Status
 
@@ -47,10 +48,10 @@ Relevant architecture decisions:
 
 - `.nani` compiles to AST/IR; StoryEngine consumes IR and emits `StoryEffect`.
 - `@gameplay grant-evidence id:evidence:keycard` is allowed as a script command, but parser treats it as a generic command.
-- `@trialKeyword` is deferred from P1 because it needs StoryEngine / TrialDirector integration to validate meaningfully.
 - Trial keyword/evidence rule binding belongs to `TrialDefinition`, not `.nani`.
 - Evidence is granted through typed gameplay events downstream, not by parser logic.
 - P1 does not include localization/text-id tooling.
+- P1 examples must only include commands aligned with the current parser/contract baseline; unsupported source-material commands should be omitted rather than kept as placeholders.
 
 Reference docs:
 
@@ -61,12 +62,12 @@ Reference docs:
 - `docs/architecture/subsystem-fanout.md`
 - `docs/templates/worktree-task-card.md`
 
-Source materials used for authoring only:
+Internal source materials:
 
-- `/Users/periokumene/Downloads/基础nani脚本范例.md`
-- `/Users/periokumene/Downloads/语法特性报告.md`
+- `docs/nani/basic-p1-example.md`
+- `docs/nani/syntax-feature-report.md`
 
-Do not treat the Downloads files as final project artifacts.
+The external Downloads files have been migrated into the internal docs above. Do not depend on `/Users/periokumene/Downloads/**` during implementation, tests, or review.
 
 ## Constraints
 
@@ -80,7 +81,8 @@ Do not treat the Downloads files as final project artifacts.
 - Do not add app or harness changes.
 - Do not implement indentation block execution.
 - Do not implement localization/text-id parsing as P1 behavior.
-- Do not include `@trialKeyword` in P1 fixtures.
+- Do not include Trial keyword commands in P1 fixtures.
+- Do not add unsupported command placeholders from the external sample.
 - Any change to `packages/nani-parser/src/types.ts` must stop and become a CCR discussion.
 
 ## Allowed Paths
@@ -167,16 +169,13 @@ Required content:
 
 Must not include:
 
-- `@input`
-- `@save`
-- `@unlock`
-- `@toast`
-- `@trialKeyword`
+- app/runtime commands for input, save, unlock, toast, or notification behavior
+- Trial keyword commands
 - text IDs such as `|#D001|`
 - localization references such as `|#&D022|`
 - indentation-based child blocks
 - block `@if/@else/@while`
-- `@gosub/@return`
+- subroutine commands
 - multi-speaker text
 
 ### `basic-trial-discussion.p1.nani`
@@ -191,7 +190,6 @@ Required content:
 - `#TrialOpening`
 - at least one local branch label
 - at least one `@goto #Label`
-- `@cameraFocus`
 - `@charEnter`
 - `@focus`
 - one small effect such as `@flash` or `@shake`
@@ -200,22 +198,22 @@ Required content:
 
 Must not include:
 
-- `@trialKeyword`
+- Trial keyword commands
 - evidence/keyword binding
 - evidence submission
-- `@gameplay submit-evidence`
+- gameplay evidence submission commands
 - Trial segment transition rules
 - text IDs/localization
 - indentation-based child blocks
 
 ## Documentation Requirements
 
-Create these docs:
+Create or maintain these docs:
 
-- `docs/nani/basic-p1-examples.md`
+- `docs/nani/basic-p1-example.md`
 - `docs/nani/syntax-feature-report.md`
 
-### `docs/nani/basic-p1-examples.md`
+### `docs/nani/basic-p1-example.md`
 
 Must include:
 
@@ -225,7 +223,8 @@ Must include:
 - full code block for `basic-trial-discussion.p1.nani`
 - explanation that these scripts are parser fixtures first
 - explanation that StoryEngine may later consume the same fixtures downstream
-- explicit note that `@trialKeyword` is deferred
+- explanation that Trial rule/evidence binding is outside the P1 parser fixture boundary
+- no unsupported command placeholders from the external source material
 
 ### `docs/nani/syntax-feature-report.md`
 
@@ -239,29 +238,8 @@ Must include four sections:
 The report must stay synchronized with the fixtures:
 
 - Every syntax feature used by the fixtures must appear in P1 Included Syntax.
-- Every removed feature from the original external sample must appear in P1 Known But Unused, P2, or P3.
-- Do not delete or forget unused Naninovel-like features just because P1 removes them.
-
-Required "known but unused" entries:
-
-- `@input`
-- `@save`
-- `@unlock`
-- `@toast`
-- text IDs
-- localization references
-- indentation child blocks
-- block `@if/@else/@while`
-- `@gosub/@return`
-- `@trialKeyword`
-- multi-speaker text
-- `@trialKeyword ... evidence:...`
-- async / await / track control
-- relative and wildcard endpoints
-- managed text
-- auto voice mapping
-- rich reveal events
-- Unity-specific scene/timeline/effect commands
+- Removed source-material features should be classified by feature area rather than kept as unsupported command placeholders.
+- Do not reserve command names that are outside the current V-Ronpa parser/contract boundary.
 
 Each unused feature must include:
 
@@ -301,7 +279,7 @@ Do not implement:
 |---|---|
 | Navi fixture exists | `packages/nani-parser/fixtures/basic-navi.p1.nani` is present and matches docs |
 | Trial discussion fixture exists | `packages/nani-parser/fixtures/basic-trial-discussion.p1.nani` is present and matches docs |
-| Markdown examples exist | `docs/nani/basic-p1-examples.md` includes both fixture contents |
+| Markdown examples exist | `docs/nani/basic-p1-example.md` includes both fixture contents |
 | Syntax report exists | `docs/nani/syntax-feature-report.md` lists included and unused syntax |
 | Fixture parse stability | Unit tests snapshot statement kinds, labels, selected commands, inline tokens |
 | Local label validation | Unit tests pass for known labels and emit diagnostics for missing labels |

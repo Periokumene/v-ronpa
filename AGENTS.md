@@ -28,10 +28,21 @@
 - Playwright smoke: `pnpm test:smoke`
 - App production build: `pnpm --filter @v-ronpa/game build`
 
+## Testing And Regression Expectations
+
+- Every behavior-changing task must add or update tests for the changed behavior.
+- Do not treat existing green tests as sufficient when the task adds a new public helper, state transition, parser shape, command, selector, presenter behavior, or harness route.
+- Prefer the narrowest useful test first: package unit tests for pure logic, contract/snapshot tests for public schemas and IR, and Playwright smoke only when app or visual behavior changes.
+- Each task card must name its required regression cases and say where they should live.
+- Tests should cover at least one normal path and one boundary, invalid, no-op, or rejection path for each new public behavior.
+- Tests should be readable as examples for downstream worktrees; avoid asserting only implementation details when public behavior can be asserted.
+- If a task cannot add a needed regression test inside its allowed paths, stop and call that out in the review packet or create a follow-up integration/harness task.
+
 ## Done When
 
 - Relevant unit tests pass.
 - `pnpm typecheck` passes.
+- Required task-specific regression tests are added or intentionally documented as out of scope.
 - Contract snapshots are updated intentionally.
 - Visual changes include Playwright screenshot evidence when they affect harness scenes.
 - Diff stays inside assigned paths, unless the task explicitly includes a CCR.

@@ -10,7 +10,8 @@
 
 ## Worktree Path
 
-- `.worktrees/gameplay-domain-p1`
+- Manual Git worktree suggestion: `.worktrees/gameplay-domain-p1`
+- Codex App may assign a managed path under `$CODEX_HOME/worktrees`; use the assigned path if launched from Codex App.
 
 ## Status
 
@@ -26,6 +27,15 @@
 Turn `packages/gameplay` into a stable pure domain package for gameplay-owned state updates and trial rule judgments.
 
 This task merges the earlier gameplay P1/P2 planning: complete the core gameplay helpers and split the current single-file implementation into maintainable internal modules without changing shared contracts.
+
+Concretely, this worktree should produce a package that downstream directors can call without knowing about UI, renderer, story execution, or Trial segment routing. The package should own only:
+
+- inventory item quantity changes for gifts/tools
+- evidence ownership and submission bookkeeping
+- character affinity/status/skill state updates
+- pure exploration outcome application for gameplay-owned outcomes
+- pure Trial rule judgments for keyword, timeout, and evidence-submit decisions
+- selectors that make current gameplay state easy for directors, tests, and harness code to inspect
 
 ## Context
 
@@ -56,6 +66,8 @@ Reference docs:
 - Do not expand evidence submission history beyond current `submittedEvidenceIds`.
 - Character status remains a simple string collection.
 - Selector helpers are gameplay package API, not shared contract.
+- `grant-item` must only mutate `InventoryState.items`; do not infer evidence ownership from item id prefixes.
+- Evidence ownership changes only through `grant-evidence` / `remove-evidence`.
 
 ## Allowed Paths
 
@@ -138,7 +150,7 @@ Required behavior:
 - `submitEvidence(segment, evidenceId)` returns accepted/rejected only.
 - Trial rule outcomes must not include `nextSegmentId`.
 
-Trial keyword outcomes:
+Debate keyword outcomes:
 
 - `correct`
 - `miss`
@@ -146,7 +158,12 @@ Trial keyword outcomes:
 - `not-available`
 - `keyword-not-found`
 - `invalid-segment`
+
+Timeout outcome:
+
 - `timeout`
+
+`resolveDebateKeyword` covers keyword/evidence judgments. `resolveTrialTimeout` covers timeout judgments. Segment routing fields such as `onCorrect`, `onMiss`, `onTimeout`, `onAccepted`, and `onRejected` remain `trial-director` concerns.
 
 Selector helpers:
 
@@ -166,9 +183,105 @@ Selector helpers:
 | Gameplay event application | Unit tests show `{ state, result }` for applied and failed/no-op events |
 | Exploration outcome application | Unit tests show gameplay-owned outcomes mutate state and `start-script` returns director-owned result |
 | Trial keyword rules | Unit tests cover `correct`, `miss`, `not-owned`, `not-available`, `keyword-not-found`, `invalid-segment` |
+| Trial timeout rules | Unit tests cover timeout as a separate debate rule judgment |
 | Evidence submit rules | Unit tests cover accepted and rejected evidence |
 | Package boundary | `pnpm validate:boundaries` passes |
 | Worktree boundary | `validate:subsystem` passes with this task card |
+
+## Regression Requirements
+
+This task must add or update tests for every public gameplay behavior it changes.
+
+Keep regression tests inside `packages/gameplay/**`. Do not widen scope into contracts, directors, app harness, or smoke tests to make these cases pass.
+
+Recommended test files:
+
+- `packages/gameplay/src/inventory.test.ts`
+- `packages/gameplay/src/evidence.test.ts`
+- `packages/gameplay/src/characters.test.ts`
+- `packages/gameplay/src/events.test.ts`
+- `packages/gameplay/src/exploration.test.ts`
+- `packages/gameplay/src/trial-rules.test.ts`
+- `packages/gameplay/src/selectors.test.ts`
+
+Required regression cases:
+
+- Inventory:
+  - grant item increments quantity
+  - remove item decrements quantity
+  - consume item returns an observable success/failure result
+  - remove/consume clamps at zero and removes zero-quantity entries
+  - `grant-item` never mutates `EvidenceState`
+- Evidence:
+  - grant evidence adds ownership once
+  - remove evidence removes ownership
+  - ownership check distinguishes owned and missing evidence
+  - owned evidence selector returns stable ids
+  - submission recording uses current `submittedEvidenceIds`
+- Characters:
+  - affinity changes clamp to 0-100
+  - status add/remove is stable and idempotent where appropriate
+  - skill unlock avoids duplicate ids
+  - missing character lookup returns a default state without mutating input state
+- Gameplay events:
+  - `applyGameplayEvent` handles every current `GameplayEvent` variant
+  - applied events return `{ state, result }`
+  - failed, invalid, or no-op cases return observable results without hidden mutation
+- Exploration outcomes:
+  - gameplay-owned outcomes mutate only gameplay state
+  - `start-script` returns a director-owned result and leaves gameplay state unchanged
+  - `none` leaves gameplay state unchanged
+- Trial keyword rules:
+  - correct evidence returns `correct`
+  - wrong evidence returns `miss`
+  - missing evidence ownership returns `not-owned`
+  - evidence not available in the segment returns `not-available`
+  - unknown keyword returns `keyword-not-found`
+  - non-debate or missing segment returns `invalid-segment`
+  - rule outcomes do not include `nextSegmentId`
+- Trial timeout and evidence submit:
+  - timeout is covered separately from keyword judgment
+  - evidence-submit accepts configured evidence
+  - evidence-submit rejects unconfigured evidence
+  - evidence-submit outcome does not include segment routing
+- Selectors:
+  - `hasItem`
+  - `getItemQuantity`
+  - `hasEvidence`
+  - `listOwnedEvidenceIds`
+  - `getCharacterState`
+
+If an implementation cannot cover a required case inside `packages/gameplay/**`, stop and document the gap in the review packet instead of modifying forbidden paths.
+
+## Programmatic Acceptance
+
+The implementation is programmatically acceptable when these checks pass from the worktree:
+
+```bash
+pnpm vitest run packages/gameplay
+pnpm typecheck
+pnpm validate:boundaries
+BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/gameplay-domain-p1.md
+```
+
+Expected evidence:
+
+- `packages/gameplay` tests cover every row in the acceptance matrix above.
+- `pnpm typecheck` confirms all public exports remain type-safe for downstream packages.
+- `pnpm validate:boundaries` confirms no renderer, browser, persistence, or app dependencies entered gameplay.
+- `validate:subsystem` confirms changed files stay inside this task card, CCR rules hold, contracts still validate, the app still builds, and smoke tests still pass after the package changes.
+
+## Manual Acceptance
+
+The reviewer should inspect the final diff and review packet for:
+
+- `index.ts` exposes a clear public gameplay API and does not leak internal module layout unnecessarily.
+- Internal files are cohesive: inventory logic in inventory module, evidence logic in evidence module, character logic in characters module, trial judgments in trial-rules module, and selectors in selectors module.
+- No gameplay helper performs Trial segment routing or returns `nextSegmentId`.
+- No helper imports or references React, DOM, Pixi, R3F, Dexie, Howler, browser globals, app harness code, or story-engine internals.
+- Evidence remains separate from inventory in behavior, tests, naming, and review summary.
+- Unit tests are readable enough to act as contract examples for future `navi-director`, `trial-director`, and harness worktrees.
+- Residual risks explicitly call out any follow-up needed in `navi-director`, `trial-director`, `story-engine`, or harness integration.
 
 ## CCR Triggers
 
@@ -185,10 +298,17 @@ Stop and add a CCR under `docs/ccr/` if the task requires:
 
 ## Required Gates
 
+Local iteration gates:
+
 ```bash
+pnpm vitest run packages/gameplay
 pnpm typecheck
-pnpm test
 pnpm validate:boundaries
+```
+
+Merge gate:
+
+```bash
 BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/gameplay-domain-p1.md
 ```
 
@@ -199,6 +319,7 @@ Include:
 - Changed files summary.
 - Public API summary for `packages/gameplay`.
 - Test and gate output.
+- Regression coverage summary mapping tests to the required regression cases.
 - Confirmation that no shared contracts changed.
 - Confirmation that no app/harness preview was added.
 - Residual risks or follow-up recommendations for `navi-director`, `trial-director`, or harness integration.
