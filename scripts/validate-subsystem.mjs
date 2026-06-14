@@ -5,7 +5,7 @@ const task = args.task;
 const base = args.base ?? process.env.BASE_REF ?? "integration/v-ronpa-baseline";
 
 if (!task) {
-  console.error("Missing --task docs/tasks/<name>.md.");
+  console.error("Missing --task <task-card.md>.");
   process.exit(1);
 }
 

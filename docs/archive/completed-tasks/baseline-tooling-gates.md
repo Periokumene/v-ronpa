@@ -12,6 +12,15 @@
 
 - `/Users/periokumene/.codex/worktrees/7c83/v-ronpa`
 
+## Status
+
+- State: `Archived`
+- Owner: `Codex`
+- Created: `2026-06-14`
+- Updated: `2026-06-14`
+- Completed Commit: `c678782`
+- Archive Target: `docs/archive/completed-tasks/baseline-tooling-gates.md`
+
 ## Goal
 
 Promote worktree, contract, dependency, and CCR rules from documentation into

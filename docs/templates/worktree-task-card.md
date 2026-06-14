@@ -12,6 +12,15 @@
 
 - `.worktrees/<name>` or the path assigned by the coordinator.
 
+## Status
+
+- State: `Draft` (`Draft | Ready | In Progress | Blocked | Review | Done | Archived`)
+- Owner: `TBD`
+- Created: `YYYY-MM-DD`
+- Updated: `YYYY-MM-DD`
+- Completed Commit: `TBD`
+- Archive Target: `docs/archive/completed-tasks/<name>.md`
+
 ## Goal
 
 State the concrete outcome.

@@ -41,6 +41,7 @@ paths unless the task card explicitly says so.
 
 Task cards must include:
 
+- `Status`
 - `Base Branch`
 - `Branch Name`
 - `Allowed Paths`
@@ -49,6 +50,12 @@ Task cards must include:
 - `Dependency Changes`
 - `Required Gates`
 - `Review Packet`
+
+`Status` is the lifecycle field used for queue and archive management. Allowed
+states are `Draft`, `Ready`, `In Progress`, `Blocked`, `Review`, `Done`, and
+`Archived`. When a task is merged, move its card from `docs/tasks/` to
+`docs/archive/completed-tasks/`, set `State` to `Archived`, and fill
+`Completed Commit`.
 
 Before review, run:
 

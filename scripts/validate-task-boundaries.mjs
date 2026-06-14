@@ -8,7 +8,7 @@ const taskPath = args.task ? resolve(root, args.task) : undefined;
 const base = args.base ?? process.env.BASE_REF;
 
 if (!taskPath) {
-  fail("Missing --task docs/tasks/<name>.md.");
+  fail("Missing --task <task-card.md>.");
 }
 
 if (!existsSync(taskPath)) {
@@ -29,8 +29,16 @@ const allowed = [
 const forbidden = parsePathList(section(taskText, "Forbidden Paths"));
 const baseBranch = section(taskText, "Base Branch").trim();
 const dependencyChanges = section(taskText, "Dependency Changes").trim();
+const status = parseStatus(section(taskText, "Status"));
 const changedFiles = changedFilesSince(base);
 const violations = [];
+const allowedStates = new Set(["Draft", "Ready", "In Progress", "Blocked", "Review", "Done", "Archived"]);
+
+if (!status.state) {
+  violations.push("Task card is missing Status State.");
+} else if (!allowedStates.has(status.state)) {
+  violations.push(`Task Status State '${status.state}' is invalid; allowed: ${[...allowedStates].join(", ")}.`);
+}
 
 if (baseBranch && !baseBranch.includes(base)) {
   violations.push(`Task Base Branch is '${baseBranch}', but BASE_REF is '${base}'.`);
@@ -104,6 +112,23 @@ function parsePathList(text) {
     if (value && value.toLowerCase() !== "none") paths.push(value);
   }
   return paths;
+}
+
+function parseStatus(text) {
+  const status = {};
+  for (const line of text.split(/\r?\n/)) {
+    const match = line.match(/^\s*[-*]\s+([^:]+):\s*(.+?)\s*$/);
+    if (!match) continue;
+    const key = match[1].trim().toLowerCase().replace(/\s+/g, "-");
+    const value = firstBacktickValue(match[2]) ?? match[2].trim();
+    status[key] = value;
+  }
+  return status;
+}
+
+function firstBacktickValue(text) {
+  const match = text.match(/`([^`]+)`/);
+  return match?.[1];
 }
 
 function dependencyChangesAllowed(text) {
