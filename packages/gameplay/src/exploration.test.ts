@@ -70,6 +70,24 @@ describe("exploration", () => {
     });
   });
 
+  it("returns director-owned map changes without mutating gameplay", () => {
+    const initial = createGameplayState();
+    const applied = applyExplorationOutcome(initial, {
+      type: "change-map",
+      mapId: "map:classroom",
+      pose: { position: [0, 1.7, 2], yaw: 3.14, pitch: 0 }
+    });
+
+    expect(applied.state).toBe(initial);
+    expect(applied.result).toEqual({
+      type: "change-map",
+      owner: "director",
+      applied: false,
+      mapId: "map:classroom",
+      pose: { position: [0, 1.7, 2], yaw: 3.14, pitch: 0 }
+    });
+  });
+
   it("leaves gameplay unchanged for none outcomes", () => {
     const initial = createGameplayState();
     const applied = applyExplorationOutcome(initial, { type: "none" });

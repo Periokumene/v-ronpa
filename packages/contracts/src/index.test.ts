@@ -56,6 +56,10 @@ describe("contracts", () => {
           id: "map:academy-hall",
           name: "Academy Hall",
           spawn: [0, 1.7, 3],
+          walkBounds: {
+            min: [-3, 0, -4],
+            max: [3, 2.4, 4]
+          },
           cameraRig: {
             id: "camera:navi:first-person",
             mode: "first-person",
@@ -70,6 +74,17 @@ describe("contracts", () => {
               position: [1, 1, 0],
               radius: 1,
               action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
+            },
+            {
+              id: "interactable:classroom-door",
+              label: "Classroom Door",
+              position: [0, 1, -3],
+              radius: 1,
+              action: {
+                type: "change-map",
+                mapId: "map:classroom",
+                pose: { position: [0, 1.7, 2.5], yaw: 3.14, pitch: 0 }
+              }
             }
           ]
         }
@@ -104,7 +119,9 @@ describe("contracts", () => {
       trials: []
     });
 
+    expect(manifest.maps[0]?.walkBounds?.min).toEqual([-3, 0, -4]);
     expect(manifest.maps[0]?.interactables[0]?.action.type).toBe("grant-evidence");
+    expect(manifest.maps[0]?.interactables[1]?.action.type).toBe("change-map");
     expect(manifest.evidence[0]?.shortLabel).toBe("Keycard");
     expect(manifest.input?.bindings[1]?.action).toBe("fire-truth-bullet");
   });
@@ -155,9 +172,10 @@ describe("contracts", () => {
       NaviRuntimeStateSchema.parse({
         substate: "vn2d-overlay",
         activeMapId: "map:academy-hall",
+        playerPose: { position: [0, 1.7, 3], yaw: 1.25 },
         inputLock: "dialog"
       })
-    ).toMatchObject({ substate: "vn2d-overlay", inputLock: "dialog" });
+    ).toMatchObject({ substate: "vn2d-overlay", playerPose: { pitch: 0 }, inputLock: "dialog" });
 
     expect(
       TrialRuntimeStateSchema.parse({

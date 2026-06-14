@@ -62,6 +62,12 @@ export type CameraControlMode = z.infer<typeof CameraControlModeSchema>;
 export const Vector3Schema = z.tuple([z.number(), z.number(), z.number()]);
 export type Vector3 = z.infer<typeof Vector3Schema>;
 
+export const AabbBoundsSchema = z.object({
+  min: Vector3Schema,
+  max: Vector3Schema
+});
+export type AabbBounds = z.infer<typeof AabbBoundsSchema>;
+
 export const CameraRigDefSchema = z.object({
   id: IdSchema,
   mode: CameraControlModeSchema,
@@ -72,6 +78,13 @@ export const CameraRigDefSchema = z.object({
   far: z.number().positive().optional()
 });
 export type CameraRigDef = z.infer<typeof CameraRigDefSchema>;
+
+export const PlayerPoseSchema = z.object({
+  position: Vector3Schema,
+  yaw: z.number().default(0),
+  pitch: z.number().default(0)
+});
+export type PlayerPose = z.infer<typeof PlayerPoseSchema>;
 
 export const SourceLocationSchema = z.object({
   scriptPath: z.string(),
@@ -227,6 +240,7 @@ export const InteractableDefSchema = z.object({
   radius: z.number().positive().default(1),
   action: z.discriminatedUnion("type", [
     z.object({ type: z.literal("start-script"), script: z.string(), label: z.string().optional() }),
+    z.object({ type: z.literal("change-map"), mapId: IdSchema, spawnId: IdSchema.optional(), pose: PlayerPoseSchema.optional() }),
     z.object({ type: z.literal("grant-item"), itemId: IdSchema, quantity: z.number().int().positive().default(1) }),
     z.object({ type: z.literal("grant-evidence"), evidenceId: IdSchema }),
     z.object({ type: z.literal("set-character-state"), characterId: IdSchema, affinityDelta: z.number().int().default(0) })
@@ -238,6 +252,7 @@ export const WorldMapDefSchema = z.object({
   id: IdSchema,
   name: z.string(),
   spawn: Vector3Schema,
+  walkBounds: AabbBoundsSchema.optional(),
   cameraRig: CameraRigDefSchema.optional(),
   collisionProxyIds: z.array(IdSchema).default([]),
   interactables: z.array(InteractableDefSchema).default([]),
@@ -432,6 +447,7 @@ export const NaviRuntimeStateSchema = z.object({
   activeMapId: IdSchema.optional(),
   activeInteractableId: IdSchema.optional(),
   overlayScript: z.string().optional(),
+  playerPose: PlayerPoseSchema.optional(),
   inputLock: InputLockStateSchema.default("none")
 });
 export type NaviRuntimeState = z.infer<typeof NaviRuntimeStateSchema>;

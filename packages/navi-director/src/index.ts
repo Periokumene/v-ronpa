@@ -1,4 +1,4 @@
-import type { NaviRuntimeState, NaviSubstate, WorldMapDef } from "@v-ronpa/contracts";
+import type { NaviRuntimeState, NaviSubstate, PlayerPose, WorldMapDef } from "@v-ronpa/contracts";
 import {
   changeCharacterAffinity,
   grantEvidence,
@@ -13,6 +13,7 @@ export type NaviEvent =
   | { type: "FOCUS_INTERACTABLE"; interactableId?: string }
   | { type: "OPEN_INVENTORY" }
   | { type: "CLOSE_OVERLAY" }
+  | { type: "CHANGE_MAP"; mapId: string; pose?: PlayerPose }
   | { type: "START_VN2D"; script: string; interactableId?: string }
   | { type: "START_EVENT"; script?: string; interactableId?: string };
 
@@ -67,6 +68,19 @@ export function naviReducer(state: NaviRuntimeState, event: NaviEvent): NaviRunt
     );
   }
 
+  if (event.type === "CHANGE_MAP") {
+    return withOptionalFields(
+      {
+        ...state,
+        ...(event.pose ? { playerPose: event.pose } : {}),
+        substate: "walk",
+        inputLock: "none"
+      },
+      event.mapId,
+      undefined
+    );
+  }
+
   if (event.type === "START_VN2D") {
     return withOverlay(state, "vn2d-overlay", event.script, event.interactableId);
   }
@@ -110,6 +124,14 @@ export function resolveNaviInteractable(
   if (outcome.type === "start-script") {
     return {
       navi: naviReducer(state, { type: "START_VN2D", script: outcome.script, interactableId }),
+      gameplay,
+      outcome
+    };
+  }
+
+  if (outcome.type === "change-map") {
+    return {
+      navi: naviReducer(state, { type: "CHANGE_MAP", mapId: outcome.mapId, ...(outcome.pose ? { pose: outcome.pose } : {}) }),
       gameplay,
       outcome
     };

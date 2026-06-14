@@ -1,10 +1,11 @@
-import type { GameplayEvent, InteractableDef, Vector3, WorldMapDef } from "@v-ronpa/contracts";
+import type { GameplayEvent, InteractableDef, PlayerPose, Vector3, WorldMapDef } from "@v-ronpa/contracts";
 import { applyGameplayEvent, type GameplayEventResult } from "./events";
 import type { GameplayState } from "./state";
 
 export type ExplorationOutcome =
   | { type: "none" }
   | { type: "start-script"; script: string; label?: string }
+  | { type: "change-map"; mapId: string; spawnId?: string; pose?: PlayerPose }
   | { type: "grant-item"; itemId: string; quantity: number }
   | { type: "grant-evidence"; evidenceId: string }
   | { type: "character-state"; characterId: string; affinityDelta: number };
@@ -12,6 +13,7 @@ export type ExplorationOutcome =
 export type ExplorationApplicationResult =
   | { type: "none"; owner: "none"; applied: false }
   | { type: "start-script"; owner: "director"; applied: false; script: string; label?: string }
+  | { type: "change-map"; owner: "director"; applied: false; mapId: string; spawnId?: string; pose?: PlayerPose }
   | { type: "gameplay-event"; owner: "gameplay"; applied: boolean; event: GameplayEvent; eventResult: GameplayEventResult };
 
 export interface ExplorationApplication {
@@ -39,6 +41,15 @@ export function resolveInteractable(interactable: InteractableDef | undefined): 
 
   if (action.type === "grant-evidence") {
     return { type: "grant-evidence", evidenceId: action.evidenceId };
+  }
+
+  if (action.type === "change-map") {
+    return {
+      type: "change-map",
+      mapId: action.mapId,
+      ...(action.spawnId ? { spawnId: action.spawnId } : {}),
+      ...(action.pose ? { pose: action.pose } : {})
+    };
   }
 
   return {
@@ -76,6 +87,20 @@ export function applyExplorationOutcome(state: GameplayState, outcome: Explorati
     };
   }
 
+  if (outcome.type === "change-map") {
+    return {
+      state,
+      result: {
+        type: "change-map",
+        owner: "director",
+        applied: false,
+        mapId: outcome.mapId,
+        ...(outcome.spawnId ? { spawnId: outcome.spawnId } : {}),
+        ...(outcome.pose ? { pose: outcome.pose } : {})
+      }
+    };
+  }
+
   const event = explorationOutcomeToGameplayEvent(outcome);
   const applied = applyGameplayEvent(state, event);
   return {
@@ -90,7 +115,9 @@ export function applyExplorationOutcome(state: GameplayState, outcome: Explorati
   };
 }
 
-function explorationOutcomeToGameplayEvent(outcome: Exclude<ExplorationOutcome, { type: "none" | "start-script" }>): GameplayEvent {
+function explorationOutcomeToGameplayEvent(
+  outcome: Exclude<ExplorationOutcome, { type: "none" | "start-script" | "change-map" }>
+): GameplayEvent {
   if (outcome.type === "grant-item") {
     return {
       type: "grant-item",

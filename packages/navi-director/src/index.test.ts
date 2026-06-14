@@ -43,4 +43,41 @@ describe("navi director", () => {
       outcome: { type: "grant-evidence" }
     });
   });
+
+  it("resolves map changes as Navi-owned state", () => {
+    const map: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:door",
+          label: "Door",
+          position: [0, 0, -1],
+          radius: 1,
+          action: {
+            type: "change-map",
+            mapId: "map:classroom",
+            pose: { position: [0, 1.7, 2], yaw: 3.14, pitch: 0 }
+          }
+        }
+      ],
+      assetRefs: []
+    };
+
+    const gameplay = createGameplayState();
+    const result = resolveNaviInteractable(createInitialNaviState(map.id), map, gameplay, "i:door");
+
+    expect(result.gameplay).toBe(gameplay);
+    expect(result).toMatchObject({
+      navi: {
+        substate: "walk",
+        activeMapId: "map:classroom",
+        playerPose: { position: [0, 1.7, 2], yaw: 3.14, pitch: 0 },
+        inputLock: "none"
+      },
+      outcome: { type: "change-map", mapId: "map:classroom" }
+    });
+  });
 });
