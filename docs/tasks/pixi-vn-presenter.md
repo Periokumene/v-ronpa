@@ -17,9 +17,35 @@
 - State: `Ready`
 - Owner: `TBD`
 - Created: `2026-06-14`
-- Updated: `2026-06-14`
+- Updated: `2026-06-15`
 - Completed Commit: `TBD`
 - Archive Target: `docs/archive/completed-tasks/pixi-vn-presenter.md`
+
+## Worktree Environment
+
+Run once after the worktree is created:
+
+```bash
+pnpm setup:worktree-env
+```
+
+This creates an ignored `.env.worktree` with a worktree-specific
+`PORT/VITE_DEV_PORT`. Vite and Playwright both read this file so parallel
+worktrees do not share the same dev server.
+
+## Thread Startup Prompt
+
+```text
+你在 V-Ronpa 独立 worktree 中执行 docs/tasks/pixi-vn-presenter.md。
+请先阅读 AGENTS.md、docs/architecture/system-guide.md、docs/architecture/worktree-flow.md、docs/architecture/harness-gates.md、以及本 task card。
+先运行 pnpm setup:worktree-env；Vite/Playwright 会读取 .env.worktree 隔离端口，不要提交 .env.worktree、.local-state、test-results 或 playwright-report。
+本线目标是在 packages/pixi-presenter 和 P0 预留的 /?scenario=pixi-vn 中完成立绘占位、简单效果和缺资源 fallback 验证。
+严格遵守 Allowed Paths / Forbidden Paths；不要改 public contracts、presentation contracts、package.json、pnpm-lock.yaml。
+只能使用 apps/game/src/harness/scenarios/pixi-vn/** 和 tests/smoke/pixi-vn.spec.ts；不要修改 apps/game 其他文件。
+若发现必须改 apps/game 其他文件、shared fixture、contracts、依赖、或任务卡外路径，停止并在 review packet 中说明需要 public-core/integration follow-up，不要扩大范围。
+实现后运行 Required Gates，最终运行 BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/pixi-vn-presenter.md。
+输出 changed files、测试结果、截图路径、残余风险。
+```
 
 ## Goal
 
@@ -87,6 +113,7 @@ Any public presentation contract, dependency, or app-wide harness change.
 ## Required Gates
 
 ```bash
+pnpm setup:worktree-env
 pnpm --filter @v-ronpa/game build
 BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/pixi-vn-presenter.md
 ```

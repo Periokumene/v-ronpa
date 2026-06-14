@@ -42,6 +42,30 @@ dependency matrix.
 - Failure screenshots under `test-results/`
 - HTML report under `playwright-report/`
 
+## Worktree Port Isolation
+
+Run `pnpm setup:worktree-env` once in every worktree before launching the app
+or running smoke tests. The script creates an ignored `.env.worktree` with
+worktree-specific `PORT` and `VITE_DEV_PORT` values.
+
+`apps/game/vite.config.ts` and `playwright.config.ts` both search upward for
+`.env.worktree`. Explicit shell values still win, then `.env.worktree`, then
+the default `5173`. Vite uses `strictPort` so a busy port fails loudly instead
+of silently moving the app while Playwright waits on a different URL.
+
+Parallel-safe commands:
+
+```bash
+pnpm setup:worktree-env
+pnpm --filter @v-ronpa/game dev
+pnpm test:smoke
+```
+
+If a worktree must change its assigned port, delete its local `.env.worktree`
+and rerun `pnpm setup:worktree-env`, or set both `PORT` and `VITE_DEV_PORT`
+for that shell. Never commit `.env.worktree`, `.local-state/`,
+`test-results/`, or `playwright-report/`.
+
 Smoke gates confirm the app boots, the harness can switch between Navi and
 Trial, Navi can trigger VN2D and inventory overlays, Trial can switch VN3D and
 debate3D presentation profiles, DOM surfaces remain interactive, canvas layers

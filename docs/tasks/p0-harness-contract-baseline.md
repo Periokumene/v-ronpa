@@ -17,9 +17,33 @@
 - State: `Ready`
 - Owner: `TBD`
 - Created: `2026-06-14`
-- Updated: `2026-06-14`
+- Updated: `2026-06-15`
 - Completed Commit: `TBD`
 - Archive Target: `docs/archive/completed-tasks/p0-harness-contract-baseline.md`
+
+## Worktree Environment
+
+Run once after the worktree is created:
+
+```bash
+pnpm setup:worktree-env
+```
+
+This creates an ignored `.env.worktree` with a worktree-specific
+`PORT/VITE_DEV_PORT`. Vite and Playwright both read this file so parallel
+worktrees do not share the same dev server.
+
+## Thread Startup Prompt
+
+```text
+你在 V-Ronpa public-core worktree 中执行 docs/tasks/p0-harness-contract-baseline.md。
+请先阅读 AGENTS.md、docs/architecture/system-guide.md、docs/architecture/worktree-flow.md、docs/architecture/harness-gates.md、以及本 task card。
+先运行 pnpm setup:worktree-env；Vite/Playwright 会读取 .env.worktree 隔离端口，不要提交 .env.worktree、.local-state、test-results 或 playwright-report。
+本线目标是建立公共 contracts、固定 harness entries、fixture 目录、task cards 和 smoke evidence，供后续独立线使用。
+严格遵守 Allowed Paths / Forbidden Paths；任何额外 public schema、依赖或 .nani IR 变化都需要 CCR。
+实现后运行 Required Gates，最终运行 BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/p0-harness-contract-baseline.md。
+输出 changed files、测试结果、截图路径、残余风险。
+```
 
 ## Goal
 
@@ -97,6 +121,7 @@ change after this card needs a new CCR.
 ## Required Gates
 
 ```bash
+pnpm setup:worktree-env
 pnpm vitest run packages/contracts packages/gameplay packages/navi-director
 pnpm --filter @v-ronpa/game build
 pnpm test:smoke

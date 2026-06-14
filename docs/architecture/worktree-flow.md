@@ -39,6 +39,16 @@ See `docs/architecture/subsystem-fanout.md` for the first fan-out table.
 Each worktree gets a strict task card. Worktrees should not share writable
 paths unless the task card explicitly says so.
 
+After creating or checking out a worktree, run:
+
+```bash
+pnpm setup:worktree-env
+```
+
+This creates the ignored `.env.worktree` consumed by Vite and Playwright for
+per-worktree dev server ports. Do not commit generated environment, local
+state, Playwright result, or report files.
+
 Task cards must include:
 
 - `Status`

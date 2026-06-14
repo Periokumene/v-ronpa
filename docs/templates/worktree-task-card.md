@@ -13,6 +13,34 @@
 - Manual Git worktree suggestion: `.worktrees/<name>`
 - Codex App may assign a managed path under `$CODEX_HOME/worktrees`; use the assigned path if launched from Codex App.
 
+## Worktree Environment
+
+Run once after the worktree is created:
+
+```bash
+pnpm setup:worktree-env
+```
+
+This creates an ignored `.env.worktree` with a worktree-specific
+`PORT/VITE_DEV_PORT`. Vite and Playwright both read this file so parallel
+worktrees do not share the same dev server. Do not commit `.env.worktree`,
+`.local-state/`, `test-results/`, or `playwright-report/`.
+
+## Thread Startup Prompt
+
+Use this prompt when opening the implementation thread for this task:
+
+```text
+你在 V-Ronpa 独立 worktree 中执行 docs/tasks/<name>.md。
+请先阅读 AGENTS.md、docs/architecture/system-guide.md、docs/architecture/worktree-flow.md、docs/architecture/harness-gates.md、以及本 task card。
+先运行 pnpm setup:worktree-env；Vite/Playwright 会读取 .env.worktree 隔离端口，不要提交 .env.worktree、.local-state、test-results 或 playwright-report。
+严格遵守 Allowed Paths / Forbidden Paths；不要改 public contracts、package.json、pnpm-lock.yaml，除非 task card 明确允许。
+只能使用本卡预留的 app harness scenario 文件夹和 tests/smoke/<line>.spec.ts；独立线不得修改 apps/game 其他文件。
+若发现必须改 apps/game 其他文件、shared fixture、contracts、依赖、或任务卡外路径，停止并在 review packet 中说明需要 public-core/integration follow-up，不要扩大范围。
+实现后运行 Required Gates，最终运行 BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/<name>.md。
+输出 changed files、测试结果、截图路径、残余风险。
+```
+
 ## Status
 
 - State: `Draft` (`Draft | Ready | In Progress | Blocked | Review | Done | Archived`)
@@ -90,6 +118,7 @@ None. Do not edit `package.json` or `pnpm-lock.yaml` unless this section says `A
 Local iteration gates:
 
 ```bash
+pnpm setup:worktree-env
 pnpm vitest run <package-or-test-path>
 pnpm typecheck
 pnpm validate:boundaries
