@@ -6,7 +6,7 @@
 
 ## Branch Name
 
-- `subsystem/gameplay-domain-p1`
+- `ai/domain-p1-gameplay`
 
 ## Worktree Path
 

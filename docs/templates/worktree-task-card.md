@@ -6,7 +6,7 @@
 
 ## Branch Name
 
-- `subsystem/<name>`
+- `ai/<feat>-<module(s)>`
 
 ## Worktree Path
 
