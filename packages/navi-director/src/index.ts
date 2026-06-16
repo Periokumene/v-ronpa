@@ -6,6 +6,7 @@ import type {
   NaviRuntimeState,
   NaviSubstate,
   PlayerPose,
+  Vector3,
   WorldMapDef
 } from "@v-ronpa/contracts";
 import {
@@ -45,6 +46,8 @@ export interface NaviSensorFocusResolution extends NaviFocusResolution {
 }
 
 export type WorldMapSource = readonly WorldMapDef[] | Record<string, WorldMapDef>;
+
+const SENSOR_FACING_THRESHOLD = 0.72;
 
 export function createInitialNaviState(activeMapId?: string): NaviRuntimeState {
   const state: NaviRuntimeState = {
@@ -186,11 +189,38 @@ export function focusNaviInteractionFromSensorReport(
     activeMapId: report.mapId,
     playerPose: report.pose
   };
-  const focused = focusNearestNaviInteractable(reportedState, map);
+  const focused = focusNaviInteractableFromSensor(reportedState, map, report);
   return {
     ...focused,
     report,
     view: createNaviInteractionView(focused.navi)
+  };
+}
+
+function focusNaviInteractableFromSensor(
+  state: NaviRuntimeState,
+  map: WorldMapDef,
+  report: NaviInteractionSensorReport
+): NaviFocusResolution {
+  if (!canAcceptNaviWalkInteraction(state)) {
+    return {
+      navi: state,
+      outcome: { type: "none" }
+    };
+  }
+
+  const interactable = selectInteractableFromSensorReport(map, report);
+  if (!interactable) {
+    return {
+      navi: naviReducer(state, { type: "FOCUS_INTERACTABLE" }),
+      outcome: { type: "none" }
+    };
+  }
+
+  return {
+    navi: naviReducer(state, { type: "FOCUS_INTERACTABLE", interactableId: interactable.id }),
+    outcome: { type: "focused", interactableId: interactable.id },
+    interactable
   };
 }
 
@@ -201,8 +231,7 @@ export function createNaviInteractionConfirmRequest(
   if (!mapId) return undefined;
   return {
     mapId,
-    ...(state.playerPose ? { pose: state.playerPose } : {}),
-    ...(state.activeInteractableId ? { candidateId: state.activeInteractableId } : {})
+    ...(state.playerPose ? { pose: state.playerPose } : {})
   };
 }
 
@@ -330,6 +359,53 @@ function findWorldMap(mapId: string, maps: WorldMapSource | undefined): WorldMap
 
 function isWorldMapArray(maps: WorldMapSource): maps is readonly WorldMapDef[] {
   return Array.isArray(maps);
+}
+
+function selectInteractableFromSensorReport(
+  map: WorldMapDef,
+  report: NaviInteractionSensorReport
+): InteractableDef | undefined {
+  let selected: { interactable: InteractableDef; score: number } | undefined;
+  for (const interactable of map.interactables) {
+    const score = sensorCandidateScore(interactable, report);
+    if (score === undefined) continue;
+    if (!selected || score > selected.score) {
+      selected = { interactable, score };
+    }
+  }
+
+  return selected?.interactable;
+}
+
+function sensorCandidateScore(interactable: InteractableDef, report: NaviInteractionSensorReport): number | undefined {
+  const distance = vectorDistance(interactable.position, report.pose.position);
+  if (distance > interactable.radius) return undefined;
+
+  const proximityScore = 1 - distance / interactable.radius;
+  if (!report.facing) return proximityScore;
+
+  const facingScore = facingScoreToInteractable(report.pose.position, report.facing, interactable.position);
+  if (facingScore === undefined || facingScore < SENSOR_FACING_THRESHOLD) return undefined;
+
+  return proximityScore + facingScore;
+}
+
+function facingScoreToInteractable(position: Vector3, facing: Vector3, target: Vector3): number | undefined {
+  const facing2d = normalize2d([facing[0], facing[2]]);
+  const targetDirection = normalize2d([target[0] - position[0], target[2] - position[2]]);
+  if (!targetDirection) return 1;
+  if (!facing2d) return undefined;
+  return facing2d[0] * targetDirection[0] + facing2d[1] * targetDirection[1];
+}
+
+function normalize2d(vector: [number, number]): [number, number] | undefined {
+  const length = Math.hypot(vector[0], vector[1]);
+  if (length <= 0.001) return undefined;
+  return [vector[0] / length, vector[1] / length];
+}
+
+function vectorDistance(a: Vector3, b: Vector3): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
 function withOptionalFields(

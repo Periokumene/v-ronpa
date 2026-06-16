@@ -27,10 +27,26 @@ candidate views, and confirm requests:
 - `NaviInteractionSensorReport`
 - `NaviInteractionView`
 - `NaviInteractionConfirmRequest`
+- `InputActionState`
 
-R3F may report renderer-local pose, facing, and suggested candidates. Navi
-remains authoritative for `activeInteractableId`, `canConfirm`, blocked reason,
-and confirm routing.
+R3F reports renderer-local pose and facing only. Navi remains authoritative for
+candidate selection, `activeInteractableId`, `canConfirm`, blocked reason, and
+confirm routing.
+
+## Implementation Notes
+
+- R3F emits sensor reports as throttled renderer observations containing pose
+  and facing, but no renderer-local interactable candidate.
+- Navi validates the report against the active map before assigning
+  `activeInteractableId`. Candidate selection, facing, and range rules live in
+  `navi-director`, not in the renderer.
+- R3F highlights the Navi-authoritative `activeInteractableId`; renderer-local
+  candidates are not computed or displayed as confirmable authority.
+- Confirm requests from first-person input are converted into
+  `NaviInteractionSensorReport` first, then resolved through Navi/gameplay.
+- Physical keyboard codes are mapped through `InputBindingMap` by an input
+  runtime before reaching R3F. R3F consumes `InputActionState`; adapter-local
+  keyboard defaults exist only as compatibility fallback.
 
 ## Affected Packages
 
@@ -61,3 +77,5 @@ valid. No save migration is required.
   input/substate locks block confirmation.
 - The vertical-slice smoke test verifies that R3F highlight and confirm output
   flow through Navi state rather than renderer-local action execution.
+- The vertical-slice smoke test also covers real first-person movement: semantic
+  move input focuses an interactable and semantic interact input confirms it.

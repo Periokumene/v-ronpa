@@ -1,5 +1,17 @@
-import { useMemo, useState, type CSSProperties } from "react";
-import type { NaviRuntimeState, PlayerPose, PresentationCommand, StoryEffect, WorldMapDef } from "@v-ronpa/contracts";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject } from "react";
+import type {
+  InputAction,
+  InputActionEvent,
+  InputActionState,
+  InputBindingMap,
+  InputContext,
+  NaviInteractionSensorReport,
+  NaviRuntimeState,
+  PlayerPose,
+  PresentationCommand,
+  StoryEffect,
+  WorldMapDef
+} from "@v-ronpa/contracts";
 import { createGameplayState, applyGameplayEvent, type ExplorationOutcome, type GameplayState } from "@v-ronpa/gameplay";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import {
@@ -9,7 +21,7 @@ import {
   focusNaviInteractionFromSensorReport,
   naviReducer
 } from "@v-ronpa/navi-director";
-import { ExplorationStage3D } from "@v-ronpa/r3f-adapter";
+import { ExplorationStage3D, type FirstPersonInteractRequest } from "@v-ronpa/r3f-adapter";
 import { advanceToNextStop, chooseStoryOption, createInitialStoryState, selectCurrentStoryLine } from "@v-ronpa/story-engine";
 import { InspectorLite, VnDialogSurface } from "@v-ronpa/ui-kit";
 import { PixiLayer } from "../../../PixiLayer";
@@ -39,7 +51,19 @@ const posePresets: PosePreset[] = [
   { id: "empty", label: "Empty", mapId: "map:academy-hall", pose: { position: [3.4, 1.7, 3.8], yaw: 0, pitch: 0 } }
 ];
 
+const verticalSliceInputBindings = {
+  version: 1,
+  bindings: [
+    { action: "move-forward", device: "keyboard", code: "ArrowUp", context: "navi" },
+    { action: "move-back", device: "keyboard", code: "ArrowDown", context: "navi" },
+    { action: "move-left", device: "keyboard", code: "ArrowLeft", context: "navi" },
+    { action: "move-right", device: "keyboard", code: "ArrowRight", context: "navi" },
+    { action: "interact", device: "keyboard", code: "Space", context: "navi" }
+  ]
+} satisfies InputBindingMap;
+
 const initialMap = verticalSliceMaps[0] ?? createFallbackMap();
+const INPUT_EVENT_HISTORY_LIMIT = 32;
 
 export function VerticalSliceScenario() {
   const parsed = useMemo(
@@ -57,26 +81,35 @@ export function VerticalSliceScenario() {
   }));
   const [lastOutcome, setLastOutcome] = useState("spawn");
   const [lastAction, setLastAction] = useState("boot");
-  const [lastCandidate, setLastCandidate] = useState<string | undefined>(undefined);
   const [resetSignal, setResetSignal] = useState(0);
+  const [poseCommand, setPoseCommand] = useState<{ pose: PlayerPose; signal: number }>(() => ({
+    pose: { position: initialMap.spawn, yaw: 0, pitch: 0 },
+    signal: 0
+  }));
   const [storySession, setStorySession] = useState(0);
   const activeMap = getActiveMap(navi);
+  const inputActionsRef = useKeyboardInputActions(verticalSliceInputBindings, "navi", navi.inputLock === "none");
   const interactionView = createNaviInteractionView(navi);
   const currentLine = storyRuntime.active ? selectCurrentStoryLine(storyRuntime.state) : undefined;
   const pixiCommands = storyRuntime.state.presentationCommands.filter((command) => command.type !== "print");
 
   function resetSlice() {
+    const spawnPose: PlayerPose = { position: initialMap.spawn, yaw: 0, pitch: 0 };
     setNavi({
       ...createInitialNaviState(initialMap.id),
-      playerPose: { position: initialMap.spawn, yaw: 0, pitch: 0 }
+      playerPose: spawnPose
     });
     setGameplay(createGameplayState());
     setStoryRuntime({ state: createInitialStoryState(parsed.scenario), active: false });
     setLastOutcome("reset");
     setLastAction("reset");
-    setLastCandidate(undefined);
     setResetSignal((signal) => signal + 1);
+    syncStagePose(spawnPose);
     setStorySession((session) => session + 1);
+  }
+
+  function syncStagePose(pose: PlayerPose) {
+    setPoseCommand((current) => ({ pose, signal: current.signal + 1 }));
   }
 
   function moveToPreset(id: PosePresetId) {
@@ -86,35 +119,41 @@ export function VerticalSliceScenario() {
     const seeded = navi.activeMapId === preset.mapId ? navi : naviReducer(navi, { type: "ENTER_WALK", mapId: preset.mapId });
     const focused = focusNaviInteractionFromSensorReport(seeded, map, {
       mapId: preset.mapId,
-      pose: preset.pose,
-      suggestedInteractableId: lastCandidate
+      pose: preset.pose
     });
     setNavi(focused.navi);
+    syncStagePose(preset.pose);
     setLastAction(`move:${id}`);
     setLastOutcome(focused.view.activeInteractableId ? `focused:${focused.view.activeInteractableId}` : focused.view.blockedReason ?? "none");
   }
 
-  function recordPose(pose: PlayerPose) {
-    const focused = focusNaviInteractionFromSensorReport(navi, activeMap, {
-      mapId: activeMap.id,
-      pose,
-      ...(lastCandidate ? { suggestedInteractableId: lastCandidate } : {})
+  const recordSensorReport = useCallback((report: NaviInteractionSensorReport) => {
+    setNavi((current) => {
+      const map = verticalSliceMaps.find((candidate) => candidate.id === report.mapId) ?? getActiveMap(current);
+      return focusNaviInteractionFromSensorReport(current, map, report).navi;
     });
-    setNavi(focused.navi);
-  }
+  }, []);
 
-  function recordCandidate(candidateId: string | undefined) {
-    setLastCandidate(candidateId);
-  }
+  const confirmInteraction = useCallback(
+    (request?: FirstPersonInteractRequest) => {
+      const report = createSensorReportFromRequest(request);
+      const confirmationMap = report
+        ? verticalSliceMaps.find((candidate) => candidate.id === report.mapId) ?? activeMap
+        : activeMap;
+      const confirmationNavi = report
+        ? focusNaviInteractionFromSensorReport(navi, confirmationMap, report).navi
+        : navi;
+      const resolution = confirmFocusedNaviInteraction(confirmationNavi, confirmationMap, gameplay, verticalSliceMaps);
 
-  function confirmInteraction() {
-    const resolution = confirmFocusedNaviInteraction(navi, activeMap, gameplay, verticalSliceMaps);
-    setNavi(resolution.navi);
-    setGameplay(resolution.gameplay);
-    setLastAction(`confirm:${navi.activeInteractableId ?? "none"}`);
-    setLastOutcome(formatOutcome(resolution.outcome));
-    if (resolution.outcome.type === "start-script") startStoryOverlay();
-  }
+      setNavi(resolution.navi);
+      setGameplay(resolution.gameplay);
+      setLastAction(`confirm:${confirmationNavi.activeInteractableId ?? "none"}`);
+      setLastOutcome(formatOutcome(resolution.outcome));
+      if (resolution.navi.playerPose) syncStagePose(resolution.navi.playerPose);
+      if (resolution.outcome.type === "start-script") startStoryOverlay();
+    },
+    [activeMap, gameplay, navi]
+  );
 
   function startStoryOverlay() {
     const initial = createInitialStoryState(parsed.scenario);
@@ -164,10 +203,12 @@ export function VerticalSliceScenario() {
             map={activeMap}
             cameraMode={navi.inputLock === "none" ? "first-person" : "locked"}
             inputLock={navi.inputLock}
-            {...(navi.activeInteractableId ? { candidateInteractableId: navi.activeInteractableId } : {})}
+            inputActionsRef={inputActionsRef}
+            {...(navi.activeInteractableId ? { activeInteractableId: navi.activeInteractableId } : {})}
+            poseOverride={poseCommand.pose}
+            poseOverrideSignal={poseCommand.signal}
             resetSignal={resetSignal}
-            onPoseChange={recordPose}
-            onCandidateChange={recordCandidate}
+            onSensorReport={recordSensorReport}
             onInteractRequest={confirmInteraction}
           />
           <PixiLayer key={storySession} commands={pixiCommands} visible={storyRuntime.active} />
@@ -205,7 +246,7 @@ export function VerticalSliceScenario() {
                 Move: {preset.label}
               </button>
             ))}
-            <button data-testid="vertical-slice-confirm" type="button" onClick={confirmInteraction}>
+            <button data-testid="vertical-slice-confirm" type="button" onClick={() => confirmInteraction()}>
               Confirm
             </button>
             <button data-testid="vertical-slice-advance" type="button" onClick={advanceStory} disabled={!storyRuntime.active}>
@@ -250,6 +291,132 @@ function applyGameplayEffects(gameplay: GameplayState, effects: StoryEffect[]): 
     if (effect.type !== "gameplay-event") return current;
     return applyGameplayEvent(current, effect.event).state;
   }, gameplay);
+}
+
+function useKeyboardInputActions(
+  inputBindings: InputBindingMap,
+  context: InputContext,
+  enabled: boolean
+): MutableRefObject<InputActionState> {
+  const stateRef = useRef<InputActionState>(createInputActionState(context, new Set(), [], 0));
+  const pressedCodesRef = useRef(new Map<string, InputAction>());
+  const downActionsRef = useRef(new Set<InputAction>());
+  const eventsRef = useRef<InputActionEvent[]>([]);
+  const sequenceRef = useRef(0);
+  const keyboardActions = useMemo(() => createKeyboardActionLookup(inputBindings, context), [context, inputBindings]);
+
+  useEffect(() => {
+    if (enabled) return;
+    pressedCodesRef.current.clear();
+    downActionsRef.current.clear();
+    eventsRef.current = [];
+    stateRef.current = createInputActionState(context, downActionsRef.current, eventsRef.current, sequenceRef.current);
+  }, [context, enabled]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    function publish(events: InputActionEvent[]) {
+      eventsRef.current = [...eventsRef.current, ...events].slice(-INPUT_EVENT_HISTORY_LIMIT);
+      stateRef.current = createInputActionState(context, downActionsRef.current, eventsRef.current, sequenceRef.current);
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      const action = keyboardActions.get(event.code);
+      if (!action) return;
+
+      event.preventDefault();
+      if (event.repeat || pressedCodesRef.current.has(event.code)) return;
+
+      const wasActionDown = downActionsRef.current.has(action);
+      pressedCodesRef.current.set(event.code, action);
+      downActionsRef.current.add(action);
+      if (!wasActionDown) {
+        sequenceRef.current += 1;
+        publish([{ action, phase: "pressed", sequence: sequenceRef.current }]);
+      } else {
+        stateRef.current = createInputActionState(context, downActionsRef.current, eventsRef.current, sequenceRef.current);
+      }
+    }
+
+    function onKeyUp(event: KeyboardEvent) {
+      const action = pressedCodesRef.current.get(event.code) ?? keyboardActions.get(event.code);
+      if (!action) return;
+
+      event.preventDefault();
+      pressedCodesRef.current.delete(event.code);
+      if (hasPressedAction(pressedCodesRef.current, action)) return;
+
+      downActionsRef.current.delete(action);
+      sequenceRef.current += 1;
+      publish([{ action, phase: "released", sequence: sequenceRef.current }]);
+    }
+
+    function onBlur() {
+      if (downActionsRef.current.size === 0) return;
+
+      const released = [...downActionsRef.current].map((action) => {
+        sequenceRef.current += 1;
+        return { action, phase: "released" as const, sequence: sequenceRef.current };
+      });
+      pressedCodesRef.current.clear();
+      downActionsRef.current.clear();
+      publish(released);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [context, enabled, keyboardActions]);
+
+  return stateRef;
+}
+
+function createKeyboardActionLookup(inputBindings: InputBindingMap, context: InputContext): Map<string, InputAction> {
+  const lookup = new Map<string, InputAction>();
+  for (const binding of inputBindings.bindings) {
+    if (binding.device !== "keyboard") continue;
+    if (binding.context !== context && binding.context !== "global") continue;
+    lookup.set(binding.code, binding.action);
+  }
+  return lookup;
+}
+
+function createInputActionState(
+  context: InputContext,
+  downActions: ReadonlySet<InputAction>,
+  events: readonly InputActionEvent[],
+  sequence: number
+): InputActionState {
+  return {
+    version: 1,
+    context,
+    down: [...downActions],
+    events: [...events],
+    sequence
+  };
+}
+
+function hasPressedAction(pressedCodes: ReadonlyMap<string, InputAction>, action: InputAction): boolean {
+  for (const pressedAction of pressedCodes.values()) {
+    if (pressedAction === action) return true;
+  }
+  return false;
+}
+
+function createSensorReportFromRequest(request: FirstPersonInteractRequest | undefined): NaviInteractionSensorReport | undefined {
+  if (!request?.mapId) return undefined;
+  return {
+    mapId: request.mapId,
+    pose: request.pose,
+    ...(request.facing ? { facing: request.facing } : {})
+  };
 }
 
 function getActiveMap(navi: NaviRuntimeState): WorldMapDef {

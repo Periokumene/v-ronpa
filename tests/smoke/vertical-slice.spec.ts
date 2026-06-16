@@ -1,4 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+test.setTimeout(60_000);
 
 test("vertical slice connects Navi exploration, gameplay state, VN dialog, and branch outcomes", async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -14,6 +16,15 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.locator("canvas")).toHaveCount(2);
   await expect(page.getByTestId("vertical-slice-map")).toHaveText("map:academy-hall");
   await page.screenshot({ path: "test-results/vertical-slice-spawn.png", fullPage: true });
+
+  await walkForwardUntilActive(page, "interactable:classroom-door");
+  await expect(page.getByTestId("vertical-slice-can-confirm")).toHaveText("true");
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("vertical-slice-map")).toHaveText("map:classroom");
+  await expect(page.getByTestId("vertical-slice-last-outcome")).toHaveText("change-map:map:classroom");
+  await page.getByTestId("vertical-slice-move-hall-door").click();
+  await page.getByTestId("vertical-slice-confirm").click();
+  await expect(page.getByTestId("vertical-slice-map")).toHaveText("map:academy-hall");
 
   await page.getByTestId("vertical-slice-move-empty").click();
   await expect(page.getByTestId("vertical-slice-active-interactable")).toHaveText("none");
@@ -73,3 +84,14 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
 
   expect(consoleErrors).toEqual([]);
 });
+
+async function walkForwardUntilActive(page: Page, interactableId: string) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await page.keyboard.down("ArrowUp");
+    await page.waitForTimeout(90);
+    await page.keyboard.up("ArrowUp");
+    if ((await page.getByTestId("vertical-slice-active-interactable").textContent()) === interactableId) return;
+  }
+
+  await expect(page.getByTestId("vertical-slice-active-interactable")).toHaveText(interactableId);
+}

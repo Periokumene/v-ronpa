@@ -21,7 +21,7 @@ and merge the change through the integration baseline first.
 - Save data must include `version`.
 - Save data must store `StoryRuntimeSnapshot`, not arbitrary engine objects.
 - Input and camera coordination must flow through `InputBindingMap`,
-  `InputLockState`, and `CameraControlMode`.
+  `InputActionState`, `InputLockState`, and `CameraControlMode`.
 - Browser assets must declare runtime files, compression, LOD, and collision
   proxy relationships through `RuntimeAsset` and `CollisionProxy`.
 - `GameMode` is intentionally narrow: `navi` and `trial` are the playable root

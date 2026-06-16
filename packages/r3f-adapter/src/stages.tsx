@@ -15,25 +15,33 @@ import {
 import { Vector3 as ThreeVector3, type Camera, type Mesh, type Object3D } from "three";
 import type {
   CameraControlMode,
+  InputAction,
+  InputActionState,
+  InputBindingMap,
   InputLockState,
+  NaviInteractionSensorReport,
   PlayerPose,
   TrialPresentationProfile,
   Vector3,
   WorldMapDef
 } from "@v-ronpa/contracts";
-import { clampVectorToAabb, findInteractableCandidate } from "./first-person";
+import { clampVectorToAabb } from "./first-person";
 
 export interface ExplorationStageProps {
   map?: WorldMapDef;
-  candidateInteractableId?: string;
+  activeInteractableId?: string;
   cameraMode?: CameraControlMode;
   inputLock?: InputLockState;
+  inputActionsRef?: MutableRefObject<InputActionState>;
+  inputBindings?: InputBindingMap;
+  poseOverride?: PlayerPose;
+  poseOverrideSignal?: number;
   resetSignal?: number;
   interactSignal?: number;
   pointerLockRequestSignal?: number;
   pointerLockSelector?: string;
   onPoseChange?: (pose: PlayerPose) => void;
-  onCandidateChange?: (candidateId: string | undefined) => void;
+  onSensorReport?: (report: NaviInteractionSensorReport) => void;
   onInteractRequest?: (request: FirstPersonInteractRequest) => void;
   onFallbackChange?: (status: FirstPersonFallbackStatus) => void;
   onPointerLockChange?: (status: PointerLockStatus) => void;
@@ -57,29 +65,51 @@ export interface FirstPersonFallbackStatus {
 }
 
 export interface FirstPersonInteractRequest {
-  candidateId?: string;
+  mapId?: string;
   pose: PlayerPose;
+  facing?: Vector3;
 }
+
+type MovementAction = Extract<InputAction, "move-forward" | "move-back" | "move-left" | "move-right">;
+
+const DEFAULT_NAV_INPUT_BINDINGS = {
+  version: 1,
+  bindings: [
+    { action: "move-forward", device: "keyboard", code: "KeyW", context: "navi" },
+    { action: "move-back", device: "keyboard", code: "KeyS", context: "navi" },
+    { action: "move-left", device: "keyboard", code: "KeyA", context: "navi" },
+    { action: "move-right", device: "keyboard", code: "KeyD", context: "navi" },
+    { action: "interact", device: "keyboard", code: "KeyE", context: "navi" }
+  ]
+} satisfies InputBindingMap;
+
+const POSE_REPORT_EPSILON = 0.15;
 
 export function ExplorationStage3D({
   map,
-  candidateInteractableId,
+  activeInteractableId,
   cameraMode = "orbit-debug",
   inputLock = "none",
+  inputActionsRef,
+  inputBindings,
+  poseOverride,
+  poseOverrideSignal = 0,
   resetSignal = 0,
   interactSignal = 0,
   pointerLockRequestSignal = 0,
   pointerLockSelector,
   onPoseChange,
-  onCandidateChange,
+  onSensorReport,
   onInteractRequest,
   onFallbackChange,
   onPointerLockChange
 }: ExplorationStageProps) {
   const controlsEnabled = inputLock === "none" && cameraMode !== "locked" && cameraMode !== "scripted-focus";
   const firstPersonEnabled = cameraMode === "first-person" && inputLock === "none";
-  const initialPose = getInitialPose(map);
-  const camera = { position: initialPose.position, fov: map?.cameraRig?.fov ?? 60 };
+  const camera = useMemo(() => {
+    const initialPose = getInitialPose(map);
+    return { position: initialPose.position, fov: map?.cameraRig?.fov ?? 60 };
+  }, [map]);
 
   return (
     <Canvas camera={camera} data-testid="r3f-canvas">
@@ -92,18 +122,22 @@ export function ExplorationStage3D({
           key={interactable.id}
           label={interactable.label}
           position={interactable.position}
-          active={interactable.id === candidateInteractableId}
+          active={interactable.id === activeInteractableId}
         />
       ))}
       {firstPersonEnabled ? (
         <FirstPersonRig
           map={map}
+          inputActionsRef={inputActionsRef}
+          inputBindings={inputBindings}
+          poseOverride={poseOverride}
+          poseOverrideSignal={poseOverrideSignal}
           resetSignal={resetSignal}
           interactSignal={interactSignal}
           pointerLockRequestSignal={pointerLockRequestSignal}
           pointerLockSelector={pointerLockSelector}
           onPoseChange={onPoseChange}
-          onCandidateChange={onCandidateChange}
+          onSensorReport={onSensorReport}
           onInteractRequest={onInteractRequest}
           onPointerLockChange={onPointerLockChange}
         />
@@ -169,37 +203,50 @@ export function TrialRoundTableStage({
 
 function FirstPersonRig({
   map,
+  inputActionsRef,
+  inputBindings,
+  poseOverride,
+  poseOverrideSignal,
   resetSignal,
   interactSignal,
   pointerLockRequestSignal,
   pointerLockSelector,
   onPoseChange,
-  onCandidateChange,
+  onSensorReport,
   onInteractRequest,
   onPointerLockChange
 }: {
   map: WorldMapDef | undefined;
+  inputActionsRef: MutableRefObject<InputActionState> | undefined;
+  inputBindings: InputBindingMap | undefined;
+  poseOverride: PlayerPose | undefined;
+  poseOverrideSignal: number;
   resetSignal: number;
   interactSignal: number;
   pointerLockRequestSignal: number;
   pointerLockSelector: string | undefined;
   onPoseChange: ((pose: PlayerPose) => void) | undefined;
-  onCandidateChange: ((candidateId: string | undefined) => void) | undefined;
+  onSensorReport: ((report: NaviInteractionSensorReport) => void) | undefined;
   onInteractRequest: ((request: FirstPersonInteractRequest) => void) | undefined;
   onPointerLockChange: ((status: PointerLockStatus) => void) | undefined;
 }) {
   const { camera } = useThree();
   const controlsRef = useRef<ComponentRef<typeof PointerLockControls>>(null);
-  const keysRef = useRef(new Set<string>());
-  const candidateRef = useRef<string | undefined>(undefined);
+  const keysRef = useRef(new Set<MovementAction>());
   const lastPoseRef = useRef<PlayerPose | undefined>(undefined);
-  const lastCandidateIdRef = useRef<string | undefined>(undefined);
+  const lastSensorReportRef = useRef<NaviInteractionSensorReport | undefined>(undefined);
+  const lastInputEventSequenceRef = useRef(0);
   const handledInteractSignalRef = useRef(interactSignal);
   const pendingInteractSignalRef = useRef<number | undefined>(undefined);
   const forward = useMemo(() => new ThreeVector3(), []);
   const right = useMemo(() => new ThreeVector3(), []);
   const movement = useMemo(() => new ThreeVector3(), []);
   const up = useMemo(() => new ThreeVector3(0, 1, 0), []);
+  const keyboardActions = useMemo(() => createKeyboardActionLookup(inputBindings), [inputBindings]);
+  const onPoseChangeRef = useLatest(onPoseChange);
+  const onSensorReportRef = useLatest(onSensorReport);
+  const onInteractRequestRef = useLatest(onInteractRequest);
+  const onPointerLockChangeRef = useLatest(onPointerLockChange);
   const lockSelector = pointerLockSelector ?? "[data-r3f-pointer-lock-disabled='true']";
 
   const applyPose = useCallback(
@@ -207,15 +254,15 @@ function FirstPersonRig({
       const clamped = clampVectorToAabb(pose.position, map?.walkBounds);
       camera.position.set(clamped[0], clamped[1], clamped[2]);
       camera.rotation.set(pose.pitch, pose.yaw, 0, "YXZ");
-      reportPose(camera, lastPoseRef, onPoseChange);
-      updateCandidate(camera, map, candidateRef, lastCandidateIdRef, onCandidateChange);
+      reportPose(camera, lastPoseRef, onPoseChangeRef, true);
+      reportSensor(camera, map, lastSensorReportRef, onSensorReportRef, true);
     },
-    [camera, map, onCandidateChange, onPoseChange]
+    [camera, map, onPoseChangeRef, onSensorReportRef]
   );
 
   useEffect(() => {
-    onPointerLockChange?.("idle");
-  }, [onPointerLockChange]);
+    onPointerLockChangeRef.current?.("idle");
+  }, [onPointerLockChangeRef]);
 
   useEffect(() => {
     applyPose(getInitialPose(map));
@@ -226,25 +273,32 @@ function FirstPersonRig({
   }, [applyPose, resetSignal]);
 
   useEffect(() => {
+    if (poseOverrideSignal <= 0 || !poseOverride) return;
+    applyPose(poseOverride);
+  }, [applyPose, poseOverride, poseOverrideSignal]);
+
+  useEffect(() => {
     if (pointerLockRequestSignal <= 0) return;
 
-    onPointerLockChange?.("requested");
+    onPointerLockChangeRef.current?.("requested");
     try {
       controlsRef.current?.lock();
       window.setTimeout(() => {
-        if (!controlsRef.current?.isLocked) onPointerLockChange?.("denied");
+        if (!controlsRef.current?.isLocked) onPointerLockChangeRef.current?.("denied");
       }, 120);
     } catch {
-      onPointerLockChange?.("denied");
+      onPointerLockChangeRef.current?.("denied");
     }
-  }, [onPointerLockChange, pointerLockRequestSignal]);
+  }, [onPointerLockChangeRef, pointerLockRequestSignal]);
 
   const requestInteraction = useCallback(() => {
-    onInteractRequest?.({
-      ...(candidateRef.current ? { candidateId: candidateRef.current } : {}),
-      pose: cameraPose(camera)
+    const facing = cameraFacing(camera);
+    onInteractRequestRef.current?.({
+      ...(map?.id ? { mapId: map.id } : {}),
+      pose: cameraPose(camera),
+      facing
     });
-  }, [camera, onInteractRequest]);
+  }, [camera, map?.id, onInteractRequestRef]);
 
   useEffect(() => {
     if (interactSignal <= 0 || interactSignal === handledInteractSignalRef.current) return;
@@ -252,20 +306,28 @@ function FirstPersonRig({
   }, [interactSignal]);
 
   useEffect(() => {
+    if (inputActionsRef) {
+      keysRef.current.clear();
+      return;
+    }
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return;
-      if (isMovementKey(event.code)) {
-        keysRef.current.add(event.code);
+      const action = keyboardActions.get(event.code);
+      const movementAction = toMovementAction(action);
+      if (movementAction) {
+        keysRef.current.add(movementAction);
         event.preventDefault();
       }
-      if (event.code === "KeyE") {
+      if (action === "interact") {
         requestInteraction();
         event.preventDefault();
       }
     };
     const onKeyUp = (event: KeyboardEvent) => {
-      if (isMovementKey(event.code)) {
-        keysRef.current.delete(event.code);
+      const movementAction = toMovementAction(keyboardActions.get(event.code));
+      if (movementAction) {
+        keysRef.current.delete(movementAction);
         event.preventDefault();
       }
     };
@@ -280,10 +342,10 @@ function FirstPersonRig({
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [requestInteraction]);
+  }, [inputActionsRef, keyboardActions, requestInteraction]);
 
   useFrame((_, delta) => {
-    updateCandidate(camera, map, candidateRef, lastCandidateIdRef, onCandidateChange);
+    consumeInputActionEvents(inputActionsRef?.current, lastInputEventSequenceRef, requestInteraction);
 
     if (pendingInteractSignalRef.current && pendingInteractSignalRef.current !== handledInteractSignalRef.current) {
       handledInteractSignalRef.current = pendingInteractSignalRef.current;
@@ -291,8 +353,9 @@ function FirstPersonRig({
       requestInteraction();
     }
 
-    if (keysRef.current.size === 0) {
-      reportPose(camera, lastPoseRef, onPoseChange);
+    if (!hasMovementInput(keysRef.current, inputActionsRef?.current)) {
+      reportPose(camera, lastPoseRef, onPoseChangeRef);
+      reportSensor(camera, map, lastSensorReportRef, onSensorReportRef);
       return;
     }
 
@@ -303,10 +366,10 @@ function FirstPersonRig({
     right.crossVectors(forward, up).normalize();
 
     movement.set(0, 0, 0);
-    if (keysRef.current.has("KeyW")) movement.add(forward);
-    if (keysRef.current.has("KeyS")) movement.sub(forward);
-    if (keysRef.current.has("KeyD")) movement.add(right);
-    if (keysRef.current.has("KeyA")) movement.sub(right);
+    if (isMovementActionDown(keysRef.current, inputActionsRef?.current, "move-forward")) movement.add(forward);
+    if (isMovementActionDown(keysRef.current, inputActionsRef?.current, "move-back")) movement.sub(forward);
+    if (isMovementActionDown(keysRef.current, inputActionsRef?.current, "move-right")) movement.add(right);
+    if (isMovementActionDown(keysRef.current, inputActionsRef?.current, "move-left")) movement.sub(right);
 
     if (movement.lengthSq() > 0) {
       movement.normalize().multiplyScalar(4 * delta);
@@ -317,16 +380,16 @@ function FirstPersonRig({
       camera.position.set(nextPosition[0], nextPosition[1], nextPosition[2]);
     }
 
-    reportPose(camera, lastPoseRef, onPoseChange);
-    updateCandidate(camera, map, candidateRef, lastCandidateIdRef, onCandidateChange);
+    reportPose(camera, lastPoseRef, onPoseChangeRef);
+    reportSensor(camera, map, lastSensorReportRef, onSensorReportRef);
   });
 
   return (
     <PointerLockControls
       ref={controlsRef}
       selector={lockSelector}
-      onLock={() => onPointerLockChange?.("locked")}
-      onUnlock={() => onPointerLockChange?.("unlocked")}
+      onLock={() => onPointerLockChangeRef.current?.("locked")}
+      onUnlock={() => onPointerLockChangeRef.current?.("unlocked")}
       enabled
     />
   );
@@ -489,7 +552,7 @@ function FallbackRoom({
         <boxGeometry args={[depth, wallHeight, 0.15]} />
         <meshStandardMaterial color="#243146" />
       </mesh>
-      <Html center distanceFactor={8} position={[centerX, min[1] + 1.8, centerZ]}>
+      <Html center distanceFactor={8} position={[centerX, min[1] + 1.8, centerZ]} style={{ pointerEvents: "none" }}>
         <span className="scene-label">Primitive fallback: {map?.name ?? "missing map"}</span>
       </Html>
     </group>
@@ -516,7 +579,7 @@ function Hotspot({
         <octahedronGeometry args={[0.28]} />
         <meshStandardMaterial color={active ? "#ff5c8a" : "#6ee7d8"} emissive={active ? "#8a123a" : "#0f5f58"} />
       </mesh>
-      <Html center distanceFactor={8} position={[0, 0.95, 0]}>
+      <Html center distanceFactor={8} position={[0, 0.95, 0]} style={{ pointerEvents: "none" }}>
         <span className="scene-label">{label}</span>
       </Html>
     </group>
@@ -533,28 +596,6 @@ function getInitialPose(map: WorldMapDef | undefined): PlayerPose {
   };
 }
 
-function updateCandidate(
-  camera: Camera,
-  map: WorldMapDef | undefined,
-  candidateRef: MutableRefObject<string | undefined>,
-  lastCandidateIdRef: MutableRefObject<string | undefined>,
-  onCandidateChange: ((candidateId: string | undefined) => void) | undefined
-) {
-  const facing = new ThreeVector3();
-  camera.getWorldDirection(facing);
-  const candidate = findInteractableCandidate({
-    position: [camera.position.x, camera.position.y, camera.position.z],
-    facing: [facing.x, facing.y, facing.z],
-    interactables: map?.interactables ?? []
-  });
-
-  candidateRef.current = candidate?.id;
-  if (candidate?.id !== lastCandidateIdRef.current) {
-    lastCandidateIdRef.current = candidate?.id;
-    onCandidateChange?.(candidate?.id);
-  }
-}
-
 function cameraPose(camera: Camera): PlayerPose {
   return {
     position: [camera.position.x, camera.position.y, camera.position.z],
@@ -563,17 +604,55 @@ function cameraPose(camera: Camera): PlayerPose {
   };
 }
 
+function cameraFacing(camera: Camera): Vector3 {
+  const facing = new ThreeVector3();
+  camera.getWorldDirection(facing);
+  return [facing.x, facing.y, facing.z];
+}
+
 function reportPose(
   camera: Camera,
   lastPoseRef: MutableRefObject<PlayerPose | undefined>,
-  onPoseChange: ((pose: PlayerPose) => void) | undefined
+  onPoseChangeRef: MutableRefObject<((pose: PlayerPose) => void) | undefined>,
+  force = false
 ) {
   const pose = cameraPose(camera);
 
-  if (lastPoseRef.current && poseDistance(lastPoseRef.current, pose) < 0.01) return;
+  if (!force && lastPoseRef.current && poseDistance(lastPoseRef.current, pose) < POSE_REPORT_EPSILON) return;
 
   lastPoseRef.current = pose;
-  onPoseChange?.(pose);
+  onPoseChangeRef.current?.(pose);
+}
+
+function reportSensor(
+  camera: Camera,
+  map: WorldMapDef | undefined,
+  lastSensorReportRef: MutableRefObject<NaviInteractionSensorReport | undefined>,
+  onSensorReportRef: MutableRefObject<((report: NaviInteractionSensorReport) => void) | undefined>,
+  force = false
+) {
+  const report = createSensorReport(camera, map);
+  if (!report) return;
+
+  if (
+    !force &&
+    lastSensorReportRef.current &&
+    sensorReportDistance(lastSensorReportRef.current, report) < POSE_REPORT_EPSILON
+  ) {
+    return;
+  }
+
+  lastSensorReportRef.current = report;
+  onSensorReportRef.current?.(report);
+}
+
+function createSensorReport(camera: Camera, map: WorldMapDef | undefined): NaviInteractionSensorReport | undefined {
+  if (!map?.id) return undefined;
+  return {
+    mapId: map.id,
+    pose: cameraPose(camera),
+    facing: cameraFacing(camera)
+  };
 }
 
 function poseDistance(previous: PlayerPose, next: PlayerPose): number {
@@ -586,8 +665,77 @@ function poseDistance(previous: PlayerPose, next: PlayerPose): number {
   );
 }
 
-function isMovementKey(code: string): boolean {
-  return code === "KeyW" || code === "KeyA" || code === "KeyS" || code === "KeyD";
+function sensorReportDistance(previous: NaviInteractionSensorReport, next: NaviInteractionSensorReport): number {
+  return Math.max(poseDistance(previous.pose, next.pose), vectorDistance(previous.facing, next.facing));
+}
+
+function vectorDistance(previous: Vector3 | undefined, next: Vector3 | undefined): number {
+  if (!previous && !next) return 0;
+  if (!previous || !next) return Infinity;
+  return Math.max(
+    Math.abs(previous[0] - next[0]),
+    Math.abs(previous[1] - next[1]),
+    Math.abs(previous[2] - next[2])
+  );
+}
+
+function consumeInputActionEvents(
+  inputState: InputActionState | undefined,
+  lastInputEventSequenceRef: MutableRefObject<number>,
+  requestInteraction: () => void
+) {
+  if (!inputState) return;
+
+  let lastSequence = lastInputEventSequenceRef.current;
+  for (const event of inputState.events) {
+    if (event.sequence <= lastInputEventSequenceRef.current) continue;
+    lastSequence = Math.max(lastSequence, event.sequence);
+    if (event.phase === "pressed" && event.action === "interact") requestInteraction();
+  }
+  lastInputEventSequenceRef.current = lastSequence;
+}
+
+function hasMovementInput(keys: ReadonlySet<MovementAction>, inputState: InputActionState | undefined): boolean {
+  return (
+    isMovementActionDown(keys, inputState, "move-forward") ||
+    isMovementActionDown(keys, inputState, "move-back") ||
+    isMovementActionDown(keys, inputState, "move-left") ||
+    isMovementActionDown(keys, inputState, "move-right")
+  );
+}
+
+function isMovementActionDown(
+  keys: ReadonlySet<MovementAction>,
+  inputState: InputActionState | undefined,
+  action: MovementAction
+): boolean {
+  return inputState ? inputState.down.includes(action) : keys.has(action);
+}
+
+function createKeyboardActionLookup(inputBindings: InputBindingMap | undefined): Map<string, InputAction> {
+  const lookup = new Map<string, InputAction>();
+  const bindings = inputBindings ?? DEFAULT_NAV_INPUT_BINDINGS;
+  for (const binding of bindings.bindings) {
+    if (binding.device !== "keyboard") continue;
+    if (binding.context !== "navi" && binding.context !== "global") continue;
+    lookup.set(binding.code, binding.action);
+  }
+  return lookup;
+}
+
+function toMovementAction(action: InputAction | undefined): MovementAction | undefined {
+  if (action === "move-forward" || action === "move-back" || action === "move-left" || action === "move-right") {
+    return action;
+  }
+  return undefined;
+}
+
+function useLatest<T>(value: T): MutableRefObject<T> {
+  const ref = useRef(value);
+  useEffect(() => {
+    ref.current = value;
+  }, [value]);
+  return ref;
 }
 
 function createFallbackStatus(
@@ -621,7 +769,7 @@ function BillboardCharacter({
         <planeGeometry args={debate ? [0.85, 1.45] : [0.95, 1.6]} />
         <meshStandardMaterial color={focused ? "#ffcf73" : debate ? "#8fd8ff" : "#b9fbc0"} emissive={focused ? "#3c2205" : debate ? "#08283d" : "#0f3d24"} />
       </mesh>
-      <Html center distanceFactor={6} position={[0, -0.95, 0]}>
+      <Html center distanceFactor={6} position={[0, -0.95, 0]} style={{ pointerEvents: "none" }}>
         <span className={focused ? "scene-label scene-label-focus" : "scene-label"}>{id.replace("character:", "")}</span>
       </Html>
     </group>

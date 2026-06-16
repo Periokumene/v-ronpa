@@ -4,7 +4,8 @@
 
 Input and camera state are public gameplay contracts, not renderer details.
 Navi, Trial, DOM overlays, Pixi effects, and R3F stages must coordinate through
-`InputBindingMap`, `InputLockState`, and `CameraControlMode`.
+`InputBindingMap`, `InputActionState`, `InputLockState`, and
+`CameraControlMode`.
 
 ## Input Actions
 
@@ -15,7 +16,8 @@ Navi, Trial, DOM overlays, Pixi effects, and R3F stages must coordinate through
 - shared commands: `confirm`, `cancel`, `interact`, `open-inventory`, `pause`
 - Trial commands: `select-truth-bullet`, `fire-truth-bullet`
 
-Adapters map devices to actions with `InputBindingMap`. Gameplay reducers
+Input runtimes map devices to actions with `InputBindingMap`, then publish
+`InputActionState` snapshots for renderers and directors. Gameplay reducers
 consume actions; they should not depend on raw keyboard or mouse codes.
 
 ## Input Locks
@@ -45,3 +47,31 @@ CSS visibility or component-local state.
 R3F may implement the camera mechanics, but `navi-director` and
 `trial-director` decide which mode is active.
 
+## Navi First-Person Interaction Pipeline
+
+The first-person Navi path uses R3F as a sensor and presenter, not as the
+gameplay authority:
+
+1. An input runtime consumes `InputBindingMap`, active context, and input locks,
+   then publishes `InputActionState` for semantic Navi actions such as
+   `move-forward` and `interact`.
+2. `ExplorationStage3D` consumes `InputActionState` and mutates Three.js camera
+   state inside the R3F frame loop.
+   High-frequency camera movement must stay in refs/Three objects and must not
+   force broad React app state updates every frame.
+3. R3F emits throttled `NaviInteractionSensorReport` values containing map id,
+   pose, and facing. It does not compute interactable candidates.
+4. `navi-director` validates those reports against the active `WorldMapDef` and
+   owns candidate selection, `activeInteractableId`, `canConfirm`, and blocked
+   reason.
+5. `ExplorationStage3D` highlights the Navi-authoritative
+   `activeInteractableId`; renderer-local candidates must not exist as
+   confirmable targets.
+6. Confirm input sends the latest R3F request payload to Navi first. Navi then
+   resolves the authoritative active target through gameplay/map outcomes.
+
+Harness shortcuts may issue explicit pose commands for debugging, but those
+commands are not evidence that real player movement is wired. Smoke coverage for
+first-person slices should include a true input path: map physical input to
+semantic actions, move through `InputActionState`, obtain a Navi-authoritative
+active target, and confirm with `interact`.

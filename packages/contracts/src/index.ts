@@ -50,6 +50,25 @@ export const InputBindingMapSchema = z.object({
 });
 export type InputBindingMap = z.infer<typeof InputBindingMapSchema>;
 
+export const InputActionEventPhaseSchema = z.enum(["pressed", "released"]);
+export type InputActionEventPhase = z.infer<typeof InputActionEventPhaseSchema>;
+
+export const InputActionEventSchema = z.object({
+  action: InputActionSchema,
+  phase: InputActionEventPhaseSchema,
+  sequence: z.number().int().nonnegative()
+}).strict();
+export type InputActionEvent = z.infer<typeof InputActionEventSchema>;
+
+export const InputActionStateSchema = z.object({
+  version: z.literal(1),
+  context: InputContextSchema.default("global"),
+  down: z.array(InputActionSchema).default([]),
+  events: z.array(InputActionEventSchema).default([]),
+  sequence: z.number().int().nonnegative().default(0)
+}).strict();
+export type InputActionState = z.infer<typeof InputActionStateSchema>;
+
 export const CameraControlModeSchema = z.enum([
   "first-person",
   "orbit-debug",
@@ -99,9 +118,8 @@ export type InteractionBlockedReason = z.infer<typeof InteractionBlockedReasonSc
 export const NaviInteractionSensorReportSchema = z.object({
   mapId: IdSchema,
   pose: PlayerPoseSchema,
-  facing: Vector3Schema.optional(),
-  suggestedInteractableId: IdSchema.optional()
-});
+  facing: Vector3Schema.optional()
+}).strict();
 export type NaviInteractionSensorReport = z.infer<typeof NaviInteractionSensorReportSchema>;
 
 export const NaviInteractionViewSchema = z.object({
@@ -114,9 +132,8 @@ export type NaviInteractionView = z.infer<typeof NaviInteractionViewSchema>;
 export const NaviInteractionConfirmRequestSchema = z.object({
   mapId: IdSchema,
   pose: PlayerPoseSchema.optional(),
-  facing: Vector3Schema.optional(),
-  candidateId: IdSchema.optional()
-});
+  facing: Vector3Schema.optional()
+}).strict();
 export type NaviInteractionConfirmRequest = z.infer<typeof NaviInteractionConfirmRequestSchema>;
 
 export const SourceLocationSchema = z.object({

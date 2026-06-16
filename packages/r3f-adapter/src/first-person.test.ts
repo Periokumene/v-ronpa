@@ -1,18 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { InteractableDef } from "@v-ronpa/contracts";
-import { clampVectorToAabb, findInteractableCandidate, yawPitchToFacingVector } from "./first-person";
+import { clampVectorToAabb, yawPitchToFacingVector } from "./first-person";
 
 const bounds = {
   min: [-3, 0, -4] as [number, number, number],
   max: [3, 2, 4] as [number, number, number]
-};
-
-const hotspot: InteractableDef = {
-  id: "interactable:door",
-  label: "Door",
-  position: [0, 1, -2],
-  radius: 1.2,
-  action: { type: "change-map", mapId: "map:classroom" }
 };
 
 describe("first-person helpers", () => {
@@ -25,31 +16,8 @@ describe("first-person helpers", () => {
     expect(clampVectorToAabb([4, 3, -5], bounds)).toEqual([3, 2, -4]);
   });
 
-  it("selects an interactable when facing it within radius", () => {
-    expect(
-      findInteractableCandidate({
-        position: [0, 1.7, -0.9],
-        facing: yawPitchToFacingVector({ yaw: 0, pitch: 0 }),
-        interactables: [hotspot]
-      })?.id
-    ).toBe("interactable:door");
-  });
-
-  it("rejects targets outside radius or outside the facing threshold", () => {
-    expect(
-      findInteractableCandidate({
-        position: [0, 1.7, 2],
-        facing: yawPitchToFacingVector({ yaw: 0, pitch: 0 }),
-        interactables: [hotspot]
-      })
-    ).toBeUndefined();
-
-    expect(
-      findInteractableCandidate({
-        position: [0, 1.7, -0.9],
-        facing: yawPitchToFacingVector({ yaw: Math.PI, pitch: 0 }),
-        interactables: [hotspot]
-      })
-    ).toBeUndefined();
+  it("converts yaw and pitch to a facing vector for sensor reports", () => {
+    expect(yawPitchToFacingVector({ yaw: 0, pitch: 0 })).toEqual([0, 0, -1]);
+    expect(yawPitchToFacingVector({ yaw: Math.PI / 2, pitch: 0 })[0]).toBeCloseTo(1);
   });
 });

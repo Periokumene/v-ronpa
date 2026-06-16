@@ -254,7 +254,7 @@ describe("navi director", () => {
     });
   });
 
-  it("turns renderer sensor reports into Navi-authoritative interaction views", () => {
+  it("turns pose/facing sensor reports into Navi-authoritative interaction views", () => {
     const map: WorldMapDef = {
       id: "map:hall",
       name: "Hall",
@@ -264,8 +264,8 @@ describe("navi director", () => {
         {
           id: "i:file",
           label: "Case File",
-          position: [1.2, 0, 0],
-          radius: 1,
+          position: [0.9, 0, 0],
+          radius: 1.2,
           action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
         },
         {
@@ -282,8 +282,7 @@ describe("navi director", () => {
     const result = focusNaviInteractionFromSensorReport(createInitialNaviState(map.id), map, {
       mapId: map.id,
       pose: { position: [0, 0, 0], yaw: 0, pitch: 0 },
-      facing: [1, 0, 0],
-      suggestedInteractableId: "i:file"
+      facing: [1, 0, 0]
     });
 
     expect(result).toMatchObject({
@@ -291,6 +290,39 @@ describe("navi director", () => {
       outcome: { type: "focused", interactableId: "i:notebook" },
       view: { activeInteractableId: "i:notebook", canConfirm: true }
     });
+  });
+
+  it("validates sensor reports with Navi-owned facing rules", () => {
+    const map: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:door",
+          label: "Door",
+          position: [0, 0, -1],
+          radius: 1.2,
+          action: { type: "change-map", mapId: "map:classroom" }
+        }
+      ],
+      assetRefs: []
+    };
+
+    const away = focusNaviInteractionFromSensorReport(createInitialNaviState(map.id), map, {
+      mapId: map.id,
+      pose: { position: [0, 0, 0], yaw: 0, pitch: 0 },
+      facing: [0, 0, 1]
+    });
+    const toward = focusNaviInteractionFromSensorReport(createInitialNaviState(map.id), map, {
+      mapId: map.id,
+      pose: { position: [0, 0, 0], yaw: 0, pitch: 0 },
+      facing: [0, 0, -1]
+    });
+
+    expect(away.view).toEqual({ canConfirm: false, blockedReason: "no-target" });
+    expect(toward.view).toEqual({ activeInteractableId: "i:door", canConfirm: true });
   });
 
   it("describes blocked and confirmable Navi interaction views", () => {
@@ -320,8 +352,7 @@ describe("navi director", () => {
     });
     expect(createNaviInteractionConfirmRequest(focused)).toEqual({
       mapId: "map:hall",
-      pose: { position: [0, 0, 0], yaw: 0, pitch: 0 },
-      candidateId: "i:notebook"
+      pose: { position: [0, 0, 0], yaw: 0, pitch: 0 }
     });
   });
 

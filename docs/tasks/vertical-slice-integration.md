@@ -64,13 +64,16 @@ The harness entry is `/?scenario=vertical-slice`.
 ## Allowed Paths
 
 - `apps/game/src/harness/scenarios/vertical-slice/**`
+- `apps/game/src/styles.css`
 - `apps/game/src/harness/registry.tsx`
 - `tests/smoke/harness-registry.spec.ts`
 - `tests/smoke/vertical-slice.spec.ts`
 - `packages/contracts/**`
 - `packages/navi-director/**`
+- `packages/r3f-adapter/**`
 - `docs/ccr/**`
 - `docs/archive/completed-tasks/**`
+- `docs/architecture/input-and-camera.md`
 - `docs/architecture/harness-gates.md`
 
 ## Forbidden Paths
@@ -89,12 +92,13 @@ authority:
 - `NaviInteractionView`
 - `NaviInteractionConfirmRequest`
 - `InteractionBlockedReason`
+- `InputActionState`
 
 ## Observability And Acceptance Matrix
 
 | Capability | Observable Evidence |
 |---|---|
-| Spawn and move in hall | Smoke screenshot |
+| Spawn and move in hall | Smoke screenshot and semantic input path |
 | Item interaction | Smoke state |
 | Evidence appears in inspector | Smoke state |
 | Map transition | Smoke state and screenshot |
@@ -108,6 +112,8 @@ Required regression cases:
 
 - Normal path: item interaction, VN trigger, choice branch.
 - Boundary path: no active interactable does not change state.
+- First-person path: semantic move input focuses a Navi-authoritative target and
+  semantic interact input resolves it.
 - Integration path: choice A returns, choice B branches and applies gameplay event.
 
 Test placement:

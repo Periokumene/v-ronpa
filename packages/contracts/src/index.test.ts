@@ -3,6 +3,7 @@ import {
   CameraRigDefSchema,
   ContentManifestSchema,
   InputBindingMapSchema,
+  InputActionStateSchema,
   NaviInteractionConfirmRequestSchema,
   NaviInteractionSensorReportSchema,
   NaviInteractionViewSchema,
@@ -195,13 +196,20 @@ describe("contracts", () => {
       NaviInteractionSensorReportSchema.parse({
         mapId: "map:academy-hall",
         pose: { position: [0, 1.7, -2.5], yaw: 0, pitch: 0 },
-        facing: [0, 0, -1],
-        suggestedInteractableId: "interactable:classroom-door"
+        facing: [0, 0, -1]
       })
     ).toMatchObject({
       mapId: "map:academy-hall",
-      suggestedInteractableId: "interactable:classroom-door"
+      facing: [0, 0, -1]
     });
+
+    expect(() =>
+      NaviInteractionSensorReportSchema.parse({
+        mapId: "map:academy-hall",
+        pose: { position: [0, 1.7, -2.5], yaw: 0, pitch: 0 },
+        suggestedInteractableId: "interactable:classroom-door"
+      })
+    ).toThrow();
 
     expect(
       NaviInteractionViewSchema.parse({
@@ -226,13 +234,20 @@ describe("contracts", () => {
       NaviInteractionConfirmRequestSchema.parse({
         mapId: "map:academy-hall",
         pose: { position: [0, 1.7, -2.5] },
-        candidateId: "interactable:classroom-door"
+        facing: [0, 0, -1]
       })
     ).toMatchObject({
       mapId: "map:academy-hall",
       pose: { yaw: 0, pitch: 0 },
-      candidateId: "interactable:classroom-door"
+      facing: [0, 0, -1]
     });
+
+    expect(() =>
+      NaviInteractionConfirmRequestSchema.parse({
+        mapId: "map:academy-hall",
+        candidateId: "interactable:classroom-door"
+      })
+    ).toThrow();
   });
 
   it("validates input, camera, and runtime asset contracts independently", () => {
@@ -242,6 +257,30 @@ describe("contracts", () => {
         bindings: [{ action: "interact", device: "keyboard", code: "KeyE", context: "navi" }]
       })
     ).toMatchObject({ bindings: [{ action: "interact" }] });
+
+    expect(
+      InputActionStateSchema.parse({
+        version: 1,
+        context: "navi",
+        down: ["move-forward"],
+        events: [{ action: "interact", phase: "pressed", sequence: 2 }],
+        sequence: 2
+      })
+    ).toMatchObject({
+      context: "navi",
+      down: ["move-forward"],
+      events: [{ action: "interact", phase: "pressed", sequence: 2 }],
+      sequence: 2
+    });
+
+    expect(() =>
+      InputActionStateSchema.parse({
+        version: 1,
+        context: "navi",
+        down: ["move-forward"],
+        rawCode: "KeyW"
+      })
+    ).toThrow();
 
     expect(
       CameraRigDefSchema.parse({
