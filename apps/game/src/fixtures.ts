@@ -16,8 +16,8 @@ export const harnessMap: WorldMapDef = {
     {
       id: "interactable:case-file",
       label: "Case File",
-      position: [1.2, 0.2, -0.8],
-      radius: 1.2,
+      position: [0, 0.9, -1.2],
+      radius: 1.3,
       action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
     },
     {

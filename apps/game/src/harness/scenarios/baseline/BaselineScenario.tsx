@@ -1,17 +1,25 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { createActor } from "xstate";
 import {
   GameModeSchema,
   type CameraControlMode,
   type GameMode,
+  type NaviInteractionSensorReport,
   type PresentationCommand,
   type TrialPresentationProfile
 } from "@v-ronpa/contracts";
 import { gameFlowMachine, modeFromSnapshotValue, type GameFlowEvent } from "@v-ronpa/game-flow-machine";
-import { createGameplayState, grantEvidence, grantItem } from "@v-ronpa/gameplay";
+import { createGameplayState, grantEvidence, grantItem, type ExplorationOutcome } from "@v-ronpa/gameplay";
 import { parseScenario } from "@v-ronpa/nani-parser";
-import { createInitialNaviState, naviReducer, resolveNaviInteractable } from "@v-ronpa/navi-director";
-import { ExplorationStage3D, TrialRoundTableStage } from "@v-ronpa/r3f-adapter";
+import {
+  confirmFocusedNaviInteraction,
+  createInitialNaviState,
+  createNaviInteractionView,
+  focusNaviInteractionFromSensorReport,
+  naviReducer,
+  resolveNaviInteractable
+} from "@v-ronpa/navi-director";
+import { ExplorationStage3D, TrialRoundTableStage, type FirstPersonInteractRequest } from "@v-ronpa/r3f-adapter";
 import { createInitialStoryState, storyReducer, type StoryRuntimeState } from "@v-ronpa/story-engine";
 import {
   createInitialTrialState,
@@ -25,6 +33,7 @@ import {
 import { DialogBox, InspectorLite, ScenarioTabs } from "@v-ronpa/ui-kit";
 import { harnessMap, harnessScript, harnessTrial } from "../../../fixtures";
 import { PixiLayer } from "../../../PixiLayer";
+import { defaultHarnessInputBindings, useKeyboardInputActions } from "../../inputActions";
 
 const scenarioOptions = [
   { id: "navi", label: "Navi" },
@@ -69,6 +78,24 @@ export function BaselineScenario() {
           ? "scripted-focus"
           : "locked";
   const presentationCommands = story.presentationCommands;
+  const inputActionsRef = useKeyboardInputActions(defaultHarnessInputBindings, "navi", mode === "navi" && navi.inputLock === "none");
+  const naviInteractionView = createNaviInteractionView(navi);
+
+  const recordSensorReport = useCallback((report: NaviInteractionSensorReport) => {
+    setNavi((current) => focusNaviInteractionFromSensorReport(current, harnessMap, report).navi);
+  }, []);
+
+  const confirmNaviInteraction = useCallback(
+    (request?: FirstPersonInteractRequest) => {
+      const report = createSensorReportFromRequest(request);
+      const confirmationNavi = report ? focusNaviInteractionFromSensorReport(navi, harnessMap, report).navi : navi;
+      const resolution = confirmFocusedNaviInteraction(confirmationNavi, harnessMap, gameplay);
+      setNavi(resolution.navi);
+      setGameplay(resolution.gameplay);
+      setNotice(formatNaviOutcomeNotice(resolution.outcome, confirmationNavi.activeInteractableId));
+    },
+    [gameplay, navi]
+  );
 
   function transition(nextMode: string) {
     const parsedMode = GameModeSchema.parse(nextMode);
@@ -214,7 +241,10 @@ export function BaselineScenario() {
               map={harnessMap}
               cameraMode={currentCameraMode}
               inputLock={currentInputLock}
+              inputActionsRef={inputActionsRef}
               {...(navi.activeInteractableId ? { activeInteractableId: navi.activeInteractableId } : {})}
+              onSensorReport={recordSensorReport}
+              onInteractRequest={confirmNaviInteraction}
             />
           )}
           <PixiLayer commands={presentationCommands} visible={pixiVisible} />
@@ -223,10 +253,12 @@ export function BaselineScenario() {
         <div className="hud">
           <div className="objective-chip">
             <span data-testid="current-mode">{mode}</span>
-            <strong>{notice}</strong>
+            <strong data-testid="current-notice">{notice}</strong>
             <small data-testid="current-detail">{currentDetail}</small>
             <small data-testid="current-input-lock">{currentInputLock}</small>
             <small data-testid="current-camera-mode">{currentCameraMode}</small>
+            <small data-testid="current-active-interactable">{navi.activeInteractableId ?? "none"}</small>
+            <small data-testid="current-can-confirm">{String(naviInteractionView.canConfirm)}</small>
           </div>
           <ScenarioTabs options={scenarioOptions} value={mode} onChange={transition} />
           <div className="command-strip">
@@ -335,4 +367,22 @@ export function BaselineScenario() {
 
 function outcomeNextSegment(outcome: TrialDirectorOutcome): string | undefined {
   return "nextSegmentId" in outcome ? outcome.nextSegmentId : undefined;
+}
+
+function createSensorReportFromRequest(request: FirstPersonInteractRequest | undefined): NaviInteractionSensorReport | undefined {
+  if (!request?.mapId) return undefined;
+  return {
+    mapId: request.mapId,
+    pose: request.pose,
+    ...(request.facing ? { facing: request.facing } : {})
+  };
+}
+
+function formatNaviOutcomeNotice(outcome: ExplorationOutcome, activeInteractableId: string | undefined): string {
+  if (outcome.type === "none") return `Navi confirm: ${activeInteractableId ?? "none"} -> none`;
+  if (outcome.type === "grant-item") return `Navi granted ${outcome.itemId}`;
+  if (outcome.type === "grant-evidence") return `Navi granted ${outcome.evidenceId}`;
+  if (outcome.type === "start-script") return `Navi script ${outcome.script}`;
+  if (outcome.type === "change-map") return `Navi map ${outcome.mapId}`;
+  return `Navi affinity ${outcome.characterId}:${outcome.affinityDelta}`;
 }
