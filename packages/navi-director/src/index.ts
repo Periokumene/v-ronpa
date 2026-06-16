@@ -1,4 +1,13 @@
-import type { InteractableDef, NaviRuntimeState, NaviSubstate, PlayerPose, WorldMapDef } from "@v-ronpa/contracts";
+import type {
+  InteractableDef,
+  NaviInteractionConfirmRequest,
+  NaviInteractionSensorReport,
+  NaviInteractionView,
+  NaviRuntimeState,
+  NaviSubstate,
+  PlayerPose,
+  WorldMapDef
+} from "@v-ronpa/contracts";
 import {
   applyExplorationOutcome,
   type ExplorationOutcome,
@@ -30,6 +39,11 @@ export interface NaviFocusResolution {
   interactable?: InteractableDef;
 }
 
+export interface NaviSensorFocusResolution extends NaviFocusResolution {
+  report: NaviInteractionSensorReport;
+  view: NaviInteractionView;
+}
+
 export type WorldMapSource = readonly WorldMapDef[] | Record<string, WorldMapDef>;
 
 export function createInitialNaviState(activeMapId?: string): NaviRuntimeState {
@@ -43,6 +57,14 @@ export function createInitialNaviState(activeMapId?: string): NaviRuntimeState {
 
 function canAcceptNaviWalkInteraction(state: NaviRuntimeState): boolean {
   return state.substate === "walk" && state.inputLock === "none";
+}
+
+function interactionBlockedReason(state: NaviRuntimeState): NaviInteractionView["blockedReason"] {
+  if (state.substate !== "walk") return "wrong-substate";
+  if (state.inputLock !== "none") return "input-lock";
+  if (!state.activeInteractableId && !state.playerPose) return "missing-pose";
+  if (!state.activeInteractableId) return "no-target";
+  return undefined;
 }
 
 export function naviReducer(state: NaviRuntimeState, event: NaviEvent): NaviRuntimeState {
@@ -141,6 +163,46 @@ export function focusNearestNaviInteractable(state: NaviRuntimeState, map: World
     navi: naviReducer(state, { type: "FOCUS_INTERACTABLE", interactableId: interactable.id }),
     outcome: { type: "focused", interactableId: interactable.id },
     interactable
+  };
+}
+
+export function createNaviInteractionView(state: NaviRuntimeState): NaviInteractionView {
+  const blockedReason = interactionBlockedReason(state);
+  const view: NaviInteractionView = {
+    canConfirm: !blockedReason
+  };
+  if (state.activeInteractableId) view.activeInteractableId = state.activeInteractableId;
+  if (blockedReason) view.blockedReason = blockedReason;
+  return view;
+}
+
+export function focusNaviInteractionFromSensorReport(
+  state: NaviRuntimeState,
+  map: WorldMapDef,
+  report: NaviInteractionSensorReport
+): NaviSensorFocusResolution {
+  const reportedState: NaviRuntimeState = {
+    ...state,
+    activeMapId: report.mapId,
+    playerPose: report.pose
+  };
+  const focused = focusNearestNaviInteractable(reportedState, map);
+  return {
+    ...focused,
+    report,
+    view: createNaviInteractionView(focused.navi)
+  };
+}
+
+export function createNaviInteractionConfirmRequest(
+  state: NaviRuntimeState,
+  mapId = state.activeMapId
+): NaviInteractionConfirmRequest | undefined {
+  if (!mapId) return undefined;
+  return {
+    mapId,
+    ...(state.playerPose ? { pose: state.playerPose } : {}),
+    ...(state.activeInteractableId ? { candidateId: state.activeInteractableId } : {})
   };
 }
 

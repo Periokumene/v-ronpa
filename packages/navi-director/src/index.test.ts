@@ -4,6 +4,9 @@ import { createGameplayState } from "@v-ronpa/gameplay";
 import {
   confirmFocusedNaviInteraction,
   createInitialNaviState,
+  createNaviInteractionConfirmRequest,
+  createNaviInteractionView,
+  focusNaviInteractionFromSensorReport,
   focusNearestNaviInteractable,
   naviReducer,
   resolveNaviInteractable
@@ -248,6 +251,77 @@ describe("navi director", () => {
     expect(focusNearestNaviInteractable(emptySpace, map)).toEqual({
       navi: emptySpace,
       outcome: { type: "none" }
+    });
+  });
+
+  it("turns renderer sensor reports into Navi-authoritative interaction views", () => {
+    const map: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:file",
+          label: "Case File",
+          position: [1.2, 0, 0],
+          radius: 1,
+          action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
+        },
+        {
+          id: "i:notebook",
+          label: "Notebook",
+          position: [0.2, 0, 0],
+          radius: 1,
+          action: { type: "grant-item", itemId: "tool:notebook", quantity: 1 }
+        }
+      ],
+      assetRefs: []
+    };
+
+    const result = focusNaviInteractionFromSensorReport(createInitialNaviState(map.id), map, {
+      mapId: map.id,
+      pose: { position: [0, 0, 0], yaw: 0, pitch: 0 },
+      facing: [1, 0, 0],
+      suggestedInteractableId: "i:file"
+    });
+
+    expect(result).toMatchObject({
+      navi: { activeInteractableId: "i:notebook", playerPose: { position: [0, 0, 0] } },
+      outcome: { type: "focused", interactableId: "i:notebook" },
+      view: { activeInteractableId: "i:notebook", canConfirm: true }
+    });
+  });
+
+  it("describes blocked and confirmable Navi interaction views", () => {
+    const walk: NaviRuntimeState = {
+      ...createInitialNaviState("map:hall"),
+      playerPose: { position: [0, 0, 0], yaw: 0, pitch: 0 }
+    };
+    const focused: NaviRuntimeState = { ...walk, activeInteractableId: "i:notebook" };
+    const inventory = naviReducer(focused, { type: "OPEN_INVENTORY" });
+
+    expect(createNaviInteractionView(createInitialNaviState("map:hall"))).toEqual({
+      canConfirm: false,
+      blockedReason: "missing-pose"
+    });
+    expect(createNaviInteractionView(walk)).toEqual({
+      canConfirm: false,
+      blockedReason: "no-target"
+    });
+    expect(createNaviInteractionView(inventory)).toEqual({
+      activeInteractableId: "i:notebook",
+      canConfirm: false,
+      blockedReason: "wrong-substate"
+    });
+    expect(createNaviInteractionView(focused)).toEqual({
+      activeInteractableId: "i:notebook",
+      canConfirm: true
+    });
+    expect(createNaviInteractionConfirmRequest(focused)).toEqual({
+      mapId: "map:hall",
+      pose: { position: [0, 0, 0], yaw: 0, pitch: 0 },
+      candidateId: "i:notebook"
     });
   });
 

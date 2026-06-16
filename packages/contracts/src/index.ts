@@ -86,6 +86,39 @@ export const PlayerPoseSchema = z.object({
 });
 export type PlayerPose = z.infer<typeof PlayerPoseSchema>;
 
+export const InteractionBlockedReasonSchema = z.enum([
+  "input-lock",
+  "wrong-substate",
+  "missing-pose",
+  "no-target",
+  "out-of-range",
+  "not-facing"
+]);
+export type InteractionBlockedReason = z.infer<typeof InteractionBlockedReasonSchema>;
+
+export const NaviInteractionSensorReportSchema = z.object({
+  mapId: IdSchema,
+  pose: PlayerPoseSchema,
+  facing: Vector3Schema.optional(),
+  suggestedInteractableId: IdSchema.optional()
+});
+export type NaviInteractionSensorReport = z.infer<typeof NaviInteractionSensorReportSchema>;
+
+export const NaviInteractionViewSchema = z.object({
+  activeInteractableId: IdSchema.optional(),
+  canConfirm: z.boolean(),
+  blockedReason: InteractionBlockedReasonSchema.optional()
+});
+export type NaviInteractionView = z.infer<typeof NaviInteractionViewSchema>;
+
+export const NaviInteractionConfirmRequestSchema = z.object({
+  mapId: IdSchema,
+  pose: PlayerPoseSchema.optional(),
+  facing: Vector3Schema.optional(),
+  candidateId: IdSchema.optional()
+});
+export type NaviInteractionConfirmRequest = z.infer<typeof NaviInteractionConfirmRequestSchema>;
+
 export const SourceLocationSchema = z.object({
   scriptPath: z.string(),
   line: z.number().int().positive(),

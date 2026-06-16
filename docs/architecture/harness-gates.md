@@ -30,15 +30,11 @@ dependency matrix.
   - `test-results/trial-vn3d.png`
   - `test-results/trial-debate3d.png`
   - `test-results/trial-keyword-break.png`
-- First vertical-slice fanout screenshots:
-  - `test-results/navi-interaction.png`
-  - `test-results/r3f-first-person.png`
-  - `test-results/story-vn.png`
-  - `test-results/vn-dialog.png`
-  - `test-results/pixi-vn.png`
+- Accepted vertical-slice screenshots:
   - `test-results/vertical-slice-spawn.png`
   - `test-results/vertical-slice-vn-choice.png`
   - `test-results/vertical-slice-map-change.png`
+  - `test-results/vertical-slice-branch-b.png`
 - Failure screenshots under `test-results/`
 - HTML report under `playwright-report/`
 
@@ -79,27 +75,19 @@ once subsystem APIs stabilize.
 
 ## Fixed Harness Scenario Entries
 
-The first vertical-slice fanout uses fixed query-param entries. They are
-temporary developer harnesses, not production routes.
+The first vertical-slice fanout used fixed query-param entries as temporary
+developer harnesses. After the P1 lines were integrated, only the baseline
+harness and the accepted vertical-slice harness remain active.
 
 | Entry | Owning worktree | Modules allowed to change |
 |---|---|---|
 | `/?scenario=baseline` | P0 baseline | app harness only |
-| `/?scenario=navi-interaction` | `docs/tasks/navi-interaction-flow.md` | `gameplay`, `navi-director`, scenario folder |
-| `/?scenario=r3f-first-person` | `docs/tasks/r3f-first-person.md` | `r3f-adapter`, scenario folder |
-| `/?scenario=story-vn` | `docs/tasks/story-vn-stepper.md` | `story-engine`, scenario folder |
-| `/?scenario=vn-dialog` | `docs/tasks/vn-dialog-surface.md` | `ui-kit`, scenario folder |
-| `/?scenario=pixi-vn` | `docs/tasks/pixi-vn-presenter.md` | `pixi-presenter`, scenario folder |
-| `/?scenario=vertical-slice` | `docs/tasks/vertical-slice-integration.md` | vertical-slice scenario folder after P1 lines merge |
+| `/?scenario=vertical-slice` | `docs/tasks/vertical-slice-integration.md` | integration harness, CCR-backed contract bridge, smoke evidence |
 
-Some independent lines intentionally touch multiple modules, for example
-`navi-interaction` spans `gameplay` and `navi-director`. The task card is the
-source of truth for the exact allowed paths. If a subsystem needs to edit an
-app file outside its own pre-created scenario folder, stop and create a
-follow-up public-core or integration task instead of widening scope silently.
-
-Temporary scenario folders and harness assets should be removed or migrated
-after the vertical slice is accepted.
+Completed temporary subsystem entries are archived under
+`docs/archive/completed-tasks/`. Future slices should add new scenario entries
+for their own acceptance evidence instead of reviving the removed temporary
+entries.
 
 ## Inspector Lite
 

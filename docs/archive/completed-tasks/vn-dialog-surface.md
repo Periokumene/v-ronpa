@@ -14,11 +14,11 @@
 
 ## Status
 
-- State: `Ready`
+- State: `Archived`
 - Owner: `TBD`
 - Created: `2026-06-14`
 - Updated: `2026-06-15`
-- Completed Commit: `TBD`
+- Completed Commit: `4db94ee`
 - Archive Target: `docs/archive/completed-tasks/vn-dialog-surface.md`
 
 ## Worktree Environment

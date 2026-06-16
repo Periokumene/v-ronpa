@@ -14,11 +14,11 @@
 
 ## Status
 
-- State: `Ready`
+- State: `Archived`
 - Owner: `TBD`
 - Created: `2026-06-14`
 - Updated: `2026-06-15`
-- Completed Commit: `TBD`
+- Completed Commit: `d4583f2`
 - Archive Target: `docs/archive/completed-tasks/navi-interaction-flow.md`
 
 ## Worktree Environment

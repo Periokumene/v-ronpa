@@ -14,11 +14,11 @@
 
 ## Status
 
-- State: `Ready`
+- State: `Archived`
 - Owner: `TBD`
 - Created: `2026-06-14`
 - Updated: `2026-06-16`
-- Completed Commit: `TBD`
+- Completed Commit: `6222df1`
 - Archive Target: `docs/archive/completed-tasks/r3f-first-person.md`
 
 ## Worktree Environment

@@ -14,11 +14,11 @@
 
 ## Status
 
-- State: `Ready`
+- State: `Archived`
 - Owner: `TBD`
 - Created: `2026-06-14`
 - Updated: `2026-06-15`
-- Completed Commit: `TBD`
+- Completed Commit: `b50b271`
 - Archive Target: `docs/archive/completed-tasks/story-vn-stepper.md`
 
 ## Worktree Environment

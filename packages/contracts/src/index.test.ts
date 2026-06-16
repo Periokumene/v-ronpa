@@ -3,6 +3,9 @@ import {
   CameraRigDefSchema,
   ContentManifestSchema,
   InputBindingMapSchema,
+  NaviInteractionConfirmRequestSchema,
+  NaviInteractionSensorReportSchema,
+  NaviInteractionViewSchema,
   NaviRuntimeStateSchema,
   PresentationCommandSchema,
   RuntimeAssetSchema,
@@ -185,6 +188,51 @@ describe("contracts", () => {
         inputLock: "trial-targeting"
       })
     ).toMatchObject({ presentation: "debate3d", keywordStates: {} });
+  });
+
+  it("validates Navi interaction authority handoff shapes", () => {
+    expect(
+      NaviInteractionSensorReportSchema.parse({
+        mapId: "map:academy-hall",
+        pose: { position: [0, 1.7, -2.5], yaw: 0, pitch: 0 },
+        facing: [0, 0, -1],
+        suggestedInteractableId: "interactable:classroom-door"
+      })
+    ).toMatchObject({
+      mapId: "map:academy-hall",
+      suggestedInteractableId: "interactable:classroom-door"
+    });
+
+    expect(
+      NaviInteractionViewSchema.parse({
+        activeInteractableId: "interactable:classroom-door",
+        canConfirm: true
+      })
+    ).toMatchObject({ activeInteractableId: "interactable:classroom-door", canConfirm: true });
+
+    expect(
+      NaviInteractionViewSchema.parse({
+        canConfirm: false,
+        blockedReason: "input-lock"
+      })
+    ).toMatchInlineSnapshot(`
+      {
+        "blockedReason": "input-lock",
+        "canConfirm": false,
+      }
+    `);
+
+    expect(
+      NaviInteractionConfirmRequestSchema.parse({
+        mapId: "map:academy-hall",
+        pose: { position: [0, 1.7, -2.5] },
+        candidateId: "interactable:classroom-door"
+      })
+    ).toMatchObject({
+      mapId: "map:academy-hall",
+      pose: { yaw: 0, pitch: 0 },
+      candidateId: "interactable:classroom-door"
+    });
   });
 
   it("validates input, camera, and runtime asset contracts independently", () => {

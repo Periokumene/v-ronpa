@@ -6,7 +6,7 @@
 
 ## Branch Name
 
-- `ai/navi-to-vn-vertical-slice`
+- `integration/navi-vn-vertical-slice-0616`
 
 ## Worktree Path
 
@@ -14,10 +14,10 @@
 
 ## Status
 
-- State: `Draft`
-- Owner: `TBD`
+- State: `Review`
+- Owner: `Codex`
 - Created: `2026-06-14`
-- Updated: `2026-06-15`
+- Updated: `2026-06-16`
 - Completed Commit: `TBD`
 - Archive Target: `docs/archive/completed-tasks/vertical-slice-integration.md`
 
@@ -40,10 +40,9 @@ worktrees do not share the same dev server.
 请先阅读 AGENTS.md、docs/architecture/system-guide.md、docs/architecture/worktree-flow.md、docs/architecture/harness-gates.md、以及本 task card。
 先运行 pnpm setup:worktree-env；Vite/Playwright 会读取 .env.worktree 隔离端口，不要提交 .env.worktree、.local-state、test-results 或 playwright-report。
 本线必须等待 navi-interaction、r3f-first-person、story-vn、vn-dialog、pixi-vn 五条独立线合入后再启动。
-目标只是在 P0 预留的 /?scenario=vertical-slice 中联通首个可玩切片，不新增 public contracts、不扩大到生产 app flow。
-只能使用 apps/game/src/harness/scenarios/vertical-slice/** 和 tests/smoke/vertical-slice.spec.ts；不要修改 apps/game 其他文件。
-若发现必须改 apps/game 其他文件、shared fixture、contracts、依赖、或任务卡外路径，停止并在 review packet 中说明需要 public-core/integration follow-up，不要扩大范围。
-实现后运行 Required Gates，最终运行 BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/vertical-slice-integration.md。
+目标是在 P0 预留的 /?scenario=vertical-slice 中联通首个可玩切片，随后移除五个临时 subsystem scenario。
+本轮允许通过 CCR-0001 增加 Navi/R3F interaction authority 的 additive public contract。
+实现后运行 Required Gates；累计合线分支不再对单张 subsystem task 运行 validate:subsystem。
 输出 changed files、测试结果、截图路径、残余风险。
 ```
 
@@ -59,17 +58,23 @@ The harness entry is `/?scenario=vertical-slice`.
 ## Constraints
 
 - Start only after independent lines merge.
-- Do not introduce new public contracts.
+- Public contract changes require CCR and additive compatibility.
 - Do not implement unrelated Trial, save/load, or production asset behavior.
 
 ## Allowed Paths
 
 - `apps/game/src/harness/scenarios/vertical-slice/**`
+- `apps/game/src/harness/registry.tsx`
+- `tests/smoke/harness-registry.spec.ts`
 - `tests/smoke/vertical-slice.spec.ts`
+- `packages/contracts/**`
+- `packages/navi-director/**`
+- `docs/ccr/**`
+- `docs/archive/completed-tasks/**`
+- `docs/architecture/harness-gates.md`
 
 ## Forbidden Paths
 
-- `packages/contracts/**`
 - `packages/presentation-contracts/**`
 - `packages/nani-parser/src/types.ts`
 - `pnpm-lock.yaml`
@@ -77,7 +82,13 @@ The harness entry is `/?scenario=vertical-slice`.
 
 ## Contracts
 
-Consume existing P0 contracts and merged P1 package APIs.
+Consume merged P1 package APIs and add CCR-0001 for Navi/R3F interaction
+authority:
+
+- `NaviInteractionSensorReport`
+- `NaviInteractionView`
+- `NaviInteractionConfirmRequest`
+- `InteractionBlockedReason`
 
 ## Observability And Acceptance Matrix
 
@@ -89,7 +100,7 @@ Consume existing P0 contracts and merged P1 package APIs.
 | Map transition | Smoke state and screenshot |
 | VN dialog trigger | Smoke state and screenshot |
 | Choice A returns to hallway | Smoke state |
-| Choice B changes scene | Smoke state |
+| Choice B grants evidence / branches route | Smoke state and screenshot |
 
 ## Regression Requirements
 
@@ -97,11 +108,12 @@ Required regression cases:
 
 - Normal path: item interaction, VN trigger, choice branch.
 - Boundary path: no active interactable does not change state.
-- Integration path: choice A returns, choice B changes map.
+- Integration path: choice A returns, choice B branches and applies gameplay event.
 
 Test placement:
 
 - `tests/smoke/vertical-slice.spec.ts`
+- package unit tests for contract and Navi authority helpers
 
 ## Dependency Changes
 
@@ -109,19 +121,23 @@ None.
 
 ## CCR Triggers
 
-Any public contract or app-wide harness change beyond this scenario.
+Any future public contract or app-wide harness change beyond CCR-0001.
 
 ## Required Gates
 
 ```bash
 pnpm setup:worktree-env
+pnpm validate:contracts
+pnpm validate:boundaries
+pnpm test
 pnpm --filter @v-ronpa/game build
-BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/vertical-slice-integration.md
+pnpm test:smoke
+pnpm validate:baseline
 ```
 
 ## Programmatic Acceptance
 
-Build, smoke, and subsystem validation pass.
+Build, smoke, and baseline validation pass.
 
 ## Manual Acceptance
 
@@ -129,10 +145,17 @@ Reviewer plays the route and checks screenshots for readability.
 
 ## Temporary Harness Cleanup
 
-This is the final temporary integration entry. Remove
-`apps/game/src/harness/scenarios/vertical-slice/**`,
-`tests/smoke/vertical-slice.spec.ts`, and related fixture assets after the
-accepted slice is migrated into production harness or app flow.
+Removed the five temporary subsystem scenario entries and smoke specs after
+their behavior was integrated:
+
+- `navi-interaction`
+- `r3f-first-person`
+- `story-vn`
+- `vn-dialog`
+- `pixi-vn`
+
+Keep `/?scenario=vertical-slice` as the accepted integration harness for this
+round. Future slices should create new scenario entries.
 
 ## Review Packet
 
