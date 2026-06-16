@@ -5,7 +5,7 @@ test.setTimeout(60_000);
 test("vertical slice connects Navi exploration, gameplay state, VN dialog, and branch outcomes", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
+    if (message.type() === "error" && !isExpectedPointerLockError(message.text())) consoleErrors.push(message.text());
   });
 
   await page.goto("/?scenario=vertical-slice");
@@ -15,8 +15,10 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vertical-slice-shell")).toBeVisible();
   await expect(page.locator("canvas")).toHaveCount(2);
   await expect(page.getByTestId("vertical-slice-map")).toHaveText("map:academy-hall");
+  await expect(page.getByTestId("vertical-slice-pointer-lock-status")).toHaveText("idle");
   await page.screenshot({ path: "test-results/vertical-slice-spawn.png", fullPage: true });
 
+  await requestPointerLockAndRelease(page, "vertical-slice-pointer-lock", "vertical-slice-pointer-lock-status");
   await expect(page.getByTestId("vertical-slice-active-interactable")).toHaveText("none");
   await blurActiveElement(page);
   await expectKeyNeverFocuses(page, "KeyW", "vertical-slice-active-interactable");
@@ -128,4 +130,21 @@ async function blurActiveElement(page: Page) {
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   });
+}
+
+async function requestPointerLockAndRelease(page: Page, triggerTestId: string, statusTestId: string) {
+  await page.getByTestId(triggerTestId).click();
+  await expect(page.getByTestId(statusTestId)).toHaveText(/requested|locked|unlocked|denied/);
+  await page.waitForTimeout(650);
+
+  const status = (await page.getByTestId(statusTestId).textContent()) ?? "";
+  expect(status).toMatch(/locked|unlocked|denied/);
+  if (!status.includes("locked")) return;
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId(statusTestId)).toHaveText("unlocked");
+}
+
+function isExpectedPointerLockError(text: string): boolean {
+  return text.includes("PointerLockControls: Unable to use Pointer Lock API");
 }

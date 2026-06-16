@@ -22,6 +22,7 @@ import { InspectorLite, VnDialogSurface } from "@v-ronpa/ui-kit";
 import { PixiLayer } from "../../../PixiLayer";
 import { verticalSliceEvidence, verticalSliceItem, verticalSliceMaps, verticalSliceScript } from "../../fixtures/verticalSlice";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../../inputActions";
+import { useFirstPersonExplorationBridge } from "../../useFirstPersonExplorationBridge";
 
 type PosePresetId = "spawn" | "notebook" | "keycard" | "door" | "hall-door" | "witness" | "empty";
 
@@ -65,13 +66,9 @@ export function VerticalSliceScenario() {
   }));
   const [lastOutcome, setLastOutcome] = useState("spawn");
   const [lastAction, setLastAction] = useState("boot");
-  const [resetSignal, setResetSignal] = useState(0);
-  const [poseCommand, setPoseCommand] = useState<{ pose: PlayerPose; signal: number }>(() => ({
-    pose: { position: initialMap.spawn, yaw: 0, pitch: 0 },
-    signal: 0
-  }));
   const [storySession, setStorySession] = useState(0);
   const activeMap = getActiveMap(navi);
+  const currentCameraMode = navi.inputLock === "none" ? "first-person" : "locked";
   const inputActionsRef = useKeyboardInputActions(defaultHarnessInputBindings, "navi", navi.inputLock === "none");
   const interactionView = createNaviInteractionView(navi);
   const currentLine = storyRuntime.active ? selectCurrentStoryLine(storyRuntime.state) : undefined;
@@ -87,13 +84,8 @@ export function VerticalSliceScenario() {
     setStoryRuntime({ state: createInitialStoryState(parsed.scenario), active: false });
     setLastOutcome("reset");
     setLastAction("reset");
-    setResetSignal((signal) => signal + 1);
-    syncStagePose(spawnPose);
+    firstPersonBridge.issuePoseCommand(spawnPose);
     setStorySession((session) => session + 1);
-  }
-
-  function syncStagePose(pose: PlayerPose) {
-    setPoseCommand((current) => ({ pose, signal: current.signal + 1 }));
   }
 
   function moveToPreset(id: PosePresetId) {
@@ -106,7 +98,7 @@ export function VerticalSliceScenario() {
       pose: preset.pose
     });
     setNavi(focused.navi);
-    syncStagePose(preset.pose);
+    firstPersonBridge.issuePoseCommand(preset.pose);
     setLastAction(`move:${id}`);
     setLastOutcome(focused.view.activeInteractableId ? `focused:${focused.view.activeInteractableId}` : focused.view.blockedReason ?? "none");
   }
@@ -133,11 +125,22 @@ export function VerticalSliceScenario() {
       setGameplay(resolution.gameplay);
       setLastAction(`confirm:${confirmationNavi.activeInteractableId ?? "none"}`);
       setLastOutcome(formatOutcome(resolution.outcome));
-      if (resolution.navi.playerPose) syncStagePose(resolution.navi.playerPose);
+      if (resolution.outcome.type === "change-map" && resolution.navi.playerPose) {
+        firstPersonBridge.issuePoseCommand(resolution.navi.playerPose);
+      }
       if (resolution.outcome.type === "start-script") startStoryOverlay();
     },
     [activeMap, gameplay, navi]
   );
+  const firstPersonBridge = useFirstPersonExplorationBridge({
+    map: activeMap,
+    cameraMode: currentCameraMode,
+    inputLock: navi.inputLock,
+    inputActionsRef,
+    ...(navi.activeInteractableId ? { activeInteractableId: navi.activeInteractableId } : {}),
+    onSensorReport: recordSensorReport,
+    onInteractRequest: confirmInteraction
+  });
 
   function startStoryOverlay() {
     const initial = createInitialStoryState(parsed.scenario);
@@ -183,18 +186,7 @@ export function VerticalSliceScenario() {
     <main className="app-shell app-shell-harness">
       <section className="playfield" data-testid="playfield">
         <div className="scene-stack" data-testid="vertical-slice-shell">
-          <ExplorationStage3D
-            map={activeMap}
-            cameraMode={navi.inputLock === "none" ? "first-person" : "locked"}
-            inputLock={navi.inputLock}
-            inputActionsRef={inputActionsRef}
-            {...(navi.activeInteractableId ? { activeInteractableId: navi.activeInteractableId } : {})}
-            poseOverride={poseCommand.pose}
-            poseOverrideSignal={poseCommand.signal}
-            resetSignal={resetSignal}
-            onSensorReport={recordSensorReport}
-            onInteractRequest={confirmInteraction}
-          />
+          <ExplorationStage3D {...firstPersonBridge.explorationStageProps} />
           <PixiLayer key={storySession} commands={pixiCommands} visible={storyRuntime.active} />
           {storyRuntime.active && currentLine ? (
             <VnDialogSurface
@@ -230,7 +222,10 @@ export function VerticalSliceScenario() {
                 Move: {preset.label}
               </button>
             ))}
-            <button data-testid="vertical-slice-confirm" type="button" onClick={() => confirmInteraction()}>
+            <button {...firstPersonBridge.pointerLockTriggerProps} data-testid="vertical-slice-pointer-lock">
+              Mouse look
+            </button>
+            <button data-testid="vertical-slice-confirm" type="button" onClick={firstPersonBridge.requestInteract}>
               Confirm
             </button>
             <button data-testid="vertical-slice-advance" type="button" onClick={advanceStory} disabled={!storyRuntime.active}>
@@ -245,6 +240,7 @@ export function VerticalSliceScenario() {
           <Readout label="Map" testId="vertical-slice-map" value={navi.activeMapId ?? "none"} />
           <Readout label="Substate" testId="vertical-slice-substate" value={navi.substate} />
           <Readout label="Input" testId="vertical-slice-input-lock" value={navi.inputLock} />
+          <Readout label="Pointer" testId="vertical-slice-pointer-lock-status" value={firstPersonBridge.pointerLockStatus} />
           <Readout label="Active" testId="vertical-slice-active-interactable" value={navi.activeInteractableId ?? "none"} />
           <Readout label="Can" testId="vertical-slice-can-confirm" value={String(interactionView.canConfirm)} />
           <Readout label="Block" testId="vertical-slice-blocked-reason" value={interactionView.blockedReason ?? "none"} />

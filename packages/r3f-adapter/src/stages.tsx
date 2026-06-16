@@ -265,6 +265,19 @@ function FirstPersonRig({
   }, [onPointerLockChangeRef]);
 
   useEffect(() => {
+    return () => {
+      const controls = controlsRef.current;
+      if (!controls?.isLocked) return;
+
+      try {
+        controls.unlock();
+      } finally {
+        onPointerLockChangeRef.current?.("unlocked");
+      }
+    };
+  }, [onPointerLockChangeRef]);
+
+  useEffect(() => {
     applyPose(getInitialPose(map));
   }, [applyPose, map?.id]);
 

@@ -34,6 +34,7 @@ import { DialogBox, InspectorLite, ScenarioTabs } from "@v-ronpa/ui-kit";
 import { harnessMap, harnessScript, harnessTrial } from "../../../fixtures";
 import { PixiLayer } from "../../../PixiLayer";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../../inputActions";
+import { useFirstPersonExplorationBridge } from "../../useFirstPersonExplorationBridge";
 
 const scenarioOptions = [
   { id: "navi", label: "Navi" },
@@ -96,6 +97,15 @@ export function BaselineScenario() {
     },
     [gameplay, navi]
   );
+  const firstPersonBridge = useFirstPersonExplorationBridge({
+    map: harnessMap,
+    cameraMode: currentCameraMode,
+    inputLock: currentInputLock,
+    inputActionsRef,
+    ...(navi.activeInteractableId ? { activeInteractableId: navi.activeInteractableId } : {}),
+    onSensorReport: recordSensorReport,
+    onInteractRequest: confirmNaviInteraction
+  });
 
   function transition(nextMode: string) {
     const parsedMode = GameModeSchema.parse(nextMode);
@@ -237,15 +247,7 @@ export function BaselineScenario() {
               inputLock={currentInputLock}
             />
           ) : (
-            <ExplorationStage3D
-              map={harnessMap}
-              cameraMode={currentCameraMode}
-              inputLock={currentInputLock}
-              inputActionsRef={inputActionsRef}
-              {...(navi.activeInteractableId ? { activeInteractableId: navi.activeInteractableId } : {})}
-              onSensorReport={recordSensorReport}
-              onInteractRequest={confirmNaviInteraction}
-            />
+            <ExplorationStage3D {...firstPersonBridge.explorationStageProps} />
           )}
           <PixiLayer commands={presentationCommands} visible={pixiVisible} />
         </div>
@@ -257,6 +259,7 @@ export function BaselineScenario() {
             <small data-testid="current-detail">{currentDetail}</small>
             <small data-testid="current-input-lock">{currentInputLock}</small>
             <small data-testid="current-camera-mode">{currentCameraMode}</small>
+            <small data-testid="current-pointer-lock">pointer:{firstPersonBridge.pointerLockStatus}</small>
             <small data-testid="current-active-interactable">{navi.activeInteractableId ?? "none"}</small>
             <small data-testid="current-can-confirm">{String(naviInteractionView.canConfirm)}</small>
           </div>
@@ -266,6 +269,12 @@ export function BaselineScenario() {
               <>
                 <button onClick={inspectCaseFile} data-testid="inspect-case-file">
                   Inspect case file
+                </button>
+                <button {...firstPersonBridge.pointerLockTriggerProps} data-testid="navi-pointer-lock">
+                  Mouse look
+                </button>
+                <button onClick={firstPersonBridge.requestInteract} data-testid="navi-confirm">
+                  Confirm
                 </button>
                 <button onClick={startNaviVn2d} data-testid="navi-vn2d">
                   Trigger VN2D

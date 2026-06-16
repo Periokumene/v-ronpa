@@ -20,6 +20,13 @@ Input runtimes map devices to actions with `InputBindingMap`, then publish
 `InputActionState` snapshots for renderers and directors. Gameplay reducers
 consume actions; they should not depend on raw keyboard or mouse codes.
 
+Mouse-look deltas are not represented in `InputActionState` yet. The current
+first-person path uses R3F `PointerLockControls` to keep high-frequency look
+delta inside the camera rig, then reports the resulting pose and facing through
+`NaviInteractionSensorReport`. If mouse, gamepad, and touch look axes need a
+shared semantic runtime later, add a new public contract through a CCR instead
+of overloading pressed/released action events.
+
 ## Input Locks
 
 `InputLockState` describes who owns player input:
@@ -75,3 +82,7 @@ commands are not evidence that real player movement is wired. Smoke coverage for
 first-person slices should include a true input path: map physical input to
 semantic actions, move through `InputActionState`, obtain a Navi-authoritative
 active target, and confirm with `interact`.
+
+App harness bridge hooks may connect DOM controls, pointer-lock status, pose
+commands, and interact signals to `ExplorationStage3D`, but they must not own
+camera pose or compute confirmable interactable candidates.

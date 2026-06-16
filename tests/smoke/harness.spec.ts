@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 test("harness validates Navi and Trial mode boundaries", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
+    if (message.type() === "error" && !isExpectedPointerLockError(message.text())) consoleErrors.push(message.text());
   });
 
   await page.goto("/");
@@ -16,15 +16,19 @@ test("harness validates Navi and Trial mode boundaries", async ({ page }) => {
   await expect(page.getByTestId("current-camera-mode")).toHaveText("first-person");
   await expect(page.getByTestId("current-active-interactable")).toHaveText("none");
   await expect(page.getByTestId("current-can-confirm")).toHaveText("false");
+  await expect(page.getByTestId("current-pointer-lock")).toHaveText("pointer:idle");
   await expect(page.locator("canvas")).toHaveCount(2);
   await page.screenshot({ path: "test-results/navi-walk.png", fullPage: true });
 
+  await requestPointerLockAndRelease(page, "navi-pointer-lock", "current-pointer-lock");
   await blurActiveElement(page);
   await expectKeyNeverFocuses(page, "KeyW", "current-active-interactable");
   await walkWithKeyUntilActive(page, "ArrowUp", "current-active-interactable", "interactable:case-file");
   await expect(page.getByTestId("current-can-confirm")).toHaveText("true");
   await page.keyboard.press("KeyE");
   await expect(page.getByTestId("current-notice")).toHaveText("Navi walk: 3D exploration baseline");
+  await page.getByTestId("navi-confirm").click();
+  await expect(page.getByText(/Navi granted evidence:keycard/)).toBeVisible();
   await page.keyboard.press("Space");
   await expect(page.getByText(/Navi granted evidence:keycard/)).toBeVisible();
 
@@ -101,4 +105,21 @@ async function blurActiveElement(page: Page) {
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   });
+}
+
+async function requestPointerLockAndRelease(page: Page, triggerTestId: string, statusTestId: string) {
+  await page.getByTestId(triggerTestId).click();
+  await expect(page.getByTestId(statusTestId)).toHaveText(/pointer:(requested|locked|unlocked|denied)/);
+  await page.waitForTimeout(650);
+
+  const status = (await page.getByTestId(statusTestId).textContent()) ?? "";
+  expect(status).toMatch(/pointer:(locked|unlocked|denied)/);
+  if (!status.includes("locked")) return;
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId(statusTestId)).toHaveText(/pointer:unlocked/);
+}
+
+function isExpectedPointerLockError(text: string): boolean {
+  return text.includes("PointerLockControls: Unable to use Pointer Lock API");
 }
