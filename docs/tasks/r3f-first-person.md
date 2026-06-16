@@ -17,7 +17,7 @@
 - State: `Ready`
 - Owner: `TBD`
 - Created: `2026-06-14`
-- Updated: `2026-06-15`
+- Updated: `2026-06-16`
 - Completed Commit: `TBD`
 - Archive Target: `docs/archive/completed-tasks/r3f-first-person.md`
 
@@ -58,9 +58,9 @@ The harness entry is `/?scenario=r3f-first-person`.
 
 This task turns the reserved P0 shell into an end-to-end R3F first-person
 presentation slice. It is intentionally not a production Navi flow task: the
-adapter proves first-person camera, movement, focus, interaction callbacks,
-fallback rendering, and observable harness evidence while directors and
-gameplay remain outside this branch.
+adapter proves first-person camera, movement, hotspot candidate detection,
+interaction request callbacks, fallback rendering, and observable harness
+evidence while directors and gameplay remain outside this branch.
 
 ## Design Intent
 
@@ -71,8 +71,8 @@ gameplay remain outside this branch.
   formal gameplay runtime. The reusable first-person capability must live in
   `packages/r3f-adapter`.
 - Prove the first-person player verbs that matter for the vertical slice:
-  boot, look, move, clamp, focus, interact, reset to spawn, local map change,
-  and missing model fallback.
+  boot, look, move, clamp, candidate detection, interact request, reset to
+  spawn, and missing model fallback.
 - Keep the implementation P0-sized. Do not introduce physics, navmesh,
   production collision, general map routing, or input binding integration.
 
@@ -86,11 +86,12 @@ gameplay remain outside this branch.
 - Keep high-frequency pose/camera mutation inside R3F scene components and
   report low-frequency observable state through callbacks/readouts.
 - Export pure helper functions from `@v-ronpa/r3f-adapter` for AABB clamp and
-  hotspot focus calculation so boundary behavior is unit-testable without a
-  browser.
-- Do not put gameplay rules in R3F. Interact callbacks may report the focused
-  interactable and its action shape; they must not grant inventory/evidence or
-  submit gameplay outcomes.
+  hotspot candidate calculation so boundary behavior is unit-testable without
+  a browser.
+- Do not put gameplay rules in R3F. Interact request callbacks may report the
+  current candidate id and player pose; they must not read or execute
+  interactable actions, grant inventory/evidence, change maps, or submit
+  gameplay outcomes.
 
 ## Functional Requirements
 
@@ -100,19 +101,21 @@ gameplay remain outside this branch.
 - WASD movement updates the first-person pose on the X/Z plane and clamps the
   camera position to `WorldMapDef.walkBounds`.
 - A reset-spawn command returns the pose to the current map spawn/camera rig.
-- Pointer Lock look changes facing direction and drives hotspot focus.
-- Hotspot focus is based on both facing direction and interactable distance.
-  The focused interactable must be observable by the harness.
-- Interact triggers the focused interactable callback and updates harness HUD
-  state with the interactable id and action type.
-- A `change-map` interactable may perform a scenario-local map switch between
-  existing vertical-slice maps. Do not implement a general map router in the
-  adapter.
+- Pointer Lock look changes facing direction and drives hotspot candidate
+  detection.
+- Hotspot candidate detection is based on both facing direction and
+  interactable distance. The candidate id must be observable by the harness.
+- Interact triggers an interaction request callback and updates harness HUD
+  state with the candidate id or a no-candidate request state.
+- `change-map` interactables may appear in the source maps, but this branch must
+  not execute their actions or switch maps. Map transitions belong to Navi
+  director/integration wiring, not the R3F adapter or this harness slice.
 - glTF/gltf map assets should load through existing R3F/drei dependencies. If
   a model is unavailable or fails to load, render a clear primitive fallback
   scene instead of leaving a blank canvas.
 - The `r3f-first-person` scenario must expose smoke-readable HUD/readout state
-  for pose, focus, last action, current map, fallback status, and pointer lock.
+  for pose, candidate id, last interaction request, current map, fallback
+  status, and pointer lock.
 
 ## Constraints
 
@@ -155,9 +158,9 @@ Expected adapter API shape:
 
 - Preserve existing `ExplorationStage3D` usage.
 - Add only minimal observation/control props needed by the scenario, such as
-  pose/focus/interact/fallback/pointer-lock callbacks, reset signal, and
-  interact signal.
-- Export pure helper functions for clamp and focus tests. These helpers are
+  pose/candidate/interact-request/fallback/pointer-lock callbacks, reset
+  signal, and interact signal.
+- Export pure helper functions for clamp and candidate tests. These helpers are
   public package exports, so keep their names and behavior narrow and stable.
 
 ## Observability And Acceptance Matrix
@@ -169,9 +172,9 @@ Expected adapter API shape:
 | WASD movement updates pose | Scenario HUD/readout |
 | Movement clamps to AABB | Adapter unit test and smoke readout |
 | Spawn reset | Scenario command and pose readout |
-| Hotspot focus callback | Scenario HUD/readout |
-| Interact callback | Scenario HUD/readout with id/action type |
-| Scenario-local map switch | Scenario HUD/readout shows map change |
+| Hotspot candidate callback | Scenario HUD/readout |
+| Interact request callback | Scenario HUD/readout with request id |
+| Map ownership boundary | Smoke shows interact request does not switch maps |
 | Missing model fallback | `test-results/r3f-first-person-fallback.png` |
 
 ## Harness Scenario Requirements
@@ -181,24 +184,26 @@ Expected adapter API shape:
 - Add commands or controls only inside the scenario folder.
 - Expose stable `data-testid` readouts for:
   - current pose
-  - focused interactable
-  - last action
+  - candidate interactable
+  - last interaction request
   - current map
   - fallback status
   - pointer-lock status
 - Use the existing `verticalSliceMaps` as source maps. Any missing-model map
   variant must be local to the scenario file/folder.
-- Local map switching is allowed only as harness demonstration. It is not a
-  substitute for future Navi director map flow.
+- Do not perform local map switching in this R3F branch. The scenario may show
+  the source map id and candidate request, but map changes must wait for future
+  Navi director/integration wiring.
 
 ## Regression Requirements
 
 Required regression cases:
 
-- Normal path: move/look/focus/interact.
+- Normal path: move/look/candidate/interact request.
 - Boundary path: movement clamps at room bounds.
 - Fallback path: missing glTF still renders primitives.
-- Map path: door interaction switches the scenario-local current map.
+- Ownership path: door interaction emits a request while current map ownership
+  remains outside R3F.
 - Pointer Lock path: activation is attempted and observable; if browser
   automation denies lock, the test must still record that limitation.
 
@@ -211,8 +216,9 @@ Adapter unit tests must cover:
 
 - clamp keeps an in-bounds vector unchanged.
 - clamp clips below min and above max AABB boundaries.
-- focus selects an interactable when facing it within radius.
-- focus rejects targets outside radius or outside the facing threshold.
+- candidate selection returns an interactable when facing it within radius.
+- candidate selection rejects targets outside radius or outside the facing
+  threshold.
 
 Smoke test must cover:
 
@@ -220,9 +226,9 @@ Smoke test must cover:
 - Pointer Lock activation path is attempted and reflected in readout.
 - movement changes pose readout.
 - movement cannot exceed `walkBounds`.
-- focus readout changes when facing/near a hotspot.
-- interact updates HUD/readout.
-- door interaction switches the scenario-local map.
+- candidate readout changes when facing/near a hotspot.
+- interact updates HUD/readout with a request.
+- door interaction request leaves the current map unchanged.
 - missing-model variant renders fallback and produces a screenshot.
 - screenshots are saved to:
   - `test-results/r3f-first-person.png`
