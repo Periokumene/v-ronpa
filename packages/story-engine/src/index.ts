@@ -17,6 +17,28 @@ export interface StoryRuntimeState extends StoryRuntimeSnapshot {
   effects: StoryEffect[];
 }
 
+export type StoryStepperDiagnosticCode = "invalid-choice" | "story-ended-noop" | "pending-choices" | "max-steps";
+
+export interface StoryStepperDiagnostic {
+  code: StoryStepperDiagnosticCode;
+  message: string;
+}
+
+export interface StoryStepperResult {
+  state: StoryRuntimeState;
+  diagnostics: StoryStepperDiagnostic[];
+}
+
+export interface AdvanceToNextStopOptions {
+  maxSteps?: number;
+  registry?: CommandRegistry;
+}
+
+export interface CurrentStoryLine {
+  speaker?: string;
+  text: string;
+}
+
 export type StoryEvent =
   | { type: "STEP"; scenario: ScenarioIR }
   | { type: "CHOOSE"; scenario: ScenarioIR; index: number }
@@ -90,6 +112,82 @@ export function storyRuntimeSnapshot(state: StoryRuntimeState): StoryRuntimeSnap
   };
 }
 
+const DEFAULT_ADVANCE_MAX_STEPS = 100;
+
+export function advanceToNextStop(
+  state: StoryRuntimeState,
+  scenario: ScenarioIR,
+  options: AdvanceToNextStopOptions = {}
+): StoryStepperResult {
+  if (state.ended) {
+    return {
+      state,
+      diagnostics: [createDiagnostic("story-ended-noop", "Story is already ended; advance did not change state.")]
+    };
+  }
+
+  if (state.pendingChoices.length > 0) {
+    return {
+      state,
+      diagnostics: [createDiagnostic("pending-choices", "Story is waiting for a choice; advance did not change state.")]
+    };
+  }
+
+  const diagnostics: StoryStepperDiagnostic[] = [];
+  const registry = options.registry ?? createCommandRegistry();
+  const maxSteps = Math.max(0, Math.floor(options.maxSteps ?? DEFAULT_ADVANCE_MAX_STEPS));
+  let nextState = state;
+  let steps = 0;
+
+  while (steps < maxSteps) {
+    if (nextState.ended) return { state: nextState, diagnostics };
+
+    const statement = scenario.statements[nextState.instructionPointer];
+    if (!statement) return { state: { ...nextState, ended: true }, diagnostics };
+
+    nextState = executeStatementAtPointer(nextState, scenario, statement, registry);
+    steps += 1;
+
+    if (statement.kind === "text" || nextState.ended) return { state: nextState, diagnostics };
+
+    if (nextState.pendingChoices.length > 0) {
+      const nextStatement = scenario.statements[nextState.instructionPointer];
+      if (nextStatement && isChoiceStatement(nextStatement, registry)) continue;
+      return { state: nextState, diagnostics };
+    }
+  }
+
+  return {
+    state: nextState,
+    diagnostics: [
+      ...diagnostics,
+      createDiagnostic("max-steps", `Advance stopped after reaching the max step limit of ${maxSteps}.`)
+    ]
+  };
+}
+
+export function chooseStoryOption(state: StoryRuntimeState, scenario: ScenarioIR, index: number): StoryStepperResult {
+  const choice = Number.isInteger(index) ? state.pendingChoices[index] : undefined;
+  if (!choice) {
+    return {
+      state,
+      diagnostics: [createDiagnostic("invalid-choice", `Choice index ${index} is not available.`)]
+    };
+  }
+
+  const cleared = { ...state, pendingChoices: [] };
+  return {
+    state: choice.goto ? jumpToLabel(cleared, scenario, choice.goto) : cleared,
+    diagnostics: []
+  };
+}
+
+export function selectCurrentStoryLine(state: StoryRuntimeState): CurrentStoryLine | undefined {
+  const latest = state.backlog.at(-1);
+  if (!latest) return undefined;
+  return latest.speaker ? { speaker: latest.speaker, text: latest.text } : { text: latest.text };
+}
+
 export function storyReducer(
   state: StoryRuntimeState,
   event: StoryEvent,
@@ -118,7 +216,24 @@ export function storyReducer(
   const statement = event.scenario.statements[state.instructionPointer];
   if (!statement) return { ...state, ended: true };
 
-  return executeStatement({ ...state, instructionPointer: state.instructionPointer + 1 }, event.scenario, statement, registry);
+  return executeStatementAtPointer(state, event.scenario, statement, registry);
+}
+
+function createDiagnostic(code: StoryStepperDiagnosticCode, message: string): StoryStepperDiagnostic {
+  return { code, message };
+}
+
+function executeStatementAtPointer(
+  state: StoryRuntimeState,
+  scenario: ScenarioIR,
+  statement: StatementIR,
+  registry: CommandRegistry
+): StoryRuntimeState {
+  return executeStatement({ ...state, instructionPointer: state.instructionPointer + 1 }, scenario, statement, registry);
+}
+
+function isChoiceStatement(statement: StatementIR, registry: CommandRegistry): boolean {
+  return statement.kind === "command" && registry.resolve(statement.commandId)?.category === "choice";
 }
 
 function executeStatement(
