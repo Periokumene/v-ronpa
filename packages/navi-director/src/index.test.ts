@@ -70,6 +70,32 @@ describe("navi director", () => {
     });
   });
 
+  it("does not change focus while Navi input is locked by an overlay", () => {
+    const map: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:notebook",
+          label: "Notebook",
+          position: [0.2, 0, 0],
+          radius: 1.5,
+          action: { type: "grant-item", itemId: "tool:notebook", quantity: 1 }
+        }
+      ],
+      assetRefs: []
+    };
+    const walk: NaviRuntimeState = { ...createInitialNaviState(map.id), playerPose: { position: [0, 0, 0], yaw: 0, pitch: 0 } };
+    const inventory = naviReducer(walk, { type: "OPEN_INVENTORY" });
+
+    expect(focusNearestNaviInteractable(inventory, map)).toEqual({
+      navi: inventory,
+      outcome: { type: "none" }
+    });
+  });
+
   it("resolves interactables without renderer state", () => {
     const map: WorldMapDef = {
       id: "map:hall",
@@ -151,6 +177,47 @@ describe("navi director", () => {
       },
       gameplay,
       outcome: { type: "start-script", script: "case.nani" }
+    });
+  });
+
+  it("does not confirm or resolve interactables while Navi input is locked", () => {
+    const map: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:notebook",
+          label: "Notebook",
+          position: [0, 0, 0],
+          radius: 1,
+          action: { type: "grant-item", itemId: "tool:notebook", quantity: 1 }
+        }
+      ],
+      assetRefs: []
+    };
+    const gameplay = createGameplayState();
+    const dialog: NaviRuntimeState = {
+      ...createInitialNaviState(map.id),
+      activeInteractableId: "i:notebook",
+      substate: "vn2d-overlay",
+      inputLock: "dialog",
+      overlayScript: "case.nani"
+    };
+    const inventory = naviReducer({ ...createInitialNaviState(map.id), activeInteractableId: "i:notebook" }, {
+      type: "OPEN_INVENTORY"
+    });
+
+    expect(confirmFocusedNaviInteraction(dialog, map, gameplay)).toEqual({
+      navi: dialog,
+      gameplay,
+      outcome: { type: "none" }
+    });
+    expect(resolveNaviInteractable(inventory, map, gameplay, "i:notebook")).toEqual({
+      navi: inventory,
+      gameplay,
+      outcome: { type: "none" }
     });
   });
 

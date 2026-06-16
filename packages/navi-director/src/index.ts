@@ -41,6 +41,10 @@ export function createInitialNaviState(activeMapId?: string): NaviRuntimeState {
   return state;
 }
 
+function canAcceptNaviWalkInteraction(state: NaviRuntimeState): boolean {
+  return state.substate === "walk" && state.inputLock === "none";
+}
+
 export function naviReducer(state: NaviRuntimeState, event: NaviEvent): NaviRuntimeState {
   if (event.type === "ENTER_WALK") {
     return withOptionalFields(
@@ -111,6 +115,13 @@ export function naviReducer(state: NaviRuntimeState, event: NaviEvent): NaviRunt
 }
 
 export function focusNearestNaviInteractable(state: NaviRuntimeState, map: WorldMapDef): NaviFocusResolution {
+  if (!canAcceptNaviWalkInteraction(state)) {
+    return {
+      navi: state,
+      outcome: { type: "none" }
+    };
+  }
+
   if (!state.playerPose) {
     return {
       navi: state,
@@ -139,6 +150,14 @@ export function confirmFocusedNaviInteraction(
   gameplay: GameplayState,
   maps?: WorldMapSource
 ): NaviInteractionResolution {
+  if (!canAcceptNaviWalkInteraction(state)) {
+    return {
+      navi: state,
+      gameplay,
+      outcome: { type: "none" }
+    };
+  }
+
   if (!state.activeInteractableId) {
     return {
       navi: state,
@@ -157,6 +176,14 @@ export function resolveNaviInteractable(
   interactableId: string,
   maps?: WorldMapSource
 ): NaviInteractionResolution {
+  if (!canAcceptNaviWalkInteraction(state)) {
+    return {
+      navi: state,
+      gameplay,
+      outcome: { type: "none" }
+    };
+  }
+
   const interactable = map.interactables.find((candidate) => candidate.id === interactableId);
   if (!interactable) {
     return {
