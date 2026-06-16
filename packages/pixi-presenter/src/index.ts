@@ -1,6 +1,13 @@
-import { Application, Container, Graphics, Text } from "pixi.js";
+import { Application, Assets, Container, Graphics, Sprite, Text, type Texture, type Ticker } from "pixi.js";
 import type { PresentationCommand } from "@v-ronpa/contracts";
 import { createMemoryPresenter, type PresentationSnapshot, type PresenterPort } from "@v-ronpa/presentation-contracts";
+import { VisualEffectScheduler } from "./internal/effects";
+import {
+  calculatePortraitLayout,
+  formatFallbackPortraitLabel,
+  resolveHarnessPortraitUrl,
+  type PortraitSlot
+} from "./internal/portraits";
 
 export interface PixiPresenterOptions {
   host: HTMLElement;
@@ -20,10 +27,19 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
   const portraitLayer = new Container({ label: "portraits" });
   const effectsLayer = new Container({ label: "effects" });
   const trialLayer = new Container({ label: "trial-overlay" });
+  const scheduler = new VisualEffectScheduler();
+  const slotLayers = new Map<PortraitSlot, Container>();
+  const portraitRequestIds: Record<PortraitSlot, number> = {
+    left: 0,
+    center: 0,
+    right: 0
+  };
+  const pendingVisualCommands: PresentationCommand[] = [];
   let mountStarted = false;
   let initialized = false;
   let mounted = false;
   let destroyed = false;
+  const tickEffects = (ticker: Ticker) => scheduler.tick(ticker.deltaMS);
 
   async function mount() {
     if (mountStarted || destroyed) return;
@@ -47,42 +63,54 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     app.canvas.dataset.testid = "pixi-canvas";
     options.host.appendChild(app.canvas);
     app.stage.addChild(backgroundLayer, portraitLayer, effectsLayer, trialLayer);
+    app.ticker.add(tickEffects);
     drawPlate("bg:harness", 0x223044);
     mounted = true;
+    for (const command of pendingVisualCommands.splice(0)) {
+      executeVisual(command);
+    }
   }
 
   function apply(command: PresentationCommand) {
     const perform = memory.apply(command);
-    if (!mounted) return perform;
+    if (!mounted) {
+      pendingVisualCommands.push(command);
+      return perform;
+    }
 
+    executeVisual(command);
+    return perform;
+  }
+
+  function executeVisual(command: PresentationCommand) {
     if (command.type === "set-background") {
       drawPlate(command.backgroundId, 0x26324c);
+      return;
     }
 
     if (command.type === "char-enter") {
-      drawPortrait(command.characterId, command.slot);
+      void drawPortrait(command);
+      return;
     }
 
     if (command.type === "trial-keyword") {
       drawTrialKeyword(command.text);
+      return;
     }
 
     if (command.type === "trial-subtitle") {
       drawTrialSubtitle(command.text, command.style);
+      return;
     }
 
     if (command.type === "flash") {
-      drawFlash(command.color);
+      runFlash(command.color, command.durationMs);
+      return;
     }
 
     if (command.type === "shake") {
-      effectsLayer.x = command.intensity * 12;
-      window.setTimeout(() => {
-        effectsLayer.x = 0;
-      }, command.durationMs);
+      runShake(command.intensity, command.durationMs);
     }
-
-    return perform;
   }
 
   function drawPlate(label: string, color: number) {
@@ -108,28 +136,136 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     backgroundLayer.addChild(plate, title);
   }
 
-  function drawPortrait(characterId: string, slot: "left" | "center" | "right") {
+  async function drawPortrait(command: Extract<PresentationCommand, { type: "char-enter" }>) {
+    const { characterId, portraitId, slot, effect } = command;
+    const requestId = ++portraitRequestIds[slot];
+    const slotLayer = ensureSlotLayer(slot);
+    positionSlotLayer(slotLayer, slot);
+    slotLayer.removeChildren();
+
+    const portraitUrl = resolveHarnessPortraitUrl(portraitId);
+    if (!portraitUrl) {
+      drawFallbackPortrait(slotLayer, characterId, portraitId, slot, effect);
+      console.warn(`[pixi-presenter] Missing portrait asset for ${portraitId ?? characterId}; using fallback.`);
+      return;
+    }
+
+    try {
+      const texture = await Assets.load<Texture>(portraitUrl);
+      if (portraitRequestIds[slot] !== requestId || destroyed) return;
+      slotLayer.removeChildren();
+      drawImagePortrait(slotLayer, texture, characterId, portraitId, slot, effect);
+    } catch {
+      if (portraitRequestIds[slot] !== requestId || destroyed) return;
+      slotLayer.removeChildren();
+      drawFallbackPortrait(slotLayer, characterId, portraitId, slot, effect);
+      console.warn(`[pixi-presenter] Missing portrait asset at ${portraitUrl}; using fallback.`);
+    }
+  }
+
+  function ensureSlotLayer(slot: PortraitSlot) {
+    const existing = slotLayers.get(slot);
+    if (existing) return existing;
+    const layer = new Container({ label: `portrait-slot:${slot}` });
+    slotLayers.set(slot, layer);
+    portraitLayer.addChild(layer);
+    return layer;
+  }
+
+  function positionSlotLayer(layer: Container, slot: PortraitSlot) {
     const width = app.renderer.width || options.host.clientWidth || 960;
     const height = app.renderer.height || options.host.clientHeight || 540;
-    const slotX = slot === "left" ? width * 0.28 : slot === "right" ? width * 0.72 : width * 0.5;
-    const group = new Container({ label: characterId });
+    const layout = calculatePortraitLayout(width, height, slot);
+    layer.x = layout.x;
+    layer.y = layout.y;
+  }
+
+  function drawImagePortrait(
+    layer: Container,
+    texture: Texture,
+    characterId: string,
+    portraitId: string | undefined,
+    slot: PortraitSlot,
+    effect: string
+  ) {
+    const layout = getCurrentLayout(slot);
+    const group = new Container({ label: portraitId ?? characterId });
+    const sprite = new Sprite(texture);
+    sprite.anchor.set(0.5, 1);
+    const scale = Math.min(layout.maxWidth / sprite.texture.width, layout.maxHeight / sprite.texture.height);
+    sprite.scale.set(scale);
+
+    const frame = new Graphics()
+      .roundRect(-layout.maxWidth / 2, -layout.maxHeight - 8, layout.maxWidth, layout.maxHeight + 42, 16)
+      .fill({ color: 0x0e1726, alpha: 0.18 })
+      .stroke({ color: 0x83e4d3, width: 2, alpha: 0.46 });
+    const name = drawPortraitNameplate(characterId, slot, 0xeef8ff, 0x121826);
+    group.addChild(frame, sprite, name);
+    layer.addChild(group);
+    runFadeIn(group, effect);
+  }
+
+  function drawFallbackPortrait(
+    layer: Container,
+    characterId: string,
+    portraitId: string | undefined,
+    slot: PortraitSlot,
+    effect: string
+  ) {
+    const layout = getCurrentLayout(slot);
+    const group = new Container({ label: `fallback:${portraitId ?? characterId}` });
+    const bodyWidth = Math.min(170, layout.maxWidth);
+    const bodyHeight = Math.min(300, layout.maxHeight);
     const body = new Graphics()
-      .roundRect(-70, -180, 140, 260, 18)
-      .fill({ color: 0xf0bf70, alpha: 0.88 })
-      .roundRect(-46, -150, 92, 84, 46)
-      .fill({ color: 0xffe0ad, alpha: 0.95 })
-      .rect(-54, -46, 108, 126)
-      .fill({ color: 0x3657a8, alpha: 0.92 });
+      .roundRect(-bodyWidth / 2, -bodyHeight, bodyWidth, bodyHeight, 18)
+      .fill({ color: 0x33243d, alpha: 0.94 })
+      .stroke({ color: 0xffd166, width: 3, alpha: 0.8 })
+      .roundRect(-bodyWidth * 0.27, -bodyHeight + 34, bodyWidth * 0.54, bodyWidth * 0.54, bodyWidth * 0.27)
+      .fill({ color: 0x5d486f, alpha: 1 })
+      .rect(-bodyWidth * 0.34, -bodyHeight * 0.48, bodyWidth * 0.68, bodyHeight * 0.34)
+      .fill({ color: 0x1f4f68, alpha: 0.95 });
+    const missing = new Text({
+      text: formatFallbackPortraitLabel(characterId, portraitId),
+      style: {
+        align: "center",
+        fill: 0xfff2c2,
+        fontSize: 13,
+        fontWeight: "700",
+        lineHeight: 17,
+        wordWrap: true,
+        wordWrapWidth: bodyWidth - 20
+      }
+    });
+    missing.anchor.set(0.5);
+    missing.y = -bodyHeight * 0.18;
+    const name = drawPortraitNameplate(characterId, slot, 0x111827, 0xffd166);
+    group.addChild(body, missing, name);
+    layer.addChild(group);
+    runFadeIn(group, effect);
+  }
+
+  function drawPortraitNameplate(characterId: string, slot: PortraitSlot, fill: number, plateColor: number) {
+    const label = `${characterId.replace(/^character:/, "")} / ${slot}`;
+    const group = new Container({ label: `nameplate:${label}` });
+    const plateWidth = Math.max(118, label.length * 8 + 20);
+    const plate = new Graphics()
+      .roundRect(-plateWidth / 2, 0, plateWidth, 28, 14)
+      .fill({ color: plateColor, alpha: 0.88 });
     const name = new Text({
-      text: characterId.replace("character:", ""),
-      style: { fill: 0x111827, fontSize: 16, fontWeight: "700" }
+      text: label,
+      style: { fill, fontSize: 14, fontWeight: "700" }
     });
     name.anchor.set(0.5);
-    name.y = 100;
-    group.x = slotX;
-    group.y = height - 118;
-    group.addChild(body, name);
-    portraitLayer.addChild(group);
+    name.y = 14;
+    group.y = 8;
+    group.addChild(plate, name);
+    return group;
+  }
+
+  function getCurrentLayout(slot: PortraitSlot) {
+    const width = app.renderer.width || options.host.clientWidth || 960;
+    const height = app.renderer.height || options.host.clientHeight || 540;
+    return calculatePortraitLayout(width, height, slot);
   }
 
   function drawTrialKeyword(text: string) {
@@ -172,14 +308,40 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     trialLayer.addChild(group);
   }
 
-  function drawFlash(color: string) {
-    effectsLayer.removeChildren();
+  function runFadeIn(target: Container, effect: string) {
+    if (effect !== "fadeIn") return;
+    target.alpha = 0;
+    scheduler.enqueue({
+      kind: "fadeIn",
+      durationMs: 280,
+      target
+    });
+  }
+
+  function runFlash(color: string, durationMs: number) {
     const width = app.renderer.width || options.host.clientWidth || 960;
     const height = app.renderer.height || options.host.clientHeight || 540;
     const numeric = Number.parseInt(color.replace("#", ""), 16);
-    const flash = new Graphics().rect(0, 0, width, height).fill({ color: numeric, alpha: 0.35 });
+    const flash = new Graphics().rect(0, 0, width, height).fill({ color: numeric, alpha: 0.5 });
+    flash.alpha = 0.5;
     effectsLayer.addChild(flash);
-    window.setTimeout(() => effectsLayer.removeChildren(), 180);
+    scheduler.enqueue({
+      kind: "flash",
+      durationMs,
+      target: flash,
+      onComplete: () => {
+        if (!flash.destroyed) flash.destroy();
+      }
+    });
+  }
+
+  function runShake(intensity: number, durationMs: number) {
+    scheduler.enqueue({
+      kind: "shake",
+      durationMs,
+      intensity,
+      target: portraitLayer
+    });
   }
 
   return {
@@ -190,13 +352,20 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     },
     clear() {
       memory.clear();
+      pendingVisualCommands.length = 0;
+      portraitRequestIds.left = 0;
+      portraitRequestIds.center = 0;
+      portraitRequestIds.right = 0;
+      scheduler.clear();
       backgroundLayer.removeChildren();
       portraitLayer.removeChildren();
       effectsLayer.removeChildren();
       trialLayer.removeChildren();
+      slotLayers.clear();
     },
     destroy() {
       destroyed = true;
+      scheduler.destroy();
       if (!initialized) return;
       app.destroy(true);
       initialized = false;
