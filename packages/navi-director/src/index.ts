@@ -1,10 +1,9 @@
-import type { NaviRuntimeState, NaviSubstate, PlayerPose, WorldMapDef } from "@v-ronpa/contracts";
+import type { InteractableDef, NaviRuntimeState, NaviSubstate, PlayerPose, WorldMapDef } from "@v-ronpa/contracts";
 import {
-  changeCharacterAffinity,
-  grantEvidence,
-  grantItem,
+  applyExplorationOutcome,
   type ExplorationOutcome,
   type GameplayState,
+  nearestInteractable,
   resolveInteractable
 } from "@v-ronpa/gameplay";
 
@@ -23,6 +22,16 @@ export interface NaviInteractionResolution {
   outcome: ExplorationOutcome;
 }
 
+export type NaviFocusOutcome = { type: "focused"; interactableId: string } | { type: "none" };
+
+export interface NaviFocusResolution {
+  navi: NaviRuntimeState;
+  outcome: NaviFocusOutcome;
+  interactable?: InteractableDef;
+}
+
+export type WorldMapSource = readonly WorldMapDef[] | Record<string, WorldMapDef>;
+
 export function createInitialNaviState(activeMapId?: string): NaviRuntimeState {
   const state: NaviRuntimeState = {
     substate: "walk",
@@ -32,15 +41,32 @@ export function createInitialNaviState(activeMapId?: string): NaviRuntimeState {
   return state;
 }
 
+function canAcceptNaviWalkInteraction(state: NaviRuntimeState): boolean {
+  return state.substate === "walk" && state.inputLock === "none";
+}
+
 export function naviReducer(state: NaviRuntimeState, event: NaviEvent): NaviRuntimeState {
-  if (event.type === "ENTER_WALK" || event.type === "CLOSE_OVERLAY") {
+  if (event.type === "ENTER_WALK") {
     return withOptionalFields(
       {
+        ...state,
         substate: "walk",
         inputLock: "none"
       },
-      event.type === "ENTER_WALK" ? event.mapId : state.activeMapId,
-      undefined
+      event.mapId ?? state.activeMapId,
+      state.activeInteractableId
+    );
+  }
+
+  if (event.type === "CLOSE_OVERLAY") {
+    return withOptionalFields(
+      {
+        ...state,
+        substate: "walk",
+        inputLock: "none"
+      },
+      state.activeMapId,
+      state.activeInteractableId
     );
   }
 
@@ -88,35 +114,93 @@ export function naviReducer(state: NaviRuntimeState, event: NaviEvent): NaviRunt
   return withOverlay(state, "event", event.script, event.interactableId);
 }
 
+export function focusNearestNaviInteractable(state: NaviRuntimeState, map: WorldMapDef): NaviFocusResolution {
+  if (!canAcceptNaviWalkInteraction(state)) {
+    return {
+      navi: state,
+      outcome: { type: "none" }
+    };
+  }
+
+  if (!state.playerPose) {
+    return {
+      navi: state,
+      outcome: { type: "none" }
+    };
+  }
+
+  const interactable = nearestInteractable(map, state.playerPose.position);
+  if (!interactable) {
+    return {
+      navi: naviReducer(state, { type: "FOCUS_INTERACTABLE" }),
+      outcome: { type: "none" }
+    };
+  }
+
+  return {
+    navi: naviReducer(state, { type: "FOCUS_INTERACTABLE", interactableId: interactable.id }),
+    outcome: { type: "focused", interactableId: interactable.id },
+    interactable
+  };
+}
+
+export function confirmFocusedNaviInteraction(
+  state: NaviRuntimeState,
+  map: WorldMapDef,
+  gameplay: GameplayState,
+  maps?: WorldMapSource
+): NaviInteractionResolution {
+  if (!canAcceptNaviWalkInteraction(state)) {
+    return {
+      navi: state,
+      gameplay,
+      outcome: { type: "none" }
+    };
+  }
+
+  if (!state.activeInteractableId) {
+    return {
+      navi: state,
+      gameplay,
+      outcome: { type: "none" }
+    };
+  }
+
+  return resolveNaviInteractable(state, map, gameplay, state.activeInteractableId, maps);
+}
+
 export function resolveNaviInteractable(
   state: NaviRuntimeState,
   map: WorldMapDef,
   gameplay: GameplayState,
-  interactableId: string
+  interactableId: string,
+  maps?: WorldMapSource
 ): NaviInteractionResolution {
+  if (!canAcceptNaviWalkInteraction(state)) {
+    return {
+      navi: state,
+      gameplay,
+      outcome: { type: "none" }
+    };
+  }
+
   const interactable = map.interactables.find((candidate) => candidate.id === interactableId);
+  if (!interactable) {
+    return {
+      navi: state,
+      gameplay,
+      outcome: { type: "none" }
+    };
+  }
+
   const outcome = resolveInteractable(interactable);
+  const focused = naviReducer(state, { type: "FOCUS_INTERACTABLE", interactableId });
+  const applied = applyExplorationOutcome(gameplay, outcome);
 
-  if (outcome.type === "grant-item") {
+  if (applied.result.owner === "gameplay") {
     return {
-      navi: naviReducer(state, { type: "FOCUS_INTERACTABLE", interactableId }),
-      gameplay: grantItem(gameplay, outcome.itemId, outcome.quantity),
-      outcome
-    };
-  }
-
-  if (outcome.type === "grant-evidence") {
-    return {
-      navi: naviReducer(state, { type: "FOCUS_INTERACTABLE", interactableId }),
-      gameplay: grantEvidence(gameplay, outcome.evidenceId),
-      outcome
-    };
-  }
-
-  if (outcome.type === "character-state") {
-    return {
-      navi: naviReducer(state, { type: "FOCUS_INTERACTABLE", interactableId }),
-      gameplay: changeCharacterAffinity(gameplay, outcome.characterId, outcome.affinityDelta),
+      navi: focused,
+      gameplay: applied.state,
       outcome
     };
   }
@@ -130,15 +214,16 @@ export function resolveNaviInteractable(
   }
 
   if (outcome.type === "change-map") {
+    const pose = resolveChangeMapPose(outcome, map, maps);
     return {
-      navi: naviReducer(state, { type: "CHANGE_MAP", mapId: outcome.mapId, ...(outcome.pose ? { pose: outcome.pose } : {}) }),
+      navi: naviReducer(focused, { type: "CHANGE_MAP", mapId: outcome.mapId, ...(pose ? { pose } : {}) }),
       gameplay,
       outcome
     };
   }
 
   return {
-    navi: naviReducer(state, { type: "FOCUS_INTERACTABLE", interactableId }),
+    navi: focused,
     gameplay,
     outcome
   };
@@ -158,6 +243,31 @@ function withOverlay(
   if (script) next.overlayScript = script;
   if (interactableId) next.activeInteractableId = interactableId;
   return next;
+}
+
+function resolveChangeMapPose(
+  outcome: Extract<ExplorationOutcome, { type: "change-map" }>,
+  currentMap: WorldMapDef,
+  maps: WorldMapSource | undefined
+): PlayerPose | undefined {
+  if (outcome.pose) return outcome.pose;
+  const targetMap = findWorldMap(outcome.mapId, maps) ?? (currentMap.id === outcome.mapId ? currentMap : undefined);
+  if (!targetMap) return undefined;
+  return {
+    position: targetMap.spawn,
+    yaw: 0,
+    pitch: 0
+  };
+}
+
+function findWorldMap(mapId: string, maps: WorldMapSource | undefined): WorldMapDef | undefined {
+  if (!maps) return undefined;
+  if (isWorldMapArray(maps)) return maps.find((map) => map.id === mapId);
+  return maps[mapId];
+}
+
+function isWorldMapArray(maps: WorldMapSource): maps is readonly WorldMapDef[] {
+  return Array.isArray(maps);
 }
 
 function withOptionalFields(

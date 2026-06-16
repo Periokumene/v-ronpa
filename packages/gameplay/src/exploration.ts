@@ -22,7 +22,17 @@ export interface ExplorationApplication {
 }
 
 export function nearestInteractable(map: WorldMapDef, position: Vector3): InteractableDef | undefined {
-  return map.interactables.find((interactable) => distance(interactable.position, position) <= interactable.radius);
+  let nearest: { interactable: InteractableDef; distance: number } | undefined;
+
+  for (const interactable of map.interactables) {
+    const candidateDistance = distance(interactable.position, position);
+    if (candidateDistance > interactable.radius) continue;
+    if (!nearest || candidateDistance < nearest.distance) {
+      nearest = { interactable, distance: candidateDistance };
+    }
+  }
+
+  return nearest?.interactable;
 }
 
 export function resolveInteractable(interactable: InteractableDef | undefined): ExplorationOutcome {

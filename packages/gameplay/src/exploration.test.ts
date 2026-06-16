@@ -32,6 +32,67 @@ describe("exploration", () => {
     expect(outcome).toEqual({ type: "grant-evidence", evidenceId: "evidence:keycard" });
   });
 
+  it("selects the closest interactable inside radius while preserving map order for ties", () => {
+    const map: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:first-tie",
+          label: "First Tie",
+          position: [-1, 0, 0],
+          radius: 2,
+          action: { type: "grant-item", itemId: "tool:first", quantity: 1 }
+        },
+        {
+          id: "i:closer",
+          label: "Closer",
+          position: [0.25, 0, 0],
+          radius: 2,
+          action: { type: "grant-item", itemId: "tool:closer", quantity: 1 }
+        },
+        {
+          id: "i:second-tie",
+          label: "Second Tie",
+          position: [1, 0, 0],
+          radius: 2,
+          action: { type: "grant-item", itemId: "tool:second", quantity: 1 }
+        }
+      ],
+      assetRefs: []
+    };
+
+    const firstTie = map.interactables[0];
+    const secondTie = map.interactables[2];
+
+    expect(nearestInteractable(map, [0, 0, 0])?.id).toBe("i:closer");
+    expect(nearestInteractable({ ...map, interactables: [firstTie!, secondTie!] }, [0, 0, 0])?.id).toBe("i:first-tie");
+  });
+
+  it("returns no interactable when every candidate is outside its radius", () => {
+    const map: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:far",
+          label: "Far",
+          position: [5, 0, 0],
+          radius: 1,
+          action: { type: "grant-item", itemId: "tool:far", quantity: 1 }
+        }
+      ],
+      assetRefs: []
+    };
+
+    expect(nearestInteractable(map, [0, 0, 0])).toBeUndefined();
+    expect(resolveInteractable(nearestInteractable(map, [0, 0, 0]))).toEqual({ type: "none" });
+  });
+
   it("applies gameplay-owned outcomes only to gameplay state", () => {
     const item = applyExplorationOutcome(createGameplayState(), {
       type: "grant-item",
