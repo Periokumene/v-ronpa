@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
-import { ExplorationStage3D, type FirstPersonFallbackStatus, type PointerLockStatus } from "@v-ronpa/r3f-adapter";
-import type { InteractableDef, PlayerPose, WorldMapDef } from "@v-ronpa/contracts";
+import {
+  ExplorationStage3D,
+  type FirstPersonFallbackStatus,
+  type FirstPersonInteractRequest,
+  type PointerLockStatus
+} from "@v-ronpa/r3f-adapter";
+import type { PlayerPose, WorldMapDef } from "@v-ronpa/contracts";
 import { ScenarioFrame } from "../../ScenarioFrame";
 import { verticalSliceMaps } from "../../fixtures/verticalSlice";
 
@@ -9,7 +14,7 @@ export function R3fFirstPersonScenario() {
   const scenarioMaps = useMemo(() => [...verticalSliceMaps, fallbackMap], [fallbackMap]);
   const [currentMapId, setCurrentMapId] = useState(verticalSliceMaps[0]?.id ?? fallbackMap.id);
   const [pose, setPose] = useState<PlayerPose | undefined>(undefined);
-  const [focused, setFocused] = useState<InteractableDef | undefined>(undefined);
+  const [candidateId, setCandidateId] = useState<string | undefined>(undefined);
   const [lastAction, setLastAction] = useState("none");
   const [fallback, setFallback] = useState<FirstPersonFallbackStatus>({
     active: true,
@@ -22,30 +27,20 @@ export function R3fFirstPersonScenario() {
   const [pointerLockSignal, setPointerLockSignal] = useState(0);
   const map = scenarioMaps.find((candidate) => candidate.id === currentMapId) ?? scenarioMaps[0];
 
-  const interact = (interactable: InteractableDef) => {
-    const actionLabel = `${interactable.id}:${interactable.action.type}`;
-    setLastAction(actionLabel);
-
-    if (interactable.action.type === "change-map") {
-      const targetMapId = interactable.action.mapId;
-      const nextMap = verticalSliceMaps.find((candidate) => candidate.id === targetMapId);
-      if (nextMap) {
-        setCurrentMapId(nextMap.id);
-        setFocused(undefined);
-      }
-    }
+  const requestInteraction = (request: FirstPersonInteractRequest) => {
+    setLastAction(request.candidateId ? `request:${request.candidateId}` : "request:none");
   };
 
   return (
     <ScenarioFrame
       scenarioId="r3f-first-person"
       title="R3F First-Person Exploration"
-      description="Reserved entry for R3F work: first-person movement, look, AABB clamp, spawn reset, hotspot focus, interact callback, and model/fallback rendering."
+      description="Reserved entry for R3F work: first-person movement, look, AABB clamp, spawn reset, hotspot candidate detection, interact request, and model/fallback rendering."
       status="R3F first-person adapter slice with scenario-local evidence"
       log={[
         { id: "map", label: "Map", value: map?.id ?? "missing" },
         { id: "bounds", label: "Walk Bounds", value: map?.walkBounds ? formatBounds(map.walkBounds) : "missing" },
-        { id: "focus", label: "Focus", value: focused?.id ?? "none" },
+        { id: "candidate", label: "Candidate", value: candidateId ?? "none" },
         { id: "last-action", label: "Last Action", value: lastAction }
       ]}
       commands={
@@ -64,7 +59,7 @@ export function R3fFirstPersonScenario() {
           </button>
           <button data-testid="r3f-show-fallback" type="button" onClick={() => {
             setCurrentMapId(fallbackMap.id);
-            setFocused(undefined);
+            setCandidateId(undefined);
           }}>
             Missing model
           </button>
@@ -76,21 +71,21 @@ export function R3fFirstPersonScenario() {
           {...(map ? { map } : {})}
           cameraMode="first-person"
           inputLock="none"
-          {...(focused ? { activeInteractableId: focused.id } : {})}
+          {...(candidateId ? { candidateInteractableId: candidateId } : {})}
           resetSignal={resetSignal}
           interactSignal={interactSignal}
           pointerLockRequestSignal={pointerLockSignal}
           pointerLockSelector='[data-testid="r3f-activate-look"]'
           onPoseChange={setPose}
-          onFocusChange={setFocused}
-          onInteract={interact}
+          onCandidateChange={setCandidateId}
+          onInteractRequest={requestInteraction}
           onFallbackChange={setFallback}
           onPointerLockChange={setPointerLock}
         />
         <section aria-label="R3F first-person readouts" style={readoutPanelStyle}>
           <Readout label="Map" testId="r3f-current-map" value={map?.id ?? "missing"} />
           <Readout label="Pose" testId="r3f-pose-readout" value={pose ? formatPose(pose) : "pending"} />
-          <Readout label="Focus" testId="r3f-focused-interactable" value={focused?.id ?? "none"} />
+          <Readout label="Candidate" testId="r3f-candidate-interactable" value={candidateId ?? "none"} />
           <Readout label="Action" testId="r3f-last-action" value={lastAction} />
           <Readout label="Fallback" testId="r3f-fallback-status" value={formatFallback(fallback)} />
           <Readout label="Pointer" testId="r3f-pointer-lock-status" value={pointerLock} />

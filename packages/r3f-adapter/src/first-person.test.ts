@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { InteractableDef } from "@v-ronpa/contracts";
-import { clampVectorToAabb, findFocusedInteractable, yawPitchToFacingVector } from "./first-person";
+import { clampVectorToAabb, findInteractableCandidate, yawPitchToFacingVector } from "./first-person";
 
 const bounds = {
   min: [-3, 0, -4] as [number, number, number],
@@ -27,7 +27,7 @@ describe("first-person helpers", () => {
 
   it("selects an interactable when facing it within radius", () => {
     expect(
-      findFocusedInteractable({
+      findInteractableCandidate({
         position: [0, 1.7, -0.9],
         facing: yawPitchToFacingVector({ yaw: 0, pitch: 0 }),
         interactables: [hotspot]
@@ -37,7 +37,7 @@ describe("first-person helpers", () => {
 
   it("rejects targets outside radius or outside the facing threshold", () => {
     expect(
-      findFocusedInteractable({
+      findInteractableCandidate({
         position: [0, 1.7, 2],
         facing: yawPitchToFacingVector({ yaw: 0, pitch: 0 }),
         interactables: [hotspot]
@@ -45,7 +45,7 @@ describe("first-person helpers", () => {
     ).toBeUndefined();
 
     expect(
-      findFocusedInteractable({
+      findInteractableCandidate({
         position: [0, 1.7, -0.9],
         facing: yawPitchToFacingVector({ yaw: Math.PI, pitch: 0 }),
         interactables: [hotspot]

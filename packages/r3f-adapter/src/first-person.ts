@@ -1,11 +1,11 @@
 import type { AabbBounds, InteractableDef, PlayerPose, Vector3 } from "@v-ronpa/contracts";
 
-export interface FocusSearchOptions {
+export interface InteractableCandidateSearchOptions {
   maxDistance?: number;
   facingThreshold?: number;
 }
 
-export interface FocusSearchInput extends FocusSearchOptions {
+export interface InteractableCandidateSearchInput extends InteractableCandidateSearchOptions {
   position: Vector3;
   facing: Vector3;
   interactables: readonly InteractableDef[];
@@ -24,13 +24,13 @@ export function clampVectorToAabb(position: Vector3, bounds?: AabbBounds): Vecto
   ];
 }
 
-export function findFocusedInteractable({
+export function findInteractableCandidate({
   position,
   facing,
   interactables,
   maxDistance = DEFAULT_FOCUS_DISTANCE,
   facingThreshold = DEFAULT_FACING_THRESHOLD
-}: FocusSearchInput): InteractableDef | undefined {
+}: InteractableCandidateSearchInput): InteractableDef | undefined {
   const facing2d = normalize2d([facing[0], facing[2]]);
   if (!facing2d) return undefined;
 

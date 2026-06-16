@@ -8,7 +8,7 @@ interface PoseReadout {
   pitch: number;
 }
 
-test("r3f first-person scenario proves movement, focus, interact, clamp, and fallback", async ({ page }) => {
+test("r3f first-person scenario proves movement, candidate request, clamp, and fallback", async ({ page }) => {
   const consoleErrors: string[] = [];
   const pointerLockLimitations: string[] = [];
   page.on("console", (message) => {
@@ -42,21 +42,21 @@ test("r3f first-person scenario proves movement, focus, interact, clamp, and fal
   await expect.poll(() => readPose(page).then((pose) => pose.z)).toBeCloseTo(4, 1);
 
   await holdKey(page, "w", 1700);
-  await expect(page.getByTestId("r3f-focused-interactable")).toHaveText("interactable:classroom-door");
+  await expect(page.getByTestId("r3f-candidate-interactable")).toHaveText("interactable:classroom-door");
 
   await page.getByTestId("r3f-trigger-interact").click();
-  await expect(page.getByTestId("r3f-current-map")).toHaveText("map:classroom");
-  await expect(page.getByTestId("r3f-last-action")).toHaveText("interactable:classroom-door:change-map");
+  await expect(page.getByTestId("r3f-current-map")).toHaveText("map:academy-hall");
+  await expect(page.getByTestId("r3f-last-action")).toHaveText("request:interactable:classroom-door");
 
   await page.getByTestId("r3f-reset-spawn").click();
-  await expect.poll(() => readPose(page).then((pose) => pose.z)).toBeCloseTo(3.2, 1);
+  await expect.poll(() => readPose(page).then((pose) => pose.z)).toBeCloseTo(4, 1);
   await expect(page.getByTestId("r3f-fallback-status")).toContainText(/active|loaded/);
   await page.screenshot({ path: "test-results/r3f-first-person.png", fullPage: true });
 
   await holdKey(page, "w", 2500);
   const clampedPose = await readPose(page);
-  expect(clampedPose.z).toBeGreaterThanOrEqual(-3.4);
-  expect(clampedPose.z).toBeLessThanOrEqual(3.6);
+  expect(clampedPose.z).toBeGreaterThanOrEqual(-4.2);
+  expect(clampedPose.z).toBeLessThanOrEqual(4.2);
 
   await page.getByTestId("r3f-show-fallback").click();
   await expect(page.getByTestId("r3f-current-map")).toHaveText("map:r3f-missing-model");

@@ -16,17 +16,16 @@ import { Vector3 as ThreeVector3, type Camera, type Mesh, type Object3D } from "
 import type {
   CameraControlMode,
   InputLockState,
-  InteractableDef,
   PlayerPose,
   TrialPresentationProfile,
   Vector3,
   WorldMapDef
 } from "@v-ronpa/contracts";
-import { clampVectorToAabb, findFocusedInteractable } from "./first-person";
+import { clampVectorToAabb, findInteractableCandidate } from "./first-person";
 
 export interface ExplorationStageProps {
   map?: WorldMapDef;
-  activeInteractableId?: string;
+  candidateInteractableId?: string;
   cameraMode?: CameraControlMode;
   inputLock?: InputLockState;
   resetSignal?: number;
@@ -34,8 +33,8 @@ export interface ExplorationStageProps {
   pointerLockRequestSignal?: number;
   pointerLockSelector?: string;
   onPoseChange?: (pose: PlayerPose) => void;
-  onFocusChange?: (interactable: InteractableDef | undefined) => void;
-  onInteract?: (interactable: InteractableDef) => void;
+  onCandidateChange?: (candidateId: string | undefined) => void;
+  onInteractRequest?: (request: FirstPersonInteractRequest) => void;
   onFallbackChange?: (status: FirstPersonFallbackStatus) => void;
   onPointerLockChange?: (status: PointerLockStatus) => void;
 }
@@ -57,9 +56,14 @@ export interface FirstPersonFallbackStatus {
   assetUri?: string;
 }
 
+export interface FirstPersonInteractRequest {
+  candidateId?: string;
+  pose: PlayerPose;
+}
+
 export function ExplorationStage3D({
   map,
-  activeInteractableId,
+  candidateInteractableId,
   cameraMode = "orbit-debug",
   inputLock = "none",
   resetSignal = 0,
@@ -67,8 +71,8 @@ export function ExplorationStage3D({
   pointerLockRequestSignal = 0,
   pointerLockSelector,
   onPoseChange,
-  onFocusChange,
-  onInteract,
+  onCandidateChange,
+  onInteractRequest,
   onFallbackChange,
   onPointerLockChange
 }: ExplorationStageProps) {
@@ -88,7 +92,7 @@ export function ExplorationStage3D({
           key={interactable.id}
           label={interactable.label}
           position={interactable.position}
-          active={interactable.id === activeInteractableId}
+          active={interactable.id === candidateInteractableId}
         />
       ))}
       {firstPersonEnabled ? (
@@ -99,8 +103,8 @@ export function ExplorationStage3D({
           pointerLockRequestSignal={pointerLockRequestSignal}
           pointerLockSelector={pointerLockSelector}
           onPoseChange={onPoseChange}
-          onFocusChange={onFocusChange}
-          onInteract={onInteract}
+          onCandidateChange={onCandidateChange}
+          onInteractRequest={onInteractRequest}
           onPointerLockChange={onPointerLockChange}
         />
       ) : (
@@ -170,8 +174,8 @@ function FirstPersonRig({
   pointerLockRequestSignal,
   pointerLockSelector,
   onPoseChange,
-  onFocusChange,
-  onInteract,
+  onCandidateChange,
+  onInteractRequest,
   onPointerLockChange
 }: {
   map: WorldMapDef | undefined;
@@ -180,16 +184,16 @@ function FirstPersonRig({
   pointerLockRequestSignal: number;
   pointerLockSelector: string | undefined;
   onPoseChange: ((pose: PlayerPose) => void) | undefined;
-  onFocusChange: ((interactable: InteractableDef | undefined) => void) | undefined;
-  onInteract: ((interactable: InteractableDef) => void) | undefined;
+  onCandidateChange: ((candidateId: string | undefined) => void) | undefined;
+  onInteractRequest: ((request: FirstPersonInteractRequest) => void) | undefined;
   onPointerLockChange: ((status: PointerLockStatus) => void) | undefined;
 }) {
   const { camera } = useThree();
   const controlsRef = useRef<ComponentRef<typeof PointerLockControls>>(null);
   const keysRef = useRef(new Set<string>());
-  const focusRef = useRef<InteractableDef | undefined>(undefined);
+  const candidateRef = useRef<string | undefined>(undefined);
   const lastPoseRef = useRef<PlayerPose | undefined>(undefined);
-  const lastFocusIdRef = useRef<string | undefined>(undefined);
+  const lastCandidateIdRef = useRef<string | undefined>(undefined);
   const handledInteractSignalRef = useRef(interactSignal);
   const pendingInteractSignalRef = useRef<number | undefined>(undefined);
   const forward = useMemo(() => new ThreeVector3(), []);
@@ -204,9 +208,9 @@ function FirstPersonRig({
       camera.position.set(clamped[0], clamped[1], clamped[2]);
       camera.rotation.set(pose.pitch, pose.yaw, 0, "YXZ");
       reportPose(camera, lastPoseRef, onPoseChange);
-      updateFocus(camera, map, focusRef, lastFocusIdRef, onFocusChange);
+      updateCandidate(camera, map, candidateRef, lastCandidateIdRef, onCandidateChange);
     },
-    [camera, map, onFocusChange, onPoseChange]
+    [camera, map, onCandidateChange, onPoseChange]
   );
 
   useEffect(() => {
@@ -235,10 +239,12 @@ function FirstPersonRig({
     }
   }, [onPointerLockChange, pointerLockRequestSignal]);
 
-  const interactWithFocus = useCallback(() => {
-    const focused = focusRef.current;
-    if (focused) onInteract?.(focused);
-  }, [onInteract]);
+  const requestInteraction = useCallback(() => {
+    onInteractRequest?.({
+      ...(candidateRef.current ? { candidateId: candidateRef.current } : {}),
+      pose: cameraPose(camera)
+    });
+  }, [camera, onInteractRequest]);
 
   useEffect(() => {
     if (interactSignal <= 0 || interactSignal === handledInteractSignalRef.current) return;
@@ -253,7 +259,7 @@ function FirstPersonRig({
         event.preventDefault();
       }
       if (event.code === "KeyE") {
-        interactWithFocus();
+        requestInteraction();
         event.preventDefault();
       }
     };
@@ -274,15 +280,15 @@ function FirstPersonRig({
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [interactWithFocus]);
+  }, [requestInteraction]);
 
   useFrame((_, delta) => {
-    updateFocus(camera, map, focusRef, lastFocusIdRef, onFocusChange);
+    updateCandidate(camera, map, candidateRef, lastCandidateIdRef, onCandidateChange);
 
     if (pendingInteractSignalRef.current && pendingInteractSignalRef.current !== handledInteractSignalRef.current) {
       handledInteractSignalRef.current = pendingInteractSignalRef.current;
       pendingInteractSignalRef.current = undefined;
-      interactWithFocus();
+      requestInteraction();
     }
 
     if (keysRef.current.size === 0) {
@@ -312,7 +318,7 @@ function FirstPersonRig({
     }
 
     reportPose(camera, lastPoseRef, onPoseChange);
-    updateFocus(camera, map, focusRef, lastFocusIdRef, onFocusChange);
+    updateCandidate(camera, map, candidateRef, lastCandidateIdRef, onCandidateChange);
   });
 
   return (
@@ -527,26 +533,34 @@ function getInitialPose(map: WorldMapDef | undefined): PlayerPose {
   };
 }
 
-function updateFocus(
+function updateCandidate(
   camera: Camera,
   map: WorldMapDef | undefined,
-  focusRef: MutableRefObject<InteractableDef | undefined>,
-  lastFocusIdRef: MutableRefObject<string | undefined>,
-  onFocusChange: ((interactable: InteractableDef | undefined) => void) | undefined
+  candidateRef: MutableRefObject<string | undefined>,
+  lastCandidateIdRef: MutableRefObject<string | undefined>,
+  onCandidateChange: ((candidateId: string | undefined) => void) | undefined
 ) {
   const facing = new ThreeVector3();
   camera.getWorldDirection(facing);
-  const focused = findFocusedInteractable({
+  const candidate = findInteractableCandidate({
     position: [camera.position.x, camera.position.y, camera.position.z],
     facing: [facing.x, facing.y, facing.z],
     interactables: map?.interactables ?? []
   });
 
-  focusRef.current = focused;
-  if (focused?.id !== lastFocusIdRef.current) {
-    lastFocusIdRef.current = focused?.id;
-    onFocusChange?.(focused);
+  candidateRef.current = candidate?.id;
+  if (candidate?.id !== lastCandidateIdRef.current) {
+    lastCandidateIdRef.current = candidate?.id;
+    onCandidateChange?.(candidate?.id);
   }
+}
+
+function cameraPose(camera: Camera): PlayerPose {
+  return {
+    position: [camera.position.x, camera.position.y, camera.position.z],
+    yaw: camera.rotation.y,
+    pitch: camera.rotation.x
+  };
 }
 
 function reportPose(
@@ -554,11 +568,7 @@ function reportPose(
   lastPoseRef: MutableRefObject<PlayerPose | undefined>,
   onPoseChange: ((pose: PlayerPose) => void) | undefined
 ) {
-  const pose: PlayerPose = {
-    position: [camera.position.x, camera.position.y, camera.position.z],
-    yaw: camera.rotation.y,
-    pitch: camera.rotation.x
-  };
+  const pose = cameraPose(camera);
 
   if (lastPoseRef.current && poseDistance(lastPoseRef.current, pose) < 0.01) return;
 
