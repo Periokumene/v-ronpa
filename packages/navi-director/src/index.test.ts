@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { WorldMapDef } from "@v-ronpa/contracts";
+import type { NaviRuntimeState, WorldMapDef } from "@v-ronpa/contracts";
 import { createGameplayState } from "@v-ronpa/gameplay";
-import { createInitialNaviState, naviReducer, resolveNaviInteractable } from "./index";
+import {
+  confirmFocusedNaviInteraction,
+  createInitialNaviState,
+  focusNearestNaviInteractable,
+  naviReducer,
+  resolveNaviInteractable
+} from "./index";
 
 describe("navi director", () => {
   it("keeps walk, inventory, and vn2d overlay as Navi substates", () => {
@@ -15,6 +21,52 @@ describe("navi director", () => {
       overlayScript: "opening.nani",
       activeInteractableId: "i:witness",
       inputLock: "dialog"
+    });
+
+    navi = naviReducer(navi, { type: "CLOSE_OVERLAY" });
+    expect(navi).toMatchObject({
+      substate: "walk",
+      activeMapId: "map:hall",
+      activeInteractableId: "i:witness",
+      inputLock: "none"
+    });
+
+    const walk = naviReducer(navi, { type: "CLOSE_OVERLAY" });
+    expect(walk).toEqual(navi);
+  });
+
+  it("focuses the nearest interactable from the current player pose", () => {
+    const map: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:file",
+          label: "Case File",
+          position: [1, 0, 0],
+          radius: 1.5,
+          action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
+        },
+        {
+          id: "i:notebook",
+          label: "Notebook",
+          position: [0.2, 0, 0],
+          radius: 1.5,
+          action: { type: "grant-item", itemId: "tool:notebook", quantity: 1 }
+        }
+      ],
+      assetRefs: []
+    };
+    const navi: NaviRuntimeState = { ...createInitialNaviState(map.id), playerPose: { position: [0, 0, 0], yaw: 0, pitch: 0 } };
+
+    const focused = focusNearestNaviInteractable(navi, map);
+
+    expect(focused).toMatchObject({
+      navi: { activeInteractableId: "i:notebook", substate: "walk", inputLock: "none" },
+      outcome: { type: "focused", interactableId: "i:notebook" },
+      interactable: { id: "i:notebook" }
     });
   });
 
@@ -41,6 +93,94 @@ describe("navi director", () => {
       navi: { substate: "walk", activeInteractableId: "i:file" },
       gameplay: { evidence: { ownedEvidenceIds: ["evidence:keycard"] } },
       outcome: { type: "grant-evidence" }
+    });
+  });
+
+  it("confirms the active focused interactable and keeps missing focus as a no-op", () => {
+    const map: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:notebook",
+          label: "Notebook",
+          position: [0, 0, 0],
+          radius: 1,
+          action: { type: "grant-item", itemId: "tool:notebook", quantity: 1 }
+        },
+        {
+          id: "i:witness",
+          label: "Witness",
+          position: [1, 0, 0],
+          radius: 1,
+          action: { type: "start-script", script: "case.nani", label: "Start" }
+        }
+      ],
+      assetRefs: []
+    };
+    const gameplay = createGameplayState();
+    const noFocus = confirmFocusedNaviInteraction(createInitialNaviState(map.id), map, gameplay);
+    const invalidNavi = { ...createInitialNaviState(map.id), activeInteractableId: "i:missing" };
+    const invalidFocus = confirmFocusedNaviInteraction(invalidNavi, map, gameplay);
+    const item = confirmFocusedNaviInteraction(
+      { ...createInitialNaviState(map.id), activeInteractableId: "i:notebook" },
+      map,
+      gameplay
+    );
+    const script = confirmFocusedNaviInteraction(
+      { ...createInitialNaviState(map.id), activeInteractableId: "i:witness" },
+      map,
+      gameplay
+    );
+
+    expect(noFocus).toEqual({ navi: createInitialNaviState(map.id), gameplay, outcome: { type: "none" } });
+    expect(invalidFocus).toEqual({ navi: invalidNavi, gameplay, outcome: { type: "none" } });
+    expect(item).toMatchObject({
+      navi: { activeInteractableId: "i:notebook" },
+      gameplay: { inventory: { items: { "tool:notebook": 1 } } },
+      outcome: { type: "grant-item" }
+    });
+    expect(script).toMatchObject({
+      navi: {
+        substate: "vn2d-overlay",
+        inputLock: "dialog",
+        overlayScript: "case.nani",
+        activeInteractableId: "i:witness"
+      },
+      gameplay,
+      outcome: { type: "start-script", script: "case.nani" }
+    });
+  });
+
+  it("keeps focus safe when player pose or nearby interactables are missing", () => {
+    const map: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:far",
+          label: "Far",
+          position: [5, 0, 0],
+          radius: 1,
+          action: { type: "grant-item", itemId: "tool:far", quantity: 1 }
+        }
+      ],
+      assetRefs: []
+    };
+    const missingPose = createInitialNaviState(map.id);
+    const emptySpace: NaviRuntimeState = { ...missingPose, playerPose: { position: [0, 0, 0], yaw: 0, pitch: 0 } };
+
+    expect(focusNearestNaviInteractable(missingPose, map)).toEqual({
+      navi: missingPose,
+      outcome: { type: "none" }
+    });
+    expect(focusNearestNaviInteractable(emptySpace, map)).toEqual({
+      navi: emptySpace,
+      outcome: { type: "none" }
     });
   });
 
@@ -75,6 +215,50 @@ describe("navi director", () => {
         substate: "walk",
         activeMapId: "map:classroom",
         playerPose: { position: [0, 1.7, 2], yaw: 3.14, pitch: 0 },
+        inputLock: "none"
+      },
+      outcome: { type: "change-map", mapId: "map:classroom" }
+    });
+  });
+
+  it("uses the target map spawn when a map change has no explicit pose", () => {
+    const hall: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:door",
+          label: "Door",
+          position: [0, 0, -1],
+          radius: 1,
+          action: {
+            type: "change-map",
+            mapId: "map:classroom"
+          }
+        }
+      ],
+      assetRefs: []
+    };
+    const classroom: WorldMapDef = {
+      id: "map:classroom",
+      name: "Classroom",
+      spawn: [2, 1.7, -3],
+      collisionProxyIds: [],
+      interactables: [],
+      assetRefs: []
+    };
+
+    const result = resolveNaviInteractable(createInitialNaviState(hall.id), hall, createGameplayState(), "i:door", [
+      hall,
+      classroom
+    ]);
+
+    expect(result).toMatchObject({
+      navi: {
+        activeMapId: "map:classroom",
+        playerPose: { position: [2, 1.7, -3], yaw: 0, pitch: 0 },
         inputLock: "none"
       },
       outcome: { type: "change-map", mapId: "map:classroom" }
