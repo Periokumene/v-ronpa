@@ -14,8 +14,23 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("harness-scenario-id")).toHaveText("vertical-slice");
   await expect(page.getByTestId("vertical-slice-shell")).toBeVisible();
   await expect(page.locator("canvas")).toHaveCount(2);
+  await expect(page.getByTestId("vertical-slice-debug-sidebar")).toBeVisible();
+  await expect(page.getByTestId("vertical-slice-debug-panel-runtime")).toBeVisible();
+  await expect(page.getByTestId("playfield").getByTestId("harness-commands")).toHaveCount(0);
+  await expect(page.getByTestId("vertical-slice-debug-panel-runtime").getByTestId("harness-commands")).toBeVisible();
+  await expect(page.getByTestId("vertical-slice-move-spawn")).toHaveText("移至：出生点");
+  await expect(page.getByTestId("vertical-slice-confirm")).toHaveText("确认交互");
+  await expect(page.getByTestId("vertical-slice-debug-tab-runtime")).toHaveAttribute("aria-selected", "true");
+  await page.getByTestId("vertical-slice-debug-tab-inspector").click();
+  await expect(page.getByTestId("inspector-lite")).toBeVisible();
+  await expect(page.getByTestId("harness-commands")).toHaveCount(0);
+  await expect(page.getByTestId("vertical-slice-debug-tab-inspector")).toHaveAttribute("aria-selected", "true");
+  await page.getByTestId("vertical-slice-debug-tab-runtime").click();
+  await expect(page.getByTestId("vertical-slice-debug-tab-runtime")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("vertical-slice-debug-panel-runtime").getByTestId("harness-commands")).toBeVisible();
   await expect(page.getByTestId("vertical-slice-map")).toHaveText("map:academy-hall");
   await expect(page.getByTestId("vertical-slice-pointer-lock-status")).toHaveText("idle");
+  await expectNoDocumentScroll(page);
   await page.screenshot({ path: "test-results/vertical-slice-spawn.png", fullPage: true });
 
   await requestPointerLockAndRelease(page, "vertical-slice-pointer-lock", "vertical-slice-pointer-lock-status");
@@ -73,30 +88,38 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("vn2d-overlay");
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
   await expect(page.getByTestId("pixi-layer")).toBeVisible();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("first playable slice");
+  await expect(page.getByTestId("vn-dialog-speaker")).toHaveText("菲利克斯");
+  await expect(page.getByTestId("vn-dialog-state")).toHaveText("可继续");
+  await expect(page.getByTestId("vn-dialog-advance")).toHaveText("继续");
+  await expect(page.getByTestId("vn-dialog-cancel")).toHaveText("取消");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("视觉小说联调剧本");
   await blurActiveElement(page);
   await page.keyboard.press("Space");
   await movementPulse(page, "ArrowUp");
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("vn2d-overlay");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("first playable slice");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("视觉小说联调剧本");
+  await expectNoDocumentScroll(page);
   await page.screenshot({ path: "test-results/vertical-slice-vn-choice.png", fullPage: true });
 
-  await page.getByTestId("vn-dialog-advance").click();
+  await advanceUntilChoices(page);
   await expect(page.getByTestId("vn-dialog-choices")).toBeVisible();
+  await expect(page.getByTestId("vn-dialog-state")).toHaveText("等待选择");
+  await expect(page.getByTestId("vn-dialog-choice-0")).toHaveText("留在走廊复盘证词");
+  await expect(page.getByTestId("vn-dialog-choice-1")).toHaveText("跟随证人进入教室");
   await page.getByTestId("vn-dialog-choice-0").click();
   await expect(page.getByTestId("vertical-slice-route")).toHaveText("return");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("stay here");
-  await page.getByTestId("vn-dialog-advance").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("留在走廊复盘证词");
+  await advanceUntilOverlayClosed(page);
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
 
   await page.getByTestId("vertical-slice-reset").click();
   await page.getByTestId("vertical-slice-move-witness").click();
   await page.getByTestId("vertical-slice-confirm").click();
-  await page.getByTestId("vn-dialog-advance").click();
+  await advanceUntilChoices(page);
   await page.getByTestId("vn-dialog-choice-1").click();
   await expect(page.getByTestId("vertical-slice-route")).toHaveText("classroom");
   await expect(page.getByTestId("vertical-slice-evidence")).toContainText("evidence:keycard");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("keycard matters");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("进入教室路线");
   await page.screenshot({ path: "test-results/vertical-slice-branch-b.png", fullPage: true });
 
   expect(consoleErrors).toEqual([]);
@@ -109,6 +132,29 @@ async function walkForwardUntilActive(page: Page, interactableId: string) {
   }
 
   await expect(page.getByTestId("vertical-slice-active-interactable")).toHaveText(interactableId);
+}
+
+async function expectNoDocumentScroll(page: Page) {
+  const hasDocumentScroll = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 1);
+  expect(hasDocumentScroll).toBe(false);
+}
+
+async function advanceUntilChoices(page: Page) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if ((await page.getByTestId("vn-dialog-choices").count()) > 0) return;
+    await page.getByTestId("vn-dialog-advance").click();
+  }
+
+  await expect(page.getByTestId("vn-dialog-choices")).toBeVisible();
+}
+
+async function advanceUntilOverlayClosed(page: Page) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if ((await page.getByTestId("vertical-slice-substate").textContent()) === "walk") return;
+    await page.getByTestId("vn-dialog-advance").click();
+  }
+
+  await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
 }
 
 async function expectKeyNeverFocuses(page: Page, key: string, activeTestId: string) {

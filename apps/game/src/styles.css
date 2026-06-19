@@ -53,6 +53,9 @@ button:hover {
 
 .app-shell-harness {
   grid-template-columns: minmax(0, 1fr) 360px;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .visually-hidden {
@@ -72,6 +75,11 @@ button:hover {
   min-width: 0;
   min-height: 100vh;
   overflow: hidden;
+}
+
+.app-shell-harness .playfield {
+  height: 100vh;
+  min-height: 0;
 }
 
 .scene-stack {
@@ -107,6 +115,10 @@ button:hover {
 
 .harness-hud {
   grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+}
+
+.vertical-slice-hud {
+  grid-template-columns: minmax(220px, 320px);
 }
 
 .hud > * {
@@ -363,6 +375,165 @@ button:hover {
   line-height: 1.4;
 }
 
+.vertical-slice-sidebar {
+  position: relative;
+  z-index: 7;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  background: rgba(12, 24, 40, 0.92);
+}
+
+.vertical-slice-debug-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid rgba(145, 230, 220, 0.24);
+  background: rgba(6, 13, 24, 0.5);
+}
+
+.vertical-slice-debug-tab {
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--text-muted);
+}
+
+.vertical-slice-debug-tab[aria-selected="true"] {
+  border-color: var(--accent);
+  background: rgba(110, 231, 216, 0.16);
+  color: #f7fbff;
+  font-weight: 700;
+}
+
+.vertical-slice-debug-panels {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vertical-slice-debug-panel {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.vertical-slice-runtime-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(9, 18, 31, 0.62);
+}
+
+.vertical-slice-readout {
+  display: grid;
+  align-content: start;
+  flex: 0 0 auto;
+  gap: 10px;
+  min-height: 0;
+}
+
+.vertical-slice-readout header,
+.vertical-slice-runtime-controls header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vertical-slice-readout header span,
+.vertical-slice-runtime-controls header span {
+  color: var(--text-muted);
+}
+
+.vertical-slice-readout header strong,
+.vertical-slice-runtime-controls header strong {
+  min-width: 0;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.vertical-slice-readout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.vertical-slice-readout-row {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(6, 13, 24, 0.32);
+  line-height: 1.25;
+}
+
+.vertical-slice-readout-row span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.vertical-slice-readout-row strong {
+  min-width: 0;
+  color: #f7fbff;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.vertical-slice-readout-row-wide {
+  grid-column: 1 / -1;
+}
+
+.vertical-slice-runtime-controls {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(6, 13, 24, 0.32);
+}
+
+.vertical-slice-runtime-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.vertical-slice-runtime-controls button {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 8px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.vertical-slice-runtime-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.vertical-slice-sidebar .inspector {
+  min-height: auto;
+  border-width: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  overflow: visible;
+}
+
 .inspector-actions {
   display: grid;
   gap: 8px;
@@ -415,6 +586,16 @@ button:hover {
     grid-template-columns: 1fr;
   }
 
+  .app-shell-harness {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  .app-shell-harness .playfield {
+    height: 100vh;
+  }
+
   .inspector {
     min-height: auto;
     border-width: 1px 0 0;
@@ -436,5 +617,12 @@ button:hover {
     left: 18px;
     right: 18px;
     width: auto;
+  }
+
+  .vertical-slice-sidebar {
+    height: min(72vh, 720px);
+    min-height: auto;
+    border-left: 0;
+    border-top: 1px solid var(--line);
   }
 }

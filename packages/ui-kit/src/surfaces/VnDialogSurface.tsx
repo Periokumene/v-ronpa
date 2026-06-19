@@ -25,7 +25,7 @@ export function VnDialogSurface({
 }: VnDialogSurfaceProps) {
   const hasChoices = !ended && choices.length > 0;
   const state = ended ? "ended" : hasChoices ? "choices" : "line";
-  const speakerLabel = speaker ?? "Narrator";
+  const speakerLabel = speaker ?? "旁白";
   const speakerId = useId();
   const textId = useId();
 
@@ -75,7 +75,7 @@ export function VnDialogSurface({
   return (
     <section
       aria-describedby={textId}
-      aria-label="Visual novel dialog"
+      aria-label="视觉小说对话"
       aria-labelledby={speakerId}
       aria-keyshortcuts="Enter Escape"
       data-state={state}
@@ -90,7 +90,7 @@ export function VnDialogSurface({
           {speakerLabel}
         </div>
         <div aria-live="polite" data-testid="vn-dialog-state" style={stateStyle}>
-          {ended ? "Ended" : hasChoices ? "Choice pending" : "Ready"}
+          {ended ? "已结束" : hasChoices ? "等待选择" : "可继续"}
         </div>
       </div>
 
@@ -99,7 +99,7 @@ export function VnDialogSurface({
       </p>
 
       {hasChoices && (
-        <div aria-label="Dialog choices" data-testid="vn-dialog-choices" role="group" style={choiceListStyle}>
+        <div aria-label="对话选项" data-testid="vn-dialog-choices" role="group" style={choiceListStyle}>
           {choices.map((choice, index) => (
             <button
               data-testid={`vn-dialog-choice-${index}`}
@@ -116,7 +116,7 @@ export function VnDialogSurface({
 
       {ended && (
         <div aria-live="polite" data-testid="vn-dialog-ended" role="status" style={endedStyle}>
-          Story segment ended. Advance is blocked.
+          本段剧情已结束，无法继续推进。
         </div>
       )}
 
@@ -129,10 +129,10 @@ export function VnDialogSurface({
           style={ended || hasChoices ? disabledButtonStyle : controlButtonStyle}
           type="button"
         >
-          Advance
+          继续
         </button>
         <button data-testid="vn-dialog-cancel" onClick={onCancel} style={controlButtonStyle} type="button">
-          Cancel
+          取消
         </button>
       </div>
     </section>
