@@ -5,8 +5,8 @@
 - `packages/contracts`: source of truth for schemas, fixtures, save data, top
   modes, Navi runtime state, Trial runtime state, inventory, trial definitions,
   evidence definitions, input bindings, camera modes, runtime assets, Story
-  snapshots, Story effects, typed gameplay events, and presentation command wire
-  shapes.
+  snapshots, Story effects, typed gameplay events, `.nani` command catalog
+  metadata, and presentation command wire shapes.
 - `packages/presentation-contracts`: runtime ports for presenter adapters.
 - `packages/nani-parser`: `.nani` AST and IR shape.
 
@@ -28,6 +28,12 @@ and merge the change through the integration baseline first.
   modes; VN2D/VN3D belong to Navi substates or Trial presentation profiles.
 - Renderer-specific objects must not appear in contracts.
 - Script source locations must be preserved through parse and compile outputs.
+- `commandCatalog` is the only declaration source for `.nani` commands.
+  Runtime handler registries bind execution only; they must not define command
+  metadata independently.
+- Official Naninovel commands are declared explicitly. Branch-local experiments
+  should use `@wildcard-<type>` with `routeKey` until they are promoted to
+  stable commands.
 - `ItemDef` is limited to gifts and tools. Evidence is modeled separately as
   `EvidenceDef` and stored in `EvidenceState`.
 - `EvidenceState.ownedEvidenceIds` is the save/runtime ownership list for
@@ -63,5 +69,10 @@ Hard gate snapshots cover:
 - Trial graph validation diagnostics
 - Navi and Trial director runtime state
 - Presentation command logs
+
+See also:
+
+- `docs/nani/command-catalog.md`
+- `docs/architecture/vn-runtime-dispatcher.md`
 
 Snapshot changes are reviewed as public API changes.

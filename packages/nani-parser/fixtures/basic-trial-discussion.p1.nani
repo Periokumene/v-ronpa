@@ -20,7 +20,7 @@ Narrator: The room turns toward Felix.[>]
 @goto #TrialEnd
 
 #ListenLonger
-@shake character:mira intensity:0.25 duration:180
+@shake actorId:character:mira intensity:0.25 duration:180
 Felix.Serious: Waiting changes the rhythm of the room.[>]
 @goto #TrialEnd
 

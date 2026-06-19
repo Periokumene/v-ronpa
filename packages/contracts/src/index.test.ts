@@ -4,6 +4,8 @@ import {
   ContentManifestSchema,
   InputBindingMapSchema,
   InputActionStateSchema,
+  NaniCommandDefinitionSchema,
+  NaniCommandStatusSchema,
   NaviInteractionConfirmRequestSchema,
   NaviInteractionSensorReportSchema,
   NaviInteractionViewSchema,
@@ -13,7 +15,10 @@ import {
   SaveDataSchema,
   StoryEffectSchema,
   TrialDefinitionSchema,
-  TrialRuntimeStateSchema
+  TrialRuntimeStateSchema,
+  WildcardStoryEffectSchema,
+  getNaniCommandDefinition,
+  naniCommandCatalog
 } from "./index";
 
 describe("contracts", () => {
@@ -325,6 +330,95 @@ describe("contracts", () => {
         event: { type: "grant-evidence", evidenceId: "evidence:keycard" }
       })
     ).toMatchObject({ type: "gameplay-event", event: { type: "grant-evidence" } });
+  });
+
+  it("pins the Naninovel command catalog as the command declaration source", () => {
+    const officialCommands = naniCommandCatalog.filter((command) => command.source === "naninovel");
+    const wildcardCommands = naniCommandCatalog.filter((command) => command.source === "wildcard");
+
+    expect(officialCommands).toHaveLength(77);
+    expect(wildcardCommands.map((command) => command.id)).toEqual([
+      "wildcard-text",
+      "wildcard-choice",
+      "wildcard-flow",
+      "wildcard-state",
+      "wildcard-actor",
+      "wildcard-scene",
+      "wildcard-effect",
+      "wildcard-media",
+      "wildcard-ui"
+    ]);
+    expect(() => NaniCommandDefinitionSchema.array().parse(naniCommandCatalog)).not.toThrow();
+  });
+
+  it("keeps canonical command names mapped to lowercase runtime ids", () => {
+    expect(getNaniCommandDefinition("addchoice")).toMatchObject({
+      canonicalName: "addChoice",
+      id: "addchoice",
+      source: "naninovel"
+    });
+    expect(getNaniCommandDefinition("stopBgm")).toMatchObject({
+      canonicalName: "stopBgm",
+      id: "stopbgm",
+      source: "naninovel"
+    });
+    expect(getNaniCommandDefinition("char-enter")).toMatchObject({
+      canonicalName: "charenter",
+      id: "charenter",
+      source: "v-ronpa"
+    });
+  });
+
+  it("preserves official Naninovel parameter type names in metadata", () => {
+    expect(getNaniCommandDefinition("back")?.params).toContainEqual({
+      name: "time",
+      type: "decimal"
+    });
+    expect(getNaniCommandDefinition("arrange")?.params).toContainEqual({
+      name: "characterPositions",
+      type: "named decimal list"
+    });
+    expect(getNaniCommandDefinition("format")?.params).toContainEqual({
+      name: "templates",
+      type: "named string list"
+    });
+    expect(NaniCommandStatusSchema.parse("stubbed")).toBe("stubbed");
+  });
+
+  it("marks migrated V-Ronpa compatibility params without pretending they are official Naninovel params", () => {
+    expect(getNaniCommandDefinition("back")?.params).toContainEqual({
+      name: "effect",
+      type: "string",
+      source: "v-ronpa"
+    });
+    expect(getNaniCommandDefinition("shake")?.params).toContainEqual({
+      name: "intensity",
+      type: "decimal",
+      source: "v-ronpa"
+    });
+    expect(getNaniCommandDefinition("shake")?.params).toContainEqual({
+      name: "duration",
+      type: "decimal",
+      source: "v-ronpa"
+    });
+  });
+
+  it("validates wildcard story effects without treating them as presentation commands", () => {
+    const effect = WildcardStoryEffectSchema.parse({
+      type: "wildcard-event",
+      wildcardType: "effect",
+      routeKey: "pixi:chromatic-burst",
+      params: { intensity: 0.8, wait: true },
+      sourceCommand: {
+        commandId: "wildcard-effect",
+        canonicalName: "wildcard-effect",
+        loc: { scriptPath: "story.nani", line: 3, column: 1, raw: "@wildcard-effect routeKey:pixi:chromatic-burst" }
+      }
+    });
+
+    expect(effect).toMatchObject({ type: "wildcard-event", wildcardType: "effect" });
+    expect(StoryEffectSchema.parse(effect)).toMatchObject({ routeKey: "pixi:chromatic-burst" });
+    expect(effect).not.toHaveProperty("command");
   });
 
   it("validates versioned save data", () => {

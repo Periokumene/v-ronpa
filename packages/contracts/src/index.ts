@@ -151,6 +151,475 @@ export const DiagnosticSchema = z.object({
 });
 export type Diagnostic = z.infer<typeof DiagnosticSchema>;
 
+export const NaniCommandCategorySchema = z.enum([
+  "text",
+  "choice",
+  "flow",
+  "state",
+  "actor",
+  "scene",
+  "effect",
+  "media",
+  "ui"
+]);
+export type NaniCommandCategory = z.infer<typeof NaniCommandCategorySchema>;
+
+export const NaniWildcardTypeSchema = z.enum([
+  "text",
+  "choice",
+  "flow",
+  "state",
+  "actor",
+  "scene",
+  "effect",
+  "media",
+  "ui"
+]);
+export type NaniWildcardType = z.infer<typeof NaniWildcardTypeSchema>;
+
+export const NaniCommandStatusSchema = z.enum(["declared", "validated", "stubbed", "implemented"]);
+export type NaniCommandStatus = z.infer<typeof NaniCommandStatusSchema>;
+
+export const NaniCommandSourceSchema = z.enum(["naninovel", "wildcard", "v-ronpa"]);
+export type NaniCommandSource = z.infer<typeof NaniCommandSourceSchema>;
+
+export interface NaniCommandParamSpec {
+  name: string;
+  type: string;
+  source?: NaniCommandSource;
+  required?: boolean;
+  repeatable?: boolean;
+  aliases?: string[];
+  description?: string;
+}
+
+export interface NaniCommandDefinition {
+  id: string;
+  canonicalName: string;
+  category: NaniCommandCategory;
+  source: NaniCommandSource;
+  status: NaniCommandStatus;
+  supportsChildren: boolean;
+  params: NaniCommandParamSpec[];
+  aliases?: string[];
+}
+
+export const NaniCommandParamSpecSchema = z
+  .object({
+    name: z.string().min(1),
+    type: z.string().min(1),
+    source: NaniCommandSourceSchema.optional(),
+    required: z.boolean().optional(),
+    repeatable: z.boolean().optional(),
+    aliases: z.array(z.string().min(1)).optional(),
+    description: z.string().optional()
+  })
+  .strict();
+
+export const NaniCommandDefinitionSchema = z
+  .object({
+    id: z.string().min(1).regex(/^[a-z0-9:_./<>-]+$/),
+    canonicalName: z.string().min(1),
+    category: NaniCommandCategorySchema,
+    source: NaniCommandSourceSchema,
+    status: NaniCommandStatusSchema,
+    supportsChildren: z.boolean(),
+    params: z.array(NaniCommandParamSpecSchema),
+    aliases: z.array(z.string().min(1).regex(/^[a-z0-9:_./<>-]+$/)).optional()
+  })
+  .strict();
+
+const officialCommandStatuses: Partial<Record<string, NaniCommandStatus>> = {
+  back: "implemented",
+  choice: "implemented",
+  goto: "implemented",
+  set: "implemented",
+  shake: "implemented"
+};
+
+function param(
+  name: string,
+  type: string,
+  required = false,
+  source: NaniCommandSource = "naninovel"
+): NaniCommandParamSpec {
+  return {
+    name,
+    type,
+    ...(source !== "naninovel" ? { source } : {}),
+    ...(required ? { required } : {})
+  };
+}
+
+function official(
+  canonicalName: string,
+  category: NaniCommandCategory,
+  params: NaniCommandParamSpec[] = [],
+  supportsChildren = false
+): NaniCommandDefinition {
+  const id = normalizeNaniCommandId(canonicalName);
+  return {
+    id,
+    canonicalName,
+    category,
+    source: "naninovel",
+    status: officialCommandStatuses[id] ?? "stubbed",
+    supportsChildren,
+    params
+  };
+}
+
+function wildcard(wildcardType: NaniWildcardType): NaniCommandDefinition {
+  return {
+    id: `wildcard-${wildcardType}`,
+    canonicalName: `wildcard-${wildcardType}`,
+    category: wildcardType,
+    source: "wildcard",
+    status: "implemented",
+    supportsChildren: false,
+    params: [
+      param("routeKey", "string", true),
+      { name: "params", type: "generic params", repeatable: true, description: "All non-routeKey params are forwarded." }
+    ]
+  };
+}
+
+function vRonpa(
+  id: string,
+  category: NaniCommandCategory,
+  params: NaniCommandParamSpec[] = [],
+  aliases: string[] = []
+): NaniCommandDefinition {
+  return {
+    id,
+    canonicalName: id,
+    category,
+    source: "v-ronpa",
+    status: "implemented",
+    supportsChildren: false,
+    params,
+    ...(aliases.length > 0 ? { aliases } : {})
+  };
+}
+
+export function normalizeNaniCommandId(id: string): string {
+  return id.trim().toLowerCase();
+}
+
+const actorTransformParams = [
+  param("id", "string"),
+  param("appearance", "string"),
+  param("pose", "string"),
+  param("via", "string"),
+  param("params", "decimal list"),
+  param("dissolve", "string"),
+  param("visible", "boolean"),
+  param("position", "decimal list"),
+  param("rotation", "decimal list"),
+  param("scale", "decimal list"),
+  param("tint", "string"),
+  param("easing", "string"),
+  param("time", "decimal"),
+  param("lazy", "boolean"),
+  param("wait", "boolean")
+];
+
+const particleParams = [
+  param("power", "decimal"),
+  param("time", "decimal"),
+  param("pos", "decimal list"),
+  param("position", "decimal list"),
+  param("rotation", "decimal list"),
+  param("scale", "decimal list"),
+  param("wait", "boolean")
+];
+
+const audioParams = [
+  param("volume", "decimal"),
+  param("loop", "boolean"),
+  param("fade", "decimal"),
+  param("group", "string"),
+  param("time", "decimal"),
+  param("wait", "boolean")
+];
+
+const choiceParams = [
+  param("choiceSummary", "string"),
+  param("id", "string"),
+  param("lock", "string"),
+  param("button", "string"),
+  param("pos", "decimal list"),
+  param("handler", "string"),
+  param("goto", "string"),
+  param("gosub", "string"),
+  param("set", "string"),
+  param("show", "boolean"),
+  param("time", "decimal")
+];
+
+export const naniCommandCatalog: NaniCommandDefinition[] = [
+  official("addChoice", "choice", choiceParams),
+  official("append", "text", [param("text", "string"), param("printer", "string"), param("author", "string")]),
+  official("arrange", "actor", [
+    param("characterPositions", "named decimal list"),
+    param("look", "boolean"),
+    param("time", "decimal"),
+    param("wait", "boolean")
+  ]),
+  official("async", "flow", [param("trackId", "string"), param("loop", "boolean")], true),
+  official("await", "flow", [param("trackId", "string"), param("complete", "boolean")]),
+  official("back", "scene", [
+    param("appearanceAndTransition", "named string"),
+    param("pos", "decimal list"),
+    ...actorTransformParams,
+    param("effect", "string", false, "v-ronpa")
+  ]),
+  official("bgm", "media", [param("bgmPath", "string"), param("intro", "string"), ...audioParams]),
+  official("blur", "effect", [
+    param("actorId", "string"),
+    param("power", "decimal"),
+    param("time", "decimal"),
+    param("wait", "boolean")
+  ]),
+  official("bokeh", "effect", [
+    param("focus", "string"),
+    param("dist", "decimal"),
+    param("power", "decimal"),
+    param("time", "decimal"),
+    param("wait", "boolean")
+  ]),
+  official("camera", "scene", [
+    param("offset", "decimal list"),
+    param("roll", "decimal"),
+    param("rotation", "decimal list"),
+    param("zoom", "decimal"),
+    param("ortho", "boolean"),
+    param("toggle", "string list"),
+    param("set", "named boolean list"),
+    param("easing", "string"),
+    param("time", "decimal"),
+    param("lazy", "boolean"),
+    param("wait", "boolean")
+  ]),
+  official("char", "actor", [
+    param("idAndAppearance", "named string"),
+    param("look", "string"),
+    param("avatar", "string"),
+    param("pos", "decimal list"),
+    ...actorTransformParams
+  ]),
+  official("choice", "choice", choiceParams),
+  official("choiceHandler", "choice", [
+    param("handlerId", "string"),
+    param("default", "boolean"),
+    ...actorTransformParams
+  ]),
+  official("clearBacklog", "text"),
+  official("clearChoice", "choice", [param("handlerId", "string"), param("id", "string"), param("hide", "boolean")]),
+  official("despawn", "actor", [param("path", "string"), param("params", "string list"), param("wait", "boolean")]),
+  official("despawnAll", "actor", [param("wait", "boolean")]),
+  official("else", "flow", [], true),
+  official("endIf", "flow"),
+  official("enterDialogue", "text"),
+  official("exitDialogue", "text", [param("destroy", "boolean")]),
+  official("format", "text", [param("templates", "named string list"), param("printer", "string")]),
+  official("glitch", "effect", [param("time", "decimal"), param("power", "decimal"), param("wait", "boolean")]),
+  official("gosub", "flow", [param("path", "string")]),
+  official("goto", "flow", [
+    param("path", "string"),
+    param("reset", "string list"),
+    param("hold", "boolean"),
+    param("release", "boolean")
+  ]),
+  official("group", "flow", [], true),
+  official("hide", "actor", [param("actorIds", "string list"), param("time", "decimal"), param("lazy", "boolean"), param("wait", "boolean")]),
+  official("hideAll", "actor", [param("time", "decimal"), param("lazy", "boolean"), param("wait", "boolean")]),
+  official("hideChars", "actor", [param("time", "decimal"), param("lazy", "boolean"), param("wait", "boolean")]),
+  official("hidePrinter", "text", [param("printerId", "string"), param("time", "decimal"), param("wait", "boolean")]),
+  official("hideUI", "ui", [
+    param("uINames", "string list"),
+    param("allowToggle", "boolean"),
+    param("time", "decimal"),
+    param("wait", "boolean")
+  ]),
+  official("if", "flow", [param("expression", "string")], true),
+  official("input", "ui", [
+    param("variableName", "string"),
+    param("type", "string"),
+    param("summary", "string"),
+    param("value", "string"),
+    param("nostop", "boolean")
+  ]),
+  official("lipSync", "actor", [param("charIdAndAllow", "named boolean")]),
+  official("loadScene", "scene", [param("sceneName", "string"), param("additive", "boolean")]),
+  official("lock", "state", [param("id", "string")]),
+  official("look", "actor", [
+    param("enable", "boolean"),
+    param("zone", "decimal list"),
+    param("speed", "decimal list"),
+    param("gravity", "boolean")
+  ]),
+  official("movie", "media", [param("moviePath", "string"), param("time", "decimal"), param("block", "boolean")]),
+  official("openURL", "ui", [param("uRL", "string"), param("target", "string")]),
+  official("print", "text", [
+    param("text", "string"),
+    param("printer", "string"),
+    param("author", "string"),
+    param("as", "string"),
+    param("speed", "decimal"),
+    param("reset", "boolean"),
+    param("default", "boolean"),
+    param("waitInput", "boolean"),
+    param("append", "boolean"),
+    param("fadeTime", "decimal"),
+    param("wait", "boolean")
+  ]),
+  official("printer", "text", [
+    param("idAndAppearance", "named string"),
+    param("default", "boolean"),
+    param("hideOther", "boolean"),
+    param("anchor", "boolean"),
+    param("pos", "decimal list"),
+    ...actorTransformParams
+  ]),
+  official("processInput", "ui", [param("inputEnabled", "boolean"), param("set", "named boolean list")]),
+  official("purgeRollback", "state"),
+  official("rain", "effect", [
+    param("power", "decimal"),
+    param("time", "decimal"),
+    param("xSpeed", "decimal"),
+    param("ySpeed", "decimal"),
+    param("pos", "decimal list"),
+    param("position", "decimal list"),
+    param("rotation", "decimal list"),
+    param("scale", "decimal list"),
+    param("wait", "boolean")
+  ]),
+  official("random", "flow", [param("weight", "decimal list")], true),
+  official("remove", "actor", [param("actorIds", "string list")]),
+  official("resetState", "state", [param("exclude", "string list"), param("only", "string list")]),
+  official("resetText", "text", [param("printerId", "string")]),
+  official("return", "flow", [param("reset", "string list")]),
+  official("save", "ui", [param("at", "string")]),
+  official("set", "state", [param("expression", "string")]),
+  official("sfx", "media", [param("sfxPath", "string"), ...audioParams]),
+  official("sfxFast", "media", [
+    param("sfxPath", "string"),
+    param("volume", "decimal"),
+    param("restart", "boolean"),
+    param("additive", "boolean"),
+    param("group", "string"),
+    param("wait", "boolean")
+  ]),
+  official("shake", "effect", [
+    param("actorId", "string"),
+    param("count", "integer"),
+    param("loop", "boolean"),
+    param("time", "decimal"),
+    param("deltaTime", "decimal"),
+    param("power", "decimal"),
+    param("deltaPower", "decimal"),
+    param("hor", "boolean"),
+    param("ver", "boolean"),
+    param("wait", "boolean"),
+    param("target", "string", false, "v-ronpa"),
+    param("intensity", "decimal", false, "v-ronpa"),
+    param("duration", "decimal", false, "v-ronpa")
+  ]),
+  official("show", "actor", [param("actorIds", "string list"), param("time", "decimal"), param("lazy", "boolean"), param("wait", "boolean")]),
+  official("showPrinter", "text", [param("printerId", "string"), param("time", "decimal"), param("wait", "boolean")]),
+  official("showUI", "ui", [param("uINames", "string list"), param("time", "decimal"), param("wait", "boolean")]),
+  official("skip", "ui", [param("enable", "boolean")]),
+  official("slide", "actor", [
+    param("idAndAppearance", "named string"),
+    param("from", "decimal list"),
+    param("to", "decimal list"),
+    param("visible", "boolean"),
+    param("easing", "string"),
+    param("time", "decimal"),
+    param("lazy", "boolean"),
+    param("wait", "boolean")
+  ]),
+  official("snow", "effect", particleParams),
+  official("spawn", "actor", [
+    param("path", "string"),
+    param("params", "string list"),
+    param("pos", "decimal list"),
+    param("position", "decimal list"),
+    param("rotation", "decimal list"),
+    param("scale", "decimal list"),
+    param("wait", "boolean")
+  ]),
+  official("stop", "flow", [param("trackId", "string")]),
+  official("stopBgm", "media", [param("bgmPath", "string"), param("fade", "decimal"), param("wait", "boolean")]),
+  official("stopSfx", "media", [param("sfxPath", "string"), param("fade", "decimal"), param("wait", "boolean")]),
+  official("stopVoice", "media"),
+  official("sun", "effect", particleParams),
+  official("sync", "flow", [param("trackId", "string")]),
+  official("timeline", "media", [
+    param("name", "string"),
+    param("stop", "boolean"),
+    param("pause", "boolean"),
+    param("resume", "boolean"),
+    param("wait", "boolean")
+  ]),
+  official("title", "ui"),
+  official("toast", "ui", [param("text", "string"), param("appearance", "string"), param("time", "decimal")]),
+  official("trans", "scene", [
+    param("transition", "string"),
+    param("params", "decimal list"),
+    param("dissolve", "string"),
+    param("easing", "string"),
+    param("time", "decimal")
+  ]),
+  official("unless", "flow", [param("expression", "string")], true),
+  official("unloadScene", "scene", [param("sceneName", "string")]),
+  official("unlock", "state", [param("id", "string")]),
+  official("voice", "media", [
+    param("voicePath", "string"),
+    param("volume", "decimal"),
+    param("group", "string"),
+    param("authorId", "string")
+  ]),
+  official("wait", "flow", [param("waitMode", "string")]),
+  official("while", "flow", [param("expression", "string")], true),
+  wildcard("text"),
+  wildcard("choice"),
+  wildcard("flow"),
+  wildcard("state"),
+  wildcard("actor"),
+  wildcard("scene"),
+  wildcard("effect"),
+  wildcard("media"),
+  wildcard("ui"),
+  vRonpa("end", "flow"),
+  vRonpa("gameplay", "state", [param("type", "string"), param("id", "string"), param("quantity", "integer")], ["gameplay-event"]),
+  vRonpa("charenter", "actor", [param("character", "string"), param("portrait", "string"), param("slot", "string"), param("effect", "string")], [
+    "char-enter"
+  ]),
+  vRonpa("flash", "effect", [param("color", "string"), param("duration", "decimal")]),
+  vRonpa("focus", "effect", [param("target", "string"), param("duration", "decimal")]),
+  vRonpa("trialkeyword", "ui", [param("id", "string"), param("text", "string"), param("speaker", "string"), param("evidence", "string")], [
+    "trial-keyword"
+  ])
+];
+
+export const commandCatalog = naniCommandCatalog;
+
+const naniCommandCatalogById = new Map<string, NaniCommandDefinition>();
+for (const definition of naniCommandCatalog) {
+  naniCommandCatalogById.set(definition.id, definition);
+  for (const alias of definition.aliases ?? []) naniCommandCatalogById.set(alias, definition);
+}
+
+export function getNaniCommandDefinition(id: string): NaniCommandDefinition | undefined {
+  return naniCommandCatalogById.get(normalizeNaniCommandId(id));
+}
+
+export function isNaniWildcardCommandId(id: string): boolean {
+  return getNaniCommandDefinition(id)?.source === "wildcard";
+}
+
 export const AssetRefSchema = z.object({
   id: IdSchema,
   kind: z.enum(["portrait", "background", "bgm", "sfx", "voice", "video", "glb", "texture", "fx"]),
@@ -478,6 +947,21 @@ export const StoryRuntimeSnapshotSchema = z.object({
 });
 export type StoryRuntimeSnapshot = z.infer<typeof StoryRuntimeSnapshotSchema>;
 
+export const WildcardStoryEffectSchema = z.object({
+  type: z.literal("wildcard-event"),
+  wildcardType: NaniWildcardTypeSchema,
+  routeKey: z.string().min(1),
+  params: z.record(z.string(), z.unknown()).default({}),
+  sourceCommand: z
+    .object({
+      commandId: z.string().min(1),
+      canonicalName: z.string().min(1).optional(),
+      loc: SourceLocationSchema.optional()
+    })
+    .strict()
+});
+export type WildcardStoryEffect = z.infer<typeof WildcardStoryEffectSchema>;
+
 export const StoryEffectSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("presentation"), command: PresentationCommandSchema }),
   z.object({ type: z.literal("navi-event"), eventType: z.string().min(1), payload: z.unknown().optional() }),
@@ -488,7 +972,8 @@ export const StoryEffectSchema = z.discriminatedUnion("type", [
     eventType: z.enum(["play-bgm", "play-sfx", "play-video", "stop-media"]),
     assetId: IdSchema.optional(),
     payload: z.unknown().optional()
-  })
+  }),
+  WildcardStoryEffectSchema
 ]);
 export type StoryEffect = z.infer<typeof StoryEffectSchema>;
 

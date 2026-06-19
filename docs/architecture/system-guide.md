@@ -42,7 +42,8 @@ adapters and apps
   timeout handling, evidence submission outcomes, and segment transitions.
 - `StoryEngine` owns script semantics, variables, backlog, choices, performs,
   serializable Story snapshots, and story-generated `StoryEffect` bridge
-  events.
+  events. Its `NaniCommandHandlerRegistry` binds command execution but does not
+  define command metadata.
 - `gameplay` owns domain reducers for exploration, inventory, evidence
   ownership, character state, and pure trial rule judgments.
 - `media-save` owns Dexie IndexedDB save storage, Howler audio playback,
@@ -78,8 +79,13 @@ See also:
 
 `.nani` scripts compile to IR. Runtime command handlers translate IR into
 state patches, game events, and presentation commands. Presentation commands
-are renderer-independent, so a command like `@shake target:hero` never knows
+are renderer-independent, so a command like `@shake actorId:hero` never knows
 whether Pixi, DOM, or another future presenter executes the motion.
+
+Command declarations live in the contracts `commandCatalog`. The catalog stores
+Naninovel canonical names, lowercase runtime ids, categories, parameter specs,
+children support, implementation status, and wildcard entries. StoryEngine
+derives validation and handler registration checks from it.
 
 Story scripts can emit typed gameplay events, for example
 `@gameplay grant-evidence id:evidence:keycard`. These events can update
@@ -89,11 +95,18 @@ submission remains a Trial UI action routed through `trial-director`.
 ```text
 .nani source
   -> nani-parser AST/IR
-  -> StoryEngine command registry
+  -> contracts commandCatalog validation
+  -> StoryEngine NaniCommandHandlerRegistry
   -> typed event reducer
   -> StoryEffect / presentation commands / gameplay events
-  -> Pixi, R3F, DOM adapters
+  -> VnRuntimeDispatcher route table
+  -> Pixi, R3F, DOM, gameplay, media, Navi, Trial consumers
 ```
+
+See also:
+
+- `docs/nani/command-catalog.md`
+- `docs/architecture/vn-runtime-dispatcher.md`
 
 ## Evidence And Trial Rules
 

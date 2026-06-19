@@ -63,7 +63,7 @@ Mira.Calm: Keep your voice down. The door still listens.[>]
 
 #InspectFile
 @gameplay grant-evidence id:evidence:keycard
-@shake character:felix intensity:0.35 duration:220
+@shake actorId:character:felix intensity:0.35 duration:220
 Narrator: Evidence registered: keycard.[>]
 @goto #End
 
@@ -101,7 +101,7 @@ Narrator: The room turns toward Felix.[>]
 @goto #TrialEnd
 
 #ListenLonger
-@shake character:mira intensity:0.25 duration:180
+@shake actorId:character:mira intensity:0.25 duration:180
 Felix.Serious: Waiting changes the rhythm of the room.[>]
 @goto #TrialEnd
 

@@ -5,6 +5,7 @@ import {
   advanceToNextStop,
   chooseStoryOption,
   createInitialStoryState,
+  createNaniCommandHandlerRegistry,
   selectCurrentStoryLine,
   storyReducer,
   storyRuntimeSnapshot
@@ -19,7 +20,7 @@ Felix: The door was locked.[>]
 @choice "Stay silent" goto:#End
 #Object
 @set route:objected
-@shake character:felix intensity:0.5 duration:300
+@shake actorId:character:felix intensity:0.5 duration:300
 @goto #End
 #End
 @end`;
@@ -48,7 +49,7 @@ describe("story engine", () => {
     let state = createInitialStoryState(scenario);
 
     for (let i = 0; i < 6; i += 1) {
-      state = storyReducer(state, { type: "STEP", scenario });
+      state = reduceWithoutDiagnostics(state, { type: "STEP", scenario });
     }
 
     expect(storyRuntimeSnapshot(state)).toMatchInlineSnapshot(`
@@ -79,9 +80,9 @@ describe("story engine", () => {
       command: { type: "trial-keyword", keywordId: "kw:locked" }
     });
 
-    state = storyReducer(state, { type: "CHOOSE", scenario, index: 0 });
-    state = storyReducer(state, { type: "STEP", scenario });
-    state = storyReducer(state, { type: "STEP", scenario });
+    state = reduceWithoutDiagnostics(state, { type: "CHOOSE", scenario, index: 0 });
+    state = reduceWithoutDiagnostics(state, { type: "STEP", scenario });
+    state = reduceWithoutDiagnostics(state, { type: "STEP", scenario });
 
     expect(state.variables.route).toBe("objected");
     expect(state.presentationCommands.at(-1)).toMatchObject({ type: "shake" });
@@ -93,9 +94,10 @@ describe("story engine", () => {
       sourceText: "@gameplay grant-evidence id:evidence:keycard",
       scriptPath: "grant-evidence.nani"
     });
-    const state = storyReducer(createInitialStoryState(scenario), { type: "STEP", scenario });
+    const result = storyReducer(createInitialStoryState(scenario), { type: "STEP", scenario });
 
-    expect(state.effects).toEqual([
+    expect(result.diagnostics).toEqual([]);
+    expect(result.state.effects).toEqual([
       {
         type: "gameplay-event",
         event: { type: "grant-evidence", evidenceId: "evidence:keycard" }
@@ -125,6 +127,143 @@ describe("story engine", () => {
       { text: "Return to the hallway", goto: "#Return" },
       { text: "Follow the witness into class", goto: "#Classroom" }
     ]);
+  });
+
+  it("derives official command parameter validation from the catalog", () => {
+    const { scenario } = parseScenario({
+      sourceText: "@back bg:harness time:fast",
+      scriptPath: "invalid-official-param.nani"
+    });
+    const result = advanceToNextStop(createInitialStoryState(scenario), scenario);
+
+    expect(result.state.presentationCommands).toEqual([]);
+    expect(result.diagnostics).toEqual([
+      {
+        code: "invalid-command-param",
+        message: "@back parameter time expected decimal.",
+        severity: "error"
+      }
+    ]);
+  });
+
+  it("keeps migrated historical commands warning-free through the catalog", () => {
+    const { scenario } = parseScenario({
+      sourceText: `@back bg:harness effect:fade
+@shake actorId:character:felix intensity:0.5 duration:300
+@goto path:#End
+#End
+Felix: Arrived.
+@end`,
+      scriptPath: "migrated-history.nani"
+    });
+    let state = createInitialStoryState(scenario);
+
+    let result = advanceToNextStop(state, scenario);
+    state = result.state;
+    expect(result.diagnostics).toEqual([]);
+    expect(state.presentationCommands).toEqual([
+      { type: "set-background", backgroundId: "bg:harness", effect: "fade" },
+      { type: "shake", target: "character:felix", intensity: 0.5, durationMs: 300 },
+      { type: "print", text: "Arrived.", speaker: "Felix", autoNext: false }
+    ]);
+    expect(selectCurrentStoryLine(state)).toEqual({ speaker: "Felix", text: "Arrived." });
+
+    result = advanceToNextStop(state, scenario);
+    expect(result.state.ended).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("reports declared but unimplemented official commands as no-op diagnostics", () => {
+    const { scenario } = parseScenario({
+      sourceText: "@bgm theme:investigation volume:0.5",
+      scriptPath: "stubbed-official-command.nani"
+    });
+    const result = advanceToNextStop(createInitialStoryState(scenario), scenario);
+
+    expect(result.state.presentationCommands).toEqual([]);
+    expect(result.state.effects).toEqual([]);
+    expect(result.diagnostics).toEqual([
+      {
+        code: "command-not-implemented",
+        message: "@bgm is declared in commandCatalog but has no runtime handler; treated as no-op.",
+        severity: "warning"
+      }
+    ]);
+  });
+
+  it("returns reducer diagnostics instead of silently dropping command catalog findings", () => {
+    const { scenario } = parseScenario({
+      sourceText: "@bgm theme:investigation volume:0.5",
+      scriptPath: "reducer-diagnostics.nani"
+    });
+    const result = storyReducer(createInitialStoryState(scenario), { type: "STEP", scenario });
+
+    expect(result.state.effects).toEqual([]);
+    expect(result.diagnostics).toEqual([
+      {
+        code: "command-not-implemented",
+        message: "@bgm is declared in commandCatalog but has no runtime handler; treated as no-op.",
+        severity: "warning"
+      }
+    ]);
+  });
+
+  it("warns when an implemented official command receives compatible params the runtime does not consume yet", () => {
+    const { scenario } = parseScenario({
+      sourceText: "@back bg:harness time:0.5",
+      scriptPath: "unsupported-official-param.nani"
+    });
+    const result = advanceToNextStop(createInitialStoryState(scenario), scenario);
+
+    expect(result.state.presentationCommands).toEqual([{ type: "set-background", backgroundId: "bg:harness" }]);
+    expect(result.diagnostics).toEqual([
+      {
+        code: "unsupported-command-param",
+        message: "@back accepts time:decimal, but the current runtime handler does not consume it yet.",
+        severity: "warning"
+      }
+    ]);
+  });
+
+  it("emits wildcard events without adding presentation commands", () => {
+    const { scenario } = parseScenario({
+      sourceText: "@wildcard-effect routeKey:pixi:chromatic-burst intensity:0.75 wait:true",
+      scriptPath: "wildcard-effect.nani"
+    });
+    const result = advanceToNextStop(createInitialStoryState(scenario), scenario);
+
+    expect(result.state.presentationCommands).toEqual([]);
+    expect(result.state.effects).toEqual([
+      {
+        type: "wildcard-event",
+        wildcardType: "effect",
+        routeKey: "pixi:chromatic-burst",
+        params: { intensity: 0.75, wait: true },
+        sourceCommand: {
+          commandId: "wildcard-effect",
+          canonicalName: "wildcard-effect",
+          loc: {
+            scriptPath: "wildcard-effect.nani",
+            line: 1,
+            column: 1,
+            raw: "@wildcard-effect routeKey:pixi:chromatic-burst intensity:0.75 wait:true"
+          }
+        }
+      }
+    ]);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("rejects handler registration for commands outside the command catalog", () => {
+    expect(() =>
+      createNaniCommandHandlerRegistry([
+        {
+          id: "catalog-drift",
+          category: "effect",
+          execute: () => ({ type: "none" })
+        }
+      ])
+    ).toThrow("Cannot register @catalog-drift; it is not declared in commandCatalog.");
   });
 
   it("does not fast-forward across multiple readable lines", () => {
@@ -233,3 +372,12 @@ Mira: Second line.
     expect(() => StoryRuntimeSnapshotSchema.parse(storyRuntimeSnapshot(state))).not.toThrow();
   });
 });
+
+function reduceWithoutDiagnostics(
+  state: ReturnType<typeof createInitialStoryState>,
+  event: Parameters<typeof storyReducer>[1]
+): ReturnType<typeof createInitialStoryState> {
+  const result = storyReducer(state, event);
+  expect(result.diagnostics).toEqual([]);
+  return result.state;
+}

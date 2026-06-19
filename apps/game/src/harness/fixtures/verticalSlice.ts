@@ -145,7 +145,7 @@ Felix: 我们先留在走廊复盘证词。第一件事是确认门锁声音的�
 Mira: 我会把证人的说法拆成三个点：灯闪、门响、广播中断。
 Ren: 灯闪不是普通故障。它只闪了一次，而且方向像是从教室里漏出来的。
 Narrator: Felix 蹲下检查门框，指尖沿着金属边缘缓慢移动。
-@shake character:felix intensity:0.28 duration:240
+@shake actorId:character:felix intensity:0.28 duration:240
 Felix: 门框没有被撬过，但读卡器边缘有一道新划痕。
 Mira: 也就是说，有人用过卡，却不一定熟悉这套门禁。
 Ren: 我听见的声音应该就是读卡器重启。它平时不会这么响。
@@ -174,7 +174,7 @@ Ren: 我见过这张卡。它不属于学生，也不属于普通教师。
 Mira: 那它可能是临时权限卡，能解释为什么广播会被切断。
 Felix: 如果有人刷卡进入教室，再切断广播，就能制造证词空窗。
 Narrator: 讲台抽屉里传来轻微震动，像有什么东西撞到木板。
-@shake character:ren intensity:0.42 duration:260
+@shake actorId:character:ren intensity:0.42 duration:260
 Ren: 等等，我刚才没有碰那个抽屉。
 Felix: 别动。我们先把现有结论写清楚。
 Mira: 结论一：证人听见门锁。结论二：门禁卡能解释门锁。结论三：广播中断可能是人为。

@@ -3,7 +3,6 @@ import type {
   NaviInteractionSensorReport,
   NaviRuntimeState,
   PlayerPose,
-  PresentationCommand,
   StoryEffect,
   WorldMapDef
 } from "@v-ronpa/contracts";
@@ -17,9 +16,9 @@ import {
   naviReducer
 } from "@v-ronpa/navi-director";
 import { ExplorationStage3D, type FirstPersonInteractRequest } from "@v-ronpa/r3f-adapter";
-import { advanceToNextStop, chooseStoryOption, createInitialStoryState, selectCurrentStoryLine } from "@v-ronpa/story-engine";
-import { InspectorLite, VnDialogSurface } from "@v-ronpa/ui-kit";
-import { PixiLayer } from "../../../PixiLayer";
+import { advanceToNextStop, chooseStoryOption, createInitialStoryState } from "@v-ronpa/story-engine";
+import { InspectorLite } from "@v-ronpa/ui-kit";
+import { VnRuntimeDispatcher, selectVnNewEffectsForTarget } from "../../../VnRuntimeDispatcher";
 import { verticalSliceEvidence, verticalSliceItem, verticalSliceMaps, verticalSliceScript } from "../../fixtures/verticalSlice";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../../inputActions";
 import { useFirstPersonExplorationBridge } from "../../useFirstPersonExplorationBridge";
@@ -73,8 +72,6 @@ export function VerticalSliceScenario() {
   const currentCameraMode = navi.inputLock === "none" ? "first-person" : "locked";
   const inputActionsRef = useKeyboardInputActions(defaultHarnessInputBindings, "navi", navi.inputLock === "none");
   const interactionView = createNaviInteractionView(navi);
-  const currentLine = storyRuntime.active ? selectCurrentStoryLine(storyRuntime.state) : undefined;
-  const pixiCommands = storyRuntime.state.presentationCommands.filter((command) => command.type !== "print");
 
   function resetSlice() {
     const spawnPose: PlayerPose = { position: initialMap.spawn, yaw: 0, pitch: 0 };
@@ -177,9 +174,9 @@ export function VerticalSliceScenario() {
   }
 
   function applyStoryEffects(nextStory: StoryRuntime["state"], previousStory: StoryRuntime["state"]) {
-    const newEffects = nextStory.effects.slice(previousStory.effects.length);
-    if (newEffects.length > 0) {
-      setGameplay((currentGameplay) => applyGameplayEffects(currentGameplay, newEffects));
+    const gameplayEffects = selectVnNewEffectsForTarget(nextStory, previousStory, "gameplay");
+    if (gameplayEffects.length > 0) {
+      setGameplay((currentGameplay) => applyGameplayEffects(currentGameplay, gameplayEffects));
     }
     return nextStory;
   }
@@ -189,23 +186,20 @@ export function VerticalSliceScenario() {
       <section className="playfield" data-testid="playfield">
         <div className="scene-stack" data-testid="vertical-slice-shell">
           <ExplorationStage3D {...firstPersonBridge.explorationStageProps} />
-          <PixiLayer key={storySession} commands={pixiCommands} visible={storyRuntime.active} />
-          {storyRuntime.active && currentLine ? (
-            <VnDialogSurface
-              {...(currentLine.speaker ? { speaker: displayStorySpeaker(currentLine.speaker) } : {})}
-              text={currentLine.text}
-              choices={storyRuntime.state.pendingChoices}
-              ended={storyRuntime.state.ended}
-              onAdvance={advanceStory}
-              onChoice={chooseStory}
-              onCancel={() => {
-                setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
-                setStoryRuntime((current) => ({ ...current, active: false }));
-                setLastAction("dialog:cancel");
-                setLastOutcome("overlay-closed");
-              }}
-            />
-          ) : null}
+          <VnRuntimeDispatcher
+            active={storyRuntime.active}
+            story={storyRuntime.state}
+            storySession={storySession}
+            formatSpeaker={displayStorySpeaker}
+            onAdvance={advanceStory}
+            onChoice={chooseStory}
+            onCancel={() => {
+              setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
+              setStoryRuntime((current) => ({ ...current, active: false }));
+              setLastAction("dialog:cancel");
+              setLastOutcome("overlay-closed");
+            }}
+          />
         </div>
         <div className="hud harness-hud vertical-slice-hud">
           <div className="objective-chip">

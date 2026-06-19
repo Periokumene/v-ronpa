@@ -88,6 +88,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("vn2d-overlay");
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
   await expect(page.getByTestId("pixi-layer")).toBeVisible();
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("aria-hidden", "false");
   await expect(page.getByTestId("vn-dialog-speaker")).toHaveText("菲利克斯");
   await expect(page.getByTestId("vn-dialog-state")).toHaveText("可继续");
   await expect(page.getByTestId("vn-dialog-advance")).toHaveText("继续");

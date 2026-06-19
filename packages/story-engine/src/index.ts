@@ -1,5 +1,9 @@
+import { getNaniCommandDefinition } from "@v-ronpa/contracts";
 import type {
   GameplayEvent,
+  NaniCommandCategory,
+  NaniCommandDefinition,
+  NaniWildcardType,
   PresentationCommand,
   StoryBacklogEntry,
   StoryChoiceOption,
@@ -17,11 +21,20 @@ export interface StoryRuntimeState extends StoryRuntimeSnapshot {
   effects: StoryEffect[];
 }
 
-export type StoryStepperDiagnosticCode = "invalid-choice" | "story-ended-noop" | "pending-choices" | "max-steps";
+export type StoryStepperDiagnosticCode =
+  | "invalid-choice"
+  | "story-ended-noop"
+  | "pending-choices"
+  | "max-steps"
+  | "unknown-command"
+  | "invalid-command-param"
+  | "command-not-implemented"
+  | "unsupported-command-param";
 
 export interface StoryStepperDiagnostic {
   code: StoryStepperDiagnosticCode;
   message: string;
+  severity?: "info" | "warning" | "error";
 }
 
 export interface StoryStepperResult {
@@ -31,7 +44,7 @@ export interface StoryStepperResult {
 
 export interface AdvanceToNextStopOptions {
   maxSteps?: number;
-  registry?: CommandRegistry;
+  registry?: NaniCommandHandlerRegistry;
 }
 
 export interface CurrentStoryLine {
@@ -58,35 +71,44 @@ export type CommandResult =
   | { type: "presentation"; command: PresentationCommand }
   | { type: "choice"; choice: ChoiceRuntimeOption }
   | { type: "set"; key: string; value: string | number | boolean }
-  | { type: "gameplay"; event: GameplayEvent };
+  | { type: "gameplay"; event: GameplayEvent }
+  | { type: "effect"; effect: StoryEffect };
 
-export interface CommandDefinition {
+export interface NaniCommandHandler {
   id: string;
   aliases?: string[];
-  category: "dialog" | "stage" | "audio" | "flow" | "choice" | "state" | "trial";
+  category: NaniCommandCategory;
+  consumesParams?: string[];
   execute(ctx: RuntimeCommandContext): CommandResult;
 }
 
-export interface CommandRegistry {
-  register(definition: CommandDefinition): void;
-  resolve(id: string): CommandDefinition | undefined;
+export interface NaniCommandHandlerRegistry {
+  register(handler: NaniCommandHandler): void;
+  resolve(id: string): NaniCommandHandler | undefined;
 }
 
-export function createCommandRegistry(definitions: CommandDefinition[] = []): CommandRegistry {
-  const definitionsById = new Map<string, CommandDefinition>();
-  const registry: CommandRegistry = {
-    register(definition) {
-      definitionsById.set(definition.id, definition);
-      for (const alias of definition.aliases ?? []) definitionsById.set(alias, definition);
+export type CommandDefinition = NaniCommandHandler;
+export type CommandRegistry = NaniCommandHandlerRegistry;
+
+export function createNaniCommandHandlerRegistry(handlers: NaniCommandHandler[] = []): NaniCommandHandlerRegistry {
+  const handlersById = new Map<string, NaniCommandHandler>();
+  const registry: NaniCommandHandlerRegistry = {
+    register(handler) {
+      assertHandlerDeclaredInCatalog(handler);
+      const definition = getNaniCommandDefinition(handler.id);
+      handlersById.set(definition?.id ?? handler.id, handler);
+      for (const alias of handler.aliases ?? []) handlersById.set(alias.trim().toLowerCase(), handler);
     },
     resolve(id) {
-      return definitionsById.get(id);
+      return handlersById.get(id.trim().toLowerCase());
     }
   };
 
-  for (const definition of [...builtinCommands, ...definitions]) registry.register(definition);
+  for (const handler of [...builtinCommands, ...handlers]) registry.register(handler);
   return registry;
 }
+
+export const createCommandRegistry = createNaniCommandHandlerRegistry;
 
 export function createInitialStoryState(scenario: ScenarioIR): StoryRuntimeState {
   return {
@@ -134,7 +156,7 @@ export function advanceToNextStop(
   }
 
   const diagnostics: StoryStepperDiagnostic[] = [];
-  const registry = options.registry ?? createCommandRegistry();
+  const registry = options.registry ?? createNaniCommandHandlerRegistry();
   const maxSteps = Math.max(0, Math.floor(options.maxSteps ?? DEFAULT_ADVANCE_MAX_STEPS));
   let nextState = state;
   let steps = 0;
@@ -145,7 +167,7 @@ export function advanceToNextStop(
     const statement = scenario.statements[nextState.instructionPointer];
     if (!statement) return { state: { ...nextState, ended: true }, diagnostics };
 
-    nextState = executeStatementAtPointer(nextState, scenario, statement, registry);
+    nextState = executeStatementAtPointer(nextState, scenario, statement, registry, diagnostics);
     steps += 1;
 
     if (statement.kind === "text" || nextState.ended) return { state: nextState, diagnostics };
@@ -191,67 +213,146 @@ export function selectCurrentStoryLine(state: StoryRuntimeState): CurrentStoryLi
 export function storyReducer(
   state: StoryRuntimeState,
   event: StoryEvent,
-  registry = createCommandRegistry()
-): StoryRuntimeState {
+  registry = createNaniCommandHandlerRegistry()
+): StoryStepperResult {
   if (event.type === "PATCH_VARIABLE") {
     return {
-      ...state,
-      variables: { ...state.variables, [event.key]: event.value }
+      state: {
+        ...state,
+        variables: { ...state.variables, [event.key]: event.value }
+      },
+      diagnostics: []
     };
   }
 
   if (event.type === "JUMP") {
-    return jumpToLabel(state, event.scenario, event.label);
+    return { state: jumpToLabel(state, event.scenario, event.label), diagnostics: [] };
   }
 
   if (event.type === "CHOOSE") {
     const choice = state.pendingChoices[event.index];
-    if (!choice) return state;
+    if (!choice) {
+      return {
+        state,
+        diagnostics: [createDiagnostic("invalid-choice", `Choice index ${event.index} is not available.`)]
+      };
+    }
     const cleared = { ...state, pendingChoices: [] };
-    return choice.goto ? jumpToLabel(cleared, event.scenario, choice.goto) : cleared;
+    return { state: choice.goto ? jumpToLabel(cleared, event.scenario, choice.goto) : cleared, diagnostics: [] };
   }
 
-  if (state.ended || state.pendingChoices.length > 0) return state;
+  if (state.ended) {
+    return {
+      state,
+      diagnostics: [createDiagnostic("story-ended-noop", "Story is already ended; advance did not change state.")]
+    };
+  }
+
+  if (state.pendingChoices.length > 0) {
+    return {
+      state,
+      diagnostics: [createDiagnostic("pending-choices", "Story is waiting for a choice; advance did not change state.")]
+    };
+  }
 
   const statement = event.scenario.statements[state.instructionPointer];
-  if (!statement) return { ...state, ended: true };
+  if (!statement) return { state: { ...state, ended: true }, diagnostics: [] };
 
-  return executeStatementAtPointer(state, event.scenario, statement, registry);
+  const diagnostics: StoryStepperDiagnostic[] = [];
+  return { state: executeStatementAtPointer(state, event.scenario, statement, registry, diagnostics), diagnostics };
 }
 
-function createDiagnostic(code: StoryStepperDiagnosticCode, message: string): StoryStepperDiagnostic {
-  return { code, message };
+function createDiagnostic(
+  code: StoryStepperDiagnosticCode,
+  message: string,
+  severity?: StoryStepperDiagnostic["severity"]
+): StoryStepperDiagnostic {
+  return severity ? { code, message, severity } : { code, message };
 }
 
 function executeStatementAtPointer(
   state: StoryRuntimeState,
   scenario: ScenarioIR,
   statement: StatementIR,
-  registry: CommandRegistry
+  registry: NaniCommandHandlerRegistry,
+  diagnostics?: StoryStepperDiagnostic[]
 ): StoryRuntimeState {
-  return executeStatement({ ...state, instructionPointer: state.instructionPointer + 1 }, scenario, statement, registry);
+  const result = executeStatement({ ...state, instructionPointer: state.instructionPointer + 1 }, scenario, statement, registry);
+  diagnostics?.push(...result.diagnostics);
+  return result.state;
 }
 
-function isChoiceStatement(statement: StatementIR, registry: CommandRegistry): boolean {
+function isChoiceStatement(statement: StatementIR, registry: NaniCommandHandlerRegistry): boolean {
   return statement.kind === "command" && registry.resolve(statement.commandId)?.category === "choice";
+}
+
+interface StatementExecutionResult {
+  state: StoryRuntimeState;
+  diagnostics: StoryStepperDiagnostic[];
 }
 
 function executeStatement(
   state: StoryRuntimeState,
   scenario: ScenarioIR,
   statement: StatementIR,
-  registry: CommandRegistry
-): StoryRuntimeState {
-  if (statement.kind === "comment" || statement.kind === "label") return state;
+  registry: NaniCommandHandlerRegistry
+): StatementExecutionResult {
+  if (statement.kind === "comment" || statement.kind === "label") return { state, diagnostics: [] };
 
   if (statement.kind === "text") {
-    return executeText(state, statement);
+    return { state: executeText(state, statement), diagnostics: [] };
   }
 
-  const definition = registry.resolve(statement.commandId);
-  if (!definition) return state;
-  const result = definition.execute({ state, scenario, command: statement });
-  return applyCommandResult(state, scenario, result);
+  const catalogDefinition = getNaniCommandDefinition(statement.commandId);
+  if (!catalogDefinition) {
+    return {
+      state,
+      diagnostics: [
+        createDiagnostic("unknown-command", `Unknown .nani command: @${statement.commandId}.`, "warning")
+      ]
+    };
+  }
+
+  const diagnostics = validateCommandAgainstCatalog(statement, catalogDefinition);
+  if (diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+    return { state, diagnostics };
+  }
+
+  if (catalogDefinition.source === "wildcard") {
+    const effect = createWildcardStoryEffect(statement, catalogDefinition);
+    if (!effect) {
+      return {
+        state,
+        diagnostics: [
+          ...diagnostics,
+          createDiagnostic("invalid-command-param", `@${statement.commandId} requires routeKey:string.`, "error")
+        ]
+      };
+    }
+    return {
+      state: applyCommandResult(state, scenario, { type: "effect", effect }),
+      diagnostics
+    };
+  }
+
+  const handler = registry.resolve(statement.commandId);
+  if (!handler) {
+    return {
+      state,
+      diagnostics: [
+        ...diagnostics,
+        createDiagnostic(
+          "command-not-implemented",
+          `@${catalogDefinition.canonicalName} is declared in commandCatalog but has no runtime handler; treated as no-op.`,
+          "warning"
+        )
+      ]
+    };
+  }
+
+  diagnostics.push(...diagnoseUnsupportedImplementedParams(statement, catalogDefinition, handler));
+  const result = handler.execute({ state, scenario, command: statement });
+  return { state: applyCommandResult(state, scenario, result), diagnostics };
 }
 
 function executeText(state: StoryRuntimeState, statement: TextIR): StoryRuntimeState {
@@ -297,6 +398,181 @@ function applyCommandResult(state: StoryRuntimeState, scenario: ScenarioIR, resu
         ...state,
         effects: [...state.effects, { type: "gameplay-event", event: result.event }]
       };
+    case "effect":
+      return {
+        ...state,
+        effects: [...state.effects, result.effect]
+      };
+  }
+}
+
+function assertHandlerDeclaredInCatalog(handler: NaniCommandHandler): void {
+  const definition = getNaniCommandDefinition(handler.id);
+  if (!definition) {
+    throw new Error(`Cannot register @${handler.id}; it is not declared in commandCatalog.`);
+  }
+  for (const alias of handler.aliases ?? []) {
+    const aliasDefinition = getNaniCommandDefinition(alias);
+    if (!aliasDefinition || aliasDefinition.id !== definition.id) {
+      throw new Error(`Cannot register alias @${alias} for @${handler.id}; the alias is not declared in commandCatalog.`);
+    }
+  }
+}
+
+function validateCommandAgainstCatalog(command: CommandIR, definition: NaniCommandDefinition): StoryStepperDiagnostic[] {
+  const diagnostics: StoryStepperDiagnostic[] = [];
+  const specsByName = new Map(definition.params.map((spec) => [normalizeParamName(spec.name), spec]));
+
+  for (const spec of definition.params) {
+    if (spec.name === "params") continue;
+    if (spec.required && getCommandParam(command, spec.name) === undefined) {
+      diagnostics.push(
+        createDiagnostic(
+          "invalid-command-param",
+          `@${definition.canonicalName} requires parameter ${spec.name}:${spec.type}.`,
+          "error"
+        )
+      );
+    }
+  }
+
+  for (const [key, value] of Object.entries(command.params)) {
+    const spec = specsByName.get(normalizeParamName(key));
+    if (!spec) {
+      if (definition.source !== "wildcard" && !allowsDynamicAssignmentParam(definition)) {
+        diagnostics.push(
+          createDiagnostic(
+            "invalid-command-param",
+            `@${definition.canonicalName} does not declare parameter ${key}; commandCatalog is the authority.`,
+            "warning"
+          )
+        );
+      }
+      continue;
+    }
+    if (!isCompatibleCommandValue(value, spec.type)) {
+      diagnostics.push(
+        createDiagnostic(
+          "invalid-command-param",
+          `@${definition.canonicalName} parameter ${key} expected ${spec.type}.`,
+          "error"
+        )
+      );
+    }
+  }
+
+  for (const key of Object.keys(command.flags)) {
+    const spec = specsByName.get(normalizeParamName(key));
+    if (!spec && definition.source !== "wildcard") {
+      diagnostics.push(
+        createDiagnostic(
+          "invalid-command-param",
+          `@${definition.canonicalName} does not declare boolean flag ${key}; commandCatalog is the authority.`,
+          "warning"
+        )
+      );
+      continue;
+    }
+    if (spec && !spec.type.includes("boolean")) {
+      diagnostics.push(
+        createDiagnostic(
+          "invalid-command-param",
+          `@${definition.canonicalName} flag ${key}! maps to ${spec.type}, not boolean.`,
+          "error"
+        )
+      );
+    }
+  }
+
+  return diagnostics;
+}
+
+function allowsDynamicAssignmentParam(definition: NaniCommandDefinition): boolean {
+  return definition.id === "set";
+}
+
+function diagnoseUnsupportedImplementedParams(
+  command: CommandIR,
+  definition: NaniCommandDefinition,
+  handler: NaniCommandHandler
+): StoryStepperDiagnostic[] {
+  const consumed = new Set((handler.consumesParams ?? []).map(normalizeParamName));
+  const specsByName = new Map(definition.params.map((spec) => [normalizeParamName(spec.name), spec]));
+  const diagnostics: StoryStepperDiagnostic[] = [];
+
+  for (const [key, value] of Object.entries(command.params)) {
+    const spec = specsByName.get(normalizeParamName(key));
+    if (!spec || !isCompatibleCommandValue(value, spec.type) || consumed.has(normalizeParamName(key))) continue;
+    diagnostics.push(
+      createDiagnostic(
+        "unsupported-command-param",
+        `@${definition.canonicalName} accepts ${key}:${spec.type}, but the current runtime handler does not consume it yet.`,
+        "warning"
+      )
+    );
+  }
+
+  return diagnostics;
+}
+
+function createWildcardStoryEffect(command: CommandIR, definition: NaniCommandDefinition): StoryEffect | undefined {
+  const routeKey = stringParam(command, "routeKey");
+  if (!routeKey) return undefined;
+  const wildcardType = definition.id.slice("wildcard-".length) as NaniWildcardType;
+  const params = Object.fromEntries(
+    Object.entries(command.params)
+      .filter(([key]) => normalizeParamName(key) !== "routekey")
+      .map(([key, value]) => [key, plainCommandValue(value)])
+  );
+
+  return {
+    type: "wildcard-event",
+    wildcardType,
+    routeKey,
+    params,
+    sourceCommand: {
+      commandId: command.commandId,
+      canonicalName: definition.canonicalName,
+      loc: command.loc
+    }
+  };
+}
+
+function normalizeParamName(name: string): string {
+  return name.toLowerCase();
+}
+
+function isCompatibleCommandValue(value: NaniValue, officialType: string): boolean {
+  const normalized = officialType.toLowerCase();
+  if (normalized === "generic params") return true;
+  if (normalized.includes("list")) {
+    if (value.type !== "list") return normalized.startsWith("named ");
+    const itemType = normalized.includes("decimal") ? "decimal" : normalized.includes("boolean") ? "boolean" : "string";
+    return value.value.every((item) => isCompatibleCommandValue(item, itemType));
+  }
+  if (normalized.startsWith("named ")) {
+    return value.type === "string" || value.type === "raw" || value.type === "expression" || value.type === "list";
+  }
+  if (normalized === "boolean") return value.type === "boolean" || value.type === "expression";
+  if (normalized === "decimal") return value.type === "number" || value.type === "expression";
+  if (normalized === "integer") {
+    return (value.type === "number" && Number.isInteger(value.value)) || value.type === "expression";
+  }
+  return value.type === "string" || value.type === "raw" || value.type === "expression";
+}
+
+function plainCommandValue(value: NaniValue): unknown {
+  switch (value.type) {
+    case "string":
+    case "number":
+    case "boolean":
+      return value.value;
+    case "raw":
+      return value.value;
+    case "expression":
+      return { expression: value.source };
+    case "list":
+      return value.value.map(plainCommandValue);
   }
 }
 
@@ -315,17 +591,24 @@ function scalarValue(value: NaniValue | undefined): string | number | boolean | 
 }
 
 function stringParam(command: CommandIR, key: string): string | undefined {
-  const value = command.params[key];
+  const value = getCommandParam(command, key);
   const scalar = scalarValue(value);
   return scalar === undefined ? undefined : String(scalar);
 }
 
 function numberParam(command: CommandIR, key: string, fallback: number): number {
-  const value = scalarValue(command.params[key]);
+  const value = scalarValue(getCommandParam(command, key));
   return typeof value === "number" ? value : fallback;
 }
 
-const builtinCommands: CommandDefinition[] = [
+function getCommandParam(command: CommandIR, key: string): NaniValue | undefined {
+  const direct = command.params[key];
+  if (direct) return direct;
+  const normalized = normalizeParamName(key);
+  return Object.entries(command.params).find(([candidate]) => normalizeParamName(candidate) === normalized)?.[1];
+}
+
+const builtinCommands: NaniCommandHandler[] = [
   {
     id: "end",
     category: "flow",
@@ -334,7 +617,8 @@ const builtinCommands: CommandDefinition[] = [
   {
     id: "goto",
     category: "flow",
-    execute: ({ command }) => ({ type: "jump", label: String(scalarValue(command.primary) ?? "") })
+    consumesParams: ["path"],
+    execute: ({ command }) => ({ type: "jump", label: String(scalarValue(command.primary) ?? stringParam(command, "path") ?? "") })
   },
   {
     id: "set",
@@ -349,6 +633,7 @@ const builtinCommands: CommandDefinition[] = [
     id: "gameplay",
     aliases: ["gameplay-event"],
     category: "state",
+    consumesParams: ["type", "quantity", "item", "itemId", "id", "evidence", "evidenceId", "character", "characterId", "status", "skill", "skillId", "delta", "affinityDelta"],
     execute: ({ command }) => {
       const event = createGameplayEvent(command);
       return event ? { type: "gameplay", event } : { type: "none" };
@@ -357,6 +642,7 @@ const builtinCommands: CommandDefinition[] = [
   {
     id: "choice",
     category: "choice",
+    consumesParams: ["goto"],
     execute: ({ command }) => ({
       type: "choice",
       choice: createChoice(String(scalarValue(command.primary) ?? "Choice"), stringParam(command, "goto"))
@@ -365,7 +651,8 @@ const builtinCommands: CommandDefinition[] = [
   {
     id: "charenter",
     aliases: ["char-enter"],
-    category: "stage",
+    category: "actor",
+    consumesParams: ["portrait", "slot", "effect"],
     execute: ({ command }) => ({
       type: "presentation",
       command: createCharEnterCommand(command)
@@ -373,8 +660,8 @@ const builtinCommands: CommandDefinition[] = [
   },
   {
     id: "back",
-    aliases: ["background"],
-    category: "stage",
+    category: "scene",
+    consumesParams: ["id", "effect"],
     execute: ({ command }) => ({
       type: "presentation",
       command: createBackgroundCommand(command)
@@ -382,12 +669,13 @@ const builtinCommands: CommandDefinition[] = [
   },
   {
     id: "shake",
-    category: "stage",
+    category: "effect",
+    consumesParams: ["target", "actorId", "intensity", "duration"],
     execute: ({ command }) => ({
       type: "presentation",
       command: {
         type: "shake",
-        target: String(scalarValue(command.primary) ?? stringParam(command, "target") ?? "stage"),
+        target: String(scalarValue(command.primary) ?? stringParam(command, "actorId") ?? stringParam(command, "target") ?? "stage"),
         intensity: numberParam(command, "intensity", 0.35),
         durationMs: numberParam(command, "duration", 280)
       }
@@ -395,7 +683,8 @@ const builtinCommands: CommandDefinition[] = [
   },
   {
     id: "flash",
-    category: "stage",
+    category: "effect",
+    consumesParams: ["color", "duration"],
     execute: ({ command }) => ({
       type: "presentation",
       command: {
@@ -407,7 +696,8 @@ const builtinCommands: CommandDefinition[] = [
   },
   {
     id: "focus",
-    category: "stage",
+    category: "effect",
+    consumesParams: ["target", "duration"],
     execute: ({ command }) => ({
       type: "presentation",
       command: {
@@ -420,7 +710,8 @@ const builtinCommands: CommandDefinition[] = [
   {
     id: "trialkeyword",
     aliases: ["trial-keyword"],
-    category: "trial",
+    category: "ui",
+    consumesParams: ["id", "text", "speaker", "evidence", "evidenceId"],
     execute: ({ command }) => ({
       type: "presentation",
       command: createTrialKeywordCommand(command)

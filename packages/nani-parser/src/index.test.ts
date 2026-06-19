@@ -195,10 +195,11 @@ describe("nani parser", () => {
               "commandId": "shake",
               "line": 17,
               "params": {
+                "actorId": "character:felix",
                 "duration": 220,
                 "intensity": 0.35,
               },
-              "primary": "character:felix",
+              "primary": undefined,
             },
             {
               "commandId": "goto",
@@ -383,10 +384,11 @@ describe("nani parser", () => {
               "commandId": "shake",
               "line": 23,
               "params": {
+                "actorId": "character:mira",
                 "duration": 180,
                 "intensity": 0.25,
               },
-              "primary": "character:mira",
+              "primary": undefined,
             },
             {
               "commandId": "goto",
@@ -520,6 +522,58 @@ describe("nani parser", () => {
     });
 
     expect(result.diagnostics).toEqual([]);
+  });
+
+  it("preserves official catalog parameter names instead of treating them as primary values", () => {
+    const result = parseScenario({
+      sourceText: `@camera offset:1,2 zoom:1.25 ortho:false
+@char hero appearance:happy position:0.5,0,0 wait:false`,
+      scriptPath: "official-params.nani"
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.scenario.statements.filter(isCommand).map(commandSummary)).toEqual([
+      {
+        line: 1,
+        commandId: "camera",
+        primary: undefined,
+        params: {
+          offset: [1, 2],
+          zoom: 1.25,
+          ortho: false
+        }
+      },
+      {
+        line: 2,
+        commandId: "char",
+        primary: "hero",
+        params: {
+          appearance: "happy",
+          position: [0.5, 0, 0],
+          wait: false
+        }
+      }
+    ]);
+  });
+
+  it("keeps official command parsing generic and leaves parameter semantics to StoryEngine", () => {
+    const result = parseScenario({
+      sourceText: "@camera offset:not-a-decimal-list zoom:fast",
+      scriptPath: "generic-official-params.nani"
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.scenario.statements.filter(isCommand).map(commandSummary)).toEqual([
+      {
+        line: 1,
+        commandId: "camera",
+        primary: undefined,
+        params: {
+          offset: "not-a-decimal-list",
+          zoom: "fast"
+        }
+      }
+    ]);
   });
 });
 
