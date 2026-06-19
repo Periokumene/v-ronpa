@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const scenarios = ["baseline", "vertical-slice"];
+const scenarios = ["vertical-slice"];
 
 test("fixed harness scenario routes boot without app edits from subsystem lines", async ({ page }) => {
   const consoleErrors: string[] = [];

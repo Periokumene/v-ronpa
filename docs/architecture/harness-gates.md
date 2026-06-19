@@ -21,15 +21,7 @@ dependency matrix.
 ## Smoke And Evidence Gates
 
 - `pnpm test:smoke`
-- Baseline screenshot at `test-results/harness-baseline.png`
 - Fixed scenario registry screenshot at `test-results/harness-registry.png`
-- Scenario evidence screenshots:
-  - `test-results/navi-walk.png`
-  - `test-results/navi-vn2d.png`
-  - `test-results/navi-inventory.png`
-  - `test-results/trial-vn3d.png`
-  - `test-results/trial-debate3d.png`
-  - `test-results/trial-keyword-break.png`
 - Accepted vertical-slice screenshots:
   - `test-results/vertical-slice-spawn.png`
   - `test-results/vertical-slice-vn-choice.png`
@@ -62,12 +54,11 @@ and rerun `pnpm setup:worktree-env`, or set both `PORT` and `VITE_DEV_PORT`
 for that shell. Never commit `.env.worktree`, `.local-state/`,
 `test-results/`, or `playwright-report/`.
 
-Smoke gates confirm the app boots, the harness can switch between Navi and
-Trial, Navi can trigger VN2D and inventory overlays, Trial can switch VN3D and
-debate3D presentation profiles, DOM surfaces remain interactive, canvas layers
-are present, `InputLockState` changes at mode boundaries, and
-`CameraControlMode` distinguishes first-person Navi, scripted-focus VN3D, and
-trial-targeting debate.
+Smoke gates confirm the app boots into the accepted vertical slice, Navi can
+move through first-person exploration, no-target interactions are rejected,
+items and evidence update gameplay state, map transitions remain director-owned,
+VN dialog can branch, DOM surfaces remain interactive, canvas layers are
+present, and `InputLockState` changes at Navi/VN boundaries.
 
 The first app build intentionally allows the large R3F/Pixi/Three bundle
 warning. A later performance task should add route or adapter code splitting
@@ -76,12 +67,11 @@ once subsystem APIs stabilize.
 ## Fixed Harness Scenario Entries
 
 The first vertical-slice fanout used fixed query-param entries as temporary
-developer harnesses. After the P1 lines were integrated, only the baseline
-harness and the accepted vertical-slice harness remain active.
+developer harnesses. After the P1 lines were integrated, only the accepted
+vertical-slice harness remains active.
 
 | Entry | Owning worktree | Modules allowed to change |
 |---|---|---|
-| `/?scenario=baseline` | P0 baseline | app harness only |
 | `/?scenario=vertical-slice` | `docs/tasks/vertical-slice-integration.md` | integration harness, CCR-backed contract bridge, smoke evidence |
 
 Completed temporary subsystem entries are archived under
