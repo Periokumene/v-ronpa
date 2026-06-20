@@ -12,6 +12,8 @@ test("fixed harness scenario routes boot without app edits from subsystem lines"
     await page.goto(`/?scenario=${scenario}`);
     await expect(page.getByTestId("playfield")).toBeVisible();
     await expect(page.getByTestId("harness-scenario-id")).toHaveText(scenario);
+    await expect(page.getByTestId("title-surface")).toBeVisible();
+    await expect(page.getByTestId("title-new-game")).toBeVisible();
   }
 
   await page.screenshot({ path: "test-results/harness-registry.png", fullPage: true });

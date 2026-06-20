@@ -34,8 +34,11 @@ adapters and apps
 
 ## Runtime Boundaries
 
-- `GameFlowMachine` owns top-level modes: `loading`, `navi`, `trial`, `paused`,
-  and `saving`.
+- `GameFlowMachine` owns shell flow state: `loading`, `title`, playable modes,
+  overlay stack, and interaction capability policy.
+- `GameInteractionShell` in `apps/game` wires app adapters to title, overlay,
+  VN toolbar, save/load, backlog, settings shell, and pause menu surfaces. It is
+  app orchestration, not a gameplay director.
 - `navi-director` owns Navi substates: `walk`, `interacting`, `vn2d-overlay`,
   `inventory`, and `event`.
 - `trial-director` owns Trial segment flow, presentation profile selection,
@@ -69,6 +72,12 @@ This prevents `VN2D` and `VN3D` from being treated as equivalent top-level game
 modes. VN2D is an overlay-heavy presentation path; VN3D requires 3D camera
 focus, staged character standees, Pixi/DOM overlays, and may participate in
 Trial-specific input locks.
+
+The title screen and pause/settings/save/load/backlog screens are shell or
+overlay flow, not additional playable modes. They coordinate through
+`GameInteractionContext`, `InteractionCapabilitySnapshot`, and `InputLockState`
+so Navi and Trial can keep their director-owned runtime state independent from
+DOM UI composition.
 
 See also:
 

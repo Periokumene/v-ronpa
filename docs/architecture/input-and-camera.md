@@ -41,6 +41,13 @@ of overloading pressed/released action events.
 Renderers must receive this value from directors. They must not infer it from
 CSS visibility or component-local state.
 
+Global shell overlays use `menu`. The app-level `GameInteractionShell` opens
+title load/settings, VN backlog/save/load/settings, and Navi pause menu through
+the `GameFlowMachine` overlay stack, then publishes `menu` to the current
+`GameInteractionContext`. R3F camera controls and semantic movement must treat
+`menu` as locked. Closing the overlay returns authority to the underlying Navi
+or Trial director context.
+
 ## Camera Modes
 
 `CameraControlMode` describes camera authority:
@@ -86,3 +93,7 @@ active target, and confirm with `interact`.
 App harness bridge hooks may connect DOM controls, pointer-lock status, pose
 commands, and interact signals to `ExplorationStage3D`, but they must not own
 camera pose or compute confirmable interactable candidates.
+
+The ESC pause path is authoritative at the shell layer: if Navi is active and no
+VN story is consuming dialog input, ESC opens `pause-menu` and locks input as
+`menu`. ESC must not mutate Navi maps, interactable candidates, or camera pose.

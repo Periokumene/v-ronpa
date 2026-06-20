@@ -36,6 +36,7 @@ const allowedWorkspaceDeps = {
     "contracts",
     "game-flow-machine",
     "gameplay",
+    "media-save",
     "nani-parser",
     "navi-director",
     "pixi-presenter",

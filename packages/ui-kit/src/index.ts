@@ -1,6 +1,24 @@
 export { DialogBox } from "./surfaces/DialogBox";
+export {
+  GameOverlayHost,
+  PauseMenuOverlay,
+  ReadOnlyBacklogOverlay,
+  SaveLoadOverlay,
+  SettingsOverlay,
+  TitleSurface,
+  VnCommandBar
+} from "./surfaces/GameInteractionSurfaces";
 export { InspectorLite } from "./surfaces/InspectorLite";
 export { ScenarioTabs } from "./surfaces/ScenarioTabs";
 export { VnDialogSurface } from "./surfaces/VnDialogSurface";
+export type {
+  GameOverlayHostProps,
+  PauseMenuOverlayProps,
+  ReadOnlyBacklogOverlayProps,
+  SaveLoadOverlayProps,
+  SettingsOverlayProps,
+  TitleSurfaceProps,
+  VnCommandBarProps
+} from "./surfaces/GameInteractionSurfaces";
 export type { InspectorLiteProps, ScenarioOption } from "./surfaces/types";
 export type { VnDialogSurfaceProps } from "./surfaces/VnDialogSurface";

@@ -1,10 +1,11 @@
 import Dexie, { type EntityTable } from "dexie";
 import { Howl } from "howler";
-import { SaveDataSchema, type SaveData } from "@v-ronpa/contracts";
+import { SaveDataSchema, type SaveData, type SaveSlotSummary } from "@v-ronpa/contracts";
 
 export interface SaveSlot {
   id: string;
   label: string;
+  summary: SaveSlotSummary;
   data: SaveData;
 }
 
@@ -12,6 +13,8 @@ export interface SavePort {
   save(slot: SaveSlot): Promise<void>;
   load(id: string): Promise<SaveSlot | undefined>;
   list(): Promise<SaveSlot[]>;
+  listSummaries(): Promise<SaveSlotSummary[]>;
+  delete(id: string): Promise<void>;
 }
 
 export interface SaveMigrationResult {
@@ -56,6 +59,27 @@ export function createSaveMigrator(): SaveMigrator {
   };
 }
 
+export function createSaveSlotSummary(id: string, label: string, data: SaveData): SaveSlotSummary {
+  const latest = data.story.backlog.at(-1);
+  return {
+    id,
+    label,
+    savedAt: data.savedAt,
+    mode: data.mode,
+    ...(latest?.speaker ? { speaker: latest.speaker } : {}),
+    ...(latest?.text ? { text: latest.text } : {})
+  };
+}
+
+function normalizeSlot(slot: SaveSlot, migrator: SaveMigrator): SaveSlot {
+  const { data } = migrator.migrate(slot.data);
+  return {
+    ...slot,
+    data,
+    summary: slot.summary ?? createSaveSlotSummary(slot.id, slot.label, data)
+  };
+}
+
 export function createDexieSavePort(dbName = "v-ronpa-saves", migrator = createSaveMigrator()): SavePort {
   const db = new Dexie(dbName) as SaveDbShape;
   db.version(1).stores({
@@ -64,21 +88,46 @@ export function createDexieSavePort(dbName = "v-ronpa-saves", migrator = createS
 
   return {
     async save(slot) {
-      const { data } = migrator.migrate(slot.data);
-      await db.slots.put({ ...slot, data });
+      await db.slots.put(normalizeSlot(slot, migrator));
     },
     async load(id) {
       const slot = await db.slots.get(id);
       if (!slot) return undefined;
-      const { data } = migrator.migrate(slot.data);
-      return { ...slot, data };
+      return normalizeSlot(slot, migrator);
     },
     async list() {
       const slots = await db.slots.toArray();
-      return slots.map((slot) => {
-        const { data } = migrator.migrate(slot.data);
-        return { ...slot, data };
-      });
+      return slots.map((slot) => normalizeSlot(slot, migrator));
+    },
+    async listSummaries() {
+      const slots = await db.slots.toArray();
+      return slots.map((slot) => normalizeSlot(slot, migrator).summary);
+    },
+    async delete(id) {
+      await db.slots.delete(id);
+    }
+  };
+}
+
+export function createMemorySavePort(initialSlots: SaveSlot[] = [], migrator = createSaveMigrator()): SavePort {
+  const slots = new Map(initialSlots.map((slot) => [slot.id, normalizeSlot(slot, migrator)]));
+
+  return {
+    async save(slot) {
+      slots.set(slot.id, normalizeSlot(slot, migrator));
+    },
+    async load(id) {
+      const slot = slots.get(id);
+      return slot ? normalizeSlot(slot, migrator) : undefined;
+    },
+    async list() {
+      return [...slots.values()].map((slot) => normalizeSlot(slot, migrator));
+    },
+    async listSummaries() {
+      return [...slots.values()].map((slot) => normalizeSlot(slot, migrator).summary);
+    },
+    async delete(id) {
+      slots.delete(id);
     }
   };
 }

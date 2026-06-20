@@ -3,10 +3,11 @@
 ## Public Contract Packages
 
 - `packages/contracts`: source of truth for schemas, fixtures, save data, top
-  modes, Navi runtime state, Trial runtime state, inventory, trial definitions,
-  evidence definitions, input bindings, camera modes, runtime assets, Story
-  snapshots, Story effects, typed gameplay events, `.nani` command catalog
-  metadata, and presentation command wire shapes.
+  modes, interaction shell context, overlay/action/capability snapshots, UI
+  asset refs, style profile refs, Navi runtime state, Trial runtime state,
+  inventory, trial definitions, evidence definitions, input bindings, camera
+  modes, runtime assets, Story snapshots, Story effects, typed gameplay events,
+  `.nani` command catalog metadata, and presentation command wire shapes.
 - `packages/presentation-contracts`: runtime ports for presenter adapters.
 - `packages/nani-parser`: `.nani` AST and IR shape.
 
@@ -26,6 +27,17 @@ and merge the change through the integration baseline first.
   proxy relationships through `RuntimeAsset` and `CollisionProxy`.
 - `GameMode` is intentionally narrow: `navi` and `trial` are the playable root
   modes; VN2D/VN3D belong to Navi substates or Trial presentation profiles.
+  `title`, `paused`, and `saving` are shell flow states and must not absorb
+  Navi/Trial runtime ownership.
+- Interaction shell controls should use `GameOverlayKind`, `GameUiAction`,
+  `GameInteractionContext`, and `InteractionCapabilitySnapshot`. App adapters
+  and UI surfaces must not redefine these shapes locally.
+- Save/load lists should use `SaveSlotSummary`. `media-save` may derive missing
+  summaries from save data, while app adapters collect the current runtime
+  snapshot.
+- UI asset refs and interaction style profiles are manifest/config references.
+  They must not contain renderer objects, React components, Pixi instances, or
+  Three.js objects.
 - Renderer-specific objects must not appear in contracts.
 - Script source locations must be preserved through parse and compile outputs.
 - `commandCatalog` is the only declaration source for `.nani` commands.

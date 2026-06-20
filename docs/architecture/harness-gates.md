@@ -23,9 +23,14 @@ dependency matrix.
 - `pnpm test:smoke`
 - Fixed scenario registry screenshot at `test-results/harness-registry.png`
 - Accepted vertical-slice screenshots:
-  - `test-results/vertical-slice-spawn.png`
-  - `test-results/vertical-slice-vn-choice.png`
+  - `test-results/vertical-slice-title.png`
+  - `test-results/vertical-slice-navi.png`
+  - `test-results/vertical-slice-vn-toolbar.png`
+  - `test-results/vertical-slice-backlog.png`
+  - `test-results/vertical-slice-save-load.png`
+  - `test-results/vertical-slice-pause-menu.png`
   - `test-results/vertical-slice-map-change.png`
+  - `test-results/vertical-slice-vn-choice.png`
   - `test-results/vertical-slice-branch-b.png`
 - Failure screenshots under `test-results/`
 - HTML report under `playwright-report/`
@@ -54,11 +59,13 @@ and rerun `pnpm setup:worktree-env`, or set both `PORT` and `VITE_DEV_PORT`
 for that shell. Never commit `.env.worktree`, `.local-state/`,
 `test-results/`, or `playwright-report/`.
 
-Smoke gates confirm the app boots into the accepted vertical slice, Navi can
-move through first-person exploration, no-target interactions are rejected,
-items and evidence update gameplay state, map transitions remain director-owned,
-VN dialog can branch, DOM surfaces remain interactive, canvas layers are
-present, and `InputLockState` changes at Navi/VN boundaries.
+Smoke gates confirm the app boots into the accepted vertical slice title page,
+title load/settings entries open, New Game enters Navi, Navi can move through
+first-person exploration, no-target interactions are rejected, items and
+evidence update gameplay state, map transitions remain director-owned, VN dialog
+can branch, VN toolbar/backlog/save-load surfaces are interactive, Navi ESC
+opens the pause menu, canvas layers are present, and `InputLockState` changes at
+Navi/VN/menu boundaries.
 
 The first app build intentionally allows the large R3F/Pixi/Three bundle
 warning. A later performance task should add route or adapter code splitting
@@ -72,7 +79,7 @@ vertical-slice harness remains active.
 
 | Entry | Owning worktree | Modules allowed to change |
 |---|---|---|
-| `/?scenario=vertical-slice` | `docs/tasks/vertical-slice-integration.md` | integration harness, CCR-backed contract bridge, smoke evidence |
+| `/?scenario=vertical-slice` | `docs/tasks/vertical-slice-integration.md`, `docs/tasks/game-interaction-shell.md` | integration harness, title-first flow, interaction shell overlays, save/load smoke evidence |
 
 Completed temporary subsystem entries are archived under
 `docs/archive/completed-tasks/`. Future slices should add new scenario entries

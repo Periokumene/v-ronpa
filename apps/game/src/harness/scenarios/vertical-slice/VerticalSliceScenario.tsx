@@ -1,211 +1,45 @@
-import { useCallback, useMemo, useState, type ButtonHTMLAttributes } from "react";
-import type {
-  NaviInteractionSensorReport,
-  NaviRuntimeState,
-  PlayerPose,
-  StoryEffect,
-  WorldMapDef
-} from "@v-ronpa/contracts";
-import { createGameplayState, applyGameplayEvent, type ExplorationOutcome, type GameplayState } from "@v-ronpa/gameplay";
-import { parseScenario } from "@v-ronpa/nani-parser";
-import {
-  confirmFocusedNaviInteraction,
-  createInitialNaviState,
-  createNaviInteractionView,
-  focusNaviInteractionFromSensorReport,
-  naviReducer
-} from "@v-ronpa/navi-director";
-import { ExplorationStage3D, type FirstPersonInteractRequest } from "@v-ronpa/r3f-adapter";
-import { advanceToNextStop, chooseStoryOption, createInitialStoryState } from "@v-ronpa/story-engine";
+import { useState, type ButtonHTMLAttributes } from "react";
+import type { GameplayState } from "@v-ronpa/gameplay";
+import { ExplorationStage3D } from "@v-ronpa/r3f-adapter";
 import { InspectorLite } from "@v-ronpa/ui-kit";
-import { VnRuntimeDispatcher, selectVnNewEffectsForTarget } from "../../../VnRuntimeDispatcher";
-import { verticalSliceEvidence, verticalSliceItem, verticalSliceMaps, verticalSliceScript } from "../../fixtures/verticalSlice";
-import { defaultHarnessInputBindings, useKeyboardInputActions } from "../../inputActions";
-import { useFirstPersonExplorationBridge } from "../../useFirstPersonExplorationBridge";
+import { GameInteractionShell } from "../../../interaction/GameInteractionShell";
+import { useGameFlowActor } from "../../../interaction/useGameFlowActor";
+import { useOverlayPageAdapters } from "../../../interaction/useOverlayPageAdapters";
+import { useVerticalSliceRuntimeAdapter, type PosePresetId, verticalSlicePosePresets } from "../../../interaction/useVerticalSliceRuntimeAdapter";
+import { useVerticalSliceSaveAdapter } from "../../../interaction/useVerticalSliceSaveAdapter";
+import { VnRuntimeDispatcher } from "../../../VnRuntimeDispatcher";
 
-type PosePresetId = "spawn" | "notebook" | "keycard" | "door" | "hall-door" | "witness" | "empty";
 type DebugTabId = "runtime" | "inspector";
 
-interface PosePreset {
-  id: PosePresetId;
-  label: string;
-  mapId: string;
-  pose: PlayerPose;
-}
-
-interface StoryRuntime {
-  state: ReturnType<typeof createInitialStoryState>;
-  active: boolean;
-}
-
-const posePresets: PosePreset[] = [
-  { id: "spawn", label: "出生点", mapId: "map:academy-hall", pose: { position: [0, 1.7, 4], yaw: 0, pitch: 0 } },
-  { id: "notebook", label: "笔记本", mapId: "map:academy-hall", pose: { position: [1.2, 1.7, -0.8], yaw: -0.25, pitch: 0 } },
-  { id: "keycard", label: "门禁卡", mapId: "map:academy-hall", pose: { position: [2, 1.7, -1.7], yaw: -0.35, pitch: 0 } },
-  { id: "door", label: "教室门", mapId: "map:academy-hall", pose: { position: [0, 1.7, -3.7], yaw: 3.14, pitch: 0 } },
-  { id: "hall-door", label: "走廊门", mapId: "map:classroom", pose: { position: [0, 1.7, 3.1], yaw: 0, pitch: 0 } },
-  { id: "witness", label: "证人", mapId: "map:academy-hall", pose: { position: [-1.7, 1.7, -1.5], yaw: 0.45, pitch: 0 } },
-  { id: "empty", label: "空位", mapId: "map:academy-hall", pose: { position: [3.4, 1.7, 3.8], yaw: 0, pitch: 0 } }
-];
-
-const initialMap = verticalSliceMaps[0] ?? createFallbackMap();
-
 export function VerticalSliceScenario() {
-  const parsed = useMemo(
-    () => parseScenario({ sourceText: verticalSliceScript, scriptPath: "harness/vertical-slice.nani" }),
-    []
-  );
-  const [navi, setNavi] = useState<NaviRuntimeState>(() => ({
-    ...createInitialNaviState(initialMap.id),
-    playerPose: { position: initialMap.spawn, yaw: 0, pitch: 0 }
-  }));
-  const [gameplay, setGameplay] = useState<GameplayState>(() => createGameplayState());
-  const [storyRuntime, setStoryRuntime] = useState<StoryRuntime>(() => ({
-    state: createInitialStoryState(parsed.scenario),
-    active: false
-  }));
-  const [lastOutcome, setLastOutcome] = useState("spawn");
-  const [lastAction, setLastAction] = useState("boot");
-  const [storySession, setStorySession] = useState(0);
+  const flow = useGameFlowActor();
+  const runtime = useVerticalSliceRuntimeAdapter(flow.mode);
+  const save = useVerticalSliceSaveAdapter(runtime);
+  const overlayPages = useOverlayPageAdapters({ flow, runtime, save });
   const [activeDebugTab, setActiveDebugTab] = useState<DebugTabId>("runtime");
-  const activeMap = getActiveMap(navi);
-  const currentCameraMode = navi.inputLock === "none" ? "first-person" : "locked";
-  const inputActionsRef = useKeyboardInputActions(defaultHarnessInputBindings, "navi", navi.inputLock === "none");
-  const interactionView = createNaviInteractionView(navi);
-
-  function resetSlice() {
-    const spawnPose: PlayerPose = { position: initialMap.spawn, yaw: 0, pitch: 0 };
-    setNavi({
-      ...createInitialNaviState(initialMap.id),
-      playerPose: spawnPose
-    });
-    setGameplay(createGameplayState());
-    setStoryRuntime({ state: createInitialStoryState(parsed.scenario), active: false });
-    setLastOutcome("reset");
-    setLastAction("reset");
-    firstPersonBridge.issuePoseCommand(spawnPose);
-    setStorySession((session) => session + 1);
-  }
-
-  function moveToPreset(id: PosePresetId) {
-    const preset = posePresets.find((candidate) => candidate.id === id);
-    if (!preset) return;
-    const map = verticalSliceMaps.find((candidate) => candidate.id === preset.mapId) ?? activeMap;
-    const seeded = navi.activeMapId === preset.mapId ? navi : naviReducer(navi, { type: "ENTER_WALK", mapId: preset.mapId });
-    const focused = focusNaviInteractionFromSensorReport(seeded, map, {
-      mapId: preset.mapId,
-      pose: preset.pose
-    });
-    setNavi(focused.navi);
-    firstPersonBridge.issuePoseCommand(preset.pose);
-    setLastAction(`move:${id}`);
-    setLastOutcome(focused.view.activeInteractableId ? `focused:${focused.view.activeInteractableId}` : focused.view.blockedReason ?? "none");
-  }
-
-  const recordSensorReport = useCallback((report: NaviInteractionSensorReport) => {
-    setNavi((current) => {
-      const map = verticalSliceMaps.find((candidate) => candidate.id === report.mapId) ?? getActiveMap(current);
-      return focusNaviInteractionFromSensorReport(current, map, report).navi;
-    });
-  }, []);
-
-  const confirmInteraction = useCallback(
-    (request?: FirstPersonInteractRequest) => {
-      const report = createSensorReportFromRequest(request);
-      const confirmationMap = report
-        ? verticalSliceMaps.find((candidate) => candidate.id === report.mapId) ?? activeMap
-        : activeMap;
-      const confirmationNavi = report
-        ? focusNaviInteractionFromSensorReport(navi, confirmationMap, report).navi
-        : navi;
-      const resolution = confirmFocusedNaviInteraction(confirmationNavi, confirmationMap, gameplay, verticalSliceMaps);
-
-      setNavi(resolution.navi);
-      setGameplay(resolution.gameplay);
-      setLastAction(`confirm:${confirmationNavi.activeInteractableId ?? "none"}`);
-      setLastOutcome(formatOutcome(resolution.outcome));
-      if (resolution.outcome.type === "change-map" && resolution.navi.playerPose) {
-        firstPersonBridge.issuePoseCommand(resolution.navi.playerPose);
-      }
-      if (resolution.outcome.type === "start-script") startStoryOverlay();
-    },
-    [activeMap, gameplay, navi]
-  );
-  const firstPersonBridge = useFirstPersonExplorationBridge({
-    map: activeMap,
-    cameraMode: currentCameraMode,
-    inputLock: navi.inputLock,
-    inputActionsRef,
-    ...(navi.activeInteractableId ? { activeInteractableId: navi.activeInteractableId } : {}),
-    onSensorReport: recordSensorReport,
-    onInteractRequest: confirmInteraction
-  });
-
-  function startStoryOverlay() {
-    const initial = createInitialStoryState(parsed.scenario);
-    const advanced = advanceToNextStop(initial, parsed.scenario);
-    setStorySession((session) => session + 1);
-    setStoryRuntime({ state: applyStoryEffects(advanced.state, initial), active: true });
-  }
-
-  function advanceStory() {
-    const current = storyRuntime.state;
-    const advanced = advanceToNextStop(current, parsed.scenario);
-    const nextStory = applyStoryEffects(advanced.state, current);
-    setStoryRuntime({ state: nextStory, active: !nextStory.ended });
-    if (nextStory.ended) {
-      setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
-      setLastAction("story:end");
-      setLastOutcome("overlay-closed");
-    } else {
-      setLastAction("story:advance");
-      setLastOutcome(nextStory.pendingChoices.length > 0 ? "choices" : "line");
-    }
-  }
-
-  function chooseStory(index: number) {
-    const current = storyRuntime.state;
-    const chosen = chooseStoryOption(current, parsed.scenario, index);
-    const advanced = advanceToNextStop(chosen.state, parsed.scenario);
-    const nextStory = applyStoryEffects(advanced.state, current);
-    setStoryRuntime({ state: nextStory, active: true });
-    setLastAction(`choice:${index}`);
-    setLastOutcome(nextStory.variables.route ? `route:${String(nextStory.variables.route)}` : "choice");
-  }
-
-  function applyStoryEffects(nextStory: StoryRuntime["state"], previousStory: StoryRuntime["state"]) {
-    const gameplayEffects = selectVnNewEffectsForTarget(nextStory, previousStory, "gameplay");
-    if (gameplayEffects.length > 0) {
-      setGameplay((currentGameplay) => applyGameplayEffects(currentGameplay, gameplayEffects));
-    }
-    return nextStory;
-  }
 
   return (
     <main className="app-shell app-shell-harness">
       <section className="playfield" data-testid="playfield">
-        <div className="scene-stack" data-testid="vertical-slice-shell">
-          <ExplorationStage3D {...firstPersonBridge.explorationStageProps} />
-          <VnRuntimeDispatcher
-            active={storyRuntime.active}
-            story={storyRuntime.state}
-            storySession={storySession}
-            formatSpeaker={displayStorySpeaker}
-            onAdvance={advanceStory}
-            onChoice={chooseStory}
-            onCancel={() => {
-              setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
-              setStoryRuntime((current) => ({ ...current, active: false }));
-              setLastAction("dialog:cancel");
-              setLastOutcome("overlay-closed");
-            }}
-          />
-        </div>
+        <GameInteractionShell flow={flow} overlayPages={overlayPages} runtime={runtime}>
+          <div className="scene-stack" data-testid="vertical-slice-shell">
+            <ExplorationStage3D {...runtime.firstPersonBridge.explorationStageProps} />
+            <VnRuntimeDispatcher
+              active={runtime.storyRuntime.active}
+              story={runtime.storyRuntime.state}
+              storySession={runtime.storySession}
+              formatSpeaker={displayStorySpeaker}
+              onAdvance={runtime.advanceStory}
+              onChoice={runtime.chooseStory}
+              onCancel={() => runtime.closeStoryOverlay()}
+            />
+          </div>
+        </GameInteractionShell>
         <div className="hud harness-hud vertical-slice-hud">
           <div className="objective-chip">
             <span data-testid="harness-scenario-id">vertical-slice</span>
             <strong data-testid="harness-scenario-title">Navi To VN Vertical Slice</strong>
-            <small data-testid="harness-status">{storyRuntime.active ? "视觉小说覆盖层" : "Navi 探索"}</small>
+            <small data-testid="harness-status">{flow.mode === "title" ? "标题界面" : runtime.storyRuntime.active ? "视觉小说覆盖层" : "Navi 探索"}</small>
           </div>
         </div>
       </section>
@@ -238,26 +72,26 @@ export function VerticalSliceScenario() {
               role="tabpanel"
             >
               <VerticalSliceReadout
-                activeInteractableId={navi.activeInteractableId ?? "none"}
-                blockedReason={interactionView.blockedReason ?? "none"}
-                canConfirm={String(interactionView.canConfirm)}
-                evidence={formatEvidence(gameplay)}
-                inputLock={navi.inputLock}
-                inventory={formatInventory(gameplay)}
-                lastAction={lastAction}
-                lastOutcome={lastOutcome}
-                mapId={navi.activeMapId ?? "none"}
-                pointerLockStatus={firstPersonBridge.pointerLockStatus}
-                route={String(storyRuntime.state.variables.route ?? "none")}
-                substate={navi.substate}
+                activeInteractableId={runtime.navi.activeInteractableId ?? "none"}
+                blockedReason={runtime.interactionView.blockedReason ?? "none"}
+                canConfirm={String(runtime.interactionView.canConfirm)}
+                evidence={formatEvidence(runtime.gameplay)}
+                inputLock={runtime.navi.inputLock}
+                inventory={formatInventory(runtime.gameplay)}
+                lastAction={runtime.lastAction}
+                lastOutcome={runtime.lastOutcome}
+                mapId={runtime.navi.activeMapId ?? "none"}
+                pointerLockStatus={runtime.firstPersonBridge.pointerLockStatus}
+                route={String(runtime.storyRuntime.state.variables.route ?? "none")}
+                substate={runtime.navi.substate}
               />
               <VerticalSliceRuntimeControls
-                advanceDisabled={!storyRuntime.active}
-                onAdvanceStory={advanceStory}
-                onMoveToPreset={moveToPreset}
-                onRequestInteract={firstPersonBridge.requestInteract}
-                onReset={resetSlice}
-                pointerLockTriggerProps={firstPersonBridge.pointerLockTriggerProps}
+                advanceDisabled={!runtime.storyRuntime.active}
+                onAdvanceStory={runtime.advanceStory}
+                onMoveToPreset={runtime.moveToPreset}
+                onRequestInteract={runtime.firstPersonBridge.requestInteract}
+                onReset={runtime.resetSlice}
+                pointerLockTriggerProps={runtime.firstPersonBridge.pointerLockTriggerProps}
               />
             </div>
           ) : null}
@@ -271,14 +105,14 @@ export function VerticalSliceScenario() {
             >
               <InspectorLite
                 mode="navi"
-                {...(navi.activeMapId ? { detail: navi.activeMapId } : {})}
-                inputLock={navi.inputLock}
-                naviSubstate={navi.substate}
-                scriptPointer={storyRuntime.state.instructionPointer}
-                variables={storyRuntime.state.variables}
-                inventoryItems={gameplay.inventory.items}
-                evidenceIds={gameplay.evidence.ownedEvidenceIds}
-                presentationCommands={storyRuntime.state.presentationCommands}
+                {...(runtime.navi.activeMapId ? { detail: runtime.navi.activeMapId } : {})}
+                inputLock={runtime.navi.inputLock}
+                naviSubstate={runtime.navi.substate}
+                scriptPointer={runtime.storyRuntime.state.instructionPointer}
+                variables={runtime.storyRuntime.state.variables}
+                inventoryItems={runtime.gameplay.inventory.items}
+                evidenceIds={runtime.gameplay.evidence.ownedEvidenceIds}
+                presentationCommands={runtime.storyRuntime.state.presentationCommands}
               />
             </div>
           ) : null}
@@ -341,7 +175,7 @@ function VerticalSliceRuntimeControls({
         <strong>debug</strong>
       </header>
       <div className="vertical-slice-runtime-controls-grid">
-        {posePresets.map((preset) => (
+        {verticalSlicePosePresets.map((preset) => (
           <button
             key={preset.id}
             data-testid={`vertical-slice-move-${preset.id}`}
@@ -366,35 +200,6 @@ function VerticalSliceRuntimeControls({
       </div>
     </section>
   );
-}
-
-function applyGameplayEffects(gameplay: GameplayState, effects: StoryEffect[]): GameplayState {
-  return effects.reduce((current, effect) => {
-    if (effect.type !== "gameplay-event") return current;
-    return applyGameplayEvent(current, effect.event).state;
-  }, gameplay);
-}
-
-function createSensorReportFromRequest(request: FirstPersonInteractRequest | undefined): NaviInteractionSensorReport | undefined {
-  if (!request?.mapId) return undefined;
-  return {
-    mapId: request.mapId,
-    pose: request.pose,
-    ...(request.facing ? { facing: request.facing } : {})
-  };
-}
-
-function getActiveMap(navi: NaviRuntimeState): WorldMapDef {
-  return verticalSliceMaps.find((map) => map.id === navi.activeMapId) ?? initialMap;
-}
-
-function formatOutcome(outcome: ExplorationOutcome): string {
-  if (outcome.type === "none") return "none";
-  if (outcome.type === "grant-item") return `grant-item:${outcome.itemId}:${outcome.quantity}`;
-  if (outcome.type === "grant-evidence") return `grant-evidence:${outcome.evidenceId}`;
-  if (outcome.type === "start-script") return `start-script:${outcome.script}`;
-  if (outcome.type === "change-map") return `change-map:${outcome.mapId}`;
-  return `character-state:${outcome.characterId}:${outcome.affinityDelta}`;
 }
 
 function formatInventory(gameplay: GameplayState): string {
@@ -474,15 +279,4 @@ function Readout({ label, testId, value, wide = false }: { label: string; testId
       <strong data-testid={testId}>{value}</strong>
     </p>
   );
-}
-
-function createFallbackMap(): WorldMapDef {
-  return {
-    id: "map:missing",
-    name: "Missing",
-    spawn: [0, 1.7, 4],
-    collisionProxyIds: [],
-    interactables: [],
-    assetRefs: []
-  };
 }

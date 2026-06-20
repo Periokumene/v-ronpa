@@ -15,6 +15,7 @@
     { "path": "../../packages/story-engine" },
     { "path": "../../packages/game-flow-machine" },
     { "path": "../../packages/gameplay" },
+    { "path": "../../packages/media-save" },
     { "path": "../../packages/navi-director" },
     { "path": "../../packages/pixi-presenter" },
     { "path": "../../packages/r3f-adapter" },

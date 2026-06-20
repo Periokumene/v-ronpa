@@ -2,8 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   CameraRigDefSchema,
   ContentManifestSchema,
+  GameInteractionContextSchema,
+  GameModeSchema,
+  GameOverlayKindSchema,
+  GameUiActionSchema,
   InputBindingMapSchema,
   InputActionStateSchema,
+  InteractionCapabilitySnapshotSchema,
+  InteractionStyleProfileSchema,
   NaniCommandDefinitionSchema,
   NaniCommandStatusSchema,
   NaviInteractionConfirmRequestSchema,
@@ -13,9 +19,12 @@ import {
   PresentationCommandSchema,
   RuntimeAssetSchema,
   SaveDataSchema,
+  SaveSlotSummarySchema,
+  SettingsSnapshotSchema,
   StoryEffectSchema,
   TrialDefinitionSchema,
   TrialRuntimeStateSchema,
+  UiAssetRefSchema,
   WildcardStoryEffectSchema,
   getNaniCommandDefinition,
   naniCommandCatalog
@@ -32,6 +41,23 @@ describe("contracts", () => {
           kind: "texture",
           uri: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='14' fill='%23ffe66d'/%3E%3Crect x='18' y='34' width='60' height='28' rx='6' fill='%231f2937'/%3E%3Ccircle cx='31' cy='48' r='5' fill='%23ffffff'/%3E%3C/svg%3E",
           tags: ["placeholder", "evidence"]
+        }
+      ],
+      uiAssets: [
+        {
+          id: "ui:title:bg",
+          role: "title-background",
+          uri: "/harness/ui/title-bg.webp",
+          slice: "stretch",
+          tags: ["harness"]
+        }
+      ],
+      interactionStyles: [
+        {
+          id: "style:harness:vn",
+          name: "Harness VN",
+          assets: [{ id: "ui:dialog:frame", role: "dialog-frame", assetId: "ui:title:bg", slice: "nine-slice" }],
+          tokens: { accentColor: "#ffd166", panelOpacity: 0.82, motionScale: 1 }
         }
       ],
       runtimeAssets: [
@@ -133,6 +159,8 @@ describe("contracts", () => {
     expect(manifest.maps[0]?.interactables[1]?.action.type).toBe("change-map");
     expect(manifest.evidence[0]?.shortLabel).toBe("Keycard");
     expect(manifest.input?.bindings[1]?.action).toBe("fire-truth-bullet");
+    expect(manifest.uiAssets[0]?.role).toBe("title-background");
+    expect(manifest.interactionStyles[0]?.assets[0]?.slice).toBe("nine-slice");
   });
 
   it("validates trial debate branches", () => {
@@ -308,6 +336,73 @@ describe("contracts", () => {
     ).toMatchObject({ collisionProxyIds: [], lods: [] });
   });
 
+  it("validates game interaction shell contracts", () => {
+    expect(GameModeSchema.parse("title")).toBe("title");
+    expect(GameOverlayKindSchema.parse("vn-save")).toBe("vn-save");
+    expect(GameUiActionSchema.parse("open-backlog")).toBe("open-backlog");
+
+    expect(
+      GameInteractionContextSchema.parse({
+        mode: "navi",
+        overlayStack: ["vn-backlog"],
+        naviSubstate: "vn2d-overlay",
+        inputLock: "dialog",
+        hasActiveStory: true,
+        storyHasChoices: false,
+        isAtStableStop: true
+      })
+    ).toMatchObject({
+      mode: "navi",
+      overlayStack: ["vn-backlog"],
+      hasActiveStory: true,
+      storyEnded: false
+    });
+
+    expect(
+      InteractionCapabilitySnapshotSchema.parse({
+        canSave: true,
+        canLoad: true,
+        canOpenBacklog: true
+      })
+    ).toMatchObject({
+      canSave: true,
+      canLoad: true,
+      canOpenSettings: true,
+      canOpenPauseMenu: false
+    });
+
+    expect(SettingsSnapshotSchema.parse({ version: 1 })).toEqual({ version: 1, placeholder: true });
+
+    expect(
+      SaveSlotSummarySchema.parse({
+        id: "slot:vertical:1",
+        label: "Slot 1",
+        savedAt: "2026-06-20T00:00:00.000Z",
+        mode: "navi",
+        speaker: "Felix",
+        text: "A saved line."
+      })
+    ).toMatchObject({ mode: "navi", text: "A saved line." });
+
+    expect(
+      UiAssetRefSchema.parse({
+        id: "ui:button:frame",
+        role: "button-frame",
+        assetId: "texture:evidence:keycard-icon",
+        slice: "nine-slice"
+      })
+    ).toMatchObject({ role: "button-frame", tags: [] });
+
+    expect(
+      InteractionStyleProfileSchema.parse({
+        id: "style:default",
+        name: "Default",
+        assets: [{ id: "ui:toolbar:icon", role: "toolbar-icon", uri: "/harness/ui/icon.png" }],
+        tokens: { accentColor: "#6ee7d8", panelOpacity: 0.9 }
+      })
+    ).toMatchObject({ assets: [{ role: "toolbar-icon" }], tokens: { accentColor: "#6ee7d8", panelOpacity: 0.9 } });
+  });
+
   it("validates story effects as the script-to-director bridge", () => {
     expect(
       StoryEffectSchema.parse({
@@ -426,6 +521,14 @@ describe("contracts", () => {
       version: 1,
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "navi",
+      summary: {
+        id: "slot:vertical:1",
+        label: "Slot 1",
+        savedAt: "2026-06-14T00:00:00.000Z",
+        mode: "navi",
+        speaker: "Felix",
+        text: "Good."
+      },
       navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
       story: {
         currentScriptPath: "opening.nani",

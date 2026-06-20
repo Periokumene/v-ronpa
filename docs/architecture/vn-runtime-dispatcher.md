@@ -10,6 +10,8 @@ runtime consumers. It routes StoryEngine output objects, not `.nani` command ids
 - `presentationCommands` is the cumulative presentation log/snapshot source.
 - `effects` is the incremental side-effect stream.
 - `VnRuntimeDispatcher` owns app-level fanout from those two output sources.
+- `GameInteractionShell` owns VN toolbar actions and shell overlays such as
+  backlog, settings, save, load, title, and pause menu.
 - DOM UI owns dialogue text, choices, menus, settings, save/load screens, and
   other accessibility-sensitive surfaces.
 - Pixi owns VN/trial 2D effects, backgrounds, portraits, filters, particles,
@@ -56,12 +58,19 @@ The vertical-slice harness now uses:
 Scenario code should not manually filter `presentationCommands` by renderer
 after this baseline. Add or update `VnOutputRouteTable` routes instead.
 
+VN toolbar actions are intentionally outside `VnRuntimeDispatcher`. BACK, LOG,
+SKIP, AUTO, SAVE, LOAD, and SETTING are shell UI actions derived from
+`InteractionCapabilitySnapshot`; they should enter the app through
+`GameInteractionShell` and its overlay/page adapters. If a future `.nani`
+command produces a runtime effect that changes a toolbar capability, route that
+effect first, then let the shell capability policy expose the UI state.
+
 ## Future Branches
 
 - The performance branch can add new Pixi presentation command handlers without
   changing the app fanout shape.
 - The UI branch can add settings, backlog, save/load, auto/skip, and style
-  surfaces behind DOM UI targets.
+  surfaces behind `GameInteractionShell` and `ui-kit` display components.
 - Branch-local experiments should use `@wildcard-<type> routeKey:<key>` and
   route by `wildcardType + routeKey`. Promote a wildcard to an explicit command
   only when it stabilizes.

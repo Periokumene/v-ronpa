@@ -2,8 +2,37 @@ import { z } from "zod";
 
 export const IdSchema = z.string().min(1).regex(/^[a-zA-Z0-9:_./-]+$/);
 
-export const GameModeSchema = z.enum(["loading", "navi", "trial", "paused", "saving"]);
+export const GameModeSchema = z.enum(["loading", "title", "navi", "trial", "paused", "saving"]);
 export type GameMode = z.infer<typeof GameModeSchema>;
+
+export const GameOverlayKindSchema = z.enum([
+  "title-load",
+  "title-settings",
+  "pause-menu",
+  "vn-backlog",
+  "vn-save",
+  "vn-load",
+  "vn-settings",
+  "confirm-load",
+  "confirm-return-title"
+]);
+export type GameOverlayKind = z.infer<typeof GameOverlayKindSchema>;
+
+export const GameUiActionSchema = z.enum([
+  "new-game",
+  "open-load",
+  "open-save",
+  "open-settings",
+  "open-backlog",
+  "open-pause-menu",
+  "close-overlay",
+  "confirm-load",
+  "return-title",
+  "toggle-auto",
+  "toggle-skip",
+  "back"
+]);
+export type GameUiAction = z.infer<typeof GameUiActionSchema>;
 
 export const NaviSubstateSchema = z.enum(["walk", "interacting", "vn2d-overlay", "inventory", "event"]);
 export type NaviSubstate = z.infer<typeof NaviSubstateSchema>;
@@ -628,6 +657,43 @@ export const AssetRefSchema = z.object({
 });
 export type AssetRef = z.infer<typeof AssetRefSchema>;
 
+export const UiAssetRoleSchema = z.enum([
+  "title-background",
+  "panel-background",
+  "dialog-frame",
+  "button-frame",
+  "button-icon",
+  "toolbar-icon",
+  "overlay-backdrop",
+  "motion-sprite"
+]);
+export type UiAssetRole = z.infer<typeof UiAssetRoleSchema>;
+
+export const UiAssetRefSchema = z.object({
+  id: IdSchema,
+  role: UiAssetRoleSchema,
+  assetId: IdSchema.optional(),
+  uri: z.string().optional(),
+  slice: z.enum(["stretch", "nine-slice", "tile"]).default("stretch"),
+  tags: z.array(z.string()).default([])
+});
+export type UiAssetRef = z.infer<typeof UiAssetRefSchema>;
+
+export const InteractionStyleProfileSchema = z.object({
+  id: IdSchema,
+  name: z.string().min(1),
+  assets: z.array(UiAssetRefSchema).default([]),
+  tokens: z
+    .object({
+      accentColor: z.string().optional(),
+      textColor: z.string().optional(),
+      panelOpacity: z.number().min(0).max(1).optional(),
+      motionScale: z.number().nonnegative().optional()
+    })
+    .default({})
+});
+export type InteractionStyleProfile = z.infer<typeof InteractionStyleProfileSchema>;
+
 export const RuntimeAssetKindSchema = z.enum([
   "portrait",
   "background",
@@ -947,6 +1013,49 @@ export const StoryRuntimeSnapshotSchema = z.object({
 });
 export type StoryRuntimeSnapshot = z.infer<typeof StoryRuntimeSnapshotSchema>;
 
+export const GameInteractionContextSchema = z.object({
+  mode: GameModeSchema,
+  overlayStack: z.array(GameOverlayKindSchema).default([]),
+  naviSubstate: NaviSubstateSchema.optional(),
+  trialPresentation: TrialPresentationProfileSchema.optional(),
+  inputLock: InputLockStateSchema.default("none"),
+  hasActiveStory: z.boolean().default(false),
+  storyHasChoices: z.boolean().default(false),
+  storyEnded: z.boolean().default(false),
+  isAtStableStop: z.boolean().default(false)
+});
+export type GameInteractionContext = z.infer<typeof GameInteractionContextSchema>;
+
+export const InteractionCapabilitySnapshotSchema = z.object({
+  canStartNewGame: z.boolean().default(false),
+  canSave: z.boolean().default(false),
+  canLoad: z.boolean().default(false),
+  canOpenSettings: z.boolean().default(true),
+  canOpenBacklog: z.boolean().default(false),
+  canOpenPauseMenu: z.boolean().default(false),
+  canAuto: z.boolean().default(false),
+  canSkip: z.boolean().default(false),
+  canBack: z.boolean().default(false),
+  canReturnTitle: z.boolean().default(false)
+});
+export type InteractionCapabilitySnapshot = z.infer<typeof InteractionCapabilitySnapshotSchema>;
+
+export const SettingsSnapshotSchema = z.object({
+  version: z.literal(1),
+  placeholder: z.boolean().default(true)
+});
+export type SettingsSnapshot = z.infer<typeof SettingsSnapshotSchema>;
+
+export const SaveSlotSummarySchema = z.object({
+  id: IdSchema,
+  label: z.string().min(1),
+  savedAt: z.string(),
+  mode: GameModeSchema,
+  speaker: z.string().optional(),
+  text: z.string().optional()
+});
+export type SaveSlotSummary = z.infer<typeof SaveSlotSummarySchema>;
+
 export const WildcardStoryEffectSchema = z.object({
   type: z.literal("wildcard-event"),
   wildcardType: NaniWildcardTypeSchema,
@@ -1002,6 +1111,7 @@ export const SaveDataSchema = z.object({
   version: z.literal(1),
   savedAt: z.string(),
   mode: GameModeSchema,
+  summary: SaveSlotSummarySchema.optional(),
   navi: NaviRuntimeStateSchema.optional(),
   story: StoryRuntimeSnapshotSchema,
   inventory: InventoryStateSchema,
@@ -1014,6 +1124,8 @@ export type SaveData = z.infer<typeof SaveDataSchema>;
 export const ContentManifestSchema = z.object({
   version: z.literal(1),
   assets: z.array(AssetRefSchema),
+  uiAssets: z.array(UiAssetRefSchema).default([]),
+  interactionStyles: z.array(InteractionStyleProfileSchema).default([]),
   runtimeAssets: z.array(RuntimeAssetSchema).default([]),
   collisionProxies: z.array(CollisionProxySchema).default([]),
   input: InputBindingMapSchema.optional(),
