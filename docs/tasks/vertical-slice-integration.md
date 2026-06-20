@@ -78,7 +78,6 @@ The harness entry is `/?scenario=vertical-slice`.
 
 ## Forbidden Paths
 
-- `packages/presentation-contracts/**`
 - `packages/nani-parser/src/types.ts`
 - `pnpm-lock.yaml`
 - `package.json`

@@ -3,7 +3,7 @@
 ## Working Agreements
 
 - Keep root guidance short; link to detailed docs instead of expanding this file.
-- Treat `packages/contracts`, `packages/presentation-contracts`, and `.nani` IR as public API.
+- Treat `packages/contracts` and `.nani` IR as public API.
 - Do not modify shared contracts from a module task without adding a Contract Change Request under `docs/ccr/`.
 - Keep gameplay/state logic independent from React, R3F, Pixi, DOM, Dexie, and Howler.
 - Treat `navi` and `trial` as the only primary playable modes; keep VN2D/VN3D as substates or presentation profiles.

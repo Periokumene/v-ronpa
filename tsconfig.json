@@ -3,7 +3,6 @@
   "references": [
     { "path": "packages/contracts" },
     { "path": "packages/nani-parser" },
-    { "path": "packages/presentation-contracts" },
     { "path": "packages/story-engine" },
     { "path": "packages/game-flow-machine" },
     { "path": "packages/gameplay" },

@@ -23,7 +23,7 @@ describe("VN output routes", () => {
     expect(routePresentationCommand(command, routeTable)).toEqual(["ui", "debug"]);
   });
 
-  it("routes presentation commands from the presentationCommands snapshot source", () => {
+  it("routes presentation commands from the presentationCommands command log", () => {
     const commands: PresentationCommand[] = [
       { type: "print", text: "Line", autoNext: false },
       { type: "set-background", backgroundId: "bg:harness" },

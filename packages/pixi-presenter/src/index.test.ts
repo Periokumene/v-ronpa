@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createPixiPresenter } from "./index";
 
 describe("pixi presenter port", () => {
-  it("keeps non-Pixi presentation commands no-op safe while preserving memory snapshots", () => {
+  it("keeps non-Pixi presentation commands no-op safe", () => {
     const host = {
       clientWidth: 960,
       clientHeight: 540,
@@ -19,17 +19,6 @@ describe("pixi presenter port", () => {
     } as const;
 
     expect(() => presenter.apply(command)).not.toThrow();
-    expect(presenter.snapshot()).toEqual({
-      portraits: [],
-      commands: [command],
-      activeEffects: []
-    });
-
-    presenter.clear();
-    expect(presenter.snapshot()).toEqual({
-      portraits: [],
-      commands: [],
-      activeEffects: []
-    });
+    expect(() => presenter.clear()).not.toThrow();
   });
 });

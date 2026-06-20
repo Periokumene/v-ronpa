@@ -23,8 +23,8 @@ Scripts use preset commands rather than renderer-specific instructions:
 @gameplay grant-evidence id:evidence:keycard
 ```
 
-The public contract is `PresentationCommand` and `PresentationPerform`; Pixi,
-DOM, R3F, or a future presenter can interpret those commands.
+The public presentation wire contract is `PresentationCommand`; Pixi, DOM, R3F,
+or a future presenter can interpret those commands.
 
 `.nani` command declarations live in `commandCatalog`. Naninovel official
 commands are explicit entries; wildcard commands are temporary branch-local
@@ -39,7 +39,7 @@ App fanout is handled by `VnRuntimeDispatcher` and `VnOutputRouteTable`.
 Route tables classify `PresentationCommand.type`, `StoryEffect.type`, and
 `wildcardType + routeKey`; they do not route by `.nani` command id.
 
-`presentationCommands` is the cumulative presentation log/snapshot source.
+`presentationCommands` is the cumulative presentation command log.
 `effects` is the incremental side-effect stream. A `presentation` effect is
 debug/log-only by default so Pixi does not replay a presentation command twice.
 
@@ -70,8 +70,8 @@ Later:
 
 Pixi is planned as an overlay presenter for VN and trial effects. R3F remains
 the 3D world presenter. Shared WebGL context integration is a future
-optimization; first baseline can use independent canvas layers as long as the
-public `PresenterPort` is stable.
+optimization; first baseline can use independent canvas layers as long as
+presenter adapters keep `PresentationCommand` as their public input shape.
 
 ## VN3D Versus Trial
 

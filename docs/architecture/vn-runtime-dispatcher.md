@@ -7,7 +7,7 @@ runtime consumers. It routes StoryEngine output objects, not `.nani` command ids
 
 - StoryEngine owns script execution, backlog, choices, `presentationCommands`,
   and incremental `effects`.
-- `presentationCommands` is the cumulative presentation log/snapshot source.
+- `presentationCommands` is the cumulative presentation command log.
 - `effects` is the incremental side-effect stream.
 - `VnRuntimeDispatcher` owns app-level fanout from those two output sources.
 - `GameInteractionShell` owns VN toolbar actions and shell overlays such as
@@ -43,9 +43,9 @@ the current baseline intentionally uses the same fixed table for both.
 - `wildcard-event` routes through the wildcard table.
 - `presentation` effects route to `debug` only.
 
-`presentation` effects must not be re-executed by Pixi. Pixi consumes
-presentation commands from `presentationCommands`, while `effects` remains the
-incremental stream for side effects.
+`presentation` effects must not be re-executed by Pixi. Pixi consumes commands
+from the `presentationCommands` log, while `effects` remains the incremental
+stream for side effects.
 
 ## Vertical Slice Migration
 

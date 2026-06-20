@@ -8,7 +8,6 @@ ensureGitRef(base);
 const changed = changedFilesSince(base);
 const contractTouched = changed.some((path) =>
   path.startsWith("packages/contracts/") ||
-  path.startsWith("packages/presentation-contracts/") ||
   path.startsWith("packages/nani-parser/src/types")
 );
 

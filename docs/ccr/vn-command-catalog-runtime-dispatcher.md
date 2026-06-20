@@ -34,8 +34,8 @@ forcing new features to touch public presentation commands too early.
   handlers not declared in the catalog.
 - `@wildcard-<type>` commands emit `wildcard-event` StoryEffects with
   `wildcardType`, `routeKey`, generic params, and source command metadata.
-- `presentationCommands` remains the presentation snapshot/log. `effects` is
-  the incremental side-effect stream.
+- `presentationCommands` remains the presentation command log. `effects` is the
+  incremental side-effect stream.
 
 ## Fixtures And Tests
 

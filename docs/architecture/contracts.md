@@ -8,7 +8,6 @@
   inventory, trial definitions, evidence definitions, input bindings, camera
   modes, runtime assets, Story snapshots, Story effects, typed gameplay events,
   `.nani` command catalog metadata, and presentation command wire shapes.
-- `packages/presentation-contracts`: runtime ports for presenter adapters.
 - `packages/nani-parser`: `.nani` AST and IR shape.
 
 Changes to these packages are cross-module changes. A module worktree must not
@@ -35,6 +34,8 @@ and merge the change through the integration baseline first.
 - Save/load lists should use `SaveSlotSummary`. `media-save` may derive missing
   summaries from save data, while app adapters collect the current runtime
   snapshot.
+- Presenter runtime traces are adapter internals. They must not be used as
+  SaveData shapes or as public stage snapshots.
 - UI asset refs and interaction style profiles are manifest/config references.
   They must not contain renderer objects, React components, Pixi instances, or
   Three.js objects.

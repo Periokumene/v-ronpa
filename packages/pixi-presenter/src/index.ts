@@ -1,7 +1,7 @@
 import { Application, Assets, Container, Graphics, Sprite, Text, type Texture, type Ticker } from "pixi.js";
 import type { PresentationCommand } from "@v-ronpa/contracts";
-import { createMemoryPresenter, type PresentationSnapshot, type PresenterPort } from "@v-ronpa/presentation-contracts";
 import { VisualEffectScheduler } from "./internal/effects";
+import { createPresenterTraceRecorder } from "./internal/presenterTrace";
 import {
   calculatePortraitLayout,
   formatFallbackPortraitLabel,
@@ -15,13 +15,15 @@ export interface PixiPresenterOptions {
   height?: number;
 }
 
-export interface PixiPresenterPort extends PresenterPort {
+export interface PixiPresenterPort {
   mount(): Promise<void>;
+  apply(command: PresentationCommand): void;
+  clear(): void;
   destroy(): void;
 }
 
 export function createPixiPresenter(options: PixiPresenterOptions): PixiPresenterPort {
-  const memory = createMemoryPresenter();
+  const traceRecorder = createPresenterTraceRecorder();
   const app = new Application();
   const backgroundLayer = new Container({ label: "background" });
   const portraitLayer = new Container({ label: "portraits" });
@@ -72,14 +74,13 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
   }
 
   function apply(command: PresentationCommand) {
-    const perform = memory.apply(command);
+    traceRecorder.apply(command);
     if (!mounted) {
       pendingVisualCommands.push(command);
-      return perform;
+      return;
     }
 
     executeVisual(command);
-    return perform;
   }
 
   function executeVisual(command: PresentationCommand) {
@@ -347,11 +348,8 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
   return {
     mount,
     apply,
-    snapshot(): PresentationSnapshot {
-      return memory.snapshot();
-    },
     clear() {
-      memory.clear();
+      traceRecorder.clear();
       pendingVisualCommands.length = 0;
       portraitRequestIds.left = 0;
       portraitRequestIds.center = 0;

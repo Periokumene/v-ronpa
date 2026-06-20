@@ -69,7 +69,6 @@ List architectural rules and non-goals.
 ## Forbidden Paths
 
 - `packages/contracts/**` unless this task explicitly includes a CCR.
-- `packages/presentation-contracts/**` unless this task explicitly includes a CCR.
 - `packages/nani-parser/src/types.ts` unless this task explicitly includes a CCR.
 
 ## Contracts

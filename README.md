@@ -31,7 +31,6 @@ pnpm --filter @v-ronpa/game dev
 - `packages/navi-director`: Navi walk, interaction, inventory, and VN2D overlay state flow.
 - `packages/trial-director`: Trial segment, presentation profile, truth bullet, timeout, and evidence flow.
 - `packages/media-save`: Dexie/Howler/HTMLVideo persistence and media adapters.
-- `packages/presentation-contracts`: renderer-independent presentation ports.
 - `packages/pixi-presenter`: Pixi canvas adapter for VN/trial 2D effects.
 - `packages/r3f-adapter`: R3F adapter for 3D exploration and trial stage.
 - `packages/ui-kit`: Radix/CSS-ready DOM HUD, dialog, tabs, inspector primitives.

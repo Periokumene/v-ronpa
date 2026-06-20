@@ -51,10 +51,10 @@ adapters and apps
   ownership, character state, and pure trial rule judgments.
 - `media-save` owns Dexie IndexedDB save storage, Howler audio playback,
   HTMLVideo playback, and future WebAudio rhythm adapter notes.
-- `presentation-contracts` owns renderer-independent visual commands and
-  snapshots.
+- `contracts` owns renderer-independent presentation command wire shapes.
 - `r3f-adapter` owns 3D scene presentation only.
-- `pixi-presenter` owns 2D canvas/WebGL presentation only.
+- `pixi-presenter` owns 2D canvas/WebGL presentation only, including internal
+  presenter traces used for adapter tests and inspection.
 - `ui-kit` owns DOM overlays, text-heavy surfaces, controls, and Inspector Lite.
 
 ## Mode Model

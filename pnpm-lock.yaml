@@ -150,18 +150,9 @@ importers:
       '@v-ronpa/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@v-ronpa/presentation-contracts':
-        specifier: workspace:*
-        version: link:../presentation-contracts
       pixi.js:
         specifier: ^8.0.0
         version: 8.19.0
-
-  packages/presentation-contracts:
-    dependencies:
-      '@v-ronpa/contracts':
-        specifier: workspace:*
-        version: link:../contracts
 
   packages/r3f-adapter:
     dependencies:

@@ -7,7 +7,6 @@ Describe the schema, type, event, command, or port change.
 ## Affected Packages
 
 - `packages/contracts`
-- `packages/presentation-contracts`
 
 ## Why Existing Contract Is Insufficient
 

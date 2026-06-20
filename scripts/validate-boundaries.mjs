@@ -6,7 +6,6 @@ const root = process.cwd();
 const packageRoots = {
   "contracts": "packages/contracts",
   "nani-parser": "packages/nani-parser",
-  "presentation-contracts": "packages/presentation-contracts",
   "story-engine": "packages/story-engine",
   "gameplay": "packages/gameplay",
   "navi-director": "packages/navi-director",
@@ -22,12 +21,11 @@ const packageRoots = {
 const allowedWorkspaceDeps = {
   "contracts": [],
   "nani-parser": [],
-  "presentation-contracts": ["contracts"],
   "story-engine": ["contracts", "nani-parser"],
   "gameplay": ["contracts"],
   "navi-director": ["contracts", "gameplay"],
   "trial-director": ["contracts", "gameplay"],
-  "pixi-presenter": ["contracts", "presentation-contracts"],
+  "pixi-presenter": ["contracts"],
   "r3f-adapter": ["contracts"],
   "ui-kit": ["contracts"],
   "media-save": ["contracts"],
@@ -62,7 +60,6 @@ const rendererAndBrowserAdapters = [
 const forbiddenExternalDeps = {
   "contracts": ["react", "react-dom", "@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
   "nani-parser": rendererAndBrowserAdapters,
-  "presentation-contracts": rendererAndBrowserAdapters,
   "story-engine": rendererAndBrowserAdapters,
   "gameplay": rendererAndBrowserAdapters,
   "navi-director": rendererAndBrowserAdapters,

@@ -9,8 +9,7 @@
     "lib": ["ES2022", "DOM"]
   },
   "references": [
-    { "path": "../contracts" },
-    { "path": "../presentation-contracts" }
+    { "path": "../contracts" }
   ],
   "include": ["src"]
 }

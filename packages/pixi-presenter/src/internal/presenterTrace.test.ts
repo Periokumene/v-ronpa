@@ -1,23 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { createMemoryPresenter } from "./index";
+import { createPresenterTraceRecorder } from "./presenterTrace";
 
-describe("presentation contracts", () => {
-  it("records presentation commands without renderer state", () => {
-    const presenter = createMemoryPresenter();
+describe("presenter trace recorder", () => {
+  it("records applied commands, persistent visuals, and active performs", () => {
+    const recorder = createPresenterTraceRecorder();
 
-    presenter.apply({ type: "set-background", backgroundId: "bg:court" });
-    presenter.apply({
+    recorder.apply({ type: "set-background", backgroundId: "bg:court" });
+    recorder.apply({
       type: "char-enter",
       characterId: "character:felix",
       portraitId: "portrait:felix:neutral",
       slot: "center",
       effect: "fadeIn"
     });
-    presenter.apply({ type: "shake", target: "character:felix", intensity: 0.3, durationMs: 240 });
+    recorder.apply({ type: "shake", target: "character:felix", intensity: 0.3, durationMs: 240 });
 
-    expect(presenter.snapshot()).toMatchInlineSnapshot(`
+    expect(recorder.getTrace()).toMatchInlineSnapshot(`
       {
-        "activeEffects": [
+        "activePerforms": [
           {
             "blocksUserNext": false,
             "command": {
@@ -59,5 +59,19 @@ describe("presentation contracts", () => {
         ],
       }
     `);
+  });
+
+  it("clears recorded trace data", () => {
+    const recorder = createPresenterTraceRecorder();
+
+    recorder.apply({ type: "set-background", backgroundId: "bg:court" });
+    recorder.apply({ type: "flash", color: "#ffffff", durationMs: 160 });
+    recorder.clear();
+
+    expect(recorder.getTrace()).toEqual({
+      portraits: [],
+      commands: [],
+      activePerforms: []
+    });
   });
 });
