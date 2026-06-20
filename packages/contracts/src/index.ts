@@ -913,6 +913,49 @@ export const PresentationCommandSchema = z.discriminatedUnion("type", [
 ]);
 export type PresentationCommand = z.infer<typeof PresentationCommandSchema>;
 
+export const PixiStageSlotIdSchema = z.enum(["left", "center", "right"]);
+export type PixiStageSlotId = z.infer<typeof PixiStageSlotIdSchema>;
+
+export const PixiStageBackgroundSnapshotSchema = z.object({
+  backgroundId: IdSchema
+});
+export type PixiStageBackgroundSnapshot = z.infer<typeof PixiStageBackgroundSnapshotSchema>;
+
+export const PixiStagePortraitSlotSnapshotSchema = z.object({
+  slot: PixiStageSlotIdSchema,
+  characterId: IdSchema,
+  portraitId: IdSchema.optional()
+});
+export type PixiStagePortraitSlotSnapshot = z.infer<typeof PixiStagePortraitSlotSnapshotSchema>;
+
+export const PixiStageSlotsSnapshotSchema = z
+  .object({
+    left: PixiStagePortraitSlotSnapshotSchema.optional(),
+    center: PixiStagePortraitSlotSnapshotSchema.optional(),
+    right: PixiStagePortraitSlotSnapshotSchema.optional()
+  })
+  .default({})
+  .superRefine((slots, ctx) => {
+    for (const slot of PixiStageSlotIdSchema.options) {
+      if (slots[slot] && slots[slot].slot !== slot) {
+        ctx.addIssue({
+          code: "custom",
+          path: [slot, "slot"],
+          message: `Pixi stage slot key '${slot}' must match the portrait slot value.`
+        });
+      }
+    }
+  });
+export type PixiStageSlotsSnapshot = z.infer<typeof PixiStageSlotsSnapshotSchema>;
+
+export const PixiStageSnapshotSchema = z.object({
+  version: z.literal(1),
+  revision: z.number().int().nonnegative().default(0),
+  background: PixiStageBackgroundSnapshotSchema.optional(),
+  slots: PixiStageSlotsSnapshotSchema
+});
+export type PixiStageSnapshot = z.infer<typeof PixiStageSnapshotSchema>;
+
 export const TrialKeywordSchema = z.object({
   id: IdSchema,
   text: z.string(),
@@ -1108,12 +1151,13 @@ export const TrialRuntimeStateSchema = z.object({
 export type TrialRuntimeState = z.infer<typeof TrialRuntimeStateSchema>;
 
 export const SaveDataSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   savedAt: z.string(),
   mode: GameModeSchema,
   summary: SaveSlotSummarySchema.optional(),
   navi: NaviRuntimeStateSchema.optional(),
   story: StoryRuntimeSnapshotSchema,
+  pixiStage: PixiStageSnapshotSchema,
   inventory: InventoryStateSchema,
   evidence: EvidenceStateSchema,
   characters: z.record(IdSchema, CharacterStateSchema),

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createMemorySavePort, createSaveMigrator, createSaveSlotSummary } from "./index";
 
 const baseSave = {
-  version: 1 as const,
+  version: 2 as const,
   savedAt: "2026-06-14T00:00:00.000Z",
   mode: "navi" as const,
   story: {
@@ -13,6 +13,14 @@ const baseSave = {
     pendingChoices: [],
     ended: false
   },
+  pixiStage: {
+    version: 1 as const,
+    revision: 2,
+    background: { backgroundId: "bg:harness" },
+    slots: {
+      center: { slot: "center" as const, characterId: "character:felix", portraitId: "portrait:felix:neutral" }
+    }
+  },
   inventory: { items: { "gift:coffee": 1 } },
   evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] },
   characters: {}
@@ -21,7 +29,7 @@ const baseSave = {
 describe("media save contracts", () => {
   it("validates saves through the versioned migrator boundary", () => {
     const result = createSaveMigrator().migrate({
-      version: 1,
+      version: 2,
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "trial",
       story: {
@@ -31,6 +39,11 @@ describe("media save contracts", () => {
         backlog: [],
         pendingChoices: [],
         ended: false
+      },
+      pixiStage: {
+        version: 1,
+        revision: 0,
+        slots: {}
       },
       inventory: { items: { "gift:coffee": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] },
@@ -46,7 +59,7 @@ describe("media save contracts", () => {
     expect(result).toMatchObject({
       migrated: false,
       data: {
-        version: 1,
+        version: 2,
         trial: { keywordStates: {} }
       }
     });

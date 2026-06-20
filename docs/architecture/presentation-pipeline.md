@@ -35,13 +35,17 @@ Story scripts emit `StoryEffect` bridge records. A presentation effect wraps a
 typed channel names so directors can consume them without coupling to parser
 internals.
 
-App fanout is handled by `VnRuntimeDispatcher` and `VnOutputRouteTable`.
-Route tables classify `PresentationCommand.type`, `StoryEffect.type`, and
-`wildcardType + routeKey`; they do not route by `.nani` command id.
+App fanout is handled by `createVnRuntimePresentationTransaction` and
+`VnOutputRouteTable`. Route tables classify `PresentationCommand.type`,
+`StoryEffect.type`, and `wildcardType + routeKey`; they do not route by `.nani`
+command id.
 
 `presentationCommands` is the cumulative presentation command log.
 `effects` is the incremental side-effect stream. A `presentation` effect is
 debug/log-only by default so Pixi does not replay a presentation command twice.
+For Pixi, newly emitted presentation commands are reduced into
+`PixiStageSnapshot` plus transient render hints before React rendering. Saves
+store the snapshot, not the command log or presenter trace.
 
 `trial-keyword` is a visual anchor for overlays and subtitles. It may carry
 debug metadata, but it is not the rule source for which evidence breaks which
@@ -54,7 +58,7 @@ First round:
 
 - single-layer placeholder portraits
 - background tint/plates
-- command log rendering
+- snapshot-driven VN stage rendering
 - simple debate keyword overlay
 - screenshot-friendly canvas state
 
@@ -71,7 +75,8 @@ Later:
 Pixi is planned as an overlay presenter for VN and trial effects. R3F remains
 the 3D world presenter. Shared WebGL context integration is a future
 optimization; first baseline can use independent canvas layers as long as
-presenter adapters keep `PresentationCommand` as their public input shape.
+presenter adapters keep `PresentationCommand` as their reducer input shape and
+render from committed runtime snapshots.
 
 ## VN3D Versus Trial
 

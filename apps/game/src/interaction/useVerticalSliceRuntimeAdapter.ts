@@ -4,6 +4,7 @@ import type {
   NaviInteractionSensorReport,
   NaviRuntimeState,
   PlayerPose,
+  PixiStageSnapshot,
   SaveData,
   StoryEffect,
   WorldMapDef
@@ -17,6 +18,7 @@ import {
   focusNaviInteractionFromSensorReport,
   naviReducer
 } from "@v-ronpa/navi-director";
+import { createInitialPixiStageSnapshot, type PixiStageRenderHint } from "@v-ronpa/pixi-presenter";
 import type { FirstPersonInteractRequest } from "@v-ronpa/r3f-adapter";
 import {
   advanceToNextStop,
@@ -24,10 +26,14 @@ import {
   createInitialStoryState,
   type StoryRuntimeState
 } from "@v-ronpa/story-engine";
-import { selectVnNewEffectsForTarget } from "../VnRuntimeDispatcher";
 import { verticalSliceMaps, verticalSliceScript } from "../harness/fixtures/verticalSlice";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../harness/inputActions";
 import { useFirstPersonExplorationBridge } from "../harness/useFirstPersonExplorationBridge";
+import {
+  createVnRuntimePresentationTransaction,
+  type VnRuntimePresentationTransaction
+} from "../vnRuntimeTransaction";
+import type { VnOutputRouteTable, VnRuntimeProfile } from "../vnOutputRoutes";
 
 export type PosePresetId = "spawn" | "notebook" | "keycard" | "door" | "hall-door" | "witness" | "empty";
 
@@ -43,11 +49,31 @@ export interface StoryRuntime {
   active: boolean;
 }
 
+export interface PixiStageRuntime {
+  snapshot: PixiStageSnapshot;
+  hints: PixiStageRenderHint[];
+  hintSequence: number;
+  animate: boolean;
+}
+
 export interface VerticalSliceRuntimeRestorePlan {
   gameplay: GameplayState;
   navi?: NaviRuntimeState;
   playerPose?: PlayerPose;
   storyRuntime: StoryRuntime;
+  pixiStageRuntime: PixiStageRuntime;
+}
+
+export interface VerticalSliceRuntimeAdapterOptions {
+  profile?: VnRuntimeProfile;
+  routeTable?: VnOutputRouteTable;
+}
+
+export interface VerticalSlicePresentationTransactionInput {
+  previousStory: StoryRuntimeState;
+  nextStory: StoryRuntimeState;
+  previousPixiStage: PixiStageSnapshot;
+  options?: VerticalSliceRuntimeAdapterOptions;
 }
 
 export const verticalSlicePosePresets: PosePreset[] = [
@@ -62,11 +88,16 @@ export const verticalSlicePosePresets: PosePreset[] = [
 
 const initialMap = verticalSliceMaps[0] ?? createFallbackMap();
 
-export function useVerticalSliceRuntimeAdapter(flowMode: GameInteractionContext["mode"]) {
+export function useVerticalSliceRuntimeAdapter(
+  flowMode: GameInteractionContext["mode"],
+  options: VerticalSliceRuntimeAdapterOptions = {}
+) {
   const parsed = useMemo(
     () => parseScenario({ sourceText: verticalSliceScript, scriptPath: "harness/vertical-slice.nani" }),
     []
   );
+  const runtimeProfile = options.profile ?? "vn2d";
+  const runtimeRouteTable = options.routeTable;
   const [navi, setNavi] = useState<NaviRuntimeState>(() => ({
     ...createInitialNaviState(initialMap.id),
     playerPose: { position: initialMap.spawn, yaw: 0, pitch: 0 }
@@ -76,6 +107,7 @@ export function useVerticalSliceRuntimeAdapter(flowMode: GameInteractionContext[
     state: createInitialStoryState(parsed.scenario),
     active: false
   }));
+  const [pixiStageRuntime, setPixiStageRuntime] = useState<PixiStageRuntime>(() => createInitialPixiStageRuntime());
   const [lastOutcome, setLastOutcome] = useState("spawn");
   const [lastAction, setLastAction] = useState("boot");
   const [storySession, setStorySession] = useState(0);
@@ -92,6 +124,10 @@ export function useVerticalSliceRuntimeAdapter(flowMode: GameInteractionContext[
     });
     setGameplay(createGameplayState());
     setStoryRuntime({ state: createInitialStoryState(parsed.scenario), active: false });
+    setPixiStageRuntime((current) => ({
+      ...createInitialPixiStageRuntime(),
+      hintSequence: current.hintSequence + 1
+    }));
     setLastOutcome("reset");
     setLastAction("reset");
     firstPersonBridge.issuePoseCommand(spawnPose);
@@ -140,7 +176,7 @@ export function useVerticalSliceRuntimeAdapter(flowMode: GameInteractionContext[
       }
       if (resolution.outcome.type === "start-script") startStoryOverlay();
     },
-    [activeMap, gameplay, navi]
+    [activeMap, gameplay, navi, runtimeProfile, runtimeRouteTable]
   );
 
   const firstPersonBridge = useFirstPersonExplorationBridge({
@@ -156,15 +192,27 @@ export function useVerticalSliceRuntimeAdapter(flowMode: GameInteractionContext[
   function startStoryOverlay() {
     const initial = createInitialStoryState(parsed.scenario);
     const advanced = advanceToNextStop(initial, parsed.scenario);
+    const initialPixiStage = createInitialPixiStageSnapshot();
     setStorySession((session) => session + 1);
-    setStoryRuntime({ state: applyStoryEffects(advanced.state, initial), active: true });
+    commitStoryTransaction({
+      previousStory: initial,
+      nextStory: advanced.state,
+      previousPixiStage: initialPixiStage,
+      active: true,
+      forcePixiCommit: true
+    });
   }
 
   function advanceStory() {
     const current = storyRuntime.state;
     const advanced = advanceToNextStop(current, parsed.scenario);
-    const nextStory = applyStoryEffects(advanced.state, current);
-    setStoryRuntime({ state: nextStory, active: !nextStory.ended });
+    const nextStory = advanced.state;
+    commitStoryTransaction({
+      previousStory: current,
+      nextStory,
+      previousPixiStage: pixiStageRuntime.snapshot,
+      active: !nextStory.ended
+    });
     if (nextStory.ended) {
       closeStoryOverlay("story:end");
     } else {
@@ -177,8 +225,13 @@ export function useVerticalSliceRuntimeAdapter(flowMode: GameInteractionContext[
     const current = storyRuntime.state;
     const chosen = chooseStoryOption(current, parsed.scenario, index);
     const advanced = advanceToNextStop(chosen.state, parsed.scenario);
-    const nextStory = applyStoryEffects(advanced.state, current);
-    setStoryRuntime({ state: nextStory, active: true });
+    const nextStory = advanced.state;
+    commitStoryTransaction({
+      previousStory: current,
+      nextStory,
+      previousPixiStage: pixiStageRuntime.snapshot,
+      active: true
+    });
     setLastAction(`choice:${index}`);
     setLastOutcome(nextStory.variables.route ? `route:${String(nextStory.variables.route)}` : "choice");
   }
@@ -190,23 +243,59 @@ export function useVerticalSliceRuntimeAdapter(flowMode: GameInteractionContext[
     setLastOutcome("overlay-closed");
   }
 
-  function restoreFromSave(save: Pick<SaveData, "navi" | "story" | "inventory" | "evidence" | "characters">) {
+  function restoreFromSave(save: Pick<SaveData, "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters">) {
     const plan = createVerticalSliceRuntimeRestorePlan(save, parsed.scenario);
     if (plan.navi) setNavi(plan.navi);
     if (plan.playerPose) firstPersonBridge.issuePoseCommand(plan.playerPose);
     setGameplay(plan.gameplay);
     setStoryRuntime(plan.storyRuntime);
+    setPixiStageRuntime((current) => ({
+      ...plan.pixiStageRuntime,
+      hintSequence: current.hintSequence + 1
+    }));
     setStorySession((session) => session + 1);
     setLastAction("load:slot");
     setLastOutcome("loaded");
   }
 
-  function applyStoryEffects(nextStory: StoryRuntimeState, previousStory: StoryRuntimeState) {
-    const gameplayEffects = selectVnNewEffectsForTarget(nextStory, previousStory, "gameplay");
-    if (gameplayEffects.length > 0) {
-      setGameplay((currentGameplay) => applyGameplayEffects(currentGameplay, gameplayEffects));
+  function commitStoryTransaction({
+    previousStory,
+    nextStory,
+    previousPixiStage,
+    active,
+    forcePixiCommit = false
+  }: {
+    previousStory: StoryRuntimeState;
+    nextStory: StoryRuntimeState;
+    previousPixiStage: PixiStageSnapshot;
+    active: boolean;
+    forcePixiCommit?: boolean;
+  }) {
+    const transaction = createVerticalSlicePresentationTransaction({
+      previousStory,
+      nextStory,
+      previousPixiStage,
+      options: {
+        profile: runtimeProfile,
+        ...(runtimeRouteTable ? { routeTable: runtimeRouteTable } : {})
+      }
+    });
+    if (transaction.gameplayEffects.length > 0) {
+      setGameplay((currentGameplay) => applyGameplayEffects(currentGameplay, transaction.gameplayEffects));
     }
-    return nextStory;
+    if (
+      forcePixiCommit ||
+      transaction.pixiStage !== previousPixiStage ||
+      transaction.pixiHints.length > 0
+    ) {
+      setPixiStageRuntime((current) => ({
+        snapshot: transaction.pixiStage,
+        hints: transaction.pixiHints,
+        hintSequence: current.hintSequence + 1,
+        animate: true
+      }));
+    }
+    setStoryRuntime({ state: nextStory, active });
   }
 
   const interactionContext: GameInteractionContext = useMemo(
@@ -235,6 +324,7 @@ export function useVerticalSliceRuntimeAdapter(flowMode: GameInteractionContext[
     moveToPreset,
     navi,
     parsed,
+    pixiStageRuntime,
     resetSlice,
     restoreFromSave,
     storyRuntime,
@@ -264,7 +354,7 @@ export function createVerticalSliceInteractionContext({
 }
 
 export function createVerticalSliceRuntimeRestorePlan(
-  save: Pick<SaveData, "navi" | "story" | "inventory" | "evidence" | "characters">,
+  save: Pick<SaveData, "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters">,
   scenario: ScenarioIR
 ): VerticalSliceRuntimeRestorePlan {
   const storyRuntime = {
@@ -280,8 +370,38 @@ export function createVerticalSliceRuntimeRestorePlan(
     gameplay: { inventory: save.inventory, evidence: save.evidence, characters: save.characters },
     ...(save.navi ? { navi: save.navi } : {}),
     ...(save.navi?.playerPose ? { playerPose: save.navi.playerPose } : {}),
-    storyRuntime
+    storyRuntime,
+    pixiStageRuntime: {
+      snapshot: save.pixiStage,
+      hints: [],
+      hintSequence: 0,
+      animate: false
+    }
   };
+}
+
+export function createInitialPixiStageRuntime(): PixiStageRuntime {
+  return {
+    snapshot: createInitialPixiStageSnapshot(),
+    hints: [],
+    hintSequence: 0,
+    animate: false
+  };
+}
+
+export function createVerticalSlicePresentationTransaction({
+  previousStory,
+  nextStory,
+  previousPixiStage,
+  options = {}
+}: VerticalSlicePresentationTransactionInput): VnRuntimePresentationTransaction {
+  return createVnRuntimePresentationTransaction({
+    previousStory,
+    nextStory,
+    previousPixiStage,
+    profile: options.profile ?? "vn2d",
+    ...(options.routeTable ? { routeTable: options.routeTable } : {})
+  });
 }
 
 function applyGameplayEffects(gameplay: GameplayState, effects: StoryEffect[]): GameplayState {

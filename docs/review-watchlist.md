@@ -196,3 +196,50 @@ delete, split, or execute entries from it.
 - Next Review: TBD
 - Status: Watching
 - Linked Task / ADR / CCR: TBD
+
+### RW-0009: Pixi Presenter Differential Reconcile
+
+- ID: RW-0009
+- Title: Decide when Pixi snapshot rendering should move from full redraw to
+  differential reconcile
+- Area: pixi-presenter, PixiStageSnapshot, VN runtime presentation
+- Source / Evidence:
+  - `packages/pixi-presenter/src/index.ts`
+  - `packages/pixi-presenter/src/stageSnapshot.ts`
+  - `apps/game/src/vnRuntimeTransaction.ts`
+  - `docs/architecture/presentation-pipeline.md`
+  - `docs/architecture/vn-runtime-dispatcher.md`
+- Current Observation: Pixi now receives `PixiStageSnapshot` plus transient
+  render hints through `reconcile(snapshot, options)`. This protects the public
+  app/runtime/save boundary from command-log replay, but the presenter v1 still
+  performs coarse full redraw inside the renderer adapter. That is acceptable for
+  the current background plus three-slot VN stage, but it can become fragile as
+  portraits, filters, particles, Live2D, or trial overlays become richer.
+- Why Not Actionable Yet: Current scope only needs stable save/load restoration
+  of VN background and portrait slots. A full differential renderer needs a
+  deliberate design pass for stage diffing, renderer instance cache, async asset
+  swap behavior, hint-lane isolation, hydrate/no-animation rules, and regression
+  coverage. Implementing it opportunistically would add complexity before the
+  next richer Pixi presentation requirements are known.
+- Future Review Questions:
+  - Should `pixi-presenter` add a first-class `diffPixiStage(previous, next)`
+    helper with background, slot add/remove/update, unchanged-slot, and
+    hints-only cases?
+  - Should each portrait slot retain a renderer instance cache keyed by
+    `slot + characterId + portraitId`?
+  - Should new portrait assets load offscreen and atomically swap only after the
+    replacement is ready, preserving the old slot during async loading?
+  - Should snapshot lane and hint lane be tested as separate paths so
+    flash/shake/subtitle hints never rebuild persistent background or portrait
+    layers?
+  - Should load/hydrate have presenter-level assertions that `animate: false`
+    never triggers fadeIn, flash, shake, or trial overlay hints?
+  - What tests should prove repeated identical snapshots produce no renderer
+    mutation, background-only changes do not rebuild portraits, and single-slot
+    changes do not affect other slots?
+- Auto Action: Forbidden
+- Review Cadence: Review before adding richer Pixi VN staging, Live2D/spine
+  portrait handling, persistent trial overlays, or Pixi performance work.
+- Next Review: TBD
+- Status: Watching
+- Linked Task / ADR / CCR: TBD

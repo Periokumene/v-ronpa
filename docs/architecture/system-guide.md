@@ -108,8 +108,9 @@ submission remains a Trial UI action routed through `trial-director`.
   -> StoryEngine NaniCommandHandlerRegistry
   -> typed event reducer
   -> StoryEffect / presentation commands / gameplay events
-  -> VnRuntimeDispatcher route table
-  -> Pixi, R3F, DOM, gameplay, media, Navi, Trial consumers
+  -> VN runtime transaction + route table
+  -> Story UI state / PixiStageSnapshot / gameplay, media, Navi, Trial effects
+  -> VnRuntimeDispatcher renders DOM dialog and Pixi snapshot
 ```
 
 See also:

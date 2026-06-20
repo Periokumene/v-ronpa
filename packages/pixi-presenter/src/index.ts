@@ -1,13 +1,21 @@
 import { Application, Assets, Container, Graphics, Sprite, Text, type Texture, type Ticker } from "pixi.js";
-import type { PresentationCommand } from "@v-ronpa/contracts";
+import type { PixiStagePortraitSlotSnapshot, PixiStageSnapshot } from "@v-ronpa/contracts";
 import { VisualEffectScheduler } from "./internal/effects";
-import { createPresenterTraceRecorder } from "./internal/presenterTrace";
 import {
   calculatePortraitLayout,
   formatFallbackPortraitLabel,
   resolveHarnessPortraitUrl,
   type PortraitSlot
 } from "./internal/portraits";
+import { pixiStageSlots, type PixiStageRenderHint } from "./stageSnapshot";
+
+export {
+  createInitialPixiStageSnapshot,
+  pixiStageSlots,
+  reducePixiStageCommand,
+  type PixiStageCommandReduction,
+  type PixiStageRenderHint
+} from "./stageSnapshot";
 
 export interface PixiPresenterOptions {
   host: HTMLElement;
@@ -15,15 +23,26 @@ export interface PixiPresenterOptions {
   height?: number;
 }
 
+export interface PixiStageReconcileOptions {
+  animate?: boolean;
+  hints?: PixiStageRenderHint[];
+}
+
 export interface PixiPresenterPort {
   mount(): Promise<void>;
-  apply(command: PresentationCommand): void;
+  reconcile(snapshot: PixiStageSnapshot, options?: PixiStageReconcileOptions): void;
   clear(): void;
   destroy(): void;
 }
 
+interface PortraitRenderSpec {
+  characterId: string;
+  portraitId?: string;
+  slot: PortraitSlot;
+  effect: string;
+}
+
 export function createPixiPresenter(options: PixiPresenterOptions): PixiPresenterPort {
-  const traceRecorder = createPresenterTraceRecorder();
   const app = new Application();
   const backgroundLayer = new Container({ label: "background" });
   const portraitLayer = new Container({ label: "portraits" });
@@ -36,11 +55,17 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     center: 0,
     right: 0
   };
-  const pendingVisualCommands: PresentationCommand[] = [];
+  let pendingReconcile:
+    | {
+        snapshot: PixiStageSnapshot;
+        options: PixiStageReconcileOptions;
+      }
+    | undefined;
   let mountStarted = false;
   let initialized = false;
   let mounted = false;
   let destroyed = false;
+  let lastRenderedSnapshot: PixiStageSnapshot | undefined;
   const tickEffects = (ticker: Ticker) => scheduler.tick(ticker.deltaMS);
 
   async function mount() {
@@ -66,51 +91,70 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     options.host.appendChild(app.canvas);
     app.stage.addChild(backgroundLayer, portraitLayer, effectsLayer, trialLayer);
     app.ticker.add(tickEffects);
-    drawPlate("bg:harness", 0x223044);
     mounted = true;
-    for (const command of pendingVisualCommands.splice(0)) {
-      executeVisual(command);
+    if (pendingReconcile) {
+      const pending = pendingReconcile;
+      pendingReconcile = undefined;
+      renderSnapshot(pending.snapshot, pending.options);
     }
   }
 
-  function apply(command: PresentationCommand) {
-    traceRecorder.apply(command);
+  function reconcile(snapshot: PixiStageSnapshot, reconcileOptions: PixiStageReconcileOptions = {}) {
     if (!mounted) {
-      pendingVisualCommands.push(command);
+      pendingReconcile = { snapshot, options: reconcileOptions };
       return;
     }
 
-    executeVisual(command);
+    renderSnapshot(snapshot, reconcileOptions);
   }
 
-  function executeVisual(command: PresentationCommand) {
-    if (command.type === "set-background") {
-      drawPlate(command.backgroundId, 0x26324c);
+  function renderSnapshot(snapshot: PixiStageSnapshot, reconcileOptions: PixiStageReconcileOptions) {
+    const animate = reconcileOptions.animate ?? false;
+    scheduler.clear();
+    effectsLayer.removeChildren();
+    trialLayer.removeChildren();
+
+    if (snapshot.background) {
+      drawPlate(snapshot.background.backgroundId, 0x26324c);
+    } else {
+      backgroundLayer.removeChildren();
+    }
+
+    for (const slot of pixiStageSlots) {
+      const portrait = snapshot.slots[slot];
+      if (portrait) {
+        const previousPortrait = lastRenderedSnapshot?.slots[slot];
+        void drawPortrait(createPortraitRenderSpec(portrait, animate && !samePortrait(previousPortrait, portrait)));
+      } else {
+        clearPortraitSlot(slot);
+      }
+    }
+    lastRenderedSnapshot = snapshot;
+
+    if (!animate) return;
+    for (const hint of reconcileOptions.hints ?? []) {
+      executeRenderHint(hint);
+    }
+  }
+
+  function executeRenderHint(hint: PixiStageRenderHint) {
+    if (hint.type === "trial-keyword") {
+      drawTrialKeyword(hint.text);
       return;
     }
 
-    if (command.type === "char-enter") {
-      void drawPortrait(command);
+    if (hint.type === "trial-subtitle") {
+      drawTrialSubtitle(hint.text, hint.style);
       return;
     }
 
-    if (command.type === "trial-keyword") {
-      drawTrialKeyword(command.text);
+    if (hint.type === "flash") {
+      runFlash(hint.color, hint.durationMs);
       return;
     }
 
-    if (command.type === "trial-subtitle") {
-      drawTrialSubtitle(command.text, command.style);
-      return;
-    }
-
-    if (command.type === "flash") {
-      runFlash(command.color, command.durationMs);
-      return;
-    }
-
-    if (command.type === "shake") {
-      runShake(command.intensity, command.durationMs);
+    if (hint.type === "shake") {
+      runShake(hint.intensity, hint.durationMs);
     }
   }
 
@@ -137,8 +181,29 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     backgroundLayer.addChild(plate, title);
   }
 
-  async function drawPortrait(command: Extract<PresentationCommand, { type: "char-enter" }>) {
-    const { characterId, portraitId, slot, effect } = command;
+  function createPortraitRenderSpec(portrait: PixiStagePortraitSlotSnapshot, animate: boolean): PortraitRenderSpec {
+    const spec: PortraitRenderSpec = {
+      characterId: portrait.characterId,
+      slot: portrait.slot,
+      effect: animate ? "fadeIn" : "none"
+    };
+    if (portrait.portraitId) spec.portraitId = portrait.portraitId;
+    return spec;
+  }
+
+  function samePortrait(
+    previous: PixiStagePortraitSlotSnapshot | undefined,
+    next: PixiStagePortraitSlotSnapshot
+  ): boolean {
+    return (
+      previous?.slot === next.slot &&
+      previous.characterId === next.characterId &&
+      previous.portraitId === next.portraitId
+    );
+  }
+
+  async function drawPortrait(spec: PortraitRenderSpec) {
+    const { characterId, portraitId, slot, effect } = spec;
     const requestId = ++portraitRequestIds[slot];
     const slotLayer = ensureSlotLayer(slot);
     positionSlotLayer(slotLayer, slot);
@@ -162,6 +227,16 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
       drawFallbackPortrait(slotLayer, characterId, portraitId, slot, effect);
       console.warn(`[pixi-presenter] Missing portrait asset at ${portraitUrl}; using fallback.`);
     }
+  }
+
+  function clearPortraitSlot(slot: PortraitSlot) {
+    portraitRequestIds[slot] += 1;
+    const slotLayer = slotLayers.get(slot);
+    if (!slotLayer) return;
+    slotLayer.removeChildren();
+    portraitLayer.removeChild(slotLayer);
+    slotLayer.destroy({ children: true });
+    slotLayers.delete(slot);
   }
 
   function ensureSlotLayer(slot: PortraitSlot) {
@@ -347,10 +422,9 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
 
   return {
     mount,
-    apply,
+    reconcile,
     clear() {
-      traceRecorder.clear();
-      pendingVisualCommands.length = 0;
+      pendingReconcile = undefined;
       portraitRequestIds.left = 0;
       portraitRequestIds.center = 0;
       portraitRequestIds.right = 0;
@@ -360,6 +434,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
       effectsLayer.removeChildren();
       trialLayer.removeChildren();
       slotLayers.clear();
+      lastRenderedSnapshot = undefined;
     },
     destroy() {
       destroyed = true;

@@ -103,3 +103,10 @@ export function selectEffectsForTarget(
 export function selectNewStoryEffects(previousEffectsLength: number, effects: StoryEffect[]): StoryEffect[] {
   return effects.slice(Math.max(0, previousEffectsLength));
 }
+
+export function selectNewPresentationCommands(
+  previousCommandsLength: number,
+  commands: PresentationCommand[]
+): PresentationCommand[] {
+  return commands.slice(Math.max(0, previousCommandsLength));
+}

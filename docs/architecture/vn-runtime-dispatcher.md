@@ -1,7 +1,12 @@
-# VN Runtime Dispatcher
+# VN Runtime Transaction And Dispatcher
 
-`VnRuntimeDispatcher` is the app-layer bridge between StoryEngine output and
-runtime consumers. It routes StoryEngine output objects, not `.nani` command ids.
+VN runtime output is split in two app-layer steps:
+
+- `createVnRuntimePresentationTransaction` projects each StoryEngine delta into
+  runtime consumers such as Pixi stage snapshots, render hints, and gameplay
+  effects.
+- `VnRuntimeDispatcher` renders the already-materialized Story UI state and
+  Pixi stage state. It does not filter or replay Story command logs for Pixi.
 
 ## Ownership
 
@@ -9,7 +14,10 @@ runtime consumers. It routes StoryEngine output objects, not `.nani` command ids
   and incremental `effects`.
 - `presentationCommands` is the cumulative presentation command log.
 - `effects` is the incremental side-effect stream.
-- `VnRuntimeDispatcher` owns app-level fanout from those two output sources.
+- `createVnRuntimePresentationTransaction` owns app-level fanout from those two
+  output sources.
+- `VnRuntimeDispatcher` owns React rendering of the DOM dialog and Pixi layer
+  from committed runtime state.
 - `GameInteractionShell` owns VN toolbar actions and shell overlays such as
   backlog, settings, save, load, title, and pause menu.
 - DOM UI owns dialogue text, choices, menus, settings, save/load screens, and
@@ -43,20 +51,23 @@ the current baseline intentionally uses the same fixed table for both.
 - `wildcard-event` routes through the wildcard table.
 - `presentation` effects route to `debug` only.
 
-`presentation` effects must not be re-executed by Pixi. Pixi consumes commands
-from the `presentationCommands` log, while `effects` remains the incremental
-stream for side effects.
+`presentation` effects must not be re-executed by Pixi. The runtime transaction
+is the only place that interprets newly emitted Pixi-routed presentation
+commands; it reduces them into `PixiStageSnapshot` plus transient render hints.
+React rendering and save/load use the snapshot, not the command log.
 
 ## Vertical Slice Migration
 
 The vertical-slice harness now uses:
 
-- `VnRuntimeDispatcher` for Pixi + VN dialog rendering.
-- `selectVnNewEffectsForTarget(..., "gameplay")` for gameplay side effects.
+- `createVnRuntimePresentationTransaction` for Story delta fanout.
+- `VnRuntimeDispatcher` for Pixi snapshot + VN dialog rendering.
+- `PixiStageSnapshot` as the saveable terminal state for VN 2D staging.
 - `InspectorLite` still reads `presentationCommands` as the presentation log.
 
 Scenario code should not manually filter `presentationCommands` by renderer
-after this baseline. Add or update `VnOutputRouteTable` routes instead.
+after this baseline. Add or update `VnOutputRouteTable` routes and pass the
+desired `profile` / `routeTable` into the runtime adapter instead.
 
 VN toolbar actions are intentionally outside `VnRuntimeDispatcher`. BACK, LOG,
 SKIP, AUTO, SAVE, LOAD, and SETTING are shell UI actions derived from

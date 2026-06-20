@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { NaviRuntimeState, SaveData, SaveSlotSummary } from "@v-ronpa/contracts";
+import type { NaviRuntimeState, PixiStageSnapshot, SaveData, SaveSlotSummary } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
 import { createDexieSavePort, createSaveSlotSummary, type SavePort } from "@v-ronpa/media-save";
 import { storyRuntimeSnapshot, type StoryRuntimeState } from "@v-ronpa/story-engine";
@@ -7,7 +7,7 @@ import type { useVerticalSliceRuntimeAdapter } from "./useVerticalSliceRuntimeAd
 
 type VerticalSliceRuntimeAdapter = ReturnType<typeof useVerticalSliceRuntimeAdapter>;
 
-const VERTICAL_SLICE_DB = "v-ronpa-vertical-slice";
+const VERTICAL_SLICE_DB = "v-ronpa-vertical-slice-v2";
 export const verticalSliceSaveSlotIds = ["slot:vertical:1", "slot:vertical:2", "slot:vertical:3", "slot:vertical:4"];
 
 export interface VerticalSliceSaveDataInput {
@@ -15,16 +15,25 @@ export interface VerticalSliceSaveDataInput {
   savedAt: string;
   navi: NaviRuntimeState;
   story: StoryRuntimeState;
+  pixiStage: PixiStageSnapshot;
   gameplay: GameplayState;
 }
 
-export function createVerticalSliceSaveData({ gameplay, navi, savedAt, slotId, story }: VerticalSliceSaveDataInput): SaveData {
+export function createVerticalSliceSaveData({
+  gameplay,
+  navi,
+  pixiStage,
+  savedAt,
+  slotId,
+  story
+}: VerticalSliceSaveDataInput): SaveData {
   const base: SaveData = {
-    version: 1,
+    version: 2,
     savedAt,
     mode: "navi",
     navi,
     story: storyRuntimeSnapshot(story),
+    pixiStage,
     inventory: gameplay.inventory,
     evidence: gameplay.evidence,
     characters: gameplay.characters
@@ -54,10 +63,18 @@ export function useVerticalSliceSaveAdapter(runtime: VerticalSliceRuntimeAdapter
         savedAt: new Date().toISOString(),
         navi: runtime.navi,
         story: runtime.storyRuntime.state,
+        pixiStage: runtime.pixiStageRuntime.snapshot,
         gameplay: runtime.gameplay
       });
     },
-    [runtime.gameplay.characters, runtime.gameplay.evidence, runtime.gameplay.inventory, runtime.navi, runtime.storyRuntime.state]
+    [
+      runtime.gameplay.characters,
+      runtime.gameplay.evidence,
+      runtime.gameplay.inventory,
+      runtime.navi,
+      runtime.pixiStageRuntime.snapshot,
+      runtime.storyRuntime.state
+    ]
   );
 
   const saveSlot = useCallback(

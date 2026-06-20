@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createGameplayState } from "@v-ronpa/gameplay";
 import { parseScenario } from "@v-ronpa/nani-parser";
+import { createInitialPixiStageSnapshot, reducePixiStageCommand } from "@v-ronpa/pixi-presenter";
 import { createInitialStoryState } from "@v-ronpa/story-engine";
 import { createVerticalSliceSaveData, verticalSliceSaveSlotIds } from "./useVerticalSliceSaveAdapter";
 
@@ -17,23 +18,33 @@ describe("vertical slice save adapter", () => {
       inventory: { items: { "gift:coffee": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] }
     };
+    const pixiStage = reducePixiStageCommand(createInitialPixiStageSnapshot(), {
+      type: "set-background",
+      backgroundId: "bg:harness"
+    }).snapshot;
 
     const save = createVerticalSliceSaveData({
       slotId: "slot:vertical:1",
       savedAt: "2026-06-20T00:00:00.000Z",
       navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
       story,
+      pixiStage,
       gameplay
     });
 
     expect(save).toMatchObject({
-      version: 1,
+      version: 2,
       mode: "navi",
       summary: {
         id: "slot:vertical:1",
         label: "Slot 1",
         speaker: "Felix",
         text: "Save me."
+      },
+      pixiStage: {
+        version: 1,
+        revision: 1,
+        background: { backgroundId: "bg:harness" }
       },
       inventory: { items: { "gift:coffee": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"] }

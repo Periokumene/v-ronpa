@@ -1,11 +1,22 @@
 import { useEffect, useRef } from "react";
-import type { PresentationCommand } from "@v-ronpa/contracts";
-import { createPixiPresenter, type PixiPresenterPort } from "@v-ronpa/pixi-presenter";
+import type { PixiStageSnapshot } from "@v-ronpa/contracts";
+import { createPixiPresenter, type PixiPresenterPort, type PixiStageRenderHint } from "@v-ronpa/pixi-presenter";
 
-export function PixiLayer({ commands, visible }: { commands: PresentationCommand[]; visible: boolean }) {
+export function PixiLayer({
+  animate,
+  hints,
+  hintSequence,
+  snapshot,
+  visible
+}: {
+  animate: boolean;
+  hints: PixiStageRenderHint[];
+  hintSequence: number;
+  snapshot: PixiStageSnapshot;
+  visible: boolean;
+}) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const presenterRef = useRef<PixiPresenterPort | null>(null);
-  const appliedCountRef = useRef(0);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -16,25 +27,33 @@ export function PixiLayer({ commands, visible }: { commands: PresentationCommand
     return () => {
       presenter.destroy();
       presenterRef.current = null;
-      appliedCountRef.current = 0;
     };
   }, []);
 
   useEffect(() => {
     const presenter = presenterRef.current;
     if (!presenter) return;
-    for (const command of commands.slice(appliedCountRef.current)) {
-      void presenter.apply(command);
-    }
-    appliedCountRef.current = commands.length;
-  }, [commands]);
+    presenter.reconcile(snapshot, { animate, hints });
+  }, [animate, hintSequence, hints, snapshot]);
 
   return (
     <div
       ref={hostRef}
       data-testid="pixi-layer"
+      data-pixi-background={snapshot.background?.backgroundId ?? "none"}
+      data-pixi-revision={String(snapshot.revision)}
+      data-pixi-slots={formatPixiStageSlots(snapshot)}
       className={visible ? "pixi-layer" : "pixi-layer pixi-layer-hidden"}
       aria-hidden={!visible}
     />
   );
+}
+
+function formatPixiStageSlots(snapshot: PixiStageSnapshot): string {
+  const entries = (["left", "center", "right"] as const).flatMap((slot) => {
+    const portrait = snapshot.slots[slot];
+    if (!portrait) return [];
+    return [`${slot}:${portrait.characterId}${portrait.portraitId ? `/${portrait.portraitId}` : ""}`];
+  });
+  return entries.length > 0 ? entries.join(", ") : "empty";
 }

@@ -1,4 +1,5 @@
 import { useState, type ButtonHTMLAttributes } from "react";
+import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
 import { ExplorationStage3D } from "@v-ronpa/r3f-adapter";
 import { InspectorLite } from "@v-ronpa/ui-kit";
@@ -26,6 +27,10 @@ export function VerticalSliceScenario() {
             <ExplorationStage3D {...runtime.firstPersonBridge.explorationStageProps} />
             <VnRuntimeDispatcher
               active={runtime.storyRuntime.active}
+              pixiAnimate={runtime.pixiStageRuntime.animate}
+              pixiHintSequence={runtime.pixiStageRuntime.hintSequence}
+              pixiHints={runtime.pixiStageRuntime.hints}
+              pixiStage={runtime.pixiStageRuntime.snapshot}
               story={runtime.storyRuntime.state}
               storySession={runtime.storySession}
               formatSpeaker={displayStorySpeaker}
@@ -81,6 +86,9 @@ export function VerticalSliceScenario() {
                 lastAction={runtime.lastAction}
                 lastOutcome={runtime.lastOutcome}
                 mapId={runtime.navi.activeMapId ?? "none"}
+                pixiBackground={runtime.pixiStageRuntime.snapshot.background?.backgroundId ?? "none"}
+                pixiRevision={String(runtime.pixiStageRuntime.snapshot.revision)}
+                pixiSlots={formatPixiStageSlots(runtime.pixiStageRuntime.snapshot)}
                 pointerLockStatus={runtime.firstPersonBridge.pointerLockStatus}
                 route={String(runtime.storyRuntime.state.variables.route ?? "none")}
                 substate={runtime.navi.substate}
@@ -211,6 +219,15 @@ function formatEvidence(gameplay: GameplayState): string {
   return gameplay.evidence.ownedEvidenceIds.length > 0 ? gameplay.evidence.ownedEvidenceIds.join(", ") : "empty";
 }
 
+function formatPixiStageSlots(stage: Pick<PixiStageSnapshot, "slots">): string {
+  const entries = (["left", "center", "right"] as const).flatMap((slot) => {
+    const portrait = stage.slots[slot];
+    if (!portrait) return [];
+    return [`${slot}:${portrait.characterId}${portrait.portraitId ? `/${portrait.portraitId}` : ""}`];
+  });
+  return entries.length > 0 ? entries.join(", ") : "empty";
+}
+
 function displayStorySpeaker(speaker: string): string {
   const labels: Record<string, string> = {
     Felix: "菲利克斯",
@@ -231,6 +248,9 @@ function VerticalSliceReadout({
   lastAction,
   lastOutcome,
   mapId,
+  pixiBackground,
+  pixiRevision,
+  pixiSlots,
   pointerLockStatus,
   route,
   substate
@@ -244,6 +264,9 @@ function VerticalSliceReadout({
   lastAction: string;
   lastOutcome: string;
   mapId: string;
+  pixiBackground: string;
+  pixiRevision: string;
+  pixiSlots: string;
   pointerLockStatus: string;
   route: string;
   substate: string;
@@ -265,6 +288,9 @@ function VerticalSliceReadout({
         <Readout label="Inventory" testId="vertical-slice-inventory" value={inventory} />
         <Readout label="Evidence" testId="vertical-slice-evidence" value={evidence} />
         <Readout label="Route" testId="vertical-slice-route" value={route} />
+        <Readout label="Pixi BG" testId="vertical-slice-pixi-background" value={pixiBackground} />
+        <Readout label="Pixi Rev" testId="vertical-slice-pixi-revision" value={pixiRevision} />
+        <Readout label="Pixi Slots" testId="vertical-slice-pixi-slots" value={pixiSlots} wide />
         <Readout label="Outcome" testId="vertical-slice-last-outcome" value={lastOutcome} wide />
         <Readout label="Action" testId="vertical-slice-last-action" value={lastAction} wide />
       </div>

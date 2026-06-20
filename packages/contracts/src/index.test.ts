@@ -16,6 +16,7 @@ import {
   NaviInteractionSensorReportSchema,
   NaviInteractionViewSchema,
   NaviRuntimeStateSchema,
+  PixiStageSnapshotSchema,
   PresentationCommandSchema,
   RuntimeAssetSchema,
   SaveDataSchema,
@@ -202,6 +203,42 @@ describe("contracts", () => {
         "type": "camera-focus",
       }
     `);
+  });
+
+  it("validates Pixi stage snapshots without command history or renderer runtime", () => {
+    const snapshot = PixiStageSnapshotSchema.parse({
+      version: 1,
+      revision: 3,
+      background: { backgroundId: "bg:harness" },
+      slots: {
+        center: {
+          slot: "center",
+          characterId: "character:felix",
+          portraitId: "portrait:felix:neutral"
+        }
+      }
+    });
+
+    expect(snapshot).toEqual({
+      version: 1,
+      revision: 3,
+      background: { backgroundId: "bg:harness" },
+      slots: {
+        center: {
+          slot: "center",
+          characterId: "character:felix",
+          portraitId: "portrait:felix:neutral"
+        }
+      }
+    });
+    expect(snapshot).not.toHaveProperty("commands");
+    expect(snapshot).not.toHaveProperty("displayObjects");
+    expect(() =>
+      PixiStageSnapshotSchema.parse({
+        version: 1,
+        slots: { left: { slot: "right", characterId: "character:mira" } }
+      })
+    ).toThrow();
   });
 
   it("validates navi and trial runtime states", () => {
@@ -518,7 +555,7 @@ describe("contracts", () => {
 
   it("validates versioned save data", () => {
     const save = SaveDataSchema.parse({
-      version: 1,
+      version: 2,
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "navi",
       summary: {
@@ -538,11 +575,41 @@ describe("contracts", () => {
         pendingChoices: [],
         ended: false
       },
+      pixiStage: {
+        version: 1,
+        revision: 2,
+        background: { backgroundId: "bg:harness" },
+        slots: {
+          center: { slot: "center", characterId: "character:felix", portraitId: "portrait:felix:neutral" }
+        }
+      },
       inventory: { items: { "gift:coffee": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"] },
       characters: {}
     });
 
-    expect(save.version).toBe(1);
+    expect(save.version).toBe(2);
+    expect(save.pixiStage.background?.backgroundId).toBe("bg:harness");
+  });
+
+  it("rejects v2 save data without a Pixi stage snapshot", () => {
+    expect(() =>
+      SaveDataSchema.parse({
+        version: 2,
+        savedAt: "2026-06-14T00:00:00.000Z",
+        mode: "navi",
+        story: {
+          currentScriptPath: "opening.nani",
+          instructionPointer: 2,
+          variables: {},
+          backlog: [],
+          pendingChoices: [],
+          ended: false
+        },
+        inventory: { items: {} },
+        evidence: { ownedEvidenceIds: [] },
+        characters: {}
+      })
+    ).toThrow();
   });
 });
