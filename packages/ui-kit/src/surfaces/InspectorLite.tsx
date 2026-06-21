@@ -12,6 +12,8 @@ export function InspectorLite({
   evidenceIds,
   trialSegmentId,
   runtimeCommandCount,
+  diagnosticCount = 0,
+  latestDiagnostic,
   onGrantItem,
   onGrantEvidence,
   onJumpLabel,
@@ -52,7 +54,15 @@ export function InspectorLite({
           <dt>Commands</dt>
           <dd>{runtimeCommandCount}</dd>
         </div>
+        <div>
+          <dt>Diagnostics</dt>
+          <dd data-testid="inspector-diagnostics-count">{diagnosticCount}</dd>
+        </div>
       </dl>
+      <section data-testid="inspector-diagnostics">
+        <h2>Diagnostics</h2>
+        <pre>{latestDiagnostic ?? "none"}</pre>
+      </section>
       <section>
         <h2>Variables</h2>
         <pre>{JSON.stringify(variables, null, 2)}</pre>

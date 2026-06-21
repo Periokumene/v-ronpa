@@ -80,7 +80,7 @@ vertical-slice harness remains active.
 
 | Entry | Owning worktree | Modules allowed to change |
 |---|---|---|
-| `/?scenario=vertical-slice` | `docs/tasks/vertical-slice-integration.md`, `docs/tasks/game-interaction-shell.md` | integration harness, title-first flow, interaction shell overlays, save/load smoke evidence |
+| `/?scenario=vertical-slice` | accepted integration baseline; see `docs/archive/completed-tasks/vertical-slice-integration.md` and `docs/archive/completed-tasks/game-interaction-shell.md` | integration harness, title-first flow, interaction shell overlays, save/load smoke evidence |
 
 Completed temporary subsystem entries are archived under
 `docs/archive/completed-tasks/`. Future slices should add new scenario entries
@@ -99,6 +99,7 @@ The harness inspector exposes:
 - inventory/evidence
 - trial segment
 - latest emitted RuntimeCommand count
+- RuntimeCommand/parser/compiler/story/transaction diagnostics
 - jump/grant/force outcome controls
 
 Inspector Lite is a developer harness, not production UI.

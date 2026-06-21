@@ -11,8 +11,8 @@ import type {
   WorldMapDef
 } from "@v-ronpa/contracts";
 import { applyGameplayEvent, createGameplayState, type ExplorationOutcome, type GameplayState } from "@v-ronpa/gameplay";
-import { parseScenario } from "@v-ronpa/nani-parser";
-import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
+import { parseScenario, type Diagnostic as ParserDiagnostic } from "@v-ronpa/nani-parser";
+import { compileRuntimeScript, type RuntimeCompilerDiagnostic } from "@v-ronpa/nani-runtime-compiler";
 import {
   confirmFocusedNaviInteraction,
   createInitialNaviState,
@@ -26,6 +26,7 @@ import {
   advanceToNextStop,
   chooseStoryOption,
   createInitialStoryState,
+  type StoryStepperDiagnostic,
   type StoryRuntimeState
 } from "@v-ronpa/story-engine";
 import { verticalSliceMaps, verticalSliceScript } from "../harness/fixtures/verticalSlice";
@@ -33,6 +34,7 @@ import { defaultHarnessInputBindings, useKeyboardInputActions } from "../harness
 import { useFirstPersonExplorationBridge } from "../harness/useFirstPersonExplorationBridge";
 import {
   createVnRuntimePresentationTransaction,
+  type VnRuntimeTransactionDiagnostic,
   type VnRuntimePresentationTransaction
 } from "../vnRuntimeTransaction";
 import type { VnOutputRouteTable, VnRuntimeProfile } from "../vnOutputRoutes";
@@ -56,6 +58,17 @@ export interface PixiStageRuntime {
   hints: PixiStageRenderHint[];
   hintSequence: number;
   animate: boolean;
+}
+
+export type VerticalSliceDiagnosticSource = "parser" | "compiler" | "story" | "transaction";
+
+export interface VerticalSliceRuntimeDiagnostic {
+  source: VerticalSliceDiagnosticSource;
+  code: string;
+  severity: "info" | "warning" | "error";
+  message: string;
+  loc?: string;
+  commandId?: string;
 }
 
 export interface VerticalSliceRuntimeRestorePlan {
@@ -88,6 +101,7 @@ export const verticalSlicePosePresets: PosePreset[] = [
 ];
 
 const initialMap = verticalSliceMaps[0] ?? createFallbackMap();
+const MAX_RUNTIME_DIAGNOSTICS = 50;
 
 export function useVerticalSliceRuntimeAdapter(
   flowMode: GameInteractionContext["mode"],
@@ -98,6 +112,10 @@ export function useVerticalSliceRuntimeAdapter(
     []
   );
   const compiled = useMemo(() => compileRuntimeScript(parsed.scenario), [parsed]);
+  const initialRuntimeDiagnostics = useMemo(
+    () => createInitialVerticalSliceDiagnostics(parsed.diagnostics, compiled.diagnostics),
+    [parsed, compiled]
+  );
   const runtimeProfile = options.profile ?? "vn2d";
   const runtimeRouteTable = options.routeTable;
   const [navi, setNavi] = useState<NaviRuntimeState>(() => ({
@@ -110,6 +128,7 @@ export function useVerticalSliceRuntimeAdapter(
     active: false
   }));
   const [pixiStageRuntime, setPixiStageRuntime] = useState<PixiStageRuntime>(() => createInitialPixiStageRuntime());
+  const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<VerticalSliceRuntimeDiagnostic[]>(() => initialRuntimeDiagnostics);
   const [lastRuntimeCommandCount, setLastRuntimeCommandCount] = useState(0);
   const [lastOutcome, setLastOutcome] = useState("spawn");
   const [lastAction, setLastAction] = useState("boot");
@@ -127,6 +146,7 @@ export function useVerticalSliceRuntimeAdapter(
     });
     setGameplay(createGameplayState());
     setStoryRuntime({ state: createInitialStoryState(compiled.script), active: false });
+    setRuntimeDiagnostics(initialRuntimeDiagnostics);
     setPixiStageRuntime((current) => ({
       ...createInitialPixiStageRuntime(),
       hintSequence: current.hintSequence + 1
@@ -202,6 +222,7 @@ export function useVerticalSliceRuntimeAdapter(
       nextStory: advanced.state,
       runtimeCommands: advanced.emittedRuntimeCommands,
       previousPixiStage: initialPixiStage,
+      storyDiagnostics: advanced.diagnostics,
       active: true,
       forcePixiCommit: true
     });
@@ -215,6 +236,7 @@ export function useVerticalSliceRuntimeAdapter(
       nextStory,
       runtimeCommands: advanced.emittedRuntimeCommands,
       previousPixiStage: pixiStageRuntime.snapshot,
+      storyDiagnostics: advanced.diagnostics,
       active: !nextStory.ended
     });
     if (nextStory.ended) {
@@ -234,6 +256,7 @@ export function useVerticalSliceRuntimeAdapter(
       nextStory,
       runtimeCommands: advanced.emittedRuntimeCommands,
       previousPixiStage: pixiStageRuntime.snapshot,
+      storyDiagnostics: [...chosen.diagnostics, ...advanced.diagnostics],
       active: true
     });
     setLastAction(`choice:${index}`);
@@ -254,6 +277,7 @@ export function useVerticalSliceRuntimeAdapter(
     if (plan.playerPose) firstPersonBridge.issuePoseCommand(plan.playerPose);
     setGameplay(plan.gameplay);
     setStoryRuntime(plan.storyRuntime);
+    setRuntimeDiagnostics(initialRuntimeDiagnostics);
     setPixiStageRuntime((current) => ({
       ...plan.pixiStageRuntime,
       hintSequence: current.hintSequence + 1
@@ -268,12 +292,14 @@ export function useVerticalSliceRuntimeAdapter(
     nextStory,
     runtimeCommands,
     previousPixiStage,
+    storyDiagnostics = [],
     active,
     forcePixiCommit = false
   }: {
     nextStory: StoryRuntimeState;
     runtimeCommands: RuntimeCommand[];
     previousPixiStage: PixiStageSnapshot;
+    storyDiagnostics?: StoryStepperDiagnostic[];
     active: boolean;
     forcePixiCommit?: boolean;
   }) {
@@ -285,6 +311,12 @@ export function useVerticalSliceRuntimeAdapter(
         ...(runtimeRouteTable ? { routeTable: runtimeRouteTable } : {})
       }
     });
+    appendRuntimeDiagnostics(
+      collectVerticalSliceRuntimeDiagnostics({
+        storyDiagnostics,
+        transactionDiagnostics: transaction.diagnostics
+      })
+    );
     setLastRuntimeCommandCount(runtimeCommands.length);
     if (transaction.gameplayEvents.length > 0) {
       setGameplay((currentGameplay) => applyGameplayEvents(currentGameplay, transaction.gameplayEvents));
@@ -334,9 +366,38 @@ export function useVerticalSliceRuntimeAdapter(
     pixiStageRuntime,
     resetSlice,
     restoreFromSave,
+    runtimeDiagnostics,
     storyRuntime,
     storySession
   };
+
+  function appendRuntimeDiagnostics(diagnostics: VerticalSliceRuntimeDiagnostic[]) {
+    if (diagnostics.length === 0) return;
+    setRuntimeDiagnostics((current) => limitRuntimeDiagnostics([...current, ...diagnostics]));
+  }
+}
+
+export function createInitialVerticalSliceDiagnostics(
+  parserDiagnostics: ParserDiagnostic[],
+  compilerDiagnostics: RuntimeCompilerDiagnostic[]
+): VerticalSliceRuntimeDiagnostic[] {
+  return limitRuntimeDiagnostics([
+    ...parserDiagnostics.map(toVerticalSliceParserDiagnostic),
+    ...compilerDiagnostics.map(toVerticalSliceCompilerDiagnostic)
+  ]);
+}
+
+export function collectVerticalSliceRuntimeDiagnostics({
+  storyDiagnostics = [],
+  transactionDiagnostics = []
+}: {
+  storyDiagnostics?: StoryStepperDiagnostic[];
+  transactionDiagnostics?: VnRuntimeTransactionDiagnostic[];
+}): VerticalSliceRuntimeDiagnostic[] {
+  return [
+    ...storyDiagnostics.map(toVerticalSliceStoryDiagnostic),
+    ...transactionDiagnostics.map(toVerticalSliceTransactionDiagnostic)
+  ];
 }
 
 export function createVerticalSliceInteractionContext({
@@ -433,6 +494,54 @@ function formatOutcome(outcome: ExplorationOutcome): string {
   if (outcome.type === "start-script") return `start-script:${outcome.script}`;
   if (outcome.type === "change-map") return `change-map:${outcome.mapId}`;
   return `character-state:${outcome.characterId}:${outcome.affinityDelta}`;
+}
+
+function toVerticalSliceParserDiagnostic(diagnostic: ParserDiagnostic): VerticalSliceRuntimeDiagnostic {
+  return {
+    source: "parser",
+    code: "parser-diagnostic",
+    severity: diagnostic.severity,
+    message: diagnostic.message,
+    ...(diagnostic.loc ? { loc: formatDiagnosticLocation(diagnostic.loc) } : {})
+  };
+}
+
+function toVerticalSliceCompilerDiagnostic(diagnostic: RuntimeCompilerDiagnostic): VerticalSliceRuntimeDiagnostic {
+  return {
+    source: "compiler",
+    code: diagnostic.code,
+    severity: diagnostic.severity ?? "warning",
+    message: diagnostic.message
+  };
+}
+
+function toVerticalSliceStoryDiagnostic(diagnostic: StoryStepperDiagnostic): VerticalSliceRuntimeDiagnostic {
+  return {
+    source: "story",
+    code: diagnostic.code,
+    severity: diagnostic.severity ?? "warning",
+    message: diagnostic.message
+  };
+}
+
+function toVerticalSliceTransactionDiagnostic(
+  diagnostic: VnRuntimeTransactionDiagnostic
+): VerticalSliceRuntimeDiagnostic {
+  return {
+    source: "transaction",
+    code: diagnostic.code,
+    severity: "error",
+    message: diagnostic.message,
+    commandId: diagnostic.commandId
+  };
+}
+
+function formatDiagnosticLocation(loc: NonNullable<ParserDiagnostic["loc"]>): string {
+  return `${loc.scriptPath}:${loc.line}:${loc.column}`;
+}
+
+function limitRuntimeDiagnostics(diagnostics: VerticalSliceRuntimeDiagnostic[]): VerticalSliceRuntimeDiagnostic[] {
+  return diagnostics.slice(-MAX_RUNTIME_DIAGNOSTICS);
 }
 
 function createFallbackMap(): WorldMapDef {

@@ -125,7 +125,7 @@ delete, split, or execute entries from it.
 - Title: Decide whether backlog entries can jump or rewind runtime state
 - Area: VN UI, StoryEngine snapshots, save/runtime restore
 - Source / Evidence:
-  - `docs/tasks/game-interaction-shell.md`
+  - `docs/archive/completed-tasks/game-interaction-shell.md`
   - `packages/ui-kit/src/surfaces/GameInteractionSurfaces.tsx`
   - `tests/smoke/vertical-slice.spec.ts`
 - Current Observation: Backlog is read-only in the interaction shell baseline.
@@ -146,6 +146,7 @@ delete, split, or execute entries from it.
 - Area: media-save, app runtime capture, storage budgets
 - Source / Evidence:
   - `docs/ccr/game-interaction-shell.md`
+  - `docs/archive/completed-tasks/game-interaction-shell.md`
   - `packages/media-save/src/index.ts`
   - `packages/ui-kit/src/surfaces/GameInteractionSurfaces.tsx`
 - Current Observation: Save slots store text summaries only. No canvas or DOM
@@ -187,19 +188,20 @@ delete, split, or execute entries from it.
   - `packages/nani-runtime-compiler/src/index.ts`
   - `packages/story-engine/src/index.ts`
   - `apps/game/src/interaction/useVerticalSliceRuntimeAdapter.ts`
-- Current Observation: The app compiles `.nani` into `RuntimeScript` and steps
-  through `emittedRuntimeCommands`, but compiler diagnostics and StoryEngine
-  step diagnostics are not yet collected into a visible app debug or reporting
-  channel.
-- Why Not Actionable Yet: Surfacing diagnostics needs a product decision on
-  scope and severity behavior: debug panel only, blocking overlay, dev console,
-  test-only assertion, save/load metadata, or a reusable diagnostics port.
+- Current Observation: Closed for the vertical-slice harness. Parser, compiler,
+  StoryEngine, and transaction diagnostics are surfaced through the app debug
+  readout and Inspector Lite. Production reporting, save metadata, or blocking
+  overlays remain separate product decisions.
+- Why Not Actionable Yet: No longer watching for the accepted harness baseline.
+  Reopen with a product-specific task if diagnostics need production UX,
+  telemetry, save metadata, or authoring-tool integration.
 - Auto Action: Forbidden
 - Review Cadence: Review before expanding `.nani` authoring or adding runtime
   script loading beyond the fixed vertical slice fixture.
 - Next Review: TBD
-- Status: Watching
-- Linked Task / ADR / CCR: TBD
+- Status: Closed
+- Linked Task / ADR / CCR: RuntimeCommand diagnostics surfacing in the accepted
+  vertical-slice harness.
 
 ### RW-0009: Auto / Skip Scheduler
 

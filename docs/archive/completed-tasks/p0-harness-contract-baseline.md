@@ -14,11 +14,11 @@
 
 ## Status
 
-- State: `Ready`
-- Owner: `TBD`
+- State: `Archived`
+- Owner: `integration`
 - Created: `2026-06-14`
-- Updated: `2026-06-15`
-- Completed Commit: `TBD`
+- Updated: `2026-06-22`
+- Completed Commit: `completed in prior thread`
 - Archive Target: `docs/archive/completed-tasks/p0-harness-contract-baseline.md`
 
 ## Worktree Environment

@@ -6,7 +6,12 @@ import { InspectorLite } from "@v-ronpa/ui-kit";
 import { GameInteractionShell } from "../../../interaction/GameInteractionShell";
 import { useGameFlowActor } from "../../../interaction/useGameFlowActor";
 import { useOverlayPageAdapters } from "../../../interaction/useOverlayPageAdapters";
-import { useVerticalSliceRuntimeAdapter, type PosePresetId, verticalSlicePosePresets } from "../../../interaction/useVerticalSliceRuntimeAdapter";
+import {
+  useVerticalSliceRuntimeAdapter,
+  type PosePresetId,
+  type VerticalSliceRuntimeDiagnostic,
+  verticalSlicePosePresets
+} from "../../../interaction/useVerticalSliceRuntimeAdapter";
 import { useVerticalSliceSaveAdapter } from "../../../interaction/useVerticalSliceSaveAdapter";
 import { VnRuntimeDispatcher } from "../../../VnRuntimeDispatcher";
 
@@ -80,10 +85,12 @@ export function VerticalSliceScenario() {
                 activeInteractableId={runtime.navi.activeInteractableId ?? "none"}
                 blockedReason={runtime.interactionView.blockedReason ?? "none"}
                 canConfirm={String(runtime.interactionView.canConfirm)}
+                diagnosticCount={String(runtime.runtimeDiagnostics.length)}
                 evidence={formatEvidence(runtime.gameplay)}
                 inputLock={runtime.navi.inputLock}
                 inventory={formatInventory(runtime.gameplay)}
                 lastAction={runtime.lastAction}
+                latestDiagnostic={formatLatestDiagnostic(runtime.runtimeDiagnostics)}
                 lastOutcome={runtime.lastOutcome}
                 mapId={runtime.navi.activeMapId ?? "none"}
                 pixiBackground={runtime.pixiStageRuntime.snapshot.background?.backgroundId ?? "none"}
@@ -121,6 +128,8 @@ export function VerticalSliceScenario() {
                 inventoryItems={runtime.gameplay.inventory.items}
                 evidenceIds={runtime.gameplay.evidence.ownedEvidenceIds}
                 runtimeCommandCount={runtime.lastRuntimeCommandCount}
+                diagnosticCount={runtime.runtimeDiagnostics.length}
+                latestDiagnostic={formatLatestDiagnostic(runtime.runtimeDiagnostics)}
               />
             </div>
           ) : null}
@@ -246,10 +255,12 @@ function VerticalSliceReadout({
   activeInteractableId,
   blockedReason,
   canConfirm,
+  diagnosticCount,
   evidence,
   inputLock,
   inventory,
   lastAction,
+  latestDiagnostic,
   lastOutcome,
   mapId,
   pixiBackground,
@@ -262,10 +273,12 @@ function VerticalSliceReadout({
   activeInteractableId: string;
   blockedReason: string;
   canConfirm: string;
+  diagnosticCount: string;
   evidence: string;
   inputLock: string;
   inventory: string;
   lastAction: string;
+  latestDiagnostic: string;
   lastOutcome: string;
   mapId: string;
   pixiBackground: string;
@@ -289,17 +302,27 @@ function VerticalSliceReadout({
         <Readout label="Active" testId="vertical-slice-active-interactable" value={activeInteractableId} />
         <Readout label="Can" testId="vertical-slice-can-confirm" value={canConfirm} />
         <Readout label="Block" testId="vertical-slice-blocked-reason" value={blockedReason} />
+        <Readout label="Diag" testId="vertical-slice-diagnostics-count" value={diagnosticCount} />
         <Readout label="Inventory" testId="vertical-slice-inventory" value={inventory} />
         <Readout label="Evidence" testId="vertical-slice-evidence" value={evidence} />
         <Readout label="Route" testId="vertical-slice-route" value={route} />
         <Readout label="Pixi BG" testId="vertical-slice-pixi-background" value={pixiBackground} />
         <Readout label="Pixi Rev" testId="vertical-slice-pixi-revision" value={pixiRevision} />
         <Readout label="Pixi Slots" testId="vertical-slice-pixi-slots" value={pixiSlots} wide />
+        <Readout label="Latest Diag" testId="vertical-slice-latest-diagnostic" value={latestDiagnostic} wide />
         <Readout label="Outcome" testId="vertical-slice-last-outcome" value={lastOutcome} wide />
         <Readout label="Action" testId="vertical-slice-last-action" value={lastAction} wide />
       </div>
     </section>
   );
+}
+
+function formatLatestDiagnostic(diagnostics: VerticalSliceRuntimeDiagnostic[]): string {
+  const latest = diagnostics.at(-1);
+  if (!latest) return "none";
+  const location = latest.loc ? ` ${latest.loc}` : "";
+  const command = latest.commandId ? ` @${latest.commandId}` : "";
+  return `${latest.severity}:${latest.source}:${latest.code}${command}${location} - ${latest.message}`;
 }
 
 function Readout({ label, testId, value, wide = false }: { label: string; testId: string; value: string; wide?: boolean }) {

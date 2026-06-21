@@ -7,6 +7,8 @@ import { createInitialPixiStageSnapshot, reducePixiStageCommand } from "@v-ronpa
 import { advanceToNextStop, createInitialStoryState, storyRuntimeSnapshot } from "@v-ronpa/story-engine";
 import type { VnOutputRouteTable } from "../vnOutputRoutes";
 import {
+  collectVerticalSliceRuntimeDiagnostics,
+  createInitialVerticalSliceDiagnostics,
   createVerticalSliceInteractionContext,
   createVerticalSlicePresentationTransaction,
   createVerticalSliceRuntimeRestorePlan,
@@ -75,6 +77,59 @@ describe("vertical slice runtime adapter helpers", () => {
     expect(transaction.pixiStage).toBe(previousPixiStage);
     expect(transaction.pixiHints).toEqual([]);
     expect(transaction.gameplayEvents).toEqual([]);
+  });
+
+  it("normalizes parser and compiler diagnostics for the harness readout", () => {
+    const parsed = parseScenario({
+      sourceText: ["#Start", "#Start", "@missingCommand value:true"].join("\n"),
+      scriptPath: "diagnostics.nani"
+    });
+    const compiled = compileRuntimeScript(parsed.scenario);
+
+    expect(createInitialVerticalSliceDiagnostics(parsed.diagnostics, compiled.diagnostics)).toEqual([
+      expect.objectContaining({
+        source: "parser",
+        code: "parser-diagnostic",
+        severity: "error",
+        message: "Duplicate label: Start",
+        loc: "diagnostics.nani:2:1"
+      }),
+      expect.objectContaining({
+        source: "compiler",
+        code: "unknown-command",
+        severity: "error"
+      })
+    ]);
+  });
+
+  it("collects StoryEngine and transaction diagnostics into the runtime channel", () => {
+    const runtimeScript = compileScenario("@flash color:#ffffff duration:{missingDuration}", "runtime-diagnostics.nani");
+    const unresolvedCommand = runtimeScript.commands[0];
+    expect(unresolvedCommand).toBeDefined();
+    const advanced = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+    const transaction = createVerticalSlicePresentationTransaction({
+      runtimeCommands: unresolvedCommand ? [unresolvedCommand] : [],
+      previousPixiStage: createInitialPixiStageSnapshot()
+    });
+
+    expect(
+      collectVerticalSliceRuntimeDiagnostics({
+        storyDiagnostics: advanced.diagnostics,
+        transactionDiagnostics: transaction.diagnostics
+      })
+    ).toEqual([
+      expect.objectContaining({
+        source: "story",
+        code: "expression-unresolved",
+        severity: "error"
+      }),
+      expect.objectContaining({
+        source: "transaction",
+        code: "unresolved-runtime-expression",
+        severity: "error",
+        commandId: "flash"
+      })
+    ]);
   });
 
   it("plans restore of Navi, Story, and Gameplay without carrying transient UI state", () => {

@@ -15,6 +15,8 @@ export interface InspectorLiteProps {
   evidenceIds: string[];
   trialSegmentId?: string;
   runtimeCommandCount: number;
+  diagnosticCount?: number;
+  latestDiagnostic?: string;
   onGrantItem?: (itemId: string) => void;
   onGrantEvidence?: (evidenceId: string) => void;
   onJumpLabel?: (label: string) => void;
