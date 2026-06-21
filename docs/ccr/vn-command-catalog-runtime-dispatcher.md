@@ -3,8 +3,8 @@
 ## Requested Change
 
 Add a first-class `.nani` command catalog to `packages/contracts`, add a
-`wildcard-event` StoryEffect shape, and clarify that StoryEngine command
-handlers are execution bindings rather than command declarations.
+wildcard RuntimeCommand route, and clarify that StoryEngine command handlers are
+execution bindings rather than command declarations.
 
 ## Affected Packages
 
@@ -18,8 +18,8 @@ handlers are execution bindings rather than command declarations.
 The VN presentation and UI workstreams both need to add commands and runtime
 outputs. Without a shared catalog, command definitions could drift across parser
 tests, StoryEngine handler registration, app routing, and docs. The previous
-StoryEffect bridge also had no generic route for future branch-local commands,
-forcing new features to touch public presentation commands too early.
+runtime bridge also had no generic route for future branch-local commands,
+forcing new features to touch package-specific adapter contracts too early.
 
 ## Proposed Shape
 
@@ -32,25 +32,25 @@ forcing new features to touch public presentation commands too early.
   Naninovel syntax.
 - `NaniCommandHandlerRegistry` registers execution handlers only and rejects
   handlers not declared in the catalog.
-- `@wildcard-<type>` commands emit `wildcard-event` StoryEffects with
-  `wildcardType`, `routeKey`, generic params, and source command metadata.
-- `presentationCommands` remains the presentation command log. `effects` is the
-  incremental side-effect stream.
+- `@wildcard-<type>` commands compile to RuntimeCommands with `wildcardType`,
+  `routeKey`, generic params, and source command metadata.
+- RuntimeCommand is the dispatch stream. StoryEngine owns story state and emits
+  incremental RuntimeCommands; package-specific Pixi/UI/gameplay adapters own
+  their projections.
 
 ## Fixtures And Tests
 
 - `packages/contracts/src/index.test.ts` covers the 77 official commands,
   9 wildcard commands, command id normalization, parameter type names, and
-  `wildcard-event` schema.
+  RuntimeCommand schema.
 - `packages/nani-parser/src/index.test.ts` covers official parameter retention
   without semantic validation.
 - `packages/story-engine/src/index.test.ts` covers catalog-derived validation,
-  stub/no-op commands, unsupported implemented params, wildcard effects, and
-  handler registry drift rejection. It also verifies reducer diagnostics and
+  stub/no-op commands, unsupported implemented params, wildcard RuntimeCommands,
+  and handler registry drift rejection. It also verifies reducer diagnostics and
   historical command migration for `back`, `shake`, and `goto`.
 - `apps/game/src/vnOutputRoutes.test.ts` covers fixed route table behavior,
-  one-to-many targets, presentation/effect source separation, and wildcard
-  routeKey overrides.
+  one-to-many RuntimeCommand targets, and wildcard routeKey overrides.
 - `tests/smoke/vertical-slice.spec.ts` keeps VN dialog and Pixi visibility
   covered through the app harness.
 

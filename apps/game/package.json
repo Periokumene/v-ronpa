@@ -17,6 +17,7 @@
     "@v-ronpa/gameplay": "workspace:*",
     "@v-ronpa/media-save": "workspace:*",
     "@v-ronpa/nani-parser": "workspace:*",
+    "@v-ronpa/nani-runtime-compiler": "workspace:*",
     "@v-ronpa/navi-director": "workspace:*",
     "@v-ronpa/pixi-presenter": "workspace:*",
     "@v-ronpa/r3f-adapter": "workspace:*",

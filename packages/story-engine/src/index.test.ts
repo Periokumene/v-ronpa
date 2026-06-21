@@ -1,56 +1,96 @@
 import { describe, expect, it } from "vitest";
-import { commandCatalog, StoryRuntimeSnapshotSchema } from "@v-ronpa/contracts";
-import { parseScenario } from "@v-ronpa/nani-parser";
+import {
+  commandCatalog,
+  StoryRuntimeSnapshotSchema,
+  type NaniCommandCategory,
+  type NaniCommandSource,
+  type NaniCommandStatus,
+  type RuntimeCommand,
+  type RuntimeScript,
+  type RuntimeValue
+} from "@v-ronpa/contracts";
 import {
   advanceToNextStop,
   chooseStoryOption,
   createInitialStoryState,
-  createNaniCommandHandlerRegistry,
   selectCurrentStoryLine,
   storyReducer,
   storyRuntimeSnapshot
 } from "./index";
 
-const script = `#Start
-@back bg:court effect:fade
-@charEnter character:felix portrait:portrait:felix:neutral slot:center
-Felix: The door was locked.[>]
-@trialKeyword kw:locked text:"locked" speaker:character:felix
-@choice "Object with the keycard" goto:#Object
-@choice "Stay silent" goto:#End
-#Object
-@set route:objected
-@shake actorId:character:felix intensity:0.5 duration:300
-@goto #End
-#End
-@end`;
+const trialRuntimeScript = runtimeScript(
+  "trial.nani",
+  [
+    runtimeCommand("back", "scene", { appearance: "bg:court", effect: "fade" }, { source: "naninovel" }),
+    runtimeCommand("charenter", "actor", {
+      characterId: "character:felix",
+      portraitId: "portrait:felix:neutral",
+      slot: "center"
+    }),
+    runtimeCommand("print", "text", { text: "The door was locked.", speaker: "Felix", autoNext: true }),
+    runtimeCommand("trialkeyword", "ui", {
+      keywordId: "kw:locked",
+      text: "locked",
+      speakerId: "character:felix"
+    }),
+    runtimeCommand("choice", "choice", { text: "Object with the keycard", goto: "#Object" }, { source: "naninovel" }),
+    runtimeCommand("choice", "choice", { text: "Stay silent", goto: "#End" }, { source: "naninovel" }),
+    runtimeCommand("set", "state", { key: "route", value: "objected" }, { source: "naninovel" }),
+    runtimeCommand("shake", "effect", { target: "character:felix", intensity: 0.5, duration: 300 }, { source: "naninovel" }),
+    runtimeCommand("goto", "flow", { label: "#End" }, { source: "naninovel" }),
+    runtimeCommand("end", "flow", {})
+  ],
+  { Start: 0, Object: 6, End: 9 }
+);
 
-const vnStepperScript = `#Start
-@back bg:harness effect:fade
-@charEnter character:felix portrait:portrait:felix:neutral slot:center
-Felix: This is the first playable slice. Move, inspect, then choose a route.[>]
-@choice "Return to the hallway" goto:#Return
-@choice "Follow the witness into class" goto:#Classroom
-
-#Return
-@set route:"return"
-Felix: Good. We stay here and keep the exploration state readable.
-@end
-
-#Classroom
-@set route:"classroom"
-@gameplay grant-evidence id:evidence:keycard
-Mira: Then the keycard matters after all.
-@end`;
+const vnStepperRuntimeScript = runtimeScript(
+  "story-vn.nani",
+  [
+    runtimeCommand("back", "scene", { appearance: "bg:harness", effect: "fade" }, { source: "naninovel" }),
+    runtimeCommand("charenter", "actor", {
+      characterId: "character:felix",
+      portraitId: "portrait:felix:neutral",
+      slot: "center"
+    }),
+    runtimeCommand("print", "text", {
+      text: "This is the first playable slice. Move, inspect, then choose a route.",
+      speaker: "Felix",
+      autoNext: true
+    }),
+    runtimeCommand("choice", "choice", { text: "Return to the hallway", goto: "#Return" }, { source: "naninovel" }),
+    runtimeCommand("choice", "choice", { text: "Follow the witness into class", goto: "#Classroom" }, { source: "naninovel" }),
+    runtimeCommand("set", "state", { key: "route", value: "return" }, { source: "naninovel" }),
+    runtimeCommand("print", "text", {
+      text: "Good. We stay here and keep the exploration state readable.",
+      speaker: "Felix",
+      autoNext: false
+    }),
+    runtimeCommand("end", "flow", {}),
+    runtimeCommand("set", "state", { key: "route", value: "classroom" }, { source: "naninovel" }),
+    runtimeCommand("gameplay", "state", { type: "grant-evidence", evidenceId: "evidence:keycard" }),
+    runtimeCommand("print", "text", {
+      text: "Then the keycard matters after all.",
+      speaker: "Mira",
+      autoNext: false
+    }),
+    runtimeCommand("end", "flow", {})
+  ],
+  { Start: 0, Return: 5, Classroom: 8 }
+);
 
 describe("story engine", () => {
-  it("reduces script statements into serializable runtime state", () => {
-    const { scenario } = parseScenario({ sourceText: script, scriptPath: "trial.nani" });
-    let state = createInitialStoryState(scenario);
+  it("reduces runtime scripts into serializable runtime state and per-step emitted commands", () => {
+    const runtimeScript = trialRuntimeScript;
+    let state = createInitialStoryState(runtimeScript);
+    const emittedCommandIds: string[] = [];
 
-    for (let i = 0; i < 6; i += 1) {
-      state = reduceWithoutDiagnostics(state, { type: "STEP", scenario });
-    }
+    let result = advanceToNextStop(state, runtimeScript);
+    state = result.state;
+    emittedCommandIds.push(...result.emittedRuntimeCommands.map((command) => command.commandId));
+
+    result = advanceToNextStop(state, runtimeScript);
+    state = result.state;
+    emittedCommandIds.push(...result.emittedRuntimeCommands.map((command) => command.commandId));
 
     expect(storyRuntimeSnapshot(state)).toMatchInlineSnapshot(`
       {
@@ -68,48 +108,52 @@ describe("story engine", () => {
             "goto": "#Object",
             "text": "Object with the keycard",
           },
+          {
+            "goto": "#End",
+            "text": "Stay silent",
+          },
         ],
         "variables": {},
       }
     `);
+    expect(storyRuntimeSnapshot(state)).not.toHaveProperty("presentationCommands");
+    expect(storyRuntimeSnapshot(state)).not.toHaveProperty("effects");
+    expect(emittedCommandIds).toEqual(["back", "charenter", "print", "trialkeyword"]);
 
-    expect(state.presentationCommands).toHaveLength(4);
-    expect(state.effects).toHaveLength(4);
-    expect(state.effects.at(-1)).toMatchObject({
-      type: "presentation",
-      command: { type: "trial-keyword", keywordId: "kw:locked" }
-    });
+    state = reduceWithoutDiagnostics(state, { type: "CHOOSE", script: runtimeScript, index: 0 }).state;
+    result = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript });
+    state = result.state;
+    expect(result.emittedRuntimeCommands).toEqual([]);
 
-    state = reduceWithoutDiagnostics(state, { type: "CHOOSE", scenario, index: 0 });
-    state = reduceWithoutDiagnostics(state, { type: "STEP", scenario });
-    state = reduceWithoutDiagnostics(state, { type: "STEP", scenario });
-
+    result = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript });
+    state = result.state;
     expect(state.variables.route).toBe("objected");
-    expect(state.presentationCommands.at(-1)).toMatchObject({ type: "shake" });
-    expect(state.effects.at(-1)).toMatchObject({ type: "presentation", command: { type: "shake" } });
+    expect(result.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["shake"]);
   });
 
-  it("emits typed gameplay events without handling evidence submission", () => {
-    const { scenario } = parseScenario({
-      sourceText: "@gameplay grant-evidence id:evidence:keycard",
-      scriptPath: "grant-evidence.nani"
-    });
-    const result = storyReducer(createInitialStoryState(scenario), { type: "STEP", scenario });
+  it("emits gameplay runtime commands without applying gameplay state in StoryEngine", () => {
+    const runtimeScript = runtimeScriptFixture("grant-evidence.nani", [
+      runtimeCommand("gameplay", "state", { type: "grant-evidence", evidenceId: "evidence:keycard" })
+    ]);
+    const result = storyReducer(createInitialStoryState(runtimeScript), { type: "STEP", script: runtimeScript });
 
     expect(result.diagnostics).toEqual([]);
-    expect(result.state.effects).toEqual([
-      {
-        type: "gameplay-event",
-        event: { type: "grant-evidence", evidenceId: "evidence:keycard" }
-      }
+    expect(result.emittedRuntimeCommands).toEqual([
+      expect.objectContaining({
+        commandId: "gameplay",
+        params: expect.objectContaining({
+          type: "grant-evidence",
+          evidenceId: "evidence:keycard"
+        })
+      })
     ]);
   });
 
   it("advances to the next text stop, then collects contiguous choices", () => {
-    const { scenario } = parseScenario({ sourceText: vnStepperScript, scriptPath: "story-vn.nani" });
-    let state = createInitialStoryState(scenario);
+    const runtimeScript = vnStepperRuntimeScript;
+    let state = createInitialStoryState(runtimeScript);
 
-    let result = advanceToNextStop(state, scenario);
+    let result = advanceToNextStop(state, runtimeScript);
     state = result.state;
 
     expect(result.diagnostics).toEqual([]);
@@ -118,8 +162,9 @@ describe("story engine", () => {
       text: "This is the first playable slice. Move, inspect, then choose a route."
     });
     expect(state.pendingChoices).toEqual([]);
+    expect(result.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "charenter", "print"]);
 
-    result = advanceToNextStop(state, scenario);
+    result = advanceToNextStop(state, runtimeScript);
     state = result.state;
 
     expect(result.diagnostics).toEqual([]);
@@ -127,61 +172,16 @@ describe("story engine", () => {
       { text: "Return to the hallway", goto: "#Return" },
       { text: "Follow the witness into class", goto: "#Classroom" }
     ]);
-  });
-
-  it("derives official command parameter validation from the catalog", () => {
-    const { scenario } = parseScenario({
-      sourceText: "@back bg:harness time:fast",
-      scriptPath: "invalid-official-param.nani"
-    });
-    const result = advanceToNextStop(createInitialStoryState(scenario), scenario);
-
-    expect(result.state.presentationCommands).toEqual([]);
-    expect(result.diagnostics).toEqual([
-      {
-        code: "invalid-command-param",
-        message: "@back parameter time expected decimal.",
-        severity: "error"
-      }
-    ]);
-  });
-
-  it("keeps migrated historical commands warning-free through the catalog", () => {
-    const { scenario } = parseScenario({
-      sourceText: `@back bg:harness effect:fade
-@shake actorId:character:felix intensity:0.5 duration:300
-@goto path:#End
-#End
-Felix: Arrived.
-@end`,
-      scriptPath: "migrated-history.nani"
-    });
-    let state = createInitialStoryState(scenario);
-
-    let result = advanceToNextStop(state, scenario);
-    state = result.state;
-    expect(result.diagnostics).toEqual([]);
-    expect(state.presentationCommands).toEqual([
-      { type: "set-background", backgroundId: "bg:harness", effect: "fade" },
-      { type: "shake", target: "character:felix", intensity: 0.5, durationMs: 300 },
-      { type: "print", text: "Arrived.", speaker: "Felix", autoNext: false }
-    ]);
-    expect(selectCurrentStoryLine(state)).toEqual({ speaker: "Felix", text: "Arrived." });
-
-    result = advanceToNextStop(state, scenario);
-    expect(result.state.ended).toBe(true);
-    expect(result.diagnostics).toEqual([]);
+    expect(result.emittedRuntimeCommands).toEqual([]);
   });
 
   it("reports declared but unimplemented official commands as no-op diagnostics", () => {
-    const { scenario } = parseScenario({
-      sourceText: "@bgm theme:investigation volume:0.5",
-      scriptPath: "stubbed-official-command.nani"
-    });
-    const result = advanceToNextStop(createInitialStoryState(scenario), scenario);
+    const runtimeScript = runtimeScriptFixture("stubbed-official-command.nani", [
+      runtimeCommand("bgm", "media", { volume: 0.5 }, { source: "naninovel", status: "stubbed" })
+    ]);
+    const result = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
 
-    expect(result.state.presentationCommands).toEqual([]);
-    expect(result.state.effects).toEqual([]);
+    expect(result.emittedRuntimeCommands).toEqual([]);
     expect(result.diagnostics).toEqual([
       {
         code: "command-not-implemented",
@@ -191,14 +191,13 @@ Felix: Arrived.
     ]);
   });
 
-  it("returns reducer diagnostics instead of silently dropping command catalog findings", () => {
-    const { scenario } = parseScenario({
-      sourceText: "@bgm theme:investigation volume:0.5",
-      scriptPath: "reducer-diagnostics.nani"
-    });
-    const result = storyReducer(createInitialStoryState(scenario), { type: "STEP", scenario });
+  it("returns reducer diagnostics instead of silently dropping command status findings", () => {
+    const runtimeScript = runtimeScriptFixture("reducer-diagnostics.nani", [
+      runtimeCommand("bgm", "media", { volume: 0.5 }, { source: "naninovel", status: "stubbed" })
+    ]);
+    const result = storyReducer(createInitialStoryState(runtimeScript), { type: "STEP", script: runtimeScript });
 
-    expect(result.state.effects).toEqual([]);
+    expect(result.emittedRuntimeCommands).toEqual([]);
     expect(result.diagnostics).toEqual([
       {
         code: "command-not-implemented",
@@ -208,25 +207,7 @@ Felix: Arrived.
     ]);
   });
 
-  it("warns when an implemented official command receives compatible params the runtime does not consume yet", () => {
-    const { scenario } = parseScenario({
-      sourceText: "@back bg:harness time:0.5",
-      scriptPath: "unsupported-official-param.nani"
-    });
-    const result = advanceToNextStop(createInitialStoryState(scenario), scenario);
-
-    expect(result.state.presentationCommands).toEqual([{ type: "set-background", backgroundId: "bg:harness" }]);
-    expect(result.diagnostics).toEqual([
-      {
-        code: "unsupported-command-param",
-        message: "@back accepts time:decimal, but the current runtime handler does not consume it yet.",
-        severity: "warning"
-      }
-    ]);
-  });
-
-  it("keeps implemented non-wildcard commands backed by StoryEngine handlers", () => {
-    const registry = createNaniCommandHandlerRegistry();
+  it("keeps implemented non-control commands as generic StoryEngine emissions", () => {
     const implementedRuntimeCommands = commandCatalog.filter(
       (command) => command.status === "implemented" && command.source !== "wildcard"
     );
@@ -235,6 +216,7 @@ Felix: Arrived.
       "back",
       "choice",
       "goto",
+      "print",
       "set",
       "shake",
       "end",
@@ -244,85 +226,150 @@ Felix: Arrived.
       "focus",
       "trialkeyword"
     ]);
-    for (const command of implementedRuntimeCommands) {
-      expect(registry.resolve(command.id), command.id).toBeDefined();
-      for (const alias of command.aliases ?? []) {
-        expect(registry.resolve(alias), alias).toBeDefined();
-      }
-    }
   });
 
-  it("emits wildcard events without adding presentation commands", () => {
-    const { scenario } = parseScenario({
-      sourceText: "@wildcard-effect routeKey:pixi:chromatic-burst intensity:0.75 wait:true",
-      scriptPath: "wildcard-effect.nani"
-    });
-    const result = advanceToNextStop(createInitialStoryState(scenario), scenario);
+  it("emits wildcard runtime commands without mutating story state beyond pointer movement", () => {
+    const runtimeScript = runtimeScriptFixture("wildcard-effect.nani", [
+      runtimeCommand(
+        "wildcard-effect",
+        "effect",
+        {
+          wildcardType: "effect",
+          routeKey: "pixi:chromatic-burst",
+          intensity: 0.75,
+          wait: true
+        },
+        { source: "wildcard" }
+      )
+    ]);
+    const result = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
 
-    expect(result.state.presentationCommands).toEqual([]);
-    expect(result.state.effects).toEqual([
-      {
-        type: "wildcard-event",
-        wildcardType: "effect",
-        routeKey: "pixi:chromatic-burst",
-        params: { intensity: 0.75, wait: true },
-        sourceCommand: {
-          commandId: "wildcard-effect",
-          canonicalName: "wildcard-effect",
-          loc: {
-            scriptPath: "wildcard-effect.nani",
-            line: 1,
-            column: 1,
-            raw: "@wildcard-effect routeKey:pixi:chromatic-burst intensity:0.75 wait:true"
-          }
+    expect(result.state.instructionPointer).toBe(1);
+    expect(result.emittedRuntimeCommands).toEqual([
+      expect.objectContaining({
+        commandId: "wildcard-effect",
+        params: {
+          wildcardType: "effect",
+          routeKey: "pixi:chromatic-burst",
+          intensity: 0.75,
+          wait: true
         }
-      }
+      })
     ]);
     expect(result.diagnostics).toEqual([]);
   });
 
-  it("rejects handler registration for commands outside the command catalog", () => {
-    expect(() =>
-      createNaniCommandHandlerRegistry([
-        {
-          id: "catalog-drift",
-          category: "effect",
-          execute: () => ({ type: "none" })
-        }
-      ])
-    ).toThrow("Cannot register @catalog-drift; it is not declared in commandCatalog.");
+  it("resolves expression params before emitting runtime commands", () => {
+    const runtimeScript = runtimeScriptFixture("expression-params.nani", [
+      runtimeCommand("set", "state", { key: "flashDuration", value: 240 }),
+      runtimeCommand("flash", "effect", {
+        color: "#ffffff",
+        duration: { type: "expression", source: "flashDuration" }
+      })
+    ]);
+    const result = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.emittedRuntimeCommands).toEqual([
+      expect.objectContaining({
+        commandId: "flash",
+        params: { color: "#ffffff", duration: 240 }
+      })
+    ]);
+  });
+
+  it("uses the expression resolver for set commands", () => {
+    const runtimeScript = runtimeScriptFixture("expression-set.nani", [
+      runtimeCommand("set", "state", { key: "score", value: 1 }),
+      runtimeCommand("set", "state", { key: "score", value: { type: "expression", source: "score+1" } }),
+      runtimeCommand("print", "text", { text: "Score changed.", autoNext: false })
+    ]);
+    const result = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.state.variables.score).toBe(2);
+    expect(result.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["print"]);
+  });
+
+  it("applies condition and unless expressions before command execution", () => {
+    const runtimeScript = runtimeScriptFixture("expression-conditions.nani", [
+      runtimeCommand("set", "state", { key: "affinity", value: 4 }),
+      runtimeCommand(
+        "flash",
+        "effect",
+        { color: "#ffffff", duration: 120 },
+        { condition: { type: "expression", source: "affinity<3" } }
+      ),
+      runtimeCommand(
+        "flash",
+        "effect",
+        { color: "#ffffff", duration: 120 },
+        { unless: { type: "expression", source: "affinity>=3" } }
+      ),
+      runtimeCommand(
+        "choice",
+        "choice",
+        { text: "Open the door", goto: "#Open" },
+        { source: "naninovel", condition: { type: "expression", source: "affinity>=3" } }
+      )
+    ]);
+    const result = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.state.pendingChoices).toEqual([{ text: "Open the door", goto: "#Open" }]);
+    expect(result.emittedRuntimeCommands).toEqual([]);
+  });
+
+  it("returns an expression diagnostic without emitting commands on unresolved variables", () => {
+    const runtimeScript = runtimeScriptFixture("unresolved-expression.nani", [
+      runtimeCommand("flash", "effect", {
+        color: "#ffffff",
+        duration: { type: "expression", source: "missingDuration" }
+      })
+    ]);
+    const initialState = createInitialStoryState(runtimeScript);
+    const result = advanceToNextStop(initialState, runtimeScript);
+
+    expect(result.state).toBe(initialState);
+    expect(result.emittedRuntimeCommands).toEqual([]);
+    expect(result.diagnostics).toEqual([
+      {
+        code: "expression-unresolved",
+        message: "@flash expression missingDuration could not be resolved: Parameter duration: Unknown variable missingDuration.",
+        severity: "error"
+      }
+    ]);
   });
 
   it("does not fast-forward across multiple readable lines", () => {
-    const { scenario } = parseScenario({
-      sourceText: `Felix: First line.
-Mira: Second line.
-@end`,
-      scriptPath: "multi-line.nani"
-    });
-    let state = createInitialStoryState(scenario);
+    const runtimeScript = runtimeScriptFixture("multi-line.nani", [
+      runtimeCommand("print", "text", { speaker: "Felix", text: "First line.", autoNext: false }),
+      runtimeCommand("print", "text", { speaker: "Mira", text: "Second line.", autoNext: false }),
+      runtimeCommand("end", "flow", {})
+    ]);
+    let state = createInitialStoryState(runtimeScript);
 
-    let result = advanceToNextStop(state, scenario);
+    let result = advanceToNextStop(state, runtimeScript);
     state = result.state;
     expect(selectCurrentStoryLine(state)).toEqual({ speaker: "Felix", text: "First line." });
 
-    result = advanceToNextStop(state, scenario);
+    result = advanceToNextStop(state, runtimeScript);
     state = result.state;
     expect(selectCurrentStoryLine(state)).toEqual({ speaker: "Mira", text: "Second line." });
     expect(state.ended).toBe(false);
   });
 
-  it("chooses a branch without auto-advancing, then applies branch state and gameplay effects on advance", () => {
-    const { scenario } = parseScenario({ sourceText: vnStepperScript, scriptPath: "story-vn.nani" });
-    let state = createInitialStoryState(scenario);
-    state = advanceToNextStop(state, scenario).state;
-    state = advanceToNextStop(state, scenario).state;
+  it("chooses a branch without auto-advancing, then applies branch state and emits gameplay on advance", () => {
+    const runtimeScript = vnStepperRuntimeScript;
+    let state = createInitialStoryState(runtimeScript);
+    state = advanceToNextStop(state, runtimeScript).state;
+    state = advanceToNextStop(state, runtimeScript).state;
 
-    let result = chooseStoryOption(state, scenario, 1);
+    let result = chooseStoryOption(state, runtimeScript, 1);
     state = result.state;
 
     expect(result.diagnostics).toEqual([]);
-    expect(state.instructionPointer).toBe((scenario.labels.Classroom ?? -1) + 1);
+    expect(state.instructionPointer).toBe(runtimeScript.labels.Classroom);
     expect(state.pendingChoices).toEqual([]);
     expect(selectCurrentStoryLine(state)).toEqual({
       speaker: "Felix",
@@ -330,15 +377,12 @@ Mira: Second line.
     });
     expect(state.variables.route).toBeUndefined();
 
-    result = advanceToNextStop(state, scenario);
+    result = advanceToNextStop(state, runtimeScript);
     state = result.state;
 
     expect(result.diagnostics).toEqual([]);
     expect(state.variables.route).toBe("classroom");
-    expect(state.effects).toContainEqual({
-      type: "gameplay-event",
-      event: { type: "grant-evidence", evidenceId: "evidence:keycard" }
-    });
+    expect(result.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["gameplay", "print"]);
     expect(selectCurrentStoryLine(state)).toEqual({
       speaker: "Mira",
       text: "Then the keycard matters after all."
@@ -346,18 +390,18 @@ Mira: Second line.
   });
 
   it("returns diagnostics for invalid choices and pending-choice advances without throwing", () => {
-    const { scenario } = parseScenario({ sourceText: vnStepperScript, scriptPath: "story-vn.nani" });
-    let state = createInitialStoryState(scenario);
-    state = advanceToNextStop(state, scenario).state;
-    state = advanceToNextStop(state, scenario).state;
+    const runtimeScript = vnStepperRuntimeScript;
+    let state = createInitialStoryState(runtimeScript);
+    state = advanceToNextStop(state, runtimeScript).state;
+    state = advanceToNextStop(state, runtimeScript).state;
 
-    const invalidChoice = chooseStoryOption(state, scenario, 9);
+    const invalidChoice = chooseStoryOption(state, runtimeScript, 9);
     expect(invalidChoice.state).toBe(state);
     expect(invalidChoice.diagnostics).toEqual([
       { code: "invalid-choice", message: "Choice index 9 is not available." }
     ]);
 
-    const pendingAdvance = advanceToNextStop(state, scenario);
+    const pendingAdvance = advanceToNextStop(state, runtimeScript);
     expect(pendingAdvance.state).toBe(state);
     expect(pendingAdvance.diagnostics).toEqual([
       { code: "pending-choices", message: "Story is waiting for a choice; advance did not change state." }
@@ -365,14 +409,17 @@ Mira: Second line.
   });
 
   it("returns an ended no-op diagnostic after the story has ended", () => {
-    const { scenario } = parseScenario({ sourceText: "Felix: Done.\n@end", scriptPath: "ended.nani" });
-    let state = createInitialStoryState(scenario);
-    state = advanceToNextStop(state, scenario).state;
-    state = advanceToNextStop(state, scenario).state;
+    const runtimeScript = runtimeScriptFixture("ended.nani", [
+      runtimeCommand("print", "text", { speaker: "Felix", text: "Done.", autoNext: false }),
+      runtimeCommand("end", "flow", {})
+    ]);
+    let state = createInitialStoryState(runtimeScript);
+    state = advanceToNextStop(state, runtimeScript).state;
+    state = advanceToNextStop(state, runtimeScript).state;
 
     expect(state.ended).toBe(true);
 
-    const result = advanceToNextStop(state, scenario);
+    const result = advanceToNextStop(state, runtimeScript);
     expect(result.state).toBe(state);
     expect(result.diagnostics).toEqual([
       { code: "story-ended-noop", message: "Story is already ended; advance did not change state." }
@@ -380,9 +427,13 @@ Mira: Second line.
   });
 
   it("returns a max-step diagnostic for guarded advance loops", () => {
-    const { scenario } = parseScenario({ sourceText: "#Start\n@goto #Start", scriptPath: "loop.nani" });
-    const state = createInitialStoryState(scenario);
-    const result = advanceToNextStop(state, scenario, { maxSteps: 3 });
+    const runtimeScript = runtimeScriptFixture(
+      "loop.nani",
+      [runtimeCommand("goto", "flow", { label: "#Start" }, { source: "naninovel" })],
+      { Start: 0 }
+    );
+    const state = createInitialStoryState(runtimeScript);
+    const result = advanceToNextStop(state, runtimeScript, { maxSteps: 3 });
 
     expect(result.state.ended).toBe(false);
     expect(result.diagnostics).toEqual([
@@ -391,10 +442,10 @@ Mira: Second line.
   });
 
   it("keeps the public story runtime snapshot serializable", () => {
-    const { scenario } = parseScenario({ sourceText: vnStepperScript, scriptPath: "story-vn.nani" });
-    let state = createInitialStoryState(scenario);
-    state = advanceToNextStop(state, scenario).state;
-    state = advanceToNextStop(state, scenario).state;
+    const runtimeScript = vnStepperRuntimeScript;
+    let state = createInitialStoryState(runtimeScript);
+    state = advanceToNextStop(state, runtimeScript).state;
+    state = advanceToNextStop(state, runtimeScript).state;
 
     expect(() => StoryRuntimeSnapshotSchema.parse(storyRuntimeSnapshot(state))).not.toThrow();
   });
@@ -403,8 +454,54 @@ Mira: Second line.
 function reduceWithoutDiagnostics(
   state: ReturnType<typeof createInitialStoryState>,
   event: Parameters<typeof storyReducer>[1]
-): ReturnType<typeof createInitialStoryState> {
+): ReturnType<typeof storyReducer> {
   const result = storyReducer(state, event);
   expect(result.diagnostics).toEqual([]);
-  return result.state;
+  return result;
+}
+
+function runtimeScriptFixture(
+  scriptPath: string,
+  commands: RuntimeCommand[],
+  labels: Record<string, number> = {}
+): RuntimeScript {
+  return runtimeScript(scriptPath, commands, labels);
+}
+
+function runtimeScript(
+  scriptPath: string,
+  commands: RuntimeCommand[],
+  labels: Record<string, number> = {}
+): RuntimeScript {
+  return { scriptPath, commands, labels, assets: [], dependencies: [] };
+}
+
+function runtimeCommand(
+  commandId: string,
+  category: NaniCommandCategory,
+  params: Record<string, RuntimeValue>,
+  options: {
+    canonicalName?: string;
+    source?: NaniCommandSource;
+    status?: NaniCommandStatus;
+    condition?: RuntimeCommand["condition"];
+    unless?: RuntimeCommand["unless"];
+  } = {}
+): RuntimeCommand {
+  return {
+    commandId,
+    canonicalName: options.canonicalName ?? commandId,
+    category,
+    source: options.source ?? "v-ronpa",
+    status: options.status ?? "implemented",
+    params,
+    ...(options.condition ? { condition: options.condition } : {}),
+    ...(options.unless ? { unless: options.unless } : {}),
+    loc: {
+      scriptPath: "story-engine-test.nani",
+      line: 1,
+      column: 1,
+      raw: `@${commandId}`
+    }
+  };
 }

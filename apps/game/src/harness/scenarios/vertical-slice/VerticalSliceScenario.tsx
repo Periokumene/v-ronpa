@@ -120,7 +120,7 @@ export function VerticalSliceScenario() {
                 variables={runtime.storyRuntime.state.variables}
                 inventoryItems={runtime.gameplay.inventory.items}
                 evidenceIds={runtime.gameplay.evidence.ownedEvidenceIds}
-                presentationCommands={runtime.storyRuntime.state.presentationCommands}
+                runtimeCommandCount={runtime.lastRuntimeCommandCount}
               />
             </div>
           ) : null}
@@ -177,7 +177,11 @@ function VerticalSliceRuntimeControls({
   pointerLockTriggerProps: ButtonHTMLAttributes<HTMLButtonElement>;
 }) {
   return (
-    <section aria-label="Runtime debug controls" className="vertical-slice-runtime-controls" data-testid="harness-commands">
+    <section
+      aria-label="Runtime debug controls"
+      className="vertical-slice-runtime-controls"
+      data-testid="vertical-slice-runtime-controls"
+    >
       <header>
         <span>Runtime Controls</span>
         <strong>debug</strong>

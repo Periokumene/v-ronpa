@@ -12,7 +12,9 @@ P1 follows the current V-Ronpa contract and architecture:
 - Parser output is generic `.nani` AST/IR.
 - Parser diagnostics are message-based and do not add diagnostic codes.
 - StoryEngine, Gameplay, TrialDirector, rendering, persistence, localization,
-  and app harness behavior are outside this parser task.
+  and app harness behavior are outside this parser task. The parser preserves
+  expression values; RuntimeCommand compilation preserves them, and StoryEngine
+  owns the restricted runtime expression resolver.
 - Unsupported command names from the external sample are not reserved as
   placeholders in examples or acceptance criteria.
 
@@ -120,7 +122,7 @@ but are intentionally unused in the P1 fixtures.
 |---|---|---|---|
 | Text localization IDs and text references | Requires stable localization and voice/backlog identity design | P2 | StoryEngine + tooling |
 | Indentation child blocks | Requires block tree construction, not just line-oriented IR | P2 | nani-parser + StoryEngine |
-| Block control flow | Requires expression semantics and runtime execution model | P2 | StoryEngine |
+| Block control flow | Requires block tree and call-stack semantics; command-level `if` / `unless` expression evaluation exists in StoryEngine v1 | P2 | StoryEngine |
 | Subroutine flow | Requires call stack semantics | P2 | StoryEngine |
 | Input/save/unlock/toast style app commands | Requires UI, save, achievement, or notification contracts | P3 | app/harness + media-save + ui-kit |
 | Multi-speaker text | Requires dialogue presentation and backlog policy | P2 | StoryEngine + ui-kit |
@@ -150,7 +152,8 @@ Any P2 change that alters `packages/nani-parser/src/types.ts` requires a CCR.
 
 P3 and later work belongs outside this parser baseline:
 
-- full expression parsing or evaluation
+- full Naninovel-compatible expression parsing or evaluation beyond the
+  restricted StoryEngine runtime resolver
 - command schema validation
 - runtime command execution
 - StoryEngine scheduling and multi-track execution

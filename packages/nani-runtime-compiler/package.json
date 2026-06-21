@@ -1,5 +1,5 @@
 {
-  "name": "@v-ronpa/story-engine",
+  "name": "@v-ronpa/nani-runtime-compiler",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,6 +7,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@v-ronpa/contracts": "workspace:*"
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/nani-parser": "workspace:*"
   }
 }

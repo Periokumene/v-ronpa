@@ -17,7 +17,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vertical-slice-debug-sidebar")).toBeVisible();
   await expect(page.getByTestId("vertical-slice-debug-panel-runtime")).toBeVisible();
   await expect(page.getByTestId("playfield").getByTestId("harness-commands")).toHaveCount(0);
-  await expect(page.getByTestId("vertical-slice-debug-panel-runtime").getByTestId("harness-commands")).toBeVisible();
+  await expect(page.getByTestId("vertical-slice-debug-panel-runtime").getByTestId("vertical-slice-runtime-controls")).toBeVisible();
   await expect(page.getByTestId("title-surface")).toBeVisible();
   await expect(page.getByTestId("title-new-game")).toBeEnabled();
   await expect(page.getByTestId("title-load")).toBeEnabled();
@@ -45,7 +45,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vertical-slice-debug-tab-inspector")).toHaveAttribute("aria-selected", "true");
   await page.getByTestId("vertical-slice-debug-tab-runtime").click();
   await expect(page.getByTestId("vertical-slice-debug-tab-runtime")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("vertical-slice-debug-panel-runtime").getByTestId("harness-commands")).toBeVisible();
+  await expect(page.getByTestId("vertical-slice-debug-panel-runtime").getByTestId("vertical-slice-runtime-controls")).toBeVisible();
   await expect(page.getByTestId("vertical-slice-map")).toHaveText("map:academy-hall");
   await expect(page.getByTestId("vertical-slice-pointer-lock-status")).toHaveText("idle");
   await expectNoDocumentScroll(page);

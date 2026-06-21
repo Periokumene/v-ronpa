@@ -12,6 +12,7 @@
   "references": [
     { "path": "../../packages/contracts" },
     { "path": "../../packages/nani-parser" },
+    { "path": "../../packages/nani-runtime-compiler" },
     { "path": "../../packages/story-engine" },
     { "path": "../../packages/game-flow-machine" },
     { "path": "../../packages/gameplay" },

@@ -1,70 +1,61 @@
 import { describe, expect, it } from "vitest";
-import type { PresentationCommand, StoryEffect } from "@v-ronpa/contracts";
+import type { NaniCommandCategory, NaniCommandSource, NaniCommandStatus, RuntimeCommand, RuntimeValue } from "@v-ronpa/contracts";
 import {
   defaultVnOutputRouteTable,
-  routePresentationCommand,
-  routeStoryEffect,
-  selectEffectsForTarget,
-  selectPresentationCommandsForTarget,
+  routeRuntimeCommand,
+  selectRuntimeCommandsForTarget,
   type VnOutputRouteTable
 } from "./vnOutputRoutes";
 
 describe("VN output routes", () => {
   it("supports one-to-many fixed route targets", () => {
-    const command: PresentationCommand = { type: "print", text: "Line", autoNext: false };
+    const command = runtimeCommand("toast", "ui", { text: "Line" });
     const routeTable: VnOutputRouteTable = {
       ...defaultVnOutputRouteTable,
-      presentationCommands: {
-        ...defaultVnOutputRouteTable.presentationCommands,
-        print: ["ui", "debug"]
+      commands: {
+        ...defaultVnOutputRouteTable.commands,
+        toast: ["ui", "debug"]
       }
     };
 
-    expect(routePresentationCommand(command, routeTable)).toEqual(["ui", "debug"]);
+    expect(routeRuntimeCommand(command, routeTable)).toEqual(["ui", "debug"]);
   });
 
-  it("routes selected presentation commands by target", () => {
-    const commands: PresentationCommand[] = [
-      { type: "print", text: "Line", autoNext: false },
-      { type: "set-background", backgroundId: "bg:harness" },
-      { type: "char-enter", characterId: "character:felix", slot: "center", effect: "fadeIn" }
+  it("keeps print out of the UI command stream because dialog reads Story state", () => {
+    const commands: RuntimeCommand[] = [
+      runtimeCommand("print", "text", { text: "Line", autoNext: false }),
+      runtimeCommand("back", "scene", { appearance: "bg:harness" }),
+      runtimeCommand("charenter", "actor", { characterId: "character:felix", slot: "center", effect: "fadeIn" })
     ];
 
-    expect(selectPresentationCommandsForTarget(commands, "pixi")).toEqual([commands[1], commands[2]]);
-    expect(selectPresentationCommandsForTarget(commands, "ui")).toEqual([commands[0]]);
+    expect(selectRuntimeCommandsForTarget(commands, "pixi")).toEqual([commands[1], commands[2]]);
+    expect(selectRuntimeCommandsForTarget(commands, "ui")).toEqual([]);
+    expect(selectRuntimeCommandsForTarget(commands, "debug")).toEqual([commands[0]]);
   });
 
-  it("routes non-presentation effects from the incremental effect stream", () => {
-    const effects: StoryEffect[] = [
-      { type: "gameplay-event", event: { type: "grant-evidence", evidenceId: "evidence:keycard" } },
-      { type: "media-event", eventType: "play-bgm", assetId: "bgm:investigation" },
-      { type: "navi-event", eventType: "close-overlay" }
+  it("routes uncased commands through category fallback", () => {
+    const commands: RuntimeCommand[] = [
+      runtimeCommand("bgm", "media", { bgmPath: "bgm:investigation" }, "naninovel", "stubbed"),
+      runtimeCommand("toast", "ui", { text: "Debug" }, "naninovel", "stubbed"),
+      runtimeCommand("lock", "state", { id: "door" }, "naninovel", "stubbed")
     ];
 
-    expect(selectEffectsForTarget(effects, "gameplay")).toEqual([effects[0]]);
-    expect(selectEffectsForTarget(effects, "media")).toEqual([effects[1]]);
-    expect(selectEffectsForTarget(effects, "navi")).toEqual([effects[2]]);
+    expect(selectRuntimeCommandsForTarget(commands, "media")).toEqual([commands[0]]);
+    expect(selectRuntimeCommandsForTarget(commands, "ui")).toEqual([commands[1]]);
+    expect(selectRuntimeCommandsForTarget(commands, "app")).toEqual([commands[2]]);
   });
 
-  it("keeps presentation effects out of Pixi execution to avoid duplicate presentation playback", () => {
-    const effect: StoryEffect = {
-      type: "presentation",
-      command: { type: "flash", color: "#ffffff", durationMs: 160 }
-    };
-
-    expect(routeStoryEffect(effect)).toEqual(["debug"]);
-    expect(selectEffectsForTarget([effect], "pixi")).toEqual([]);
-    expect(selectEffectsForTarget([effect], "debug")).toEqual([effect]);
-  });
-
-  it("routes wildcard effects by wildcardType with routeKey overrides", () => {
-    const effect: StoryEffect = {
-      type: "wildcard-event",
-      wildcardType: "effect",
-      routeKey: "ui:shake-debug",
-      params: { intensity: 0.8 },
-      sourceCommand: { commandId: "wildcard-effect", canonicalName: "wildcard-effect" }
-    };
+  it("routes wildcard commands by wildcardType with routeKey overrides", () => {
+    const command = runtimeCommand(
+      "wildcard-effect",
+      "effect",
+      {
+        wildcardType: "effect",
+        routeKey: "ui:shake-debug",
+        intensity: 0.8
+      },
+      "wildcard"
+    );
     const routeTable: VnOutputRouteTable = {
       ...defaultVnOutputRouteTable,
       wildcards: {
@@ -78,16 +69,42 @@ describe("VN output routes", () => {
       }
     };
 
-    expect(routeStoryEffect(effect, routeTable)).toEqual(["ui", "debug"]);
-    expect(selectEffectsForTarget([effect], "ui", routeTable)).toEqual([effect]);
+    expect(routeRuntimeCommand(command, routeTable)).toEqual(["ui", "debug"]);
+    expect(selectRuntimeCommandsForTarget([command], "ui", routeTable)).toEqual([command]);
     expect(
-      routeStoryEffect(
+      routeRuntimeCommand(
         {
-          ...effect,
-          routeKey: "pixi:burst"
+          ...command,
+          params: {
+            ...command.params,
+            routeKey: "pixi:burst"
+          }
         },
         routeTable
       )
     ).toEqual(["pixi"]);
   });
 });
+
+function runtimeCommand(
+  commandId: string,
+  category: NaniCommandCategory,
+  params: Record<string, RuntimeValue>,
+  source: NaniCommandSource = "v-ronpa",
+  status: NaniCommandStatus = "implemented"
+): RuntimeCommand {
+  return {
+    commandId,
+    canonicalName: commandId,
+    category,
+    source,
+    status,
+    params,
+    loc: {
+      scriptPath: "route-test.nani",
+      line: 1,
+      column: 1,
+      raw: `@${commandId}`
+    }
+  };
+}

@@ -130,9 +130,9 @@ delete, split, or execute entries from it.
   - `tests/smoke/vertical-slice.spec.ts`
 - Current Observation: Backlog is read-only in the interaction shell baseline.
   It displays story entries but does not seek, rewind, or branch-jump.
-- Why Not Actionable Yet: Jumping from backlog needs a replay/snapshot policy
-  for story variables, presentation commands, gameplay events, and saveable
-  side effects. That policy should be reviewed before implementation.
+- Why Not Actionable Yet: Jumping from backlog needs a snapshot/replay policy
+  for story variables, RuntimeCommand fanout, gameplay events, and saveable
+  runtime state. That policy should be reviewed before implementation.
 - Auto Action: Forbidden
 - Review Cadence: Review before implementing VN BACK or backlog jump behavior.
 - Next Review: TBD
@@ -178,9 +178,32 @@ delete, split, or execute entries from it.
 - Status: Watching
 - Linked Task / ADR / CCR: TBD
 
-### RW-0008: Auto / Skip Scheduler
+### RW-0008: RuntimeCommand Diagnostics Surfacing
 
 - ID: RW-0008
+- Title: Decide how compiler and story step diagnostics surface in app runtime
+- Area: nani-runtime-compiler, StoryEngine, apps/game harness, debug UI
+- Source / Evidence:
+  - `packages/nani-runtime-compiler/src/index.ts`
+  - `packages/story-engine/src/index.ts`
+  - `apps/game/src/interaction/useVerticalSliceRuntimeAdapter.ts`
+- Current Observation: The app compiles `.nani` into `RuntimeScript` and steps
+  through `emittedRuntimeCommands`, but compiler diagnostics and StoryEngine
+  step diagnostics are not yet collected into a visible app debug or reporting
+  channel.
+- Why Not Actionable Yet: Surfacing diagnostics needs a product decision on
+  scope and severity behavior: debug panel only, blocking overlay, dev console,
+  test-only assertion, save/load metadata, or a reusable diagnostics port.
+- Auto Action: Forbidden
+- Review Cadence: Review before expanding `.nani` authoring or adding runtime
+  script loading beyond the fixed vertical slice fixture.
+- Next Review: TBD
+- Status: Watching
+- Linked Task / ADR / CCR: TBD
+
+### RW-0009: Auto / Skip Scheduler
+
+- ID: RW-0009
 - Title: Define scheduler ownership for VN auto and skip behavior
 - Area: StoryEngine stepping, GameInteractionShell, VN toolbar
 - Source / Evidence:
@@ -197,9 +220,9 @@ delete, split, or execute entries from it.
 - Status: Watching
 - Linked Task / ADR / CCR: TBD
 
-### RW-0009: Pixi Presenter Differential Reconcile
+### RW-0010: Pixi Presenter Differential Reconcile
 
-- ID: RW-0009
+- ID: RW-0010
 - Title: Decide when Pixi snapshot rendering should move from full redraw to
   differential reconcile
 - Area: pixi-presenter, PixiStageSnapshot, VN runtime presentation

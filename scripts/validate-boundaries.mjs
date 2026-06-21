@@ -6,6 +6,7 @@ const root = process.cwd();
 const packageRoots = {
   "contracts": "packages/contracts",
   "nani-parser": "packages/nani-parser",
+  "nani-runtime-compiler": "packages/nani-runtime-compiler",
   "story-engine": "packages/story-engine",
   "gameplay": "packages/gameplay",
   "navi-director": "packages/navi-director",
@@ -21,7 +22,8 @@ const packageRoots = {
 const allowedWorkspaceDeps = {
   "contracts": [],
   "nani-parser": [],
-  "story-engine": ["contracts", "nani-parser"],
+  "nani-runtime-compiler": ["contracts", "nani-parser"],
+  "story-engine": ["contracts"],
   "gameplay": ["contracts"],
   "navi-director": ["contracts", "gameplay"],
   "trial-director": ["contracts", "gameplay"],
@@ -36,6 +38,7 @@ const allowedWorkspaceDeps = {
     "gameplay",
     "media-save",
     "nani-parser",
+    "nani-runtime-compiler",
     "navi-director",
     "pixi-presenter",
     "r3f-adapter",
@@ -60,6 +63,7 @@ const rendererAndBrowserAdapters = [
 const forbiddenExternalDeps = {
   "contracts": ["react", "react-dom", "@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
   "nani-parser": rendererAndBrowserAdapters,
+  "nani-runtime-compiler": rendererAndBrowserAdapters,
   "story-engine": rendererAndBrowserAdapters,
   "gameplay": rendererAndBrowserAdapters,
   "navi-director": rendererAndBrowserAdapters,

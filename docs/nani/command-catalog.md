@@ -52,10 +52,16 @@ demote the command unless the supported V-Ronpa behavior is no longer covered.
   catalog. This keeps the official parameter list auditable.
 - `@wildcard-<type>` commands are branch-local escape hatches. They require
   `routeKey:string`; all other params are forwarded as generic params.
-- `NaniCommandHandlerRegistry` binds runtime handlers only. It rejects handlers
-  not declared in the catalog.
-- Parser IR remains generic. It preserves known parameter names, but StoryEngine
-  owns catalog-derived parameter validation.
+- `nani-runtime-compiler` binds catalog metadata to compiled RuntimeCommand
+  output. It rejects or diagnoses commands and params against the catalog.
+- Parser IR remains generic. It preserves known parameter names, but the runtime
+  compiler owns catalog-derived parameter validation and normalization.
+- Implemented RuntimeCommand params use canonical runtime field names only.
+  Raw aliases stay in `sourceCommand`; wildcard commands are the only generic
+  forwarding exception.
+- `{...}` parameter expressions are preserved by the compiler and evaluated by
+  StoryEngine against story variables. The compiler must not replace expression
+  params with defaults.
 - `children` means the catalog marks the command as child-block capable. This
   baseline does not parse nested command blocks yet.
 
@@ -174,7 +180,9 @@ These commands remain project-specific declarations in the same catalog so
 handler registration cannot drift:
 
 - `end`
-- `gameplay` alias `gameplay-event`
+- `gameplay` alias `gameplay-event`; params `type`, `id`, `quantity`, `item`,
+  `itemId`, `evidence`, `evidenceId`, `character`, `characterId`, `status`,
+  `skill`, `skillId`, `delta`, and `affinityDelta`
 - `charenter` alias `char-enter`
 - `flash`
 - `focus`
@@ -198,8 +206,9 @@ implementation, not top-level `@` commands:
 - `[< speed:0.8]` is parsed as an inline command with id `<`. The parser copies
   its params into `TextIR.printParams`, so text presentation can adjust print
   behavior mid-line.
-- `[>]` is parsed as an inline command with id `>`. StoryEngine maps its
-  presence to `PresentationCommand.print.autoNext`.
+- `[>]` is parsed as an inline command with id `>`. The runtime compiler maps
+  its presence to `RuntimeCommand.params.autoNext` on the compiled `print`
+  command.
 
 They are intentionally not part of `commandCatalog` in this baseline. If they
 grow beyond inline text control, add a separate inline-token contract instead of

@@ -1,4 +1,4 @@
-import type { NaniWildcardType, PresentationCommand, StoryEffect } from "@v-ronpa/contracts";
+import type { NaniCommandCategory, RuntimeCommand } from "@v-ronpa/contracts";
 
 export type VnRuntimeProfile = "vn2d" | "vn3d";
 
@@ -10,9 +10,9 @@ export interface VnWildcardRouteConfig {
 }
 
 export interface VnOutputRouteTable {
-  presentationCommands: Partial<Record<PresentationCommand["type"], VnOutputRouteTarget[]>>;
-  effects: Partial<Record<StoryEffect["type"], VnOutputRouteTarget[]>>;
-  wildcards: Partial<Record<NaniWildcardType, VnWildcardRouteConfig>>;
+  commands: Partial<Record<string, VnOutputRouteTarget[]>>;
+  categories: Partial<Record<NaniCommandCategory, VnOutputRouteTarget[]>>;
+  wildcards: Partial<Record<string, VnWildcardRouteConfig>>;
 }
 
 export interface VnOutputRouteContext {
@@ -20,25 +20,26 @@ export interface VnOutputRouteContext {
 }
 
 export const defaultVnOutputRouteTable: VnOutputRouteTable = {
-  presentationCommands: {
-    print: ["ui"],
-    "set-background": ["pixi"],
-    "char-enter": ["pixi"],
+  commands: {
+    print: ["debug"],
+    back: ["pixi"],
+    charenter: ["pixi"],
     shake: ["pixi"],
     flash: ["pixi"],
     focus: ["pixi"],
-    "trial-keyword": ["pixi"],
-    "trial-subtitle": ["pixi"],
-    "camera-focus": ["r3f"],
-    "stage-actor": ["r3f"]
+    trialkeyword: ["pixi"],
+    gameplay: ["gameplay"]
   },
-  effects: {
-    presentation: ["debug"],
-    "gameplay-event": ["gameplay"],
-    "media-event": ["media"],
-    "navi-event": ["navi"],
-    "trial-event": ["trial"],
-    "wildcard-event": ["wildcard"]
+  categories: {
+    media: ["media"],
+    ui: ["ui"],
+    actor: ["pixi"],
+    scene: ["pixi"],
+    effect: ["pixi"],
+    state: ["app"],
+    flow: ["app"],
+    choice: ["ui"],
+    text: ["debug"]
   },
   wildcards: {
     text: { defaultTargets: ["ui"] },
@@ -53,60 +54,46 @@ export const defaultVnOutputRouteTable: VnOutputRouteTable = {
   }
 };
 
-export function routePresentationCommand(
-  command: PresentationCommand,
+export function routeRuntimeCommand(
+  command: RuntimeCommand,
   routeTable: VnOutputRouteTable = defaultVnOutputRouteTable,
   context: VnOutputRouteContext = {}
 ): VnOutputRouteTarget[] {
   void context;
-  return routeTable.presentationCommands[command.type] ?? ["debug"];
+  if (command.source === "wildcard") return routeWildcardCommand(command, routeTable, context);
+  return routeTable.commands[command.commandId] ?? routeTable.categories[command.category] ?? ["debug"];
 }
 
-export function routeStoryEffect(
-  effect: StoryEffect,
+export function routeWildcardCommand(
+  command: RuntimeCommand,
   routeTable: VnOutputRouteTable = defaultVnOutputRouteTable,
   context: VnOutputRouteContext = {}
 ): VnOutputRouteTarget[] {
   void context;
-  if (effect.type === "wildcard-event") return routeWildcardEffect(effect, routeTable, context);
-  return routeTable.effects[effect.type] ?? ["debug"];
+  const wildcardType = stringParam(command, "wildcardType") ?? command.commandId.slice("wildcard-".length);
+  const routeKey = stringParam(command, "routeKey");
+  const config = routeTable.wildcards[wildcardType];
+  return (routeKey ? config?.routeKeys?.[routeKey] : undefined) ?? config?.defaultTargets ?? ["wildcard"];
 }
 
-export function routeWildcardEffect(
-  effect: Extract<StoryEffect, { type: "wildcard-event" }>,
-  routeTable: VnOutputRouteTable = defaultVnOutputRouteTable,
-  context: VnOutputRouteContext = {}
-): VnOutputRouteTarget[] {
-  void context;
-  const config = routeTable.wildcards[effect.wildcardType];
-  return config?.routeKeys?.[effect.routeKey] ?? config?.defaultTargets ?? ["wildcard"];
-}
-
-export function selectPresentationCommandsForTarget(
-  commands: PresentationCommand[],
+export function selectRuntimeCommandsForTarget(
+  commands: RuntimeCommand[],
   target: VnOutputRouteTarget,
   routeTable: VnOutputRouteTable = defaultVnOutputRouteTable,
   context: VnOutputRouteContext = {}
-): PresentationCommand[] {
-  return commands.filter((command) => routePresentationCommand(command, routeTable, context).includes(target));
+): RuntimeCommand[] {
+  return commands.filter((command) => routeRuntimeCommand(command, routeTable, context).includes(target));
 }
 
-export function selectEffectsForTarget(
-  effects: StoryEffect[],
-  target: VnOutputRouteTarget,
-  routeTable: VnOutputRouteTable = defaultVnOutputRouteTable,
-  context: VnOutputRouteContext = {}
-): StoryEffect[] {
-  return effects.filter((effect) => routeStoryEffect(effect, routeTable, context).includes(target));
-}
-
-export function selectNewStoryEffects(previousEffectsLength: number, effects: StoryEffect[]): StoryEffect[] {
-  return effects.slice(Math.max(0, previousEffectsLength));
-}
-
-export function selectNewPresentationCommands(
-  previousCommandsLength: number,
-  commands: PresentationCommand[]
-): PresentationCommand[] {
-  return commands.slice(Math.max(0, previousCommandsLength));
+function stringParam(command: RuntimeCommand, key: string): string | undefined {
+  const value = command.params[key];
+  if (value === undefined) return undefined;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    const items = value.map((item) =>
+      typeof item === "string" || typeof item === "number" || typeof item === "boolean" ? String(item) : undefined
+    );
+    return items.some((item) => item === undefined) ? undefined : items.join(",");
+  }
+  return undefined;
 }

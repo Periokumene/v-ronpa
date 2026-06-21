@@ -6,8 +6,9 @@
   modes, interaction shell context, overlay/action/capability snapshots, UI
   asset refs, style profile refs, Navi runtime state, Trial runtime state,
   inventory, trial definitions, evidence definitions, input bindings, camera
-  modes, runtime assets, Story snapshots, Story effects, typed gameplay events,
-  `.nani` command catalog metadata, and presentation command wire shapes.
+  modes, runtime assets, Story snapshots, RuntimeCommand bridge schemas, typed
+  gameplay events, `.nani` command catalog metadata, and presentation command
+  wire shapes used by presenter adapters.
 - `packages/nani-parser`: `.nani` AST and IR shape.
 
 Changes to these packages are cross-module changes. A module worktree must not
@@ -41,6 +42,12 @@ and merge the change through the integration baseline first.
   Three.js objects.
 - Renderer-specific objects must not appear in contracts.
 - Script source locations must be preserved through parse and compile outputs.
+- RuntimeCommand params must use canonical runtime field names only. Raw parser
+  aliases and source params belong in `sourceCommand`, except wildcard commands
+  whose purpose is generic forwarding.
+- RuntimeCommand may carry unresolved expression values and `condition/unless`
+  expressions. The compiler preserves them; StoryEngine evaluates them against
+  story variables before app adapter fanout.
 - `commandCatalog` is the only declaration source for `.nani` commands.
   Runtime handler registries bind execution only; they must not define command
   metadata independently.
@@ -80,11 +87,11 @@ Hard gate snapshots cover:
 
 - `.nani` AST/IR
 - StoryEngine runtime state
-- StoryEffect bridge outputs
+- RuntimeCommand bridge outputs
 - Trial outcomes
 - Trial graph validation diagnostics
 - Navi and Trial director runtime state
-- Presentation command logs
+- Pixi presentation snapshots and render hints
 
 See also:
 

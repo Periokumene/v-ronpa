@@ -19,14 +19,14 @@ import {
   PixiStageSnapshotSchema,
   PresentationCommandSchema,
   RuntimeAssetSchema,
+  RuntimeCommandSchema,
+  RuntimeScriptSchema,
   SaveDataSchema,
   SaveSlotSummarySchema,
   SettingsSnapshotSchema,
-  StoryEffectSchema,
   TrialDefinitionSchema,
   TrialRuntimeStateSchema,
   UiAssetRefSchema,
-  WildcardStoryEffectSchema,
   getNaniCommandDefinition,
   naniCommandCatalog
 } from "./index";
@@ -440,30 +440,6 @@ describe("contracts", () => {
     ).toMatchObject({ assets: [{ role: "toolbar-icon" }], tokens: { accentColor: "#6ee7d8", panelOpacity: 0.9 } });
   });
 
-  it("validates story effects as the script-to-director bridge", () => {
-    expect(
-      StoryEffectSchema.parse({
-        type: "presentation",
-        command: { type: "flash", color: "#ffffff", durationMs: 160 }
-      })
-    ).toMatchObject({ type: "presentation" });
-
-    expect(
-      StoryEffectSchema.parse({
-        type: "trial-event",
-        eventType: "break-keyword",
-        payload: { keywordId: "kw:locked", evidenceId: "evidence:keycard" }
-      })
-    ).toMatchObject({ eventType: "break-keyword" });
-
-    expect(
-      StoryEffectSchema.parse({
-        type: "gameplay-event",
-        event: { type: "grant-evidence", evidenceId: "evidence:keycard" }
-      })
-    ).toMatchObject({ type: "gameplay-event", event: { type: "grant-evidence" } });
-  });
-
   it("pins the Naninovel command catalog as the command declaration source", () => {
     const officialCommands = naniCommandCatalog.filter((command) => command.source === "naninovel");
     const wildcardCommands = naniCommandCatalog.filter((command) => command.source === "wildcard");
@@ -535,22 +511,45 @@ describe("contracts", () => {
     });
   });
 
-  it("validates wildcard story effects without treating them as presentation commands", () => {
-    const effect = WildcardStoryEffectSchema.parse({
-      type: "wildcard-event",
-      wildcardType: "effect",
-      routeKey: "pixi:chromatic-burst",
-      params: { intensity: 0.8, wait: true },
+  it("validates runtime commands and runtime scripts as the command dispatch bridge", () => {
+    const command = RuntimeCommandSchema.parse({
+      commandId: "flash",
+      canonicalName: "flash",
+      category: "effect",
+      source: "v-ronpa",
+      status: "implemented",
+      params: {
+        color: "#ffffff",
+        duration: 160,
+        enabled: true,
+        easing: { type: "expression", source: "$flashEase" },
+        stops: [0, 0.5, 1]
+      },
+      condition: { type: "expression", source: "flashEnabled" },
+      loc: { scriptPath: "story.nani", line: 2, column: 1, raw: "@flash color:#ffffff duration:160" },
       sourceCommand: {
-        commandId: "wildcard-effect",
-        canonicalName: "wildcard-effect",
-        loc: { scriptPath: "story.nani", line: 3, column: 1, raw: "@wildcard-effect routeKey:pixi:chromatic-burst" }
+        rawCommandId: "flash",
+        rawPrimary: undefined,
+        rawParams: { color: "#ffffff", duration: 160 },
+        rawFlags: {}
       }
     });
 
-    expect(effect).toMatchObject({ type: "wildcard-event", wildcardType: "effect" });
-    expect(StoryEffectSchema.parse(effect)).toMatchObject({ routeKey: "pixi:chromatic-burst" });
-    expect(effect).not.toHaveProperty("command");
+    expect(command).toMatchObject({
+      commandId: "flash",
+      params: { color: "#ffffff", duration: 160 },
+      condition: { type: "expression", source: "flashEnabled" }
+    });
+
+    expect(
+      RuntimeScriptSchema.parse({
+        scriptPath: "story.nani",
+        commands: [command],
+        labels: { Start: 0 },
+        assets: [{ id: "bg:harness", kind: "background", uri: "/bg.png" }],
+        dependencies: [{ endpoint: "common.nani" }]
+      })
+    ).toMatchObject({ scriptPath: "story.nani", commands: [{ commandId: "flash" }] });
   });
 
   it("validates versioned save data", () => {
@@ -611,5 +610,28 @@ describe("contracts", () => {
         characters: {}
       })
     ).toThrow();
+  });
+
+  it("does not persist runtime command streams in save data", () => {
+    const save = SaveDataSchema.parse({
+      version: 2,
+      savedAt: "2026-06-14T00:00:00.000Z",
+      mode: "navi",
+      story: {
+        currentScriptPath: "opening.nani",
+        instructionPointer: 2,
+        variables: {},
+        backlog: [],
+        pendingChoices: [],
+        ended: false,
+        emittedRuntimeCommands: []
+      },
+      pixiStage: { version: 1, revision: 0, slots: {} },
+      inventory: { items: {} },
+      evidence: { ownedEvidenceIds: [] },
+      characters: {}
+    });
+
+    expect(save.story).not.toHaveProperty("emittedRuntimeCommands");
   });
 });

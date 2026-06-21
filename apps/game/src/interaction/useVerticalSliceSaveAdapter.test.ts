@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
+import type { RuntimeScript } from "@v-ronpa/contracts";
 import { createGameplayState } from "@v-ronpa/gameplay";
 import { parseScenario } from "@v-ronpa/nani-parser";
+import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot, reducePixiStageCommand } from "@v-ronpa/pixi-presenter";
 import { createInitialStoryState } from "@v-ronpa/story-engine";
 import { createVerticalSliceSaveData, verticalSliceSaveSlotIds } from "./useVerticalSliceSaveAdapter";
 
 describe("vertical slice save adapter", () => {
   it("collects public runtime state into versioned SaveData without UI state", () => {
-    const { scenario } = parseScenario({ sourceText: "Felix: Save me.", scriptPath: "save-test.nani" });
+    const runtimeScript = compileScenario("Felix: Save me.", "save-test.nani");
     const story = {
-      ...createInitialStoryState(scenario),
+      ...createInitialStoryState(runtimeScript),
       instructionPointer: 1,
       backlog: [{ speaker: "Felix", text: "Save me." }]
     };
@@ -61,3 +63,10 @@ describe("vertical slice save adapter", () => {
     ]);
   });
 });
+
+function compileScenario(sourceText: string, scriptPath: string): RuntimeScript {
+  const parsed = parseScenario({ sourceText, scriptPath });
+  const compiled = compileRuntimeScript(parsed.scenario);
+  expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+  return compiled.script;
+}

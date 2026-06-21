@@ -10,9 +10,10 @@
 - `BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/<name>.md`
 
 Hard gates verify public contracts, input/camera/asset schemas, parser IR,
-StoryEngine state and StoryEffect bridge outputs, gameplay outcomes,
-Navi/Trial director flow, Trial graph diagnostics, save migration validation,
-task path boundaries, CCR requirements, and dependency boundaries.
+RuntimeCommand compilation, StoryEngine state and emitted command outputs,
+gameplay outcomes, Navi/Trial director flow, Trial graph diagnostics, save
+migration validation, task path boundaries, CCR requirements, and dependency
+boundaries.
 
 `validate:boundaries` checks source imports, `package.json` dependency
 direction, and `tsconfig.json` project references against the same workspace
@@ -97,7 +98,7 @@ The harness inspector exposes:
 - variables
 - inventory/evidence
 - trial segment
-- presentation command log
+- latest emitted RuntimeCommand count
 - jump/grant/force outcome controls
 
 Inspector Lite is a developer harness, not production UI.

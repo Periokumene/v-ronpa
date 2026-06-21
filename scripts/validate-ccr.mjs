@@ -34,7 +34,8 @@ function changedFilesSince(ref) {
   const files = new Set([
     ...gitLines(["diff", "--name-only", `${ref}...HEAD`]),
     ...gitLines(["diff", "--name-only", "--cached"]),
-    ...gitLines(["diff", "--name-only"])
+    ...gitLines(["diff", "--name-only"]),
+    ...gitLines(["ls-files", "--others", "--exclude-standard"])
   ]);
   return [...files].filter(Boolean).sort();
 }

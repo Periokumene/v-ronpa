@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import type { RuntimeScript } from "@v-ronpa/contracts";
 import { createGameplayState } from "@v-ronpa/gameplay";
 import { parseScenario } from "@v-ronpa/nani-parser";
+import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot, reducePixiStageCommand } from "@v-ronpa/pixi-presenter";
 import { advanceToNextStop, createInitialStoryState, storyRuntimeSnapshot } from "@v-ronpa/story-engine";
 import type { VnOutputRouteTable } from "../vnOutputRoutes";
@@ -13,11 +15,11 @@ import {
 
 describe("vertical slice runtime adapter helpers", () => {
   it("extracts a small GameInteractionContext from vertical slice runtime state", () => {
-    const { scenario } = parseScenario({ sourceText: "Felix: Hello.\n- Choice A", scriptPath: "context-test.nani" });
+    const runtimeScript = compileScenario("Felix: Hello.\n- Choice A", "context-test.nani");
     const storyRuntime: StoryRuntime = {
       active: true,
       state: {
-        ...createInitialStoryState(scenario),
+        ...createInitialStoryState(runtimeScript),
         pendingChoices: [{ text: "Choice A" }]
       }
     };
@@ -41,51 +43,46 @@ describe("vertical slice runtime adapter helpers", () => {
   });
 
   it("passes vertical-slice route options into the unified Story/Pixi transaction", () => {
-    const { scenario } = parseScenario({
-      sourceText: [
+    const runtimeScript = compileScenario(
+      [
         "@back bg:harness effect:fade",
         "@charEnter character:felix portrait:portrait:felix:neutral slot:center",
         "@gameplay grant-evidence id:evidence:keycard",
         "Felix: Routed."
       ].join("\n"),
-      scriptPath: "route-options-test.nani"
-    });
+      "route-options-test.nani"
+    );
     const routeTable: VnOutputRouteTable = {
-      presentationCommands: {
-        print: ["ui"],
-        "set-background": ["debug"],
-        "char-enter": ["debug"]
+      commands: {
+        print: ["debug"],
+        back: ["debug"],
+        charenter: ["debug"],
+        gameplay: ["debug"]
       },
-      effects: {
-        presentation: ["debug"],
-        "gameplay-event": ["debug"]
-      },
+      categories: {},
       wildcards: {}
     };
-    const previousStory = createInitialStoryState(scenario);
-    const nextStory = advanceToNextStop(previousStory, scenario).state;
+    const initialStory = createInitialStoryState(runtimeScript);
+    const advanced = advanceToNextStop(initialStory, runtimeScript);
     const previousPixiStage = createInitialPixiStageSnapshot();
 
     const transaction = createVerticalSlicePresentationTransaction({
-      previousStory,
-      nextStory,
+      runtimeCommands: advanced.emittedRuntimeCommands,
       previousPixiStage,
       options: { profile: "vn3d", routeTable }
     });
 
     expect(transaction.pixiStage).toBe(previousPixiStage);
     expect(transaction.pixiHints).toEqual([]);
-    expect(transaction.gameplayEffects).toEqual([]);
+    expect(transaction.gameplayEvents).toEqual([]);
   });
 
   it("plans restore of Navi, Story, and Gameplay without carrying transient UI state", () => {
-    const { scenario } = parseScenario({ sourceText: "Felix: Restore me.", scriptPath: "restore-test.nani" });
+    const runtimeScript = compileScenario("Felix: Restore me.", "restore-test.nani");
     const story = {
-      ...createInitialStoryState(scenario),
+      ...createInitialStoryState(runtimeScript),
       instructionPointer: 1,
-      backlog: [{ speaker: "Felix", text: "Restore me." }],
-      presentationCommands: [{ type: "print" as const, text: "transient", autoNext: false }],
-      effects: [{ type: "presentation" as const, command: { type: "print" as const, text: "transient", autoNext: false } }]
+      backlog: [{ speaker: "Felix", text: "Restore me." }]
     };
     const gameplay = {
       ...createGameplayState(),
@@ -116,7 +113,7 @@ describe("vertical slice runtime adapter helpers", () => {
       characters: gameplay.characters
     };
 
-    const plan = createVerticalSliceRuntimeRestorePlan(save, scenario);
+    const plan = createVerticalSliceRuntimeRestorePlan(save, runtimeScript);
 
     expect(plan.navi).toEqual(save.navi);
     expect(plan.playerPose).toEqual(save.navi.playerPose);
@@ -128,10 +125,10 @@ describe("vertical slice runtime adapter helpers", () => {
     expect(plan.storyRuntime.active).toBe(true);
     expect(plan.storyRuntime.state).toMatchObject({
       instructionPointer: 1,
-      backlog: [{ speaker: "Felix", text: "Restore me." }],
-      presentationCommands: [],
-      effects: []
+      backlog: [{ speaker: "Felix", text: "Restore me." }]
     });
+    expect(plan.storyRuntime.state).not.toHaveProperty("presentationCommands");
+    expect(plan.storyRuntime.state).not.toHaveProperty("effects");
     expect(plan.pixiStageRuntime).toEqual({
       snapshot: pixiStage,
       hints: [],
@@ -140,3 +137,10 @@ describe("vertical slice runtime adapter helpers", () => {
     });
   });
 });
+
+function compileScenario(sourceText: string, scriptPath: string): RuntimeScript {
+  const parsed = parseScenario({ sourceText, scriptPath });
+  const compiled = compileRuntimeScript(parsed.scenario);
+  expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+  return compiled.script;
+}

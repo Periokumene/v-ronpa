@@ -56,6 +56,9 @@ importers:
       '@v-ronpa/nani-parser':
         specifier: workspace:*
         version: link:../../packages/nani-parser
+      '@v-ronpa/nani-runtime-compiler':
+        specifier: workspace:*
+        version: link:../../packages/nani-runtime-compiler
       '@v-ronpa/navi-director':
         specifier: workspace:*
         version: link:../../packages/navi-director
@@ -136,6 +139,15 @@ importers:
 
   packages/nani-parser: {}
 
+  packages/nani-runtime-compiler:
+    dependencies:
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@v-ronpa/nani-parser':
+        specifier: workspace:*
+        version: link:../nani-parser
+
   packages/navi-director:
     dependencies:
       '@v-ronpa/contracts':
@@ -181,9 +193,6 @@ importers:
       '@v-ronpa/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@v-ronpa/nani-parser':
-        specifier: workspace:*
-        version: link:../nani-parser
 
   packages/trial-director:
     dependencies:

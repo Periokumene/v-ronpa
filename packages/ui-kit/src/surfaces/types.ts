@@ -1,5 +1,3 @@
-import type { PresentationCommand } from "@v-ronpa/contracts";
-
 export interface ScenarioOption {
   id: string;
   label: string;
@@ -16,7 +14,7 @@ export interface InspectorLiteProps {
   inventoryItems: Record<string, number>;
   evidenceIds: string[];
   trialSegmentId?: string;
-  presentationCommands: PresentationCommand[];
+  runtimeCommandCount: number;
   onGrantItem?: (itemId: string) => void;
   onGrantEvidence?: (evidenceId: string) => void;
   onJumpLabel?: (label: string) => void;

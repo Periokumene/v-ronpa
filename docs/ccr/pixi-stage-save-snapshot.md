@@ -13,9 +13,10 @@ Add a public `PixiStageSnapshot` contract and require it in `SaveData` v2.
 
 ## Why Existing Contract Is Insufficient
 
-Story UI can restore from `StoryRuntimeSnapshot`, but Pixi staging is currently
-driven by transient `presentationCommands`. Loading a save clears that command
-log, so background and portrait staging cannot be restored directly.
+Story UI can restore from `StoryRuntimeSnapshot`, but Pixi staging is derived
+from transient RuntimeCommand fanout and render hints. Loading a save must not
+replay that command stream, so background and portrait staging need a direct
+terminal snapshot.
 
 ## Proposed Shape
 
@@ -30,7 +31,7 @@ log, so background and portrait staging cannot be restored directly.
 ## Runtime Ownership
 
 - Story continues to own `StoryRuntimeSnapshot`.
-- Pixi reducer code owns command-to-`PixiStageSnapshot` projection.
+- App Pixi adapter code owns RuntimeCommand-to-`PixiStageSnapshot` projection.
 - Pixi presenter owns renderer reconciliation from the snapshot.
 - `PresenterTrace` remains internal debug state and is not a save contract.
 

@@ -23,29 +23,31 @@ Scripts use preset commands rather than renderer-specific instructions:
 @gameplay grant-evidence id:evidence:keycard
 ```
 
-The public presentation wire contract is `PresentationCommand`; Pixi, DOM, R3F,
-or a future presenter can interpret those commands.
+The public script-to-runtime command bridge is `RuntimeCommand`. It is produced
+by `nani-runtime-compiler` from parser IR before StoryEngine execution.
+RuntimeCommand params use canonical runtime names; for example `shake`,
+`flash`, and `focus` use `duration`, while the Pixi adapter maps that field to
+PresentationCommand `durationMs`.
 
 `.nani` command declarations live in `commandCatalog`. Naninovel official
 commands are explicit entries; wildcard commands are temporary branch-local
 routes named `@wildcard-<type>`.
 
-Story scripts emit `StoryEffect` bridge records. A presentation effect wraps a
-`PresentationCommand`; Trial, Navi, gameplay, and media effects keep their own
-typed channel names so directors can consume them without coupling to parser
-internals.
-
 App fanout is handled by `createVnRuntimePresentationTransaction` and
-`VnOutputRouteTable`. Route tables classify `PresentationCommand.type`,
-`StoryEffect.type`, and `wildcardType + routeKey`; they do not route by `.nani`
-command id.
+`VnOutputRouteTable`. Route tables classify normalized
+`RuntimeCommand.commandId`, command categories, and `wildcardType + routeKey`.
 
-`presentationCommands` is the cumulative presentation command log.
-`effects` is the incremental side-effect stream. A `presentation` effect is
-debug/log-only by default so Pixi does not replay a presentation command twice.
-For Pixi, newly emitted presentation commands are reduced into
-`PixiStageSnapshot` plus transient render hints before React rendering. Saves
-store the snapshot, not the command log or presenter trace.
+StoryEngine state stores story semantics only: script path, instruction pointer,
+variables, backlog, pending choices, and end state. It returns the current
+step's emitted runtime commands as an incremental stream. For Pixi, emitted
+commands such as `back`, `charenter`, `shake`, `flash`, `focus`, and
+`trialkeyword` are reduced into `PixiStageSnapshot` plus transient render hints
+before React rendering. Saves store the snapshot and story/gameplay state, not
+the runtime command stream or presenter trace.
+
+Expression params such as `duration:{flashDuration}` are preserved by the
+compiler, evaluated by StoryEngine against story variables, and should be
+resolved before app adapters consume emitted runtime commands.
 
 `trial-keyword` is a visual anchor for overlays and subtitles. It may carry
 debug metadata, but it is not the rule source for which evidence breaks which
@@ -75,8 +77,9 @@ Later:
 Pixi is planned as an overlay presenter for VN and trial effects. R3F remains
 the 3D world presenter. Shared WebGL context integration is a future
 optimization; first baseline can use independent canvas layers as long as
-presenter adapters keep `PresentationCommand` as their reducer input shape and
-render from committed runtime snapshots.
+presenter adapters render from committed runtime snapshots. Existing Pixi
+reducers may adapt RuntimeCommand into internal presenter command shapes at the
+app boundary, but StoryEngine does not emit presenter-specific logs.
 
 ## VN3D Versus Trial
 

@@ -43,10 +43,12 @@ adapters and apps
   `inventory`, and `event`.
 - `trial-director` owns Trial segment flow, presentation profile selection,
   timeout handling, evidence submission outcomes, and segment transitions.
-- `StoryEngine` owns script semantics, variables, backlog, choices, performs,
-  serializable Story snapshots, and story-generated `StoryEffect` bridge
-  events. Its `NaniCommandHandlerRegistry` binds command execution but does not
-  define command metadata.
+- `nani-runtime-compiler` owns `.nani` IR to `RuntimeScript` compilation,
+  command normalization, canonical runtime params, expression preservation, and
+  compiler diagnostics.
+- `StoryEngine` owns script semantics, variables, backlog, choices,
+  expression evaluation, serializable Story snapshots, and per-step
+  `emittedRuntimeCommands`.
 - `gameplay` owns domain reducers for exploration, inventory, evidence
   ownership, character state, and pure trial rule judgments.
 - `media-save` owns Dexie IndexedDB save storage, Howler audio playback,
@@ -86,17 +88,19 @@ See also:
 
 ## Script To Presentation
 
-`.nani` scripts compile to IR. Runtime command handlers translate IR into
-state patches, game events, and presentation commands. Presentation commands
-are renderer-independent, so a command like `@shake actorId:hero` never knows
-whether Pixi, DOM, or another future presenter executes the motion.
+`.nani` scripts compile to parser IR, then `nani-runtime-compiler` turns that IR
+into `RuntimeScript`. StoryEngine consumes `RuntimeScript`, updates story state,
+and emits the current step's non-control `RuntimeCommand` records.
+RuntimeCommand params use canonical runtime names only; raw script aliases stay
+in `sourceCommand`. Expressions are resolved by StoryEngine before emitted
+commands reach app adapters.
 
 Command declarations live in the contracts `commandCatalog`. The catalog stores
 Naninovel canonical names, lowercase runtime ids, categories, parameter specs,
-children support, implementation status, and wildcard entries. StoryEngine
-derives validation and handler registration checks from it.
+children support, implementation status, and wildcard entries. The compiler
+derives validation and normalization from it.
 
-Story scripts can emit typed gameplay events, for example
+Story scripts can emit gameplay runtime commands, for example
 `@gameplay grant-evidence id:evidence:keycard`. These events can update
 saveable gameplay state, but they do not submit evidence during Trial. Evidence
 submission remains a Trial UI action routed through `trial-director`.
@@ -104,12 +108,10 @@ submission remains a Trial UI action routed through `trial-director`.
 ```text
 .nani source
   -> nani-parser AST/IR
-  -> contracts commandCatalog validation
-  -> StoryEngine NaniCommandHandlerRegistry
-  -> typed event reducer
-  -> StoryEffect / presentation commands / gameplay events
+  -> nani-runtime-compiler RuntimeScript / RuntimeCommand
+  -> StoryEngine story state + emittedRuntimeCommands
   -> VN runtime transaction + route table
-  -> Story UI state / PixiStageSnapshot / gameplay, media, Navi, Trial effects
+  -> PixiStageSnapshot / PixiStageRenderHint / gameplay events
   -> VnRuntimeDispatcher renders DOM dialog and Pixi snapshot
 ```
 

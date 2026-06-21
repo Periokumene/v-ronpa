@@ -11,7 +11,7 @@ export function InspectorLite({
   inventoryItems,
   evidenceIds,
   trialSegmentId,
-  presentationCommands,
+  runtimeCommandCount,
   onGrantItem,
   onGrantEvidence,
   onJumpLabel,
@@ -50,7 +50,7 @@ export function InspectorLite({
         </div>
         <div>
           <dt>Commands</dt>
-          <dd>{presentationCommands.length}</dd>
+          <dd>{runtimeCommandCount}</dd>
         </div>
       </dl>
       <section>

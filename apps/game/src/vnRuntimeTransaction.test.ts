@@ -1,36 +1,32 @@
 import { describe, expect, it } from "vitest";
+import type { RuntimeScript } from "@v-ronpa/contracts";
 import { parseScenario } from "@v-ronpa/nani-parser";
+import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-presenter";
 import { advanceToNextStop, createInitialStoryState } from "@v-ronpa/story-engine";
 import { createVnRuntimePresentationTransaction } from "./vnRuntimeTransaction";
 
 describe("VN runtime presentation transaction", () => {
-  it("projects new Story presentation commands into Pixi stage snapshot while leaving print in Story UI state", () => {
-    const { scenario } = parseScenario({
-      sourceText: [
+  it("projects emitted runtime commands into Pixi stage snapshot while leaving print in Story UI state", () => {
+    const runtimeScript = compileScenario(
+      [
         "@back bg:harness effect:fade",
         "@charEnter character:felix portrait:portrait:felix:neutral slot:center",
         "Felix: Hello."
       ].join("\n"),
-      scriptPath: "transaction-test.nani"
-    });
-    const initialStory = createInitialStoryState(scenario);
+      "transaction-test.nani"
+    );
+    const initialStory = createInitialStoryState(runtimeScript);
     const initialPixiStage = createInitialPixiStageSnapshot();
-    const advanced = advanceToNextStop(initialStory, scenario).state;
+    const advanced = advanceToNextStop(initialStory, runtimeScript);
 
     const transaction = createVnRuntimePresentationTransaction({
-      previousStory: initialStory,
-      nextStory: advanced,
+      runtimeCommands: advanced.emittedRuntimeCommands,
       previousPixiStage: initialPixiStage
     });
 
-    expect(advanced.backlog).toEqual([{ speaker: "Felix", text: "Hello." }]);
-    expect(advanced.presentationCommands.at(-1)).toEqual({
-      type: "print",
-      speaker: "Felix",
-      text: "Hello.",
-      autoNext: false
-    });
+    expect(advanced.state.backlog).toEqual([{ speaker: "Felix", text: "Hello." }]);
+    expect(advanced.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "charenter", "print"]);
     expect(transaction.pixiStage).toEqual({
       version: 1,
       revision: 2,
@@ -47,43 +43,106 @@ describe("VN runtime presentation transaction", () => {
   });
 
   it("keeps transient Pixi effects as render hints without changing the terminal stage snapshot", () => {
-    const { scenario } = parseScenario({
-      sourceText: ["Felix: First.", "@flash color:#ffffff duration:120", "Felix: Second."].join("\n"),
-      scriptPath: "transaction-effect-test.nani"
-    });
-    const initialStory = createInitialStoryState(scenario);
-    const firstStop = advanceToNextStop(initialStory, scenario).state;
+    const runtimeScript = compileScenario(
+      ["Felix: First.", "@flash color:#ffffff duration:120", "Felix: Second."].join("\n"),
+      "transaction-effect-test.nani"
+    );
+    const initialStory = createInitialStoryState(runtimeScript);
+    const firstStop = advanceToNextStop(initialStory, runtimeScript).state;
     const initialPixiStage = createInitialPixiStageSnapshot();
 
-    const secondStop = advanceToNextStop(firstStop, scenario).state;
+    const secondStop = advanceToNextStop(firstStop, runtimeScript);
     const transaction = createVnRuntimePresentationTransaction({
-      previousStory: firstStop,
-      nextStory: secondStop,
+      runtimeCommands: secondStop.emittedRuntimeCommands,
       previousPixiStage: initialPixiStage
     });
 
     expect(transaction.pixiStage).toBe(initialPixiStage);
     expect(transaction.pixiHints).toEqual([{ type: "flash", color: "#ffffff", durationMs: 120 }]);
+    expect(transaction.diagnostics).toEqual([]);
   });
 
-  it("returns gameplay effects from the same Story delta without coupling them to Pixi stage state", () => {
-    const { scenario } = parseScenario({
-      sourceText: ["@gameplay grant-evidence id:evidence:keycard", "Felix: Evidence updated."].join("\n"),
-      scriptPath: "transaction-gameplay-test.nani"
-    });
-    const initialStory = createInitialStoryState(scenario);
-    const advanced = advanceToNextStop(initialStory, scenario).state;
+  it("returns gameplay events from emitted runtime commands without coupling them to Pixi stage state", () => {
+    const runtimeScript = compileScenario(
+      ["@gameplay grant-evidence id:evidence:keycard", "Felix: Evidence updated."].join("\n"),
+      "transaction-gameplay-test.nani"
+    );
+    const initialStory = createInitialStoryState(runtimeScript);
+    const advanced = advanceToNextStop(initialStory, runtimeScript);
     const initialPixiStage = createInitialPixiStageSnapshot();
 
     const transaction = createVnRuntimePresentationTransaction({
-      previousStory: initialStory,
-      nextStory: advanced,
+      runtimeCommands: advanced.emittedRuntimeCommands,
       previousPixiStage: initialPixiStage
     });
 
     expect(transaction.pixiStage).toBe(initialPixiStage);
-    expect(transaction.gameplayEffects).toEqual([
-      { type: "gameplay-event", event: { type: "grant-evidence", evidenceId: "evidence:keycard" } }
+    expect(transaction.gameplayEvents).toEqual([{ type: "grant-evidence", evidenceId: "evidence:keycard" }]);
+    expect(transaction.diagnostics).toEqual([]);
+  });
+
+  it("skips adapter output for unresolved runtime expressions instead of falling back", () => {
+    const initialPixiStage = createInitialPixiStageSnapshot();
+    const runtimeScript: RuntimeScript = {
+      scriptPath: "unresolved-app-expression.nani",
+      labels: {},
+      assets: [],
+      dependencies: [],
+      commands: [
+        {
+          commandId: "flash",
+          canonicalName: "flash",
+          category: "effect",
+          source: "v-ronpa",
+          status: "implemented",
+          params: {
+            color: "#ffffff",
+            duration: { type: "expression", source: "flashDuration" }
+          },
+          loc: { scriptPath: "unresolved-app-expression.nani", line: 1, column: 1, raw: "@flash duration:{flashDuration}" }
+        },
+        {
+          commandId: "gameplay",
+          canonicalName: "gameplay",
+          category: "state",
+          source: "v-ronpa",
+          status: "implemented",
+          params: {
+            type: "grant-item",
+            itemId: "gift:coffee",
+            quantity: { type: "expression", source: "itemCount" }
+          },
+          loc: { scriptPath: "unresolved-app-expression.nani", line: 2, column: 1, raw: "@gameplay grant-item quantity:{itemCount}" }
+        }
+      ]
+    };
+
+    const transaction = createVnRuntimePresentationTransaction({
+      runtimeCommands: runtimeScript.commands,
+      previousPixiStage: initialPixiStage
+    });
+
+    expect(transaction.pixiStage).toBe(initialPixiStage);
+    expect(transaction.pixiHints).toEqual([]);
+    expect(transaction.gameplayEvents).toEqual([]);
+    expect(transaction.diagnostics).toEqual([
+      {
+        code: "unresolved-runtime-expression",
+        commandId: "flash",
+        message: "@flash contains unresolved expression params; app adapters require resolved runtime values."
+      },
+      {
+        code: "unresolved-runtime-expression",
+        commandId: "gameplay",
+        message: "@gameplay contains unresolved expression params; app adapters require resolved runtime values."
+      }
     ]);
   });
 });
+
+function compileScenario(sourceText: string, scriptPath: string): RuntimeScript {
+  const parsed = parseScenario({ sourceText, scriptPath });
+  const compiled = compileRuntimeScript(parsed.scenario);
+  expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+  return compiled.script;
+}

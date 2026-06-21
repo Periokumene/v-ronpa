@@ -262,6 +262,7 @@ const officialCommandStatuses: Partial<Record<string, NaniCommandStatus>> = {
   back: "implemented",
   choice: "implemented",
   goto: "implemented",
+  print: "implemented",
   set: "implemented",
   shake: "implemented"
 };
@@ -622,7 +623,27 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
   wildcard("media"),
   wildcard("ui"),
   vRonpa("end", "flow"),
-  vRonpa("gameplay", "state", [param("type", "string"), param("id", "string"), param("quantity", "integer")], ["gameplay-event"]),
+  vRonpa(
+    "gameplay",
+    "state",
+    [
+      param("type", "string"),
+      param("id", "string"),
+      param("quantity", "integer"),
+      param("item", "string"),
+      param("itemId", "string"),
+      param("evidence", "string"),
+      param("evidenceId", "string"),
+      param("character", "string"),
+      param("characterId", "string"),
+      param("status", "string"),
+      param("skill", "string"),
+      param("skillId", "string"),
+      param("delta", "integer"),
+      param("affinityDelta", "integer")
+    ],
+    ["gameplay-event"]
+  ),
   vRonpa("charenter", "actor", [param("character", "string"), param("portrait", "string"), param("slot", "string"), param("effect", "string")], [
     "char-enter"
   ]),
@@ -656,6 +677,65 @@ export const AssetRefSchema = z.object({
   tags: z.array(z.string()).default([])
 });
 export type AssetRef = z.infer<typeof AssetRefSchema>;
+
+export const RuntimeExpressionSchema = z.object({ type: z.literal("expression"), source: z.string() }).strict();
+export type RuntimeExpression = z.infer<typeof RuntimeExpressionSchema>;
+
+export const RuntimeValueSchema: z.ZodType<string | number | boolean | RuntimeValue[] | RuntimeExpression> =
+  z.lazy(() =>
+    z.union([
+      z.string(),
+      z.number(),
+      z.boolean(),
+      z.array(RuntimeValueSchema),
+      RuntimeExpressionSchema
+    ])
+  );
+export type RuntimeValue = string | number | boolean | RuntimeValue[] | RuntimeExpression;
+
+export const RuntimeSourceCommandSchema = z
+  .object({
+    rawCommandId: z.string().min(1),
+    rawPrimary: z.unknown().optional(),
+    rawParams: z.record(z.string(), z.unknown()).optional(),
+    rawFlags: z.record(z.string(), z.boolean()).optional()
+  })
+  .strict();
+export type RuntimeSourceCommand = z.infer<typeof RuntimeSourceCommandSchema>;
+
+export const RuntimeCommandSchema = z
+  .object({
+    commandId: z.string().min(1),
+    canonicalName: z.string().min(1),
+    category: NaniCommandCategorySchema,
+    source: NaniCommandSourceSchema,
+    status: NaniCommandStatusSchema,
+    params: z.record(z.string(), RuntimeValueSchema).default({}),
+    condition: RuntimeExpressionSchema.optional(),
+    unless: RuntimeExpressionSchema.optional(),
+    loc: SourceLocationSchema,
+    sourceCommand: RuntimeSourceCommandSchema.optional()
+  })
+  .strict();
+export type RuntimeCommand = z.infer<typeof RuntimeCommandSchema>;
+
+export const ScriptDependencySchema = z
+  .object({
+    endpoint: z.string().min(1)
+  })
+  .strict();
+export type ScriptDependency = z.infer<typeof ScriptDependencySchema>;
+
+export const RuntimeScriptSchema = z
+  .object({
+    scriptPath: z.string(),
+    commands: z.array(RuntimeCommandSchema),
+    labels: z.record(z.string(), z.number().int().nonnegative()).default({}),
+    assets: z.array(AssetRefSchema).default([]),
+    dependencies: z.array(ScriptDependencySchema).default([])
+  })
+  .strict();
+export type RuntimeScript = z.infer<typeof RuntimeScriptSchema>;
 
 export const UiAssetRoleSchema = z.enum([
   "title-background",
@@ -1098,36 +1178,6 @@ export const SaveSlotSummarySchema = z.object({
   text: z.string().optional()
 });
 export type SaveSlotSummary = z.infer<typeof SaveSlotSummarySchema>;
-
-export const WildcardStoryEffectSchema = z.object({
-  type: z.literal("wildcard-event"),
-  wildcardType: NaniWildcardTypeSchema,
-  routeKey: z.string().min(1),
-  params: z.record(z.string(), z.unknown()).default({}),
-  sourceCommand: z
-    .object({
-      commandId: z.string().min(1),
-      canonicalName: z.string().min(1).optional(),
-      loc: SourceLocationSchema.optional()
-    })
-    .strict()
-});
-export type WildcardStoryEffect = z.infer<typeof WildcardStoryEffectSchema>;
-
-export const StoryEffectSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("presentation"), command: PresentationCommandSchema }),
-  z.object({ type: z.literal("navi-event"), eventType: z.string().min(1), payload: z.unknown().optional() }),
-  z.object({ type: z.literal("trial-event"), eventType: z.string().min(1), payload: z.unknown().optional() }),
-  z.object({ type: z.literal("gameplay-event"), event: GameplayEventSchema }),
-  z.object({
-    type: z.literal("media-event"),
-    eventType: z.enum(["play-bgm", "play-sfx", "play-video", "stop-media"]),
-    assetId: IdSchema.optional(),
-    payload: z.unknown().optional()
-  }),
-  WildcardStoryEffectSchema
-]);
-export type StoryEffect = z.infer<typeof StoryEffectSchema>;
 
 export const NaviRuntimeStateSchema = z.object({
   substate: NaviSubstateSchema,
