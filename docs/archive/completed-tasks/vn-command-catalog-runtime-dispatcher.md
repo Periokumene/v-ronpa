@@ -14,11 +14,11 @@
 
 ## Status
 
-- State: `Review`
+- State: `Archived`
 - Owner: `integration`
 - Created: `2026-06-19`
-- Updated: `2026-06-19`
-- Completed Commit: `TBD`
+- Updated: `2026-06-21`
+- Completed Commit: `1c77c67`
 - Archive Target: `docs/archive/completed-tasks/vn-command-catalog-runtime-dispatcher.md`
 
 ## Goal

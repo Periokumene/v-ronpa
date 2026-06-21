@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { StoryRuntimeSnapshotSchema } from "@v-ronpa/contracts";
+import { commandCatalog, StoryRuntimeSnapshotSchema } from "@v-ronpa/contracts";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import {
   advanceToNextStop,
@@ -223,6 +223,33 @@ Felix: Arrived.
         severity: "warning"
       }
     ]);
+  });
+
+  it("keeps implemented non-wildcard commands backed by StoryEngine handlers", () => {
+    const registry = createNaniCommandHandlerRegistry();
+    const implementedRuntimeCommands = commandCatalog.filter(
+      (command) => command.status === "implemented" && command.source !== "wildcard"
+    );
+
+    expect(implementedRuntimeCommands.map((command) => command.id)).toEqual([
+      "back",
+      "choice",
+      "goto",
+      "set",
+      "shake",
+      "end",
+      "gameplay",
+      "charenter",
+      "flash",
+      "focus",
+      "trialkeyword"
+    ]);
+    for (const command of implementedRuntimeCommands) {
+      expect(registry.resolve(command.id), command.id).toBeDefined();
+      for (const alias of command.aliases ?? []) {
+        expect(registry.resolve(alias), alias).toBeDefined();
+      }
+    }
   });
 
   it("emits wildcard events without adding presentation commands", () => {

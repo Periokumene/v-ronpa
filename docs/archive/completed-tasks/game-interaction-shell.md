@@ -14,11 +14,11 @@
 
 ## Status
 
-- State: `Review`
+- State: `Archived`
 - Owner: `integration`
 - Created: `2026-06-20`
-- Updated: `2026-06-20`
-- Completed Commit: `TBD`
+- Updated: `2026-06-21`
+- Completed Commit: `0d79486`
 - Archive Target: `docs/archive/completed-tasks/game-interaction-shell.md`
 
 ## Goal

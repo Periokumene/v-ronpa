@@ -44,6 +44,9 @@ and merge the change through the integration baseline first.
 - `commandCatalog` is the only declaration source for `.nani` commands.
   Runtime handler registries bind execution only; they must not define command
   metadata independently.
+- `NaniCommandStatus` is the command maturity signal. `implemented` means
+  V-Ronpa has tested runtime behavior for the command; it is not a promise that
+  every official Naninovel parameter is fully compatible.
 - Official Naninovel commands are declared explicitly. Branch-local experiments
   should use `@wildcard-<type>` with `routeKey` until they are promoted to
   stable commands.

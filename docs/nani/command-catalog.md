@@ -8,6 +8,29 @@ catalog instead of redefining command metadata elsewhere.
 Runtime command ids are lowercase. `canonicalName` preserves the official or
 project-facing spelling for diagnostics and tools.
 
+## Command Status Semantics
+
+`NaniCommandStatus` is the command maturity signal. Do not add a parallel
+implementation matrix or separate command-readiness entity unless the contract
+needs a future CCR.
+
+Status values mean:
+
+- `declared`: the command is present in the catalog, but runtime parameter
+  validation and behavior are not yet promised.
+- `validated`: the catalog metadata is usable for validation, but execution is
+  not yet promised.
+- `stubbed`: the command is declared and validation is catalog-driven; when the
+  StoryEngine sees it without a handler, it no-ops with a diagnostic.
+- `implemented`: V-Ronpa runtime behavior exists and is covered by tests. This
+  does not mean full Naninovel compatibility for every official parameter.
+
+For official Naninovel commands, `implemented` means the V-Ronpa-supported
+behavior is safe to use in current scripts. Compatible official parameters that
+the handler does not consume yet may still produce an
+`unsupported-command-param` warning. That warning is expected and does not
+demote the command unless the supported V-Ronpa behavior is no longer covered.
+
 ## Categories
 
 - `text`: dialogue printer, backlog, and text formatting commands.

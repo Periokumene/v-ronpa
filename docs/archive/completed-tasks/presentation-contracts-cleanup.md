@@ -14,11 +14,11 @@
 
 ## Status
 
-- State: `Review`
+- State: `Archived`
 - Owner: `integration`
 - Created: `2026-06-20`
-- Updated: `2026-06-20`
-- Completed Commit: `TBD`
+- Updated: `2026-06-21`
+- Completed Commit: `21a3304`
 - Archive Target: `docs/archive/completed-tasks/presentation-contracts-cleanup.md`
 
 ## Goal
