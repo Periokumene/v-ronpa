@@ -30,12 +30,11 @@ RuntimeCommand params use canonical runtime names; for example `shake`,
 PresentationCommand `durationMs`.
 
 `.nani` command declarations live in `commandCatalog`. Naninovel official
-commands are explicit entries; wildcard commands are temporary branch-local
-routes named `@wildcard-<type>`.
+commands and V-Ronpa project commands must be explicit catalog entries.
 
 App fanout is handled by `createVnRuntimePresentationTransaction` and
 `VnOutputRouteTable`. Route tables classify normalized
-`RuntimeCommand.commandId`, command categories, and `wildcardType + routeKey`.
+`RuntimeCommand.commandId` entries first, then command categories as fallback.
 
 StoryEngine state stores story semantics only: script path, instruction pointer,
 variables, backlog, pending choices, and end state. It returns the current

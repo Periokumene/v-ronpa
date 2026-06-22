@@ -24,7 +24,7 @@
 ## Goal
 
 Prepare the common VN architecture for the performance branch and UI branch by
-adding an explicit Naninovel command catalog, wildcard command effect route,
+adding an explicit Naninovel command catalog, early generic extension routing,
 StoryEngine handler-registry guardrails, and an app-level VN runtime dispatcher.
 
 ## Context
@@ -46,8 +46,7 @@ Relevant docs:
 
 ## Constraints
 
-- Naninovel official commands must be explicit catalog entries, not generic
-  wildcard routes.
+- Naninovel official commands must be explicit catalog entries.
 - `commandCatalog` is the command declaration source.
 - `NaniCommandHandlerRegistry` is execution binding only.
 - `VnOutputRouteTable` routes StoryEngine output objects, not `.nani`
@@ -95,9 +94,7 @@ Relevant docs:
 - `NaniCommandParamSpec`
 - `NaniCommandStatus`
 - `NaniCommandCategory`
-- `NaniWildcardType`
 - `commandCatalog`
-- `StoryEffect` including `wildcard-event`
 - Existing `PresentationCommand`, `GameplayEvent`, and `StoryRuntimeSnapshot`
 
 ## Observability And Acceptance Matrix
@@ -105,14 +102,14 @@ Relevant docs:
 | Capability | Observable Evidence |
 |---|---|
 | Official command catalog covers Naninovel baseline | Contract test asserts 77 official commands |
-| Wildcard command family exists | Contract test asserts 9 wildcard commands |
+| Early generic extension family exists | Contract test asserts 9 generic extension commands |
 | Parser preserves official params | Parser test keeps official params out of primary |
 | StoryEngine validates from catalog | StoryEngine tests cover invalid official params |
 | Stubbed commands no-op with diagnostics | StoryEngine test covers `@bgm` no-op |
 | Runtime handler registry cannot drift | StoryEngine test rejects catalog-external handler |
 | Reducer diagnostics do not drift from stepper diagnostics | StoryEngine test checks `storyReducer` returns catalog diagnostics |
 | Historical implemented commands are catalog-clean | StoryEngine test covers `back.effect`, `shake.actorId/intensity/duration`, and `goto.path` without warnings |
-| Wildcard effects route through `effects` | StoryEngine test emits `wildcard-event` only |
+| Early generic effects route through `effects` | StoryEngine test emits generic extension events only |
 | App route table separates snapshot and effect streams | App unit test covers presentation commands and non-presentation effects |
 | Presentation effects are not replayed by Pixi | App unit test routes presentation effects to debug only |
 | Vertical slice behavior stays intact | Playwright smoke covers VN dialog, Pixi layer, choices, gameplay route |
@@ -128,7 +125,7 @@ Required regression cases:
 - No-op path: declared but unimplemented official command produces a warning
   diagnostic and no-op.
 - Drift path: handler registry rejects a command not declared in catalog.
-- Serialization/contract path: `wildcard-event` validates as a `StoryEffect`.
+- Serialization/contract path: generic extension events validate as `StoryEffect`.
 
 Test placement:
 
@@ -171,7 +168,7 @@ Review that:
 
 - Official commands are explicitly declared.
 - Runtime handlers do not redefine command metadata.
-- Wildcard commands are clearly marked as branch-local escape hatches.
+- Generic extension commands are clearly marked as branch-local escape hatches.
 - Dispatcher routing is based on runtime output objects.
 - Existing vertical-slice VN behavior does not regress.
 

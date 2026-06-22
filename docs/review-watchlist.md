@@ -59,27 +59,6 @@ delete, split, or execute entries from it.
 - Status: Watching
 - Linked Task / ADR / CCR: TBD
 
-### RW-0002: Wildcard command promotion path
-
-- ID: RW-0002
-- Title: Decide when `@wildcard-<type>` routes graduate into formal commands
-- Area: contracts, StoryEngine, branch-specific VN presentation work
-- Source / Evidence:
-  - `docs/ccr/vn-command-catalog-runtime-dispatcher.md`
-  - `docs/nani/command-catalog.md`
-  - `docs/architecture/vn-runtime-dispatcher.md`
-- Current Observation: Wildcard commands are deliberate extension points for the
-  performance branch and UI branch. They carry `wildcardType`, `routeKey`, and
-  generic params, while official Naninovel commands remain explicitly declared.
-- Why Not Actionable Yet: It is too early to know which branch-local route keys
-  deserve stable command status. Promotion criteria should be based on repeated
-  usage, cross-branch need, and contract stability.
-- Auto Action: Forbidden
-- Review Cadence: Review after each major VN branch merge.
-- Next Review: TBD
-- Status: Watching
-- Linked Task / ADR / CCR: TBD
-
 ### RW-0003: VN UI surface architecture
 
 - ID: RW-0003

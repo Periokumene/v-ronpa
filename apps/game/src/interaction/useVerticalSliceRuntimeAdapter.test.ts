@@ -98,8 +98,7 @@ describe("vertical slice runtime adapter helpers", () => {
         charenter: ["debug"],
         gameplay: ["debug"]
       },
-      categories: {},
-      wildcards: {}
+      categories: {}
     };
     const initialStory = createInitialStoryState(runtimeScript);
     const advanced = advanceToNextStop(initialStory, runtimeScript);

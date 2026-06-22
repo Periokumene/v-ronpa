@@ -192,23 +192,10 @@ export const NaniCommandCategorySchema = z.enum([
 ]);
 export type NaniCommandCategory = z.infer<typeof NaniCommandCategorySchema>;
 
-export const NaniWildcardTypeSchema = z.enum([
-  "text",
-  "choice",
-  "flow",
-  "state",
-  "actor",
-  "scene",
-  "effect",
-  "media",
-  "ui"
-]);
-export type NaniWildcardType = z.infer<typeof NaniWildcardTypeSchema>;
-
 export const NaniCommandStatusSchema = z.enum(["declared", "validated", "stubbed", "implemented"]);
 export type NaniCommandStatus = z.infer<typeof NaniCommandStatusSchema>;
 
-export const NaniCommandSourceSchema = z.enum(["naninovel", "wildcard", "v-ronpa"]);
+export const NaniCommandSourceSchema = z.enum(["naninovel", "v-ronpa"]);
 export type NaniCommandSource = z.infer<typeof NaniCommandSourceSchema>;
 
 export interface NaniCommandParamSpec {
@@ -295,21 +282,6 @@ function official(
     status: officialCommandStatuses[id] ?? "stubbed",
     supportsChildren,
     params
-  };
-}
-
-function wildcard(wildcardType: NaniWildcardType): NaniCommandDefinition {
-  return {
-    id: `wildcard-${wildcardType}`,
-    canonicalName: `wildcard-${wildcardType}`,
-    category: wildcardType,
-    source: "wildcard",
-    status: "implemented",
-    supportsChildren: false,
-    params: [
-      param("routeKey", "string", true),
-      { name: "params", type: "generic params", repeatable: true, description: "All non-routeKey params are forwarded." }
-    ]
   };
 }
 
@@ -612,15 +584,6 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
   ]),
   official("wait", "flow", [param("waitMode", "string")]),
   official("while", "flow", [param("expression", "string")], true),
-  wildcard("text"),
-  wildcard("choice"),
-  wildcard("flow"),
-  wildcard("state"),
-  wildcard("actor"),
-  wildcard("scene"),
-  wildcard("effect"),
-  wildcard("media"),
-  wildcard("ui"),
   vRonpa("end", "flow"),
   vRonpa(
     "gameplay",
@@ -663,10 +626,6 @@ for (const definition of naniCommandCatalog) {
 
 export function getNaniCommandDefinition(id: string): NaniCommandDefinition | undefined {
   return naniCommandCatalogById.get(normalizeNaniCommandId(id));
-}
-
-export function isNaniWildcardCommandId(id: string): boolean {
-  return getNaniCommandDefinition(id)?.source === "wildcard";
 }
 
 export const AssetRefSchema = z.object({

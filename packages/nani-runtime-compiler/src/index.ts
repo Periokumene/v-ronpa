@@ -254,22 +254,6 @@ function normalizeCommandParams(command: CommandIR, definition: NaniCommandDefin
     case "end":
       return { params: {}, consumesParams: [] };
     default:
-      if (definition.source === "wildcard") {
-        const genericParams = createGenericParams(command);
-        const routeKey = runtimeParam(command, "routeKey");
-        const wildcardParams = Object.fromEntries(
-          Object.entries(genericParams).filter(([key]) => normalizeParamName(key) !== "routekey")
-        );
-        return {
-          params: compactParams({
-            wildcardType: definition.id.slice("wildcard-".length),
-            routeKey,
-            ...wildcardParams
-          }),
-          consumesParams: Object.keys(command.params)
-        };
-      }
-
       return { params: createGenericParams(command), consumesParams: [] };
   }
 }
@@ -305,7 +289,7 @@ function validateCommandAgainstCatalog(
   for (const [key, value] of Object.entries(command.params)) {
     const spec = specsByName.get(normalizeParamName(key));
     if (!spec) {
-      if (definition.source !== "wildcard" && !allowsDynamicAssignmentParam(definition)) {
+      if (!allowsDynamicAssignmentParam(definition)) {
         diagnostics.push(
           createDiagnostic(
             "invalid-command-param",
@@ -329,7 +313,7 @@ function validateCommandAgainstCatalog(
 
   for (const key of Object.keys(command.flags)) {
     const spec = specsByName.get(normalizeParamName(key));
-    if (!spec && definition.source !== "wildcard") {
+    if (!spec) {
       diagnostics.push(
         createDiagnostic(
           "invalid-command-param",
@@ -385,7 +369,6 @@ function allowsDynamicAssignmentParam(definition: NaniCommandDefinition): boolea
 
 function isCompatibleCommandValue(value: NaniValue, officialType: string): boolean {
   const normalized = officialType.toLowerCase();
-  if (normalized === "generic params") return true;
   if (normalized.includes("list")) {
     if (value.type !== "list") return normalized.startsWith("named ");
     const itemType = normalized.includes("decimal") ? "decimal" : normalized.includes("boolean") ? "boolean" : "string";

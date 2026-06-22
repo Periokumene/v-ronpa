@@ -48,8 +48,6 @@ Route entries are fixed in this baseline and support one-to-many targets:
 
 - `commands`: keyed by normalized `RuntimeCommand.commandId`.
 - `categories`: fallback targets keyed by `NaniCommandCategory`.
-- `wildcards`: keyed by `RuntimeCommand.params.wildcardType`, with optional
-  `routeKey` overrides.
 
 The API accepts `profile: "vn2d" | "vn3d"` for future routing strategies, but
 the current baseline intentionally uses the same fixed table for both.
@@ -64,7 +62,6 @@ the current baseline intentionally uses the same fixed table for both.
 - Media-category commands route to `media` when emitted.
 - Flow/state control commands are consumed by StoryEngine and normally do not
   enter the emitted command stream.
-- Wildcard commands route through the wildcard table.
 
 Pixi-routed runtime commands are interpreted at the app adapter boundary and
 reduced into `PixiStageSnapshot` plus transient render hints before React
@@ -114,6 +111,6 @@ through display props.
   surfaces behind `GameInteractionShell` and `ui-kit` display components.
   Settings extensions should keep the same app-owned canonical state and narrow
   runtime-consumer pattern.
-- Branch-local experiments should use `@wildcard-<type> routeKey:<key>` and
-  route by `wildcardType + routeKey`. Promote a wildcard to an explicit command
-  only when it stabilizes.
+- Branch-local experiments must add explicit V-Ronpa command declarations before
+  they can enter `RuntimeCommand` dispatch. Unknown `@` commands are compiler
+  errors, not app-routed extension points.

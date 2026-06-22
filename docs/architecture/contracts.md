@@ -48,8 +48,7 @@ and merge the change through the integration baseline first.
 - Renderer-specific objects must not appear in contracts.
 - Script source locations must be preserved through parse and compile outputs.
 - RuntimeCommand params must use canonical runtime field names only. Raw parser
-  aliases and source params belong in `sourceCommand`, except wildcard commands
-  whose purpose is generic forwarding.
+  aliases and source params belong in `sourceCommand`.
 - RuntimeCommand may carry unresolved expression values and `condition/unless`
   expressions. The compiler preserves them; StoryEngine evaluates them against
   story variables before app adapter fanout.
@@ -59,9 +58,9 @@ and merge the change through the integration baseline first.
 - `NaniCommandStatus` is the command maturity signal. `implemented` means
   V-Ronpa has tested runtime behavior for the command; it is not a promise that
   every official Naninovel parameter is fully compatible.
-- Official Naninovel commands are declared explicitly. Branch-local experiments
-  should use `@wildcard-<type>` with `routeKey` until they are promoted to
-  stable commands.
+- Official Naninovel commands and V-Ronpa project commands are declared
+  explicitly. Branch-local experiments must add catalog entries before they can
+  compile to `RuntimeCommand`.
 - `ItemDef` is limited to gifts and tools. Evidence is modeled separately as
   `EvidenceDef` and stored in `EvidenceState`.
 - `EvidenceState.ownedEvidenceIds` is the save/runtime ownership list for

@@ -45,44 +45,18 @@ describe("VN output routes", () => {
     expect(selectRuntimeCommandsForTarget(commands, "app")).toEqual([commands[2]]);
   });
 
-  it("routes wildcard commands by wildcardType with routeKey overrides", () => {
-    const command = runtimeCommand(
-      "wildcard-effect",
-      "effect",
-      {
-        wildcardType: "effect",
-        routeKey: "ui:shake-debug",
-        intensity: 0.8
-      },
-      "wildcard"
-    );
+  it("requires explicit command or category routes for every runtime command", () => {
+    const command = runtimeCommand("focus", "effect", { target: "character:felix", duration: 320 });
     const routeTable: VnOutputRouteTable = {
       ...defaultVnOutputRouteTable,
-      wildcards: {
-        ...defaultVnOutputRouteTable.wildcards,
-        effect: {
-          defaultTargets: ["pixi"],
-          routeKeys: {
-            "ui:shake-debug": ["ui", "debug"]
-          }
-        }
+      commands: {
+        ...defaultVnOutputRouteTable.commands,
+        focus: ["pixi", "debug"]
       }
     };
 
-    expect(routeRuntimeCommand(command, routeTable)).toEqual(["ui", "debug"]);
-    expect(selectRuntimeCommandsForTarget([command], "ui", routeTable)).toEqual([command]);
-    expect(
-      routeRuntimeCommand(
-        {
-          ...command,
-          params: {
-            ...command.params,
-            routeKey: "pixi:burst"
-          }
-        },
-        routeTable
-      )
-    ).toEqual(["pixi"]);
+    expect(routeRuntimeCommand(command, routeTable)).toEqual(["pixi", "debug"]);
+    expect(selectRuntimeCommandsForTarget([command], "debug", routeTable)).toEqual([command]);
   });
 });
 

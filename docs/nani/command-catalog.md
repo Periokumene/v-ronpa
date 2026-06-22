@@ -45,20 +45,17 @@ demote the command unless the supported V-Ronpa behavior is no longer covered.
 
 ## Runtime Rules
 
-- Naninovel official commands are explicit catalog entries. They must not use
-  the wildcard generic route.
+- Naninovel official commands are explicit catalog entries. Unknown top-level
+  `@` commands are compiler errors.
 - Existing V-Ronpa compatibility params may be attached to an official command
   entry, but each such param must be marked with `source: "v-ronpa"` in the
   catalog. This keeps the official parameter list auditable.
-- `@wildcard-<type>` commands are branch-local escape hatches. They require
-  `routeKey:string`; all other params are forwarded as generic params.
 - `nani-runtime-compiler` binds catalog metadata to compiled RuntimeCommand
   output. It rejects or diagnoses commands and params against the catalog.
 - Parser IR remains generic. It preserves known parameter names, but the runtime
   compiler owns catalog-derived parameter validation and normalization.
 - Implemented RuntimeCommand params use canonical runtime field names only.
-  Raw aliases stay in `sourceCommand`; wildcard commands are the only generic
-  forwarding exception.
+  Raw aliases stay in `sourceCommand`.
 - `{...}` parameter expressions are preserved by the compiler and evaluated by
   StoryEngine against story variables. The compiler must not replace expression
   params with defaults.
@@ -108,7 +105,7 @@ demote the command unless the supported V-Ronpa behavior is no longer covered.
 | `look` | `look` | actor | `enable:boolean`, `zone:decimal list`, `speed:decimal list`, `gravity:boolean` | no | stubbed |
 | `movie` | `movie` | media | `moviePath:string`, `time:decimal`, `block:boolean` | no | stubbed |
 | `openURL` | `openurl` | ui | `uRL:string`, `target:string` | no | stubbed |
-| `print` | `print` | text | `text:string`, `printer:string`, `author:string`, `as:string`, `speed:decimal`, `reset:boolean`, `default:boolean`, `waitInput:boolean`, `append:boolean`, `fadeTime:decimal`, `wait:boolean` | no | stubbed |
+| `print` | `print` | text | `text:string`, `printer:string`, `author:string`, `as:string`, `speed:decimal`, `reset:boolean`, `default:boolean`, `waitInput:boolean`, `append:boolean`, `fadeTime:decimal`, `wait:boolean` | no | implemented |
 | `printer` | `printer` | text | `idAndAppearance:named string`, `default:boolean`, `hideOther:boolean`, `anchor:boolean`, `pos:decimal list`, actor transform params | no | stubbed |
 | `processInput` | `processinput` | ui | `inputEnabled:boolean`, `set:named boolean list` | no | stubbed |
 | `purgeRollback` | `purgerollback` | state | none | no | stubbed |
@@ -159,20 +156,6 @@ Shared shorthand:
 - `particle params`: `power:decimal`, `time:decimal`, `pos:decimal list`,
   `position:decimal list`, `rotation:decimal list`, `scale:decimal list`,
   `wait:boolean`.
-
-## Wildcard Commands
-
-| Command | Category | Required params | Forwarded params | Status |
-|---|---|---|---|---|
-| `wildcard-text` | text | `routeKey:string` | all non-`routeKey` params | implemented |
-| `wildcard-choice` | choice | `routeKey:string` | all non-`routeKey` params | implemented |
-| `wildcard-flow` | flow | `routeKey:string` | all non-`routeKey` params | implemented |
-| `wildcard-state` | state | `routeKey:string` | all non-`routeKey` params | implemented |
-| `wildcard-actor` | actor | `routeKey:string` | all non-`routeKey` params | implemented |
-| `wildcard-scene` | scene | `routeKey:string` | all non-`routeKey` params | implemented |
-| `wildcard-effect` | effect | `routeKey:string` | all non-`routeKey` params | implemented |
-| `wildcard-media` | media | `routeKey:string` | all non-`routeKey` params | implemented |
-| `wildcard-ui` | ui | `routeKey:string` | all non-`routeKey` params | implemented |
 
 ## V-Ronpa Project Commands
 

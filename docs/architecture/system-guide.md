@@ -110,7 +110,7 @@ commands reach app adapters.
 
 Command declarations live in the contracts `commandCatalog`. The catalog stores
 Naninovel canonical names, lowercase runtime ids, categories, parameter specs,
-children support, implementation status, and wildcard entries. The compiler
+children support, implementation status, and command source. The compiler
 derives validation and normalization from it.
 
 Story scripts can emit gameplay runtime commands, for example

@@ -166,24 +166,4 @@ describe("nani runtime compiler", () => {
     ]);
   });
 
-  it("keeps wildcard params generic under a route key", () => {
-    const { scenario } = parseScenario({
-      sourceText: "@wildcard-effect routeKey:pixi:burst intensity:0.8 wait:true",
-      scriptPath: "wildcard.nani"
-    });
-    const result = compileRuntimeScript(scenario);
-
-    expect(result.diagnostics).toEqual([]);
-    expect(result.script.commands[0]).toEqual(
-      expect.objectContaining({
-        commandId: "wildcard-effect",
-        params: {
-          wildcardType: "effect",
-          routeKey: "pixi:burst",
-          intensity: 0.8,
-          wait: true
-        }
-      })
-    );
-  });
 });

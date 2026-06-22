@@ -474,20 +474,9 @@ describe("contracts", () => {
 
   it("pins the Naninovel command catalog as the command declaration source", () => {
     const officialCommands = naniCommandCatalog.filter((command) => command.source === "naninovel");
-    const wildcardCommands = naniCommandCatalog.filter((command) => command.source === "wildcard");
 
     expect(officialCommands).toHaveLength(77);
-    expect(wildcardCommands.map((command) => command.id)).toEqual([
-      "wildcard-text",
-      "wildcard-choice",
-      "wildcard-flow",
-      "wildcard-state",
-      "wildcard-actor",
-      "wildcard-scene",
-      "wildcard-effect",
-      "wildcard-media",
-      "wildcard-ui"
-    ]);
+    expect(naniCommandCatalog).toHaveLength(83);
     expect(() => NaniCommandDefinitionSchema.array().parse(naniCommandCatalog)).not.toThrow();
   });
 

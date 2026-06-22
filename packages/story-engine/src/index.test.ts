@@ -208,9 +208,7 @@ describe("story engine", () => {
   });
 
   it("keeps implemented non-control commands as generic StoryEngine emissions", () => {
-    const implementedRuntimeCommands = commandCatalog.filter(
-      (command) => command.status === "implemented" && command.source !== "wildcard"
-    );
+    const implementedRuntimeCommands = commandCatalog.filter((command) => command.status === "implemented");
 
     expect(implementedRuntimeCommands.map((command) => command.id)).toEqual([
       "back",
@@ -226,37 +224,6 @@ describe("story engine", () => {
       "focus",
       "trialkeyword"
     ]);
-  });
-
-  it("emits wildcard runtime commands without mutating story state beyond pointer movement", () => {
-    const runtimeScript = runtimeScriptFixture("wildcard-effect.nani", [
-      runtimeCommand(
-        "wildcard-effect",
-        "effect",
-        {
-          wildcardType: "effect",
-          routeKey: "pixi:chromatic-burst",
-          intensity: 0.75,
-          wait: true
-        },
-        { source: "wildcard" }
-      )
-    ]);
-    const result = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
-
-    expect(result.state.instructionPointer).toBe(1);
-    expect(result.emittedRuntimeCommands).toEqual([
-      expect.objectContaining({
-        commandId: "wildcard-effect",
-        params: {
-          wildcardType: "effect",
-          routeKey: "pixi:chromatic-burst",
-          intensity: 0.75,
-          wait: true
-        }
-      })
-    ]);
-    expect(result.diagnostics).toEqual([]);
   });
 
   it("resolves expression params before emitting runtime commands", () => {

@@ -333,7 +333,6 @@ const knownParameterKeys = new Set(
     "resume",
     "roll",
     "rotation",
-    "routeKey",
     "scale",
     "sceneName",
     "set",
