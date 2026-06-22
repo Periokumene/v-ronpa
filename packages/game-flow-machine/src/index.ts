@@ -184,7 +184,6 @@ export function calculateInteractionCapabilities(context: GameInteractionContext
     canOpenPauseMenu: inPlayableMode && context.inputLock !== "menu",
     canAuto: inVnStory && !context.storyEnded,
     canSkip: inVnStory && !context.storyEnded,
-    canBack: inVnStory && context.isAtStableStop,
     canReturnTitle: inPlayableMode || mode === "paused"
   });
 }

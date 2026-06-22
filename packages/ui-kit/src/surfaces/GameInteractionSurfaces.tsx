@@ -46,7 +46,6 @@ export interface VnCommandBarProps {
 
 export function VnCommandBar({ capabilities, onAction }: VnCommandBarProps) {
   const commands: Array<{ action: GameUiAction; label: string; enabled: boolean; testId: string }> = [
-    { action: "back", label: "BACK", enabled: capabilities.canBack, testId: "vn-command-back" },
     { action: "open-backlog", label: "LOG", enabled: capabilities.canOpenBacklog, testId: "vn-command-backlog" },
     { action: "toggle-skip", label: "SKIP", enabled: capabilities.canSkip, testId: "vn-command-skip" },
     { action: "toggle-auto", label: "AUTO", enabled: capabilities.canAuto, testId: "vn-command-auto" },

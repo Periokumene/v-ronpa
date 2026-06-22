@@ -89,7 +89,7 @@ delete, split, or execute entries from it.
   - User planning notes for the VN UI/interaction branch
   - `docs/architecture/vn-runtime-dispatcher.md`
 - Current Observation: The runtime dispatcher now leaves room for UI actions,
-  but BACK, LOG, SKIP, AUTO, SAVE, LOAD, and SETTING surfaces still need a
+  but LOG, SKIP, AUTO, SAVE, LOAD, and SETTING surfaces still need a
   mature UI architecture, style configuration strategy, and persistence boundary.
 - Why Not Actionable Yet: The work crosses UI layout, runtime controls, save
   data, backlog policy, accessibility, and style presets. It should not be
@@ -119,7 +119,7 @@ delete, split, or execute entries from it.
 - Status: Watching
 - Linked Task / ADR / CCR: TBD
 
-### RW-0005: Backlog Jump / Back Navigation Policy
+### RW-0005: Backlog Jump Policy
 
 - ID: RW-0005
 - Title: Decide whether backlog entries can jump or rewind runtime state
@@ -134,7 +134,7 @@ delete, split, or execute entries from it.
   for story variables, RuntimeCommand fanout, gameplay events, and saveable
   runtime state. That policy should be reviewed before implementation.
 - Auto Action: Forbidden
-- Review Cadence: Review before implementing VN BACK or backlog jump behavior.
+- Review Cadence: Review before implementing backlog jump behavior.
 - Next Review: TBD
 - Status: Watching
 - Linked Task / ADR / CCR: TBD

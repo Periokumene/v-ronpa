@@ -29,8 +29,7 @@ export const GameUiActionSchema = z.enum([
   "confirm-load",
   "return-title",
   "toggle-auto",
-  "toggle-skip",
-  "back"
+  "toggle-skip"
 ]);
 export type GameUiAction = z.infer<typeof GameUiActionSchema>;
 
@@ -1158,7 +1157,6 @@ export const InteractionCapabilitySnapshotSchema = z.object({
   canOpenPauseMenu: z.boolean().default(false),
   canAuto: z.boolean().default(false),
   canSkip: z.boolean().default(false),
-  canBack: z.boolean().default(false),
   canReturnTitle: z.boolean().default(false)
 });
 export type InteractionCapabilitySnapshot = z.infer<typeof InteractionCapabilitySnapshotSchema>;

@@ -85,8 +85,8 @@ Scenario code should not manually filter runtime commands by renderer. Add or
 update `VnOutputRouteTable` routes and pass the desired `profile` / `routeTable`
 into the runtime adapter instead.
 
-VN toolbar actions are intentionally outside `VnRuntimeDispatcher`. BACK, LOG,
-SKIP, AUTO, SAVE, LOAD, and SETTING are shell UI actions derived from
+VN toolbar actions are intentionally outside `VnRuntimeDispatcher`. LOG, SKIP,
+AUTO, SAVE, LOAD, and SETTING are shell UI actions derived from
 `InteractionCapabilitySnapshot`; they should enter the app through
 `GameInteractionShell` and its overlay/page adapters.
 
