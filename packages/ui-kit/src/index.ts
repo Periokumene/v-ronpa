@@ -21,4 +21,4 @@ export type {
   VnCommandBarProps
 } from "./surfaces/GameInteractionSurfaces";
 export type { InspectorLiteProps, ScenarioOption } from "./surfaces/types";
-export type { VnDialogSurfaceProps } from "./surfaces/VnDialogSurface";
+export type { VnDialogDisplaySettings, VnDialogSurfaceProps } from "./surfaces/VnDialogSurface";

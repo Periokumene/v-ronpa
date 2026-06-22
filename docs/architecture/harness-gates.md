@@ -61,12 +61,14 @@ for that shell. Never commit `.env.worktree`, `.local-state/`,
 `test-results/`, or `playwright-report/`.
 
 Smoke gates confirm the app boots into the accepted vertical slice title page,
-title load/settings entries open, New Game enters Navi, Navi can move through
-first-person exploration, no-target interactions are rejected, items and
-evidence update gameplay state, map transitions remain director-owned, VN dialog
-can branch, VN toolbar/backlog/save-load surfaces are interactive, Navi ESC
-opens the pause menu, canvas layers are present, and `InputLockState` changes at
-Navi/VN/menu boundaries.
+title load/settings entries open, Settings edits persist outside save slots, New
+Game enters Navi, Navi can move through first-person exploration, no-target
+interactions are rejected, items and evidence update gameplay state, map
+transitions remain director-owned, VN dialog can branch, VN dialog display
+settings update the real `VnDialogSurface`, VN AUTO timing responds to settings,
+VN toolbar/backlog/save-load surfaces are interactive, Navi ESC opens the pause
+menu, canvas layers are present, and `InputLockState` changes at Navi/VN/menu
+boundaries.
 
 The first app build intentionally allows the large R3F/Pixi/Three bundle
 warning. A later performance task should add route or adapter code splitting

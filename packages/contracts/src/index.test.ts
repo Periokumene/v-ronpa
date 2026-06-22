@@ -24,6 +24,7 @@ import {
   SaveDataSchema,
   SaveSlotSummarySchema,
   SettingsSnapshotSchema,
+  createDefaultSettingsSnapshot,
   TrialDefinitionSchema,
   TrialRuntimeStateSchema,
   UiAssetRefSchema,
@@ -410,7 +411,24 @@ describe("contracts", () => {
     });
     expect(InteractionCapabilitySnapshotSchema.parse({ canBack: true })).not.toHaveProperty("canBack");
 
-    expect(SettingsSnapshotSchema.parse({ version: 1 })).toEqual({ version: 1, placeholder: true });
+    expect(SettingsSnapshotSchema.parse({ version: 1 })).toEqual(createDefaultSettingsSnapshot());
+    expect(createDefaultSettingsSnapshot()).toMatchObject({
+      version: 1,
+      system: { language: "zh-CN", skipAll: false, preferFullscreen: false },
+      display: { textSpeed: 0.5, textSize: "medium", textboxOpacity: 0.75, fontFamilyId: "font:default" },
+      sound: {
+        masterVolume: 1,
+        bgmVolume: 0.25,
+        sfxVolume: 1,
+        voiceVolume: 1,
+        uiVolume: 0.5,
+        muted: false,
+        voiceInterruption: "continue"
+      },
+      automation: { autoSpeed: 0.5, skipSpeed: 0.5 }
+    });
+    expect(() => SettingsSnapshotSchema.parse({ version: 1, placeholder: true })).toThrow();
+    expect(() => SettingsSnapshotSchema.parse({ version: 1, sound: { masterVolume: 1.2 } })).toThrow();
 
     expect(
       SaveSlotSummarySchema.parse({

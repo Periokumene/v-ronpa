@@ -7,10 +7,12 @@ import {
   SettingsOverlay
 } from "@v-ronpa/ui-kit";
 import type { useGameFlowActor } from "./useGameFlowActor";
+import type { useGameSettingsAdapter } from "./useGameSettingsAdapter";
 import type { useVerticalSliceRuntimeAdapter } from "./useVerticalSliceRuntimeAdapter";
 import type { useVerticalSliceSaveAdapter } from "./useVerticalSliceSaveAdapter";
 
 type GameFlowAdapter = ReturnType<typeof useGameFlowActor>;
+type GameSettingsAdapter = ReturnType<typeof useGameSettingsAdapter>;
 type VerticalSliceRuntimeAdapter = ReturnType<typeof useVerticalSliceRuntimeAdapter>;
 type VerticalSliceSaveAdapter = ReturnType<typeof useVerticalSliceSaveAdapter>;
 
@@ -54,11 +56,13 @@ export function createSaveLoadOverlayModel({
 export function useOverlayPageAdapters({
   flow,
   runtime,
-  save
+  save,
+  settings
 }: {
   flow: GameFlowAdapter;
   runtime: VerticalSliceRuntimeAdapter;
   save: VerticalSliceSaveAdapter;
+  settings: GameSettingsAdapter;
 }) {
   function dispatchUiAction(action: GameUiAction) {
     if (action === "toggle-auto") {
@@ -154,7 +158,14 @@ export function useOverlayPageAdapters({
       }
 
       if (overlay === "title-settings" || overlay === "vn-settings") {
-        return <SettingsOverlay onClose={flow.closeTopOverlay} />;
+        return (
+          <SettingsOverlay
+            onClose={flow.closeTopOverlay}
+            onPatchSettings={settings.patchSettings}
+            onResetSettings={settings.resetSettings}
+            settings={settings.settings}
+          />
+        );
       }
 
       if (overlay === "pause-menu") {

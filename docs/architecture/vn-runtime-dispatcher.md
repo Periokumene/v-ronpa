@@ -30,6 +30,10 @@ VN runtime output is split in two app-layer steps:
   `RuntimeCommand` records.
 - `VnRuntimeDispatcher` owns React rendering of the DOM dialog and Pixi layer
   from committed runtime state.
+- Settings are not routed through StoryEngine or RuntimeCommand output.
+  `apps/game` derives VN dialog display props and story-play timing policy from
+  the canonical settings snapshot, then passes those narrow values into runtime
+  adapters and `VnDialogSurface`.
 - DOM UI owns dialogue text, choices, menus, settings, save/load screens, and
   other accessibility-sensitive surfaces.
 - Pixi owns VN/trial 2D effects, backgrounds, portraits, filters, particles,
@@ -96,12 +100,20 @@ AUTO, SAVE, LOAD, and SETTING are shell UI actions derived from
 routed from those adapters into the runtime adapter, which hosts web timers and
 delegates playback rules to `story-play`.
 
+Settings overlay edits update app-owned canonical settings immediately and are
+debounced to localStorage by the app adapter. The overlay does not own draft
+state, does not render dialogue previews, and does not subscribe to runtime
+state. Text rendering remains in `VnDialogSurface`; settings can only affect it
+through display props.
+
 ## Future Branches
 
 - The performance branch can add new Pixi runtime command handlers without
   changing StoryEngine state shape.
-- The UI branch can add settings, backlog, save/load, auto/skip, and style
+- Future UI branches can extend backlog, save/load, auto/skip, and style
   surfaces behind `GameInteractionShell` and `ui-kit` display components.
+  Settings extensions should keep the same app-owned canonical state and narrow
+  runtime-consumer pattern.
 - Branch-local experiments should use `@wildcard-<type> routeKey:<key>` and
   route by `wildcardType + routeKey`. Promote a wildcard to an explicit command
   only when it stabilizes.

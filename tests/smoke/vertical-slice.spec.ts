@@ -8,6 +8,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
     if (message.type() === "error" && !isExpectedPointerLockError(message.text())) consoleErrors.push(message.text());
   });
 
+  await page.addInitScript(() => localStorage.removeItem("v-ronpa:settings:v1"));
   await page.goto("/?scenario=vertical-slice");
 
   await expect(page.getByTestId("playfield")).toBeVisible();
@@ -25,7 +26,18 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await page.screenshot({ path: "test-results/vertical-slice-title.png", fullPage: true });
   await page.getByTestId("title-settings").click();
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
-  await expect(page.getByTestId("settings-empty")).toBeVisible();
+  await expect(page.getByTestId("settings-group-system")).toBeVisible();
+  await expect(page.getByTestId("settings-group-display")).toBeVisible();
+  await expect(page.getByTestId("settings-group-sound")).toBeVisible();
+  await expect(page.getByTestId("settings-overlay").getByTestId("vn-dialog-text")).toHaveCount(0);
+  await page.getByTestId("settings-display-text-size").selectOption("large");
+  await page.getByTestId("settings-display-textbox-opacity").fill("50");
+  await page.getByTestId("settings-overlay-close").click();
+  await expect(page.getByTestId("settings-overlay")).toBeHidden();
+  await page.getByTestId("title-settings").click();
+  await expect(page.getByTestId("settings-display-text-size")).toHaveValue("large");
+  await expect(page.getByTestId("settings-display-textbox-opacity")).toHaveValue("50");
+  await expect(page.getByTestId("settings-display-textbox-opacity-value")).toHaveText("50%");
   await page.getByTestId("settings-overlay-close").click();
   await expect(page.getByTestId("settings-overlay")).toBeHidden();
   await page.getByTestId("title-load").click();
@@ -105,6 +117,8 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await page.getByTestId("vertical-slice-confirm").click();
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("vn2d-overlay");
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-text-size", "large");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-textbox-opacity", "0.5");
   await expect(page.getByTestId("pixi-layer")).toBeVisible();
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("aria-hidden", "false");
   await expect(page.getByTestId("vn-dialog-speaker")).toHaveText("菲利克斯");
@@ -119,6 +133,16 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vn-command-save")).toBeEnabled();
   await expect(page.getByTestId("vn-command-load")).toBeEnabled();
   await expect(page.getByTestId("vn-command-settings")).toBeEnabled();
+  await page.getByTestId("vn-command-settings").click();
+  await expect(page.getByTestId("settings-overlay")).toBeVisible();
+  await page.getByTestId("settings-display-text-size").selectOption("small");
+  await page.getByTestId("settings-display-textbox-opacity").fill("40");
+  await expect(page.getByTestId("settings-display-textbox-opacity-value")).toHaveText("40%");
+  await expect(page.getByTestId("settings-overlay").getByTestId("vn-dialog-text")).toHaveCount(0);
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-text-size", "small");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-textbox-opacity", "0.4");
+  await page.getByTestId("settings-overlay-close").click();
+  await expect(page.getByTestId("settings-overlay")).toBeHidden();
   await page.screenshot({ path: "test-results/vertical-slice-vn-toolbar.png", fullPage: true });
   await page.getByTestId("vn-command-backlog").click();
   await expect(page.getByTestId("backlog-overlay")).toBeVisible();
@@ -142,6 +166,8 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await page.getByTestId("load-confirm").click();
   await expect(page.getByTestId("save-load-overlay")).toBeHidden();
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-text-size", "small");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-textbox-opacity", "0.4");
   await blurActiveElement(page);
   await page.keyboard.press("Space");
   await movementPulse(page, "ArrowUp");

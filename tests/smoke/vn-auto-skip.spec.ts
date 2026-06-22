@@ -8,6 +8,7 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
     if (message.type() === "error" && !isExpectedPointerLockError(message.text())) consoleErrors.push(message.text());
   });
 
+  await page.addInitScript(() => localStorage.removeItem("v-ronpa:settings:v1"));
   await page.goto("/?scenario=vertical-slice");
   await page.getByTestId("title-new-game").click();
   await startWitnessStory(page);
@@ -17,9 +18,16 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
   await expect(page.getByTestId("vn-command-skip")).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("vn-dialog-text")).toContainText("我会记录每一次状态变化", { timeout: 8_000 });
 
+  await page.getByTestId("vn-command-settings").click();
+  await expect(page.getByTestId("settings-overlay")).toBeVisible();
+  await page.getByTestId("settings-automation-auto-speed").fill("100");
+  await expect(page.getByTestId("settings-automation-auto-speed-value")).toHaveText("100%");
+  await page.getByTestId("settings-overlay-close").click();
+  await expect(page.getByTestId("settings-overlay")).toBeHidden();
+
   await page.getByTestId("vn-command-auto").click();
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("先别急着追问", { timeout: 8_000 });
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("先别急着追问", { timeout: 1_500 });
 
   await page.getByTestId("vn-dialog-advance").click();
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "false");

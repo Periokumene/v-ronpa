@@ -37,8 +37,8 @@ adapters and apps
 - `GameFlowMachine` owns shell flow state: `loading`, `title`, playable modes,
   overlay stack, and interaction capability policy.
 - `GameInteractionShell` in `apps/game` wires app adapters to title, overlay,
-  VN toolbar, save/load, backlog, settings shell, and pause menu surfaces. It is
-  app orchestration, not a gameplay director.
+  VN toolbar, save/load, backlog, settings, and pause menu surfaces. It is app
+  orchestration, not a gameplay director.
 - `navi-director` owns Navi substates: `walk`, `interacting`, `vn2d-overlay`,
   `inventory`, and `event`.
 - `trial-director` owns Trial segment flow, presentation profile selection,
@@ -62,6 +62,8 @@ adapters and apps
 - `pixi-presenter` owns 2D canvas/WebGL presentation only, including internal
   presenter traces used for adapter tests and inspection.
 - `ui-kit` owns DOM overlays, text-heavy surfaces, controls, and Inspector Lite.
+  Settings UI components stay pure and controlled; app adapters own settings
+  state, persistence, and runtime derivation.
 
 ## Mode Model
 
@@ -84,6 +86,13 @@ overlay flow, not additional playable modes. They coordinate through
 `GameInteractionContext`, `InteractionCapabilitySnapshot`, and `InputLockState`
 so Navi and Trial can keep their director-owned runtime state independent from
 DOM UI composition.
+
+Settings are app-owned user preferences, not save data and not media-save
+payloads. `packages/contracts` declares the versioned `SettingsSnapshot`;
+`apps/game` owns the canonical settings adapter and localStorage persistence;
+`ui-kit` renders controlled controls only. Runtime consumers receive narrow
+derived values such as `StoryPlayTimingPolicy` and VN dialog display props
+instead of the full settings snapshot.
 
 See also:
 

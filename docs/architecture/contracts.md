@@ -36,6 +36,10 @@ and merge the change through the integration baseline first.
   summaries from save data, while app adapters collect the current runtime
   snapshot. `SaveData` itself should remain the restore payload, not the list
   preview authority.
+- Settings should use the public `SettingsSnapshot` contract. The snapshot is a
+  versioned user-preference shape grouped by system, display, sound, and
+  automation. It is persisted by app adapters outside `SaveData`; `media-save`
+  must not store or merge settings as part of save slots.
 - Presenter runtime traces are adapter internals. They must not be used as
   SaveData shapes or as public stage snapshots.
 - UI asset refs and interaction style profiles are manifest/config references.

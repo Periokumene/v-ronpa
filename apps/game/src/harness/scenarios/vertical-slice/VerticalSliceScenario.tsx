@@ -1,10 +1,15 @@
-import { useState, type ButtonHTMLAttributes } from "react";
+import { useMemo, useState, type ButtonHTMLAttributes } from "react";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
 import { ExplorationStage3D } from "@v-ronpa/r3f-adapter";
 import { InspectorLite } from "@v-ronpa/ui-kit";
 import { GameInteractionShell } from "../../../interaction/GameInteractionShell";
 import { useGameFlowActor } from "../../../interaction/useGameFlowActor";
+import {
+  settingsToDialogDisplaySettings,
+  settingsToStoryPlayTimingPolicy,
+  useGameSettingsAdapter
+} from "../../../interaction/useGameSettingsAdapter";
 import { useOverlayPageAdapters } from "../../../interaction/useOverlayPageAdapters";
 import {
   useVerticalSliceRuntimeAdapter,
@@ -19,9 +24,12 @@ type DebugTabId = "runtime" | "inspector";
 
 export function VerticalSliceScenario() {
   const flow = useGameFlowActor();
-  const runtime = useVerticalSliceRuntimeAdapter(flow.mode);
+  const settings = useGameSettingsAdapter();
+  const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
+  const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
+  const runtime = useVerticalSliceRuntimeAdapter(flow.mode, { storyPlayTiming });
   const save = useVerticalSliceSaveAdapter(runtime);
-  const overlayPages = useOverlayPageAdapters({ flow, runtime, save });
+  const overlayPages = useOverlayPageAdapters({ flow, runtime, save, settings });
   const [activeDebugTab, setActiveDebugTab] = useState<DebugTabId>("runtime");
 
   return (
@@ -38,6 +46,7 @@ export function VerticalSliceScenario() {
               pixiStage={runtime.pixiStageRuntime.snapshot}
               story={runtime.storyRuntime.state}
               storySession={runtime.storySession}
+              dialogDisplay={dialogDisplay}
               formatSpeaker={displayStorySpeaker}
               onAdvance={runtime.advanceStory}
               onChoice={runtime.chooseStory}

@@ -1,7 +1,7 @@
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { PixiStageRenderHint } from "@v-ronpa/pixi-presenter";
 import { selectCurrentStoryLine, type StoryRuntimeState } from "@v-ronpa/story-engine";
-import { VnDialogSurface } from "@v-ronpa/ui-kit";
+import { VnDialogSurface, type VnDialogDisplaySettings } from "@v-ronpa/ui-kit";
 import { PixiLayer } from "./PixiLayer";
 
 export interface VnRuntimeDispatcherProps {
@@ -12,6 +12,7 @@ export interface VnRuntimeDispatcherProps {
   pixiHintSequence: number;
   pixiAnimate: boolean;
   storySession?: number | string;
+  dialogDisplay?: VnDialogDisplaySettings;
   formatSpeaker?: (speaker: string) => string;
   onAdvance: () => void;
   onChoice: (index: number) => void;
@@ -26,6 +27,7 @@ export function VnRuntimeDispatcher({
   pixiHintSequence,
   pixiAnimate,
   storySession = "story",
+  dialogDisplay,
   formatSpeaker,
   onAdvance,
   onChoice,
@@ -49,6 +51,7 @@ export function VnRuntimeDispatcher({
           {...(speaker ? { speaker } : {})}
           text={currentLine.text}
           choices={story.pendingChoices}
+          {...(dialogDisplay ? { displaySettings: dialogDisplay } : {})}
           ended={story.ended}
           onAdvance={onAdvance}
           onChoice={onChoice}

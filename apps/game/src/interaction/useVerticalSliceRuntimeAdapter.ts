@@ -41,7 +41,8 @@ import {
   type StoryPlayPacing,
   type StoryPlaySchedule,
   type StoryPlayStopReason,
-  type StoryPlayState
+  type StoryPlayState,
+  type StoryPlayTimingPolicy
 } from "@v-ronpa/story-play";
 import { verticalSliceMaps, verticalSliceScript } from "../harness/fixtures/verticalSlice";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../harness/inputActions";
@@ -97,6 +98,7 @@ export interface VerticalSliceRuntimeRestorePlan {
 export interface VerticalSliceRuntimeAdapterOptions {
   profile?: VnRuntimeProfile;
   routeTable?: VnOutputRouteTable;
+  storyPlayTiming?: StoryPlayTimingPolicy;
 }
 
 export interface VerticalSlicePresentationTransactionInput {
@@ -133,6 +135,7 @@ export function useVerticalSliceRuntimeAdapter(
   );
   const runtimeProfile = options.profile ?? "vn2d";
   const runtimeRouteTable = options.routeTable;
+  const storyPlayTiming = options.storyPlayTiming;
   const [navi, setNavi] = useState<NaviRuntimeState>(() => ({
     ...createInitialNaviState(initialMap.id),
     playerPose: { position: initialMap.spawn, yaw: 0, pitch: 0 }
@@ -161,9 +164,10 @@ export function useVerticalSliceRuntimeAdapter(
     () =>
       selectStoryPlaySchedule(storyPlay, storyRuntime.state, {
         active: storyRuntime.active,
-        hostReadyForAuto: true
+        hostReadyForAuto: true,
+        ...(storyPlayTiming ? { timing: storyPlayTiming } : {})
       }),
-    [storyPlay, storyRuntime.active, storyRuntime.state]
+    [storyPlay, storyPlayTiming, storyRuntime.active, storyRuntime.state]
   );
   const storyPlayActiveActions: Partial<Record<GameUiAction, boolean>> = useMemo(
     () => ({

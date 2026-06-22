@@ -1161,11 +1161,106 @@ export const InteractionCapabilitySnapshotSchema = z.object({
 });
 export type InteractionCapabilitySnapshot = z.infer<typeof InteractionCapabilitySnapshotSchema>;
 
-export const SettingsSnapshotSchema = z.object({
-  version: z.literal(1),
-  placeholder: z.boolean().default(true)
-});
+export const SettingsLanguageSchema = z.enum(["zh-CN", "zh-TW", "en", "ja", "ko"]);
+export type SettingsLanguage = z.infer<typeof SettingsLanguageSchema>;
+
+export const SettingsTextSizeSchema = z.enum(["small", "medium", "large"]);
+export type SettingsTextSize = z.infer<typeof SettingsTextSizeSchema>;
+
+export const SettingsVoiceInterruptionSchema = z.enum(["interrupt", "continue"]);
+export type SettingsVoiceInterruption = z.infer<typeof SettingsVoiceInterruptionSchema>;
+
+const NormalizedSettingSchema = z.number().min(0).max(1);
+
+export const SettingsSystemSnapshotSchema = z
+  .object({
+    language: SettingsLanguageSchema.default("zh-CN"),
+    skipAll: z.boolean().default(false),
+    preferFullscreen: z.boolean().default(false)
+  })
+  .strict();
+export type SettingsSystemSnapshot = z.infer<typeof SettingsSystemSnapshotSchema>;
+
+export const SettingsDisplaySnapshotSchema = z
+  .object({
+    textSpeed: NormalizedSettingSchema.default(0.5),
+    textSize: SettingsTextSizeSchema.default("medium"),
+    textboxOpacity: NormalizedSettingSchema.default(0.75),
+    fontFamilyId: IdSchema.default("font:default")
+  })
+  .strict();
+export type SettingsDisplaySnapshot = z.infer<typeof SettingsDisplaySnapshotSchema>;
+
+export const SettingsSoundSnapshotSchema = z
+  .object({
+    masterVolume: NormalizedSettingSchema.default(1),
+    bgmVolume: NormalizedSettingSchema.default(0.25),
+    sfxVolume: NormalizedSettingSchema.default(1),
+    voiceVolume: NormalizedSettingSchema.default(1),
+    uiVolume: NormalizedSettingSchema.default(0.5),
+    muted: z.boolean().default(false),
+    voiceInterruption: SettingsVoiceInterruptionSchema.default("continue")
+  })
+  .strict();
+export type SettingsSoundSnapshot = z.infer<typeof SettingsSoundSnapshotSchema>;
+
+export const SettingsAutomationSnapshotSchema = z
+  .object({
+    autoSpeed: NormalizedSettingSchema.default(0.5),
+    skipSpeed: NormalizedSettingSchema.default(0.5)
+  })
+  .strict();
+export type SettingsAutomationSnapshot = z.infer<typeof SettingsAutomationSnapshotSchema>;
+
+const DEFAULT_SETTINGS_SYSTEM_SNAPSHOT = {
+  language: "zh-CN",
+  skipAll: false,
+  preferFullscreen: false
+} as const;
+
+const DEFAULT_SETTINGS_DISPLAY_SNAPSHOT = {
+  textSpeed: 0.5,
+  textSize: "medium",
+  textboxOpacity: 0.75,
+  fontFamilyId: "font:default"
+} as const;
+
+const DEFAULT_SETTINGS_SOUND_SNAPSHOT = {
+  masterVolume: 1,
+  bgmVolume: 0.25,
+  sfxVolume: 1,
+  voiceVolume: 1,
+  uiVolume: 0.5,
+  muted: false,
+  voiceInterruption: "continue"
+} as const;
+
+const DEFAULT_SETTINGS_AUTOMATION_SNAPSHOT = {
+  autoSpeed: 0.5,
+  skipSpeed: 0.5
+} as const;
+
+export const SettingsSnapshotSchema = z
+  .object({
+    version: z.literal(1),
+    system: SettingsSystemSnapshotSchema.default(DEFAULT_SETTINGS_SYSTEM_SNAPSHOT),
+    display: SettingsDisplaySnapshotSchema.default(DEFAULT_SETTINGS_DISPLAY_SNAPSHOT),
+    sound: SettingsSoundSnapshotSchema.default(DEFAULT_SETTINGS_SOUND_SNAPSHOT),
+    automation: SettingsAutomationSnapshotSchema.default(DEFAULT_SETTINGS_AUTOMATION_SNAPSHOT)
+  })
+  .strict();
 export type SettingsSnapshot = z.infer<typeof SettingsSnapshotSchema>;
+
+export interface SettingsPatch {
+  system?: Partial<SettingsSystemSnapshot>;
+  display?: Partial<SettingsDisplaySnapshot>;
+  sound?: Partial<SettingsSoundSnapshot>;
+  automation?: Partial<SettingsAutomationSnapshot>;
+}
+
+export function createDefaultSettingsSnapshot(): SettingsSnapshot {
+  return SettingsSnapshotSchema.parse({ version: 1 });
+}
 
 export const SaveSlotSummarySchema = z.object({
   id: IdSchema,

@@ -89,8 +89,8 @@ delete, split, or execute entries from it.
   - User planning notes for the VN UI/interaction branch
   - `docs/architecture/vn-runtime-dispatcher.md`
 - Current Observation: The runtime dispatcher now leaves room for UI actions,
-  but LOG, SKIP, AUTO, SAVE, LOAD, and SETTING surfaces still need a
-  mature UI architecture, style configuration strategy, and persistence boundary.
+  and the settings persistence baseline is in place. LOG, SKIP, AUTO, SAVE,
+  LOAD, and broader style configuration still need a mature product UI pass.
 - Why Not Actionable Yet: The work crosses UI layout, runtime controls, save
   data, backlog policy, accessibility, and style presets. It should not be
   inferred from dispatcher scaffolding alone.
@@ -164,20 +164,22 @@ delete, split, or execute entries from it.
 
 - ID: RW-0007
 - Title: Define persistent settings before filling the settings page
-- Area: contracts, ui-kit, media-save, app runtime
+- Area: contracts, ui-kit, app runtime
 - Source / Evidence:
   - `SettingsSnapshot` in `packages/contracts/src/index.ts`
   - `SettingsOverlay` in `packages/ui-kit/src/surfaces/GameInteractionSurfaces.tsx`
-- Current Observation: Settings is an empty shell. It does not persist audio,
-  text speed, fullscreen, accessibility, input, or language preferences.
-- Why Not Actionable Yet: Settings should be designed as a durable product
-  surface with migration rules, defaults, reset behavior, and per-project style
-  overrides.
+- Current Observation: Closed by `docs/ccr/settings-persistence-baseline.md`.
+  Settings now has grouped contracts, app-owned localStorage persistence,
+  controlled ui-kit controls, and narrow runtime consumption for VN dialog
+  display plus story-play timing.
+- Why Not Actionable Yet: Baseline persistence is complete. Future additions
+  such as keybinds, accessibility presets, per-project style overrides, or
+  richer audio behavior should be reviewed as separate expansions.
 - Auto Action: Forbidden
-- Review Cadence: Review at the start of the VN UI/interaction branch.
+- Review Cadence: Review only when expanding settings beyond the baseline.
 - Next Review: TBD
-- Status: Watching
-- Linked Task / ADR / CCR: TBD
+- Status: Closed
+- Linked Task / ADR / CCR: `docs/ccr/settings-persistence-baseline.md`
 
 ### RW-0008: RuntimeCommand Diagnostics Surfacing
 

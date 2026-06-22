@@ -2,10 +2,17 @@ import type { StoryChoiceOption } from "@v-ronpa/contracts";
 import { useId } from "react";
 import type { CSSProperties, KeyboardEvent } from "react";
 
+export interface VnDialogDisplaySettings {
+  textSize: "small" | "medium" | "large";
+  textboxOpacity: number;
+  textSpeed: number;
+}
+
 export interface VnDialogSurfaceProps {
   speaker?: string;
   text: string;
   choices?: StoryChoiceOption[];
+  displaySettings?: VnDialogDisplaySettings;
   ended?: boolean;
   onAdvance?: () => void;
   onAdvanceBlocked?: (reason: "ended") => void;
@@ -17,6 +24,7 @@ export function VnDialogSurface({
   speaker,
   text,
   choices = [],
+  displaySettings,
   ended = false,
   onAdvance,
   onAdvanceBlocked,
@@ -28,6 +36,9 @@ export function VnDialogSurface({
   const speakerLabel = speaker ?? "旁白";
   const speakerId = useId();
   const textId = useId();
+  const textSize = displaySettings?.textSize ?? "medium";
+  const textSpeed = displaySettings?.textSpeed ?? 0.5;
+  const textboxOpacity = displaySettings?.textboxOpacity ?? 0.84;
 
   function selectChoice(index: number) {
     const choice = choices[index];
@@ -79,10 +90,13 @@ export function VnDialogSurface({
       aria-labelledby={speakerId}
       aria-keyshortcuts="Enter Escape"
       data-state={state}
+      data-text-size={textSize}
+      data-text-speed={String(textSpeed)}
+      data-textbox-opacity={String(textboxOpacity)}
       data-testid="vn-dialog-surface"
       onKeyDown={handleKeyDown}
       role="region"
-      style={rootStyle}
+      style={dialogRootStyle(textboxOpacity)}
       tabIndex={0}
     >
       <div style={headerStyle}>
@@ -94,7 +108,7 @@ export function VnDialogSurface({
         </div>
       </div>
 
-      <p data-testid="vn-dialog-text" id={textId} style={textStyle}>
+      <p data-testid="vn-dialog-text" id={textId} style={dialogTextStyle(textSize, textSpeed)}>
         {text}
       </p>
 
@@ -157,6 +171,15 @@ const rootStyle: CSSProperties = {
   backdropFilter: "blur(12px)"
 };
 
+function dialogRootStyle(textboxOpacity: number): CSSProperties {
+  const primaryOpacity = clamp(textboxOpacity, 0.2, 1);
+  const secondaryOpacity = clamp(textboxOpacity * 0.92, 0.18, 1);
+  return {
+    ...rootStyle,
+    background: `linear-gradient(180deg, rgba(11, 16, 23, ${primaryOpacity}), rgba(13, 20, 31, ${secondaryOpacity}))`
+  };
+}
+
 const headerStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -192,6 +215,14 @@ const textStyle: CSSProperties = {
   fontSize: 16,
   lineHeight: 1.55
 };
+
+function dialogTextStyle(textSize: VnDialogDisplaySettings["textSize"], textSpeed: number): CSSProperties {
+  return {
+    ...textStyle,
+    fontSize: textSize === "small" ? 15 : textSize === "large" ? 18 : 16,
+    transitionDuration: `${Math.round(260 - clamp(textSpeed, 0, 1) * 180)}ms`
+  };
+}
 
 const choiceListStyle: CSSProperties = {
   display: "flex",
@@ -231,3 +262,7 @@ const endedStyle: CSSProperties = {
   color: "#ffb3c7",
   fontSize: 13
 };
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}

@@ -7,6 +7,8 @@ import type {
   InteractionCapabilitySnapshot,
   InteractionStyleProfile,
   SaveSlotSummary,
+  SettingsPatch,
+  SettingsSnapshot,
   StoryBacklogEntry
 } from "@v-ronpa/contracts";
 import type { CSSProperties, ReactNode } from "react";
@@ -214,14 +216,239 @@ export function SaveLoadOverlay({
 }
 
 export interface SettingsOverlayProps {
+  onPatchSettings: (patch: SettingsPatch) => void;
+  onResetSettings: () => void;
   onClose: () => void;
+  settings: SettingsSnapshot;
 }
 
-export function SettingsOverlay({ onClose }: SettingsOverlayProps) {
+export function SettingsOverlay({ onClose, onPatchSettings, onResetSettings, settings }: SettingsOverlayProps) {
   return (
     <OverlayPanel onClose={onClose} testId="settings-overlay" title="Settings">
-      <div aria-label="Settings placeholder" data-testid="settings-empty" style={emptyPanelStyle} />
+      <div data-testid="settings-groups" style={settingsGroupsStyle}>
+        <section aria-label="System settings" data-testid="settings-group-system" style={settingsGroupStyle}>
+          <h3 style={settingsGroupTitleStyle}>System</h3>
+          <SettingsSelect
+            label="Language"
+            testId="settings-system-language"
+            value={settings.system.language}
+            options={[
+              ["zh-CN", "Chinese (Simplified)"],
+              ["zh-TW", "Chinese (Traditional)"],
+              ["en", "English"],
+              ["ja", "Japanese"],
+              ["ko", "Korean"]
+            ]}
+            onChange={(language) => onPatchSettings({ system: { language: language as SettingsSnapshot["system"]["language"] } })}
+          />
+          <SettingsToggle
+            checked={settings.system.skipAll}
+            label="Skip unread text"
+            onChange={(skipAll) => onPatchSettings({ system: { skipAll } })}
+            testId="settings-system-skip-all"
+          />
+          <SettingsToggle
+            checked={settings.system.preferFullscreen}
+            label="Prefer fullscreen"
+            onChange={(preferFullscreen) => onPatchSettings({ system: { preferFullscreen } })}
+            testId="settings-system-fullscreen"
+          />
+        </section>
+
+        <section aria-label="Display settings" data-testid="settings-group-display" style={settingsGroupStyle}>
+          <h3 style={settingsGroupTitleStyle}>Display</h3>
+          <SettingsSelect
+            label="Text size"
+            testId="settings-display-text-size"
+            value={settings.display.textSize}
+            options={[
+              ["small", "Small"],
+              ["medium", "Medium"],
+              ["large", "Large"]
+            ]}
+            onChange={(textSize) => onPatchSettings({ display: { textSize: textSize as SettingsSnapshot["display"]["textSize"] } })}
+          />
+          <SettingsSlider
+            label="Text speed"
+            onChange={(textSpeed) => onPatchSettings({ display: { textSpeed } })}
+            testId="settings-display-text-speed"
+            value={settings.display.textSpeed}
+          />
+          <SettingsSlider
+            label="Textbox opacity"
+            onChange={(textboxOpacity) => onPatchSettings({ display: { textboxOpacity } })}
+            testId="settings-display-textbox-opacity"
+            value={settings.display.textboxOpacity}
+          />
+          <SettingsSelect
+            label="Textbox font"
+            testId="settings-display-font"
+            value={settings.display.fontFamilyId}
+            options={[["font:default", "Default"]]}
+            onChange={(fontFamilyId) => onPatchSettings({ display: { fontFamilyId } })}
+          />
+        </section>
+
+        <section aria-label="Sound settings" data-testid="settings-group-sound" style={settingsGroupStyle}>
+          <h3 style={settingsGroupTitleStyle}>Sound</h3>
+          <SettingsToggle
+            checked={settings.sound.muted}
+            label="Mute all"
+            onChange={(muted) => onPatchSettings({ sound: { muted } })}
+            testId="settings-sound-muted"
+          />
+          <SettingsSlider
+            label="Master volume"
+            onChange={(masterVolume) => onPatchSettings({ sound: { masterVolume } })}
+            testId="settings-sound-master"
+            value={settings.sound.masterVolume}
+          />
+          <SettingsSlider
+            label="BGM volume"
+            onChange={(bgmVolume) => onPatchSettings({ sound: { bgmVolume } })}
+            testId="settings-sound-bgm"
+            value={settings.sound.bgmVolume}
+          />
+          <SettingsSlider
+            label="SFX volume"
+            onChange={(sfxVolume) => onPatchSettings({ sound: { sfxVolume } })}
+            testId="settings-sound-sfx"
+            value={settings.sound.sfxVolume}
+          />
+          <SettingsSlider
+            label="Voice volume"
+            onChange={(voiceVolume) => onPatchSettings({ sound: { voiceVolume } })}
+            testId="settings-sound-voice"
+            value={settings.sound.voiceVolume}
+          />
+          <SettingsSlider
+            label="UI volume"
+            onChange={(uiVolume) => onPatchSettings({ sound: { uiVolume } })}
+            testId="settings-sound-ui"
+            value={settings.sound.uiVolume}
+          />
+          <SettingsSelect
+            label="Voice interruption"
+            testId="settings-sound-voice-interruption"
+            value={settings.sound.voiceInterruption}
+            options={[
+              ["continue", "Continue voice"],
+              ["interrupt", "Interrupt voice"]
+            ]}
+            onChange={(voiceInterruption) => onPatchSettings({ sound: { voiceInterruption: voiceInterruption as SettingsSnapshot["sound"]["voiceInterruption"] } })}
+          />
+        </section>
+
+        <section aria-label="Automation settings" data-testid="settings-group-automation" style={settingsGroupStyle}>
+          <h3 style={settingsGroupTitleStyle}>Automation</h3>
+          <SettingsSlider
+            label="Auto speed"
+            onChange={(autoSpeed) => onPatchSettings({ automation: { autoSpeed } })}
+            testId="settings-automation-auto-speed"
+            value={settings.automation.autoSpeed}
+          />
+          <SettingsSlider
+            label="Skip speed"
+            onChange={(skipSpeed) => onPatchSettings({ automation: { skipSpeed } })}
+            testId="settings-automation-skip-speed"
+            value={settings.automation.skipSpeed}
+          />
+        </section>
+      </div>
+      <div style={settingsActionsStyle}>
+        <button data-testid="settings-reset" onClick={onResetSettings} style={secondaryButtonStyle} type="button">
+          Reset
+        </button>
+      </div>
     </OverlayPanel>
+  );
+}
+
+function SettingsSlider({
+  label,
+  onChange,
+  testId,
+  value
+}: {
+  label: string;
+  onChange: (value: number) => void;
+  testId: string;
+  value: number;
+}) {
+  const percent = Math.round(value * 100);
+  return (
+    <label style={settingsControlStyle}>
+      <span>{label}</span>
+      <input
+        aria-label={label}
+        data-testid={testId}
+        max={100}
+        min={0}
+        onChange={(event) => onChange(Number(event.currentTarget.value) / 100)}
+        style={settingsRangeStyle}
+        type="range"
+        value={percent}
+      />
+      <output data-testid={`${testId}-value`} style={settingsValueStyle}>{percent}%</output>
+    </label>
+  );
+}
+
+function SettingsToggle({
+  checked,
+  label,
+  onChange,
+  testId
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (value: boolean) => void;
+  testId: string;
+}) {
+  return (
+    <label style={settingsControlStyle}>
+      <span>{label}</span>
+      <input
+        aria-label={label}
+        checked={checked}
+        data-testid={testId}
+        onChange={(event) => onChange(event.currentTarget.checked)}
+        type="checkbox"
+      />
+    </label>
+  );
+}
+
+function SettingsSelect({
+  label,
+  onChange,
+  options,
+  testId,
+  value
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  options: Array<[string, string]>;
+  testId: string;
+  value: string;
+}) {
+  return (
+    <label style={settingsControlStyle}>
+      <span>{label}</span>
+      <select
+        aria-label={label}
+        data-testid={testId}
+        onChange={(event) => onChange(event.currentTarget.value)}
+        style={settingsSelectStyle}
+        value={value}
+      >
+        {options.map(([optionValue, text]) => (
+          <option key={optionValue} value={optionValue}>
+            {text}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -298,7 +525,14 @@ const scrollViewportStyle: CSSProperties = { width: "100%", height: "100%" };
 const scrollbarStyle: CSSProperties = { width: 8, background: "rgba(255,255,255,0.08)" };
 const scrollThumbStyle: CSSProperties = { borderRadius: 999, background: "rgba(255,255,255,0.32)" };
 const emptyStyle: CSSProperties = { margin: 0, color: "rgba(255,255,255,0.68)" };
-const emptyPanelStyle: CSSProperties = { minHeight: 180, display: "grid", placeItems: "center", border: "1px dashed rgba(255,255,255,0.22)", borderRadius: 6, color: "rgba(255,255,255,0.72)" };
+const settingsGroupsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, overflow: "auto", paddingRight: 4 };
+const settingsGroupStyle: CSSProperties = { display: "grid", alignContent: "start", gap: 10, padding: 12, border: "1px solid rgba(255,255,255,0.16)", borderRadius: 6, background: "rgba(255,255,255,0.05)" };
+const settingsGroupTitleStyle: CSSProperties = { margin: 0, color: "#ffd166", fontSize: 15, letterSpacing: 0 };
+const settingsControlStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(100px, 1fr) minmax(92px, 1.2fr) auto", alignItems: "center", gap: 8, color: "rgba(255,255,255,0.82)", fontSize: 13 };
+const settingsRangeStyle: CSSProperties = { width: "100%", minWidth: 92 };
+const settingsSelectStyle: CSSProperties = { minWidth: 120, borderRadius: 5, border: "1px solid rgba(255,255,255,0.24)", background: "#101821", color: "#f8fbff" };
+const settingsValueStyle: CSSProperties = { minWidth: 38, color: "#6ee7d8", textAlign: "right", fontSize: 12 };
+const settingsActionsStyle: CSSProperties = { display: "flex", justifyContent: "flex-end" };
 const listStyle: CSSProperties = { display: "grid", gap: 10, margin: 0, padding: 0, listStyle: "none" };
 const backlogItemStyle: CSSProperties = { display: "grid", gap: 4, padding: 12, borderRadius: 6, background: "rgba(255,255,255,0.07)" };
 const modeBadgeStyle: CSSProperties = { width: "fit-content", padding: "3px 8px", borderRadius: 999, background: "rgba(110,231,216,0.14)", color: "#6ee7d8", textTransform: "uppercase", fontSize: 12 };
