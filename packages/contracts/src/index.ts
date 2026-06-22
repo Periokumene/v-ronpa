@@ -1202,7 +1202,6 @@ export const SaveDataSchema = z.object({
   version: z.literal(2),
   savedAt: z.string(),
   mode: GameModeSchema,
-  summary: SaveSlotSummarySchema.optional(),
   navi: NaviRuntimeStateSchema.optional(),
   story: StoryRuntimeSnapshotSchema,
   pixiStage: PixiStageSnapshotSchema,

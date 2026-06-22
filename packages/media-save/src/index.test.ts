@@ -84,7 +84,7 @@ describe("media save contracts", () => {
       id: "slot:1",
       label: "Slot 1",
       summary,
-      data: { ...baseSave, summary }
+      data: baseSave
     });
 
     await expect(port.listSummaries()).resolves.toEqual([summary]);
@@ -98,11 +98,27 @@ describe("media save contracts", () => {
 
   it("returns undefined for invalid slots without mutating stored summaries", async () => {
     const summary = createSaveSlotSummary("slot:1", "Slot 1", baseSave);
-    const port = createMemorySavePort([{ id: "slot:1", label: "Slot 1", summary, data: { ...baseSave, summary } }]);
+    const port = createMemorySavePort([{ id: "slot:1", label: "Slot 1", summary, data: baseSave }]);
 
     await expect(port.load("slot:missing")).resolves.toBeUndefined();
     await port.delete("slot:missing");
 
     await expect(port.listSummaries()).resolves.toEqual([summary]);
+  });
+
+  it("regenerates stale slot summaries from save data", async () => {
+    const staleSummary = {
+      id: "slot:1",
+      label: "Slot 1",
+      savedAt: "2026-06-14T00:00:00.000Z",
+      mode: "navi" as const,
+      speaker: "Old",
+      text: "Stale line."
+    };
+    const expectedSummary = createSaveSlotSummary("slot:1", "Slot 1", baseSave);
+    const port = createMemorySavePort([{ id: "slot:1", label: "Slot 1", summary: staleSummary, data: baseSave }]);
+
+    await expect(port.listSummaries()).resolves.toEqual([expectedSummary]);
+    await expect(port.load("slot:1")).resolves.toMatchObject({ summary: expectedSummary });
   });
 });

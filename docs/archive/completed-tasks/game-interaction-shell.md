@@ -95,7 +95,6 @@ boots into the title surface instead of directly entering play.
 - `InteractionStyleProfile`
 - `UiAssetRef`
 - `SaveSlotSummary`
-- `SaveData.summary`
 - `ContentManifest.uiAssets`
 - `ContentManifest.interactionStyles`
 

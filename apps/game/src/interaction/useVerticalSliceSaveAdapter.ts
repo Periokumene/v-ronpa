@@ -11,7 +11,6 @@ const VERTICAL_SLICE_DB = "v-ronpa-vertical-slice-v2";
 export const verticalSliceSaveSlotIds = ["slot:vertical:1", "slot:vertical:2", "slot:vertical:3", "slot:vertical:4"];
 
 export interface VerticalSliceSaveDataInput {
-  slotId: string;
   savedAt: string;
   navi: NaviRuntimeState;
   story: StoryRuntimeState;
@@ -24,10 +23,9 @@ export function createVerticalSliceSaveData({
   navi,
   pixiStage,
   savedAt,
-  slotId,
   story
 }: VerticalSliceSaveDataInput): SaveData {
-  const base: SaveData = {
+  return {
     version: 2,
     savedAt,
     mode: "navi",
@@ -38,9 +36,6 @@ export function createVerticalSliceSaveData({
     evidence: gameplay.evidence,
     characters: gameplay.characters
   };
-  const label = labelForSlot(slotId);
-  const summary = createSaveSlotSummary(slotId, label, base);
-  return { ...base, summary };
 }
 
 export function useVerticalSliceSaveAdapter(runtime: VerticalSliceRuntimeAdapter, port?: SavePort) {
@@ -57,9 +52,8 @@ export function useVerticalSliceSaveAdapter(runtime: VerticalSliceRuntimeAdapter
   }, [refreshSlots]);
 
   const collectSaveData = useCallback(
-    (slotId: string): SaveData => {
+    (): SaveData => {
       return createVerticalSliceSaveData({
-        slotId,
         savedAt: new Date().toISOString(),
         navi: runtime.navi,
         story: runtime.storyRuntime.state,
@@ -79,8 +73,8 @@ export function useVerticalSliceSaveAdapter(runtime: VerticalSliceRuntimeAdapter
 
   const saveSlot = useCallback(
     async (slotId: string) => {
-      const data = collectSaveData(slotId);
-      const summary = data.summary ?? createSaveSlotSummary(slotId, labelForSlot(slotId), data);
+      const data = collectSaveData();
+      const summary = createSaveSlotSummary(slotId, labelForSlot(slotId), data);
       await savePort.save({ id: slotId, label: summary.label, summary, data });
       await refreshSlots();
     },

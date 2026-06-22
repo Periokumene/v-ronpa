@@ -559,14 +559,6 @@ describe("contracts", () => {
       version: 2,
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "navi",
-      summary: {
-        id: "slot:vertical:1",
-        label: "Slot 1",
-        savedAt: "2026-06-14T00:00:00.000Z",
-        mode: "navi",
-        speaker: "Felix",
-        text: "Good."
-      },
       navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
       story: {
         currentScriptPath: "opening.nani",
@@ -591,6 +583,7 @@ describe("contracts", () => {
 
     expect(save.version).toBe(2);
     expect(save.pixiStage.background?.backgroundId).toBe("bg:harness");
+    expect(save).not.toHaveProperty("summary");
   });
 
   it("rejects v2 save data without a Pixi stage snapshot", () => {

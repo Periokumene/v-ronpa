@@ -73,10 +73,11 @@ export function createSaveSlotSummary(id: string, label: string, data: SaveData)
 
 function normalizeSlot(slot: SaveSlot, migrator: SaveMigrator): SaveSlot {
   const { data } = migrator.migrate(slot.data);
+  const summary = createSaveSlotSummary(slot.id, slot.label, data);
   return {
     ...slot,
     data,
-    summary: slot.summary ?? createSaveSlotSummary(slot.id, slot.label, data)
+    summary
   };
 }
 

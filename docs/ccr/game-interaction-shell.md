@@ -4,8 +4,8 @@
 
 Add public interaction-shell contracts for title/overlay UI flow, capability
 snapshots, settings/style shells, UI asset references, and save slot summaries.
-Extend `SaveData` and `ContentManifest` with additive fields used by the
-vertical-slice interaction shell.
+Extend `ContentManifest` with additive fields used by the vertical-slice
+interaction shell.
 
 ## Affected Packages
 
@@ -38,8 +38,10 @@ logic would each invent their own shape.
 - `InteractionStyleProfile` and `UiAssetRef` reserve style/asset configuration
   without binding contracts to DOM, Pixi, or R3F objects.
 - `SaveSlotSummary` stores text-only save previews for lists and load menus.
-- `SaveData.summary`, `ContentManifest.uiAssets`, and
-  `ContentManifest.interactionStyles` are optional additive fields.
+- Save data remains the runtime restore payload. Slot summaries are derived by
+  `media-save` from `SaveData` instead of being stored inside `SaveData`.
+- `ContentManifest.uiAssets` and `ContentManifest.interactionStyles` are
+  optional additive fields.
 
 ## Runtime Ownership
 
@@ -55,10 +57,9 @@ logic would each invent their own shape.
 
 ## Compatibility And Migration
 
-All contract changes are additive. Existing save data with version `1` remains
-valid because `summary` is optional and can be regenerated from story backlog
-when a slot is normalized. Existing manifests remain valid because UI asset refs
-and interaction style profiles default to empty arrays.
+Existing manifests remain valid because UI asset refs and interaction style
+profiles default to empty arrays. Slot summaries can be regenerated from save
+data story backlog when a slot is normalized.
 
 ## Fixtures And Tests
 

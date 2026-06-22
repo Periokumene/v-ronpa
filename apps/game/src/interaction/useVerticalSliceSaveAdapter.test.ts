@@ -26,7 +26,6 @@ describe("vertical slice save adapter", () => {
     }).snapshot;
 
     const save = createVerticalSliceSaveData({
-      slotId: "slot:vertical:1",
       savedAt: "2026-06-20T00:00:00.000Z",
       navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
       story,
@@ -37,12 +36,6 @@ describe("vertical slice save adapter", () => {
     expect(save).toMatchObject({
       version: 2,
       mode: "navi",
-      summary: {
-        id: "slot:vertical:1",
-        label: "Slot 1",
-        speaker: "Felix",
-        text: "Save me."
-      },
       pixiStage: {
         version: 1,
         revision: 1,
@@ -52,6 +45,7 @@ describe("vertical slice save adapter", () => {
       evidence: { ownedEvidenceIds: ["evidence:keycard"] }
     });
     expect(save).not.toHaveProperty("overlayStack");
+    expect(save).not.toHaveProperty("summary");
   });
 
   it("keeps the vertical-slice slot id policy in the app adapter layer", () => {

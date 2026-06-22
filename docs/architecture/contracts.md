@@ -32,9 +32,10 @@ and merge the change through the integration baseline first.
 - Interaction shell controls should use `GameOverlayKind`, `GameUiAction`,
   `GameInteractionContext`, and `InteractionCapabilitySnapshot`. App adapters
   and UI surfaces must not redefine these shapes locally.
-- Save/load lists should use `SaveSlotSummary`. `media-save` may derive missing
+- Save/load lists should use `SaveSlotSummary`. `media-save` derives slot
   summaries from save data, while app adapters collect the current runtime
-  snapshot.
+  snapshot. `SaveData` itself should remain the restore payload, not the list
+  preview authority.
 - Presenter runtime traces are adapter internals. They must not be used as
   SaveData shapes or as public stage snapshots.
 - UI asset refs and interaction style profiles are manifest/config references.
