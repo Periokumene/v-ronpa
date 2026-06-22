@@ -62,6 +62,32 @@ describe("VN runtime presentation transaction", () => {
     expect(transaction.diagnostics).toEqual([]);
   });
 
+  it("reports unsupported Pixi-routed runtime commands without changing stage state", () => {
+    const runtimeScript = compileScenario(
+      ["Felix: First.", "@focus character:felix duration:420", "Felix: Second."].join("\n"),
+      "transaction-unsupported-pixi-test.nani"
+    );
+    const initialStory = createInitialStoryState(runtimeScript);
+    const firstStop = advanceToNextStop(initialStory, runtimeScript).state;
+    const initialPixiStage = createInitialPixiStageSnapshot();
+
+    const secondStop = advanceToNextStop(firstStop, runtimeScript);
+    const transaction = createVnRuntimePresentationTransaction({
+      runtimeCommands: secondStop.emittedRuntimeCommands,
+      previousPixiStage: initialPixiStage
+    });
+
+    expect(transaction.pixiStage).toBe(initialPixiStage);
+    expect(transaction.pixiHints).toEqual([]);
+    expect(transaction.diagnostics).toEqual([
+      {
+        code: "unsupported-pixi-command",
+        commandId: "focus",
+        message: "@focus is routed to Pixi but is not consumed by pixi-presenter yet."
+      }
+    ]);
+  });
+
   it("returns gameplay events from emitted runtime commands without coupling them to Pixi stage state", () => {
     const runtimeScript = compileScenario(
       ["@gameplay grant-evidence id:evidence:keycard", "Felix: Evidence updated."].join("\n"),

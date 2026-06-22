@@ -1,7 +1,7 @@
-import type { GameplayEvent, PixiStageSnapshot, PresentationCommand, RuntimeCommand, RuntimeValue } from "@v-ronpa/contracts";
+import type { GameplayEvent, PixiStageSnapshot, RuntimeCommand, RuntimeValue } from "@v-ronpa/contracts";
 import {
-  reducePixiStageCommand,
-  type PixiStageCommandReduction,
+  reducePixiRuntimeCommand,
+  type PixiRuntimeCommandReduction,
   type PixiStageRenderHint
 } from "@v-ronpa/pixi-presenter";
 import {
@@ -26,7 +26,7 @@ export interface VnRuntimePresentationTransaction {
 }
 
 export interface VnRuntimeTransactionDiagnostic {
-  code: "unresolved-runtime-expression";
+  code: "unresolved-runtime-expression" | "unsupported-pixi-command" | "unsupported-pixi-params";
   message: string;
   commandId: string;
 }
@@ -46,17 +46,17 @@ export function createVnRuntimePresentationTransaction({
       commandId: command.commandId
     }));
   const pixiCommands = selectRuntimeCommandsForTarget(runtimeCommands, "pixi", routeTable, routeContext);
-  const pixiReduction = pixiCommands.reduce<PixiStageCommandReduction>(
+  const pixiReduction = pixiCommands.reduce<PixiRuntimeCommandReduction>(
     (current, command) => {
-      const presentationCommand = runtimeCommandToPixiPresentationCommand(command);
-      if (!presentationCommand) return current;
-      const next = reducePixiStageCommand(current.snapshot, presentationCommand);
+      if (hasUnresolvedExpression(command)) return current;
+      const next = reducePixiRuntimeCommand(current.snapshot, command);
       return {
         snapshot: next.snapshot,
-        hints: [...current.hints, ...next.hints]
+        hints: [...current.hints, ...next.hints],
+        diagnostics: [...current.diagnostics, ...next.diagnostics]
       };
     },
-    { snapshot: previousPixiStage, hints: [] }
+    { snapshot: previousPixiStage, hints: [], diagnostics: [] }
   );
   const gameplayEvents = selectRuntimeCommandsForTarget(runtimeCommands, "gameplay", routeTable, routeContext)
     .map(runtimeCommandToGameplayEvent)
@@ -66,74 +66,8 @@ export function createVnRuntimePresentationTransaction({
     pixiStage: pixiReduction.snapshot,
     pixiHints: pixiReduction.hints,
     gameplayEvents,
-    diagnostics
+    diagnostics: [...diagnostics, ...pixiReduction.diagnostics]
   };
-}
-
-export function runtimeCommandToPixiPresentationCommand(command: RuntimeCommand): PresentationCommand | undefined {
-  if (hasUnresolvedExpression(command)) return undefined;
-
-  if (command.commandId === "back") {
-    const stageCommand: PresentationCommand = {
-      type: "set-background",
-      backgroundId: stringParam(command, "appearance") ?? "bg:unknown"
-    };
-    const effect = stringParam(command, "effect");
-    if (effect) stageCommand.effect = effect;
-    return stageCommand;
-  }
-
-  if (command.commandId === "charenter") {
-    const stageCommand: PresentationCommand = {
-      type: "char-enter",
-      characterId: stringParam(command, "characterId") ?? "character:unknown",
-      slot: pixiSlotParam(command, "slot") ?? "center",
-      effect: stringParam(command, "effect") ?? "fadeIn"
-    };
-    const portraitId = stringParam(command, "portraitId");
-    if (portraitId) stageCommand.portraitId = portraitId;
-    return stageCommand;
-  }
-
-  if (command.commandId === "shake") {
-    return {
-      type: "shake",
-      target: stringParam(command, "target") ?? "stage",
-      intensity: numberParam(command, "intensity", 0.35),
-      durationMs: numberParam(command, "duration", 280)
-    };
-  }
-
-  if (command.commandId === "flash") {
-    return {
-      type: "flash",
-      color: stringParam(command, "color") ?? "#ffffff",
-      durationMs: numberParam(command, "duration", 160)
-    };
-  }
-
-  if (command.commandId === "focus") {
-    return {
-      type: "focus",
-      target: stringParam(command, "target") ?? "stage",
-      durationMs: numberParam(command, "duration", 500)
-    };
-  }
-
-  if (command.commandId === "trialkeyword") {
-    const stageCommand: PresentationCommand = {
-      type: "trial-keyword",
-      keywordId: stringParam(command, "keywordId") ?? "kw:unknown",
-      text: stringParam(command, "text") ?? "keyword"
-    };
-    const evidenceId = stringParam(command, "evidenceId");
-    if (evidenceId) stageCommand.evidenceId = evidenceId;
-    const speakerId = stringParam(command, "speakerId");
-    if (speakerId) stageCommand.speakerId = speakerId;
-    return stageCommand;
-  }
-
-  return undefined;
 }
 
 export function runtimeCommandToGameplayEvent(command: RuntimeCommand): GameplayEvent | undefined {
@@ -160,11 +94,6 @@ export function runtimeCommandToGameplayEvent(command: RuntimeCommand): Gameplay
   if (type === "remove-character-status" && characterId && status) return { type, characterId, status };
   if (type === "unlock-character-skill" && characterId && skillId) return { type, characterId, skillId };
   return undefined;
-}
-
-function pixiSlotParam(command: RuntimeCommand, key: string): "left" | "center" | "right" | undefined {
-  const value = stringParam(command, key);
-  return value === "left" || value === "center" || value === "right" ? value : undefined;
 }
 
 function stringParam(command: RuntimeCommand, key: string): string | undefined {

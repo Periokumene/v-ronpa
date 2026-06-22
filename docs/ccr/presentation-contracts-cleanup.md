@@ -1,5 +1,9 @@
 # Contract Change Request
 
+> Superseded note: `docs/ccr/runtime-command-pixi-dispatch.md` removes public
+> `PresentationCommand` wire shapes. This CCR remains as the historical record
+> for removing the former `@v-ronpa/presentation-contracts` package.
+
 ## Requested Change
 
 Remove `@v-ronpa/presentation-contracts` as a public contract package and
@@ -22,8 +26,9 @@ needs `packages/contracts` to remain the only public schema source.
 
 ## Proposed Shape
 
-- `packages/contracts` remains the only public schema contract package for
-  presentation command wire shapes.
+- At the time of this cleanup, `packages/contracts` remained the only public
+  schema contract package for presentation command wire shapes. This is
+  superseded by `docs/ccr/runtime-command-pixi-dispatch.md`.
 - `@v-ronpa/presentation-contracts` is removed from workspace references,
   dependency manifests, gates, and architecture docs.
 - Pixi keeps an internal `PresenterTrace` recorder for tests and presenter
@@ -34,7 +39,8 @@ needs `packages/contracts` to remain the only public schema source.
 
 ## Runtime Ownership
 
-- `PresentationCommand` remains owned by `packages/contracts`.
+- `PresentationCommand` remained owned by `packages/contracts` at the time of
+  this cleanup; `docs/ccr/runtime-command-pixi-dispatch.md` later removes it.
 - Pixi-specific presenter trace types live inside `packages/pixi-presenter`.
 - App code continues consuming `PixiPresenterPort` from `pixi-presenter`.
 - Future saveable stage snapshots must be introduced through a separate CCR in
@@ -56,6 +62,7 @@ StoryRuntimeSnapshot, or content manifest shape changes are introduced.
 
 ## Rebase Impact
 
-Branches importing `@v-ronpa/presentation-contracts` must rebase and import
-runtime presenter types from `pixi-presenter`, or use `PresentationCommand` from
-`contracts` for public wire shapes.
+Branches importing `@v-ronpa/presentation-contracts` must rebase to current
+runtime presenter types from `pixi-presenter`. Branches that used
+`PresentationCommand` from `contracts` must rebase to RuntimeCommand-based Pixi
+dispatch.

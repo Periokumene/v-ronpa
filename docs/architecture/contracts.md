@@ -7,8 +7,7 @@
   asset refs, style profile refs, Navi runtime state, Trial runtime state,
   inventory, trial definitions, evidence definitions, input bindings, camera
   modes, runtime assets, Story snapshots, RuntimeCommand bridge schemas, typed
-  gameplay events, `.nani` command catalog metadata, and presentation command
-  wire shapes used by presenter adapters.
+  gameplay events, and `.nani` command catalog metadata.
 - `packages/nani-parser`: `.nani` AST and IR shape.
 
 Changes to these packages are cross-module changes. A module worktree must not
@@ -69,8 +68,8 @@ and merge the change through the integration baseline first.
   Story scripts may grant evidence, but evidence submission is a Trial UI action
   consumed by `trial-director`, not a `.nani` gameplay event.
 - `TrialDefinition` is the rule source for debate truth bullets, breakable
-  keywords, accepted evidence, and segment transitions. Presentation commands
-  may visually mark keywords, but they must not define trial rules.
+  keywords, accepted evidence, and segment transitions. Routed `RuntimeCommand`
+  visual cues may mark keywords, but they must not define trial rules.
 - `InteractableDef.action` may use `start-trial` to enter an existing
   `TrialDefinition` from Navi exploration. The action is director-owned: it
   does not mutate gameplay state, and app runtime code creates or restores the

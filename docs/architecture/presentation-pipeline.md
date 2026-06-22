@@ -26,8 +26,9 @@ Scripts use preset commands rather than renderer-specific instructions:
 The public script-to-runtime command bridge is `RuntimeCommand`. It is produced
 by `nani-runtime-compiler` from parser IR before StoryEngine execution.
 RuntimeCommand params use canonical runtime names; for example `shake`,
-`flash`, and `focus` use `duration`, while the Pixi adapter maps that field to
-PresentationCommand `durationMs`.
+`flash`, and `focus` use `duration`. Pixi render hints may use renderer-local
+`durationMs` internally, but routed Pixi consumption starts from
+`RuntimeCommand`.
 
 `.nani` command declarations live in `commandCatalog`. Naninovel official
 commands and V-Ronpa project commands must be explicit catalog entries.
@@ -47,6 +48,9 @@ the runtime command stream or presenter trace.
 Expression params such as `duration:{flashDuration}` are preserved by the
 compiler, evaluated by StoryEngine against story variables, and should be
 resolved before app adapters consume emitted runtime commands.
+If a routed Pixi command reaches the reducer with missing or unsupported
+Pixi-consumable params, the reducer returns a diagnostic no-op instead of
+writing placeholder background, portrait, or keyword ids.
 
 `story-play` sits above StoryEngine for playback control only. It decides when
 manual, AUTO, SKIP, or one-shot `autoNext` should request the next StoryEngine
@@ -82,9 +86,9 @@ Later:
 Pixi is planned as an overlay presenter for VN and trial effects. R3F remains
 the 3D world presenter. Shared WebGL context integration is a future
 optimization; first baseline can use independent canvas layers as long as
-presenter adapters render from committed runtime snapshots. Existing Pixi
-reducers may adapt RuntimeCommand into internal presenter command shapes at the
-app boundary, but StoryEngine does not emit presenter-specific logs.
+presenter adapters render from committed runtime snapshots. Pixi reducers
+consume routed RuntimeCommands directly and may produce Pixi-local render hints,
+but StoryEngine does not emit presenter-specific logs.
 
 ## VN3D Versus Trial
 
@@ -104,7 +108,7 @@ effects, and interaction overlays.
 debate segments, available truth bullets, breakable keywords, timeout/miss
 outcomes, evidence submission branches, and special minigame transitions.
 
-In other words, Trial may reuse the same 3D staging and presentation commands
+In other words, Trial may reuse the same staged `RuntimeCommand` visual cues
 as `vn3d`, but it is not just `vn3d` with a different camera. Trial requires a
 `TrialDefinition`, `TrialRuntimeState`, and `trial-director` logic on top of
 story presentation.

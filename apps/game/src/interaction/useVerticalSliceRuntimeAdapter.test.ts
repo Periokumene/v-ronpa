@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { RuntimeScript } from "@v-ronpa/contracts";
+import type { NaniCommandCategory, RuntimeCommand, RuntimeScript, RuntimeValue } from "@v-ronpa/contracts";
 import { createGameplayState } from "@v-ronpa/gameplay";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
-import { createInitialPixiStageSnapshot, reducePixiStageCommand } from "@v-ronpa/pixi-presenter";
+import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ronpa/pixi-presenter";
 import { advanceToNextStop, createInitialStoryState, storyRuntimeSnapshot } from "@v-ronpa/story-engine";
 import type { VnOutputRouteTable } from "../vnOutputRoutes";
 import {
@@ -180,13 +180,15 @@ describe("vertical slice runtime adapter helpers", () => {
       inventory: { items: { "tool:notebook": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] }
     };
-    const pixiStage = reducePixiStageCommand(createInitialPixiStageSnapshot(), {
-      type: "char-enter",
-      characterId: "character:felix",
-      portraitId: "portrait:felix:neutral",
-      slot: "center",
-      effect: "fadeIn"
-    }).snapshot;
+    const pixiStage = reducePixiRuntimeCommand(
+      createInitialPixiStageSnapshot(),
+      runtimeCommand("charenter", "actor", {
+        characterId: "character:felix",
+        portraitId: "portrait:felix:neutral",
+        slot: "center",
+        effect: "fadeIn"
+      })
+    ).snapshot;
     const save = {
       version: 2 as const,
       savedAt: "2026-06-20T00:00:00.000Z",
@@ -288,4 +290,16 @@ function compileScenario(sourceText: string, scriptPath: string): RuntimeScript 
   const compiled = compileRuntimeScript(parsed.scenario);
   expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
   return compiled.script;
+}
+
+function runtimeCommand(commandId: string, category: NaniCommandCategory, params: Record<string, RuntimeValue>): RuntimeCommand {
+  return {
+    commandId,
+    canonicalName: commandId,
+    category,
+    source: "v-ronpa",
+    status: "implemented",
+    params,
+    loc: { scriptPath: "runtime-adapter-test.nani", line: 1, column: 1, raw: `@${commandId}` }
+  };
 }

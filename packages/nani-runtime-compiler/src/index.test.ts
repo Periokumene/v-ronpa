@@ -20,7 +20,7 @@ describe("nani runtime compiler", () => {
     ]);
   });
 
-  it("normalizes presentation command params without producing downstream command shapes", () => {
+  it("normalizes visual runtime params without producing downstream command shapes", () => {
     const { scenario } = parseScenario({
       sourceText: ["@back bg:harness effect:fade", "@flash color:#fff duration:120"].join("\n"),
       scriptPath: "presentation.nani"

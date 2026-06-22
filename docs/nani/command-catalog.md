@@ -166,7 +166,7 @@ handler registration cannot drift:
 - `gameplay` alias `gameplay-event`; params `type`, `id`, `quantity`, `item`,
   `itemId`, `evidence`, `evidenceId`, `character`, `characterId`, `status`,
   `skill`, `skillId`, `delta`, and `affinityDelta`
-- `charenter` alias `char-enter`
+- `charenter` with `.nani` source alias `char-enter`
 - `flash`
 - `focus`
 - `trialkeyword` alias `trial-keyword`

@@ -49,7 +49,7 @@ timeline commands.
 ```nani
 ; basic-navi.p1.nani
 ; P1 parser fixture for Navi-flavored dialogue, choices, local labels,
-; generic presentation commands, and gameplay event commands.
+; visual RuntimeCommands, and gameplay event commands.
 
 #Start
 @set route:"intro"

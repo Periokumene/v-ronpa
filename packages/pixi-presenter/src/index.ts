@@ -12,8 +12,9 @@ import { pixiStageSlots, type PixiStageRenderHint } from "./stageSnapshot";
 export {
   createInitialPixiStageSnapshot,
   pixiStageSlots,
-  reducePixiStageCommand,
-  type PixiStageCommandReduction,
+  reducePixiRuntimeCommand,
+  type PixiRuntimeCommandDiagnostic,
+  type PixiRuntimeCommandReduction,
   type PixiStageRenderHint
 } from "./stageSnapshot";
 

@@ -17,7 +17,6 @@ import {
   NaviInteractionViewSchema,
   NaviRuntimeStateSchema,
   PixiStageSnapshotSchema,
-  PresentationCommandSchema,
   RuntimeAssetSchema,
   RuntimeCommandSchema,
   RuntimeScriptSchema,
@@ -198,24 +197,6 @@ describe("contracts", () => {
     });
 
     expect(trial.segments[0]?.kind).toBe("debate");
-  });
-
-  it("validates presentation command wire shapes", () => {
-    expect(
-      PresentationCommandSchema.parse({
-        type: "camera-focus",
-        targetId: "character:felix",
-        framing: "close",
-        durationMs: 480
-      })
-    ).toMatchInlineSnapshot(`
-      {
-        "durationMs": 480,
-        "framing": "close",
-        "targetId": "character:felix",
-        "type": "camera-focus",
-      }
-    `);
   });
 
   it("validates Pixi stage snapshots without command history or renderer runtime", () => {

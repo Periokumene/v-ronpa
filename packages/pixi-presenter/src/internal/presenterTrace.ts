@@ -1,4 +1,4 @@
-import type { PresentationCommand } from "@v-ronpa/contracts";
+import type { RuntimeCommand, RuntimeValue } from "@v-ronpa/contracts";
 import type { PortraitSlot } from "./portraits";
 
 export interface PresenterTracePortrait {
@@ -9,7 +9,7 @@ export interface PresenterTracePortrait {
 
 export interface PresenterTracePerform {
   id: string;
-  command: PresentationCommand;
+  command: RuntimeCommand;
   durationMs?: number;
   blocksUserNext: boolean;
 }
@@ -17,12 +17,12 @@ export interface PresenterTracePerform {
 export interface PresenterTrace {
   backgroundId?: string;
   portraits: PresenterTracePortrait[];
-  commands: PresentationCommand[];
+  commands: RuntimeCommand[];
   activePerforms: PresenterTracePerform[];
 }
 
 export interface PresenterTraceRecorder {
-  apply(command: PresentationCommand): PresenterTracePerform | undefined;
+  apply(command: RuntimeCommand): PresenterTracePerform | undefined;
   getTrace(): PresenterTrace;
   clear(): void;
 }
@@ -38,32 +38,35 @@ export function createPresenterTraceRecorder(): PresenterTraceRecorder {
     apply(command) {
       trace.commands.push(command);
 
-      if (command.type === "set-background") {
-        trace.backgroundId = command.backgroundId;
+      if (command.commandId === "back") {
+        const appearance = stringParam(command, "appearance");
+        if (appearance) trace.backgroundId = appearance;
       }
 
-      if (command.type === "char-enter") {
-        trace.portraits = trace.portraits.filter((portrait) => portrait.slot !== command.slot);
+      if (command.commandId === "charenter") {
+        const rawSlot = stringParam(command, "slot");
+        if (rawSlot && !isPortraitSlot(rawSlot)) return undefined;
+        const slot: PortraitSlot = rawSlot && isPortraitSlot(rawSlot) ? rawSlot : "center";
+        const characterId = stringParam(command, "characterId");
+        if (!characterId) return undefined;
+        trace.portraits = trace.portraits.filter((portrait) => portrait.slot !== slot);
         const portrait: PresenterTracePortrait = {
-          characterId: command.characterId,
-          slot: command.slot
+          characterId,
+          slot
         };
-        if (command.portraitId) portrait.portraitId = command.portraitId;
+        const portraitId = stringParam(command, "portraitId");
+        if (portraitId) portrait.portraitId = portraitId;
         trace.portraits.push(portrait);
       }
 
-      if (
-        command.type === "shake" ||
-        command.type === "flash" ||
-        command.type === "focus" ||
-        command.type === "camera-focus"
-      ) {
+      if (command.commandId === "shake" || command.commandId === "flash" || command.commandId === "focus") {
         const perform: PresenterTracePerform = {
-          id: `${command.type}:${trace.commands.length}`,
+          id: `${command.commandId}:${trace.commands.length}`,
           command,
           blocksUserNext: false
         };
-        if ("durationMs" in command) perform.durationMs = command.durationMs;
+        const duration = numberParam(command, "duration");
+        if (duration !== undefined) perform.durationMs = duration;
         trace.activePerforms.push(perform);
         return perform;
       }
@@ -86,4 +89,25 @@ export function createPresenterTraceRecorder(): PresenterTraceRecorder {
       trace.activePerforms = [];
     }
   };
+}
+
+function isPortraitSlot(value: string): value is PortraitSlot {
+  return value === "left" || value === "center" || value === "right";
+}
+
+function stringParam(command: RuntimeCommand, key: string): string | undefined {
+  const value = scalarValue(command.params[key]);
+  return value === undefined ? undefined : String(value);
+}
+
+function numberParam(command: RuntimeCommand, key: string): number | undefined {
+  const value = scalarValue(command.params[key]);
+  return typeof value === "number" ? value : undefined;
+}
+
+function scalarValue(value: RuntimeValue | undefined): string | number | boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.map((item) => String(scalarValue(item))).join(",");
+  return undefined;
 }

@@ -57,7 +57,8 @@ adapters and apps
   ownership, character state, and pure trial rule judgments.
 - `media-save` owns Dexie IndexedDB save storage, Howler audio playback,
   HTMLVideo playback, and future WebAudio rhythm adapter notes.
-- `contracts` owns renderer-independent presentation command wire shapes.
+- `contracts` owns RuntimeCommand and saveable runtime contracts; renderer-local
+  hint and trace shapes stay in presenter packages.
 - `r3f-adapter` owns 3D scene presentation only.
 - `pixi-presenter` owns 2D canvas/WebGL presentation only, including internal
   presenter traces used for adapter tests and inspection.
@@ -125,6 +126,7 @@ submission remains a Trial UI action routed through `trial-director`.
   -> StoryEngine story state + emittedRuntimeCommands
   -> story-play playback state + pacing schedule
   -> VN runtime transaction + route table
+  -> routed RuntimeCommand consumption
   -> PixiStageSnapshot / PixiStageRenderHint / gameplay events
   -> VnRuntimeDispatcher renders DOM dialog and Pixi snapshot
 ```

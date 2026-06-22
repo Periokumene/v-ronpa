@@ -63,15 +63,18 @@ the current baseline intentionally uses the same fixed table for both.
 - Flow/state control commands are consumed by StoryEngine and normally do not
   enter the emitted command stream.
 
-Pixi-routed runtime commands are interpreted at the app adapter boundary and
-reduced into `PixiStageSnapshot` plus transient render hints before React
-rendering. Saves store the snapshot and story/gameplay state, not runtime
-command streams.
+Pixi-routed runtime commands are passed directly to `pixi-presenter`'s
+RuntimeCommand reducer and reduced into `PixiStageSnapshot` plus transient
+render hints before React rendering. Saves store the snapshot and
+story/gameplay state, not runtime command streams.
 
-RuntimeCommand durations use `params.duration`. The Pixi adapter maps that value
-to the existing PresentationCommand `durationMs` field. App adapters expect
-StoryEngine-resolved params; if an expression reaches this layer, the adapter
-skips the output and reports a transaction diagnostic instead of falling back.
+RuntimeCommand durations use `params.duration`. Pixi render hints may keep a
+renderer-local `durationMs` field for scheduler code, but the public command
+stream remains `RuntimeCommand`. App adapters expect StoryEngine-resolved
+params; if an expression reaches this layer, the adapter skips the output and
+reports a transaction diagnostic instead of falling back. Pixi reducers also
+return diagnostic no-op output for commands with missing or unsupported
+Pixi-consumable params rather than writing placeholder stage ids.
 
 ## Vertical Slice Migration
 
