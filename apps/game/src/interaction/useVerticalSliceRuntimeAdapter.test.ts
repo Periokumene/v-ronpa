@@ -44,6 +44,41 @@ describe("vertical slice runtime adapter helpers", () => {
       storyEnded: false,
       isAtStableStop: true
     });
+
+    expect(
+      createVerticalSliceInteractionContext({
+        flowMode: "trial",
+        navi: { substate: "walk", inputLock: "none" },
+        storyRuntime: { ...storyRuntime, active: false },
+        trialRuntime: {
+          definition: {
+            id: "trial:door-lock",
+            title: "Door Lock Trial",
+            initialSegmentId: "debate:door-lock",
+            segments: []
+          },
+          active: true,
+          state: {
+            trialId: "trial:door-lock",
+            currentSegmentId: "debate:door-lock",
+            presentation: "debate3d",
+            inputLock: "trial-targeting",
+            keywordStates: {}
+          },
+          lastOutcome: "segment:debate:door-lock"
+        }
+      })
+    ).toEqual({
+      mode: "trial",
+      overlayStack: [],
+      naviSubstate: "walk",
+      trialPresentation: "debate3d",
+      inputLock: "trial-targeting",
+      hasActiveStory: false,
+      storyHasChoices: false,
+      storyEnded: false,
+      isAtStableStop: false
+    });
   });
 
   it("passes vertical-slice route options into the unified Story/Pixi transaction", () => {
@@ -187,12 +222,47 @@ describe("vertical slice runtime adapter helpers", () => {
     expect(plan.storyRuntime.state).not.toHaveProperty("presentationCommands");
     expect(plan.storyRuntime.state).not.toHaveProperty("effects");
     expect(plan.storyPlay).toEqual({ mode: "manual" });
+    expect(plan.trialRuntime.active).toBe(false);
     expect(plan.pixiStageRuntime).toEqual({
       snapshot: pixiStage,
       hints: [],
       hintSequence: 0,
       animate: false
     });
+  });
+
+  it("restores saved Trial runtime state when a save was captured in trial mode", () => {
+    const runtimeScript = compileScenario("Felix: Restore trial.", "restore-trial-test.nani");
+    const save = {
+      version: 2 as const,
+      savedAt: "2026-06-20T00:00:00.000Z",
+      mode: "trial" as const,
+      story: storyRuntimeSnapshot(createInitialStoryState(runtimeScript)),
+      pixiStage: createInitialPixiStageSnapshot(),
+      inventory: { items: {} },
+      evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] },
+      characters: {},
+      trial: {
+        trialId: "trial:door-lock",
+        currentSegmentId: "debate:door-lock",
+        presentation: "debate3d" as const,
+        inputLock: "trial-targeting" as const,
+        selectedEvidenceId: "evidence:keycard",
+        keywordStates: { "kw:door-lock": "broken" as const }
+      }
+    };
+
+    const plan = createVerticalSliceRuntimeRestorePlan(save, runtimeScript);
+
+    expect(plan.trialRuntime).toMatchObject({
+      active: true,
+      state: {
+        currentSegmentId: "debate:door-lock",
+        presentation: "debate3d",
+        keywordStates: { "kw:door-lock": "broken" }
+      }
+    });
+    expect(plan.storyRuntime.active).toBe(false);
   });
 
   it("keeps story automation availability and presentation pacing as adapter decisions", () => {

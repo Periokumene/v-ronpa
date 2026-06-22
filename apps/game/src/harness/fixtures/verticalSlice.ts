@@ -1,4 +1,4 @@
-import type { EvidenceDef, ItemDef, WorldMapDef } from "@v-ronpa/contracts";
+import type { EvidenceDef, ItemDef, TrialDefinition, WorldMapDef } from "@v-ronpa/contracts";
 
 export const verticalSliceItem: ItemDef = {
   id: "tool:notebook",
@@ -20,6 +20,44 @@ export const verticalSliceEvidence: EvidenceDef = {
     accentColor: "#ffd166"
   },
   tags: ["harness", "vertical-slice"]
+};
+
+export const verticalSliceTrial: TrialDefinition = {
+  id: "trial:door-lock",
+  title: "Door Lock Trial",
+  initialSegmentId: "discussion:trial-opening",
+  segments: [
+    {
+      kind: "discussion",
+      id: "discussion:trial-opening",
+      presentation: "vn3d",
+      script: "harness/vertical-slice-trial.nani#Opening",
+      nextSegmentId: "debate:door-lock"
+    },
+    {
+      kind: "debate",
+      id: "debate:door-lock",
+      script: "harness/vertical-slice-trial.nani#DoorLock",
+      truthBullets: [{ evidenceId: verticalSliceEvidence.id, label: verticalSliceEvidence.shortLabel }],
+      keywords: [
+        {
+          id: "kw:door-lock",
+          text: "门锁声只是普通故障",
+          correctEvidenceId: verticalSliceEvidence.id,
+          speakerId: "character:ren"
+        }
+      ],
+      onCorrect: "discussion:trial-close",
+      onMiss: "debate:door-lock",
+      onTimeout: "discussion:trial-close"
+    },
+    {
+      kind: "discussion",
+      id: "discussion:trial-close",
+      presentation: "vn2d",
+      script: "harness/vertical-slice-trial.nani#Close"
+    }
+  ]
 };
 
 export const verticalSliceMaps: WorldMapDef[] = [
@@ -62,6 +100,13 @@ export const verticalSliceMaps: WorldMapDef[] = [
         position: [-1.7, 0.9, -1.5],
         radius: 1.2,
         action: { type: "start-script", script: "harness/vertical-slice.nani", label: "Start" }
+      },
+      {
+        id: "interactable:trial-stand",
+        label: "Trial Stand",
+        position: [-2.7, 0.9, 1.2],
+        radius: 1.2,
+        action: { type: "start-trial", trialId: verticalSliceTrial.id, segmentId: "debate:door-lock" }
       },
       {
         id: "interactable:classroom-door",

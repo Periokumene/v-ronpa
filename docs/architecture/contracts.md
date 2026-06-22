@@ -72,6 +72,10 @@ and merge the change through the integration baseline first.
 - `TrialDefinition` is the rule source for debate truth bullets, breakable
   keywords, accepted evidence, and segment transitions. Presentation commands
   may visually mark keywords, but they must not define trial rules.
+- `InteractableDef.action` may use `start-trial` to enter an existing
+  `TrialDefinition` from Navi exploration. The action is director-owned: it
+  does not mutate gameplay state, and app runtime code creates or restores the
+  `TrialRuntimeState`.
 
 ## Evidence / Trial Rule Ownership
 

@@ -5,6 +5,7 @@ import type { GameplayState } from "./state";
 export type ExplorationOutcome =
   | { type: "none" }
   | { type: "start-script"; script: string; label?: string }
+  | { type: "start-trial"; trialId: string; segmentId?: string }
   | { type: "change-map"; mapId: string; spawnId?: string; pose?: PlayerPose }
   | { type: "grant-item"; itemId: string; quantity: number }
   | { type: "grant-evidence"; evidenceId: string }
@@ -13,6 +14,7 @@ export type ExplorationOutcome =
 export type ExplorationApplicationResult =
   | { type: "none"; owner: "none"; applied: false }
   | { type: "start-script"; owner: "director"; applied: false; script: string; label?: string }
+  | { type: "start-trial"; owner: "director"; applied: false; trialId: string; segmentId?: string }
   | { type: "change-map"; owner: "director"; applied: false; mapId: string; spawnId?: string; pose?: PlayerPose }
   | { type: "gameplay-event"; owner: "gameplay"; applied: boolean; event: GameplayEvent; eventResult: GameplayEventResult };
 
@@ -47,6 +49,14 @@ export function resolveInteractable(interactable: InteractableDef | undefined): 
 
   if (action.type === "grant-item") {
     return { type: "grant-item", itemId: action.itemId, quantity: action.quantity };
+  }
+
+  if (action.type === "start-trial") {
+    return {
+      type: "start-trial",
+      trialId: action.trialId,
+      ...(action.segmentId ? { segmentId: action.segmentId } : {})
+    };
   }
 
   if (action.type === "grant-evidence") {
@@ -111,6 +121,19 @@ export function applyExplorationOutcome(state: GameplayState, outcome: Explorati
     };
   }
 
+  if (outcome.type === "start-trial") {
+    return {
+      state,
+      result: {
+        type: "start-trial",
+        owner: "director",
+        applied: false,
+        trialId: outcome.trialId,
+        ...(outcome.segmentId ? { segmentId: outcome.segmentId } : {})
+      }
+    };
+  }
+
   const event = explorationOutcomeToGameplayEvent(outcome);
   const applied = applyGameplayEvent(state, event);
   return {
@@ -126,7 +149,7 @@ export function applyExplorationOutcome(state: GameplayState, outcome: Explorati
 }
 
 function explorationOutcomeToGameplayEvent(
-  outcome: Exclude<ExplorationOutcome, { type: "none" | "start-script" | "change-map" }>
+  outcome: Exclude<ExplorationOutcome, { type: "none" | "start-script" | "start-trial" | "change-map" }>
 ): GameplayEvent {
   if (outcome.type === "grant-item") {
     return {

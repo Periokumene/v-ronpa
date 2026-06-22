@@ -145,6 +145,13 @@ describe("navi director", () => {
           position: [1, 0, 0],
           radius: 1,
           action: { type: "start-script", script: "case.nani", label: "Start" }
+        },
+        {
+          id: "i:trial-door",
+          label: "Trial Door",
+          position: [2, 0, 0],
+          radius: 1,
+          action: { type: "start-trial", trialId: "trial:case-01", segmentId: "debate:door" }
         }
       ],
       assetRefs: []
@@ -160,6 +167,11 @@ describe("navi director", () => {
     );
     const script = confirmFocusedNaviInteraction(
       { ...createInitialNaviState(map.id), activeInteractableId: "i:witness" },
+      map,
+      gameplay
+    );
+    const trial = confirmFocusedNaviInteraction(
+      { ...createInitialNaviState(map.id), activeInteractableId: "i:trial-door" },
       map,
       gameplay
     );
@@ -180,6 +192,15 @@ describe("navi director", () => {
       },
       gameplay,
       outcome: { type: "start-script", script: "case.nani" }
+    });
+    expect(trial).toMatchObject({
+      navi: {
+        substate: "walk",
+        inputLock: "none",
+        activeInteractableId: "i:trial-door"
+      },
+      gameplay,
+      outcome: { type: "start-trial", trialId: "trial:case-01", segmentId: "debate:door" }
     });
   });
 

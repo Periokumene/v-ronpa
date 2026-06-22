@@ -32,6 +32,31 @@ describe("exploration", () => {
     expect(outcome).toEqual({ type: "grant-evidence", evidenceId: "evidence:keycard" });
   });
 
+  it("resolves trial entry interactables as director-owned outcomes", () => {
+    const map: WorldMapDef = {
+      id: "map:hall",
+      name: "Hall",
+      spawn: [0, 0, 0],
+      collisionProxyIds: [],
+      interactables: [
+        {
+          id: "i:trial-door",
+          label: "Trial Door",
+          position: [0, 0, 0],
+          radius: 1.5,
+          action: { type: "start-trial", trialId: "trial:case-01", segmentId: "debate:door" }
+        }
+      ],
+      assetRefs: []
+    };
+
+    expect(resolveInteractable(nearestInteractable(map, [0, 0, 0]))).toEqual({
+      type: "start-trial",
+      trialId: "trial:case-01",
+      segmentId: "debate:door"
+    });
+  });
+
   it("selects the closest interactable inside radius while preserving map order for ties", () => {
     const map: WorldMapDef = {
       id: "map:hall",
@@ -128,6 +153,24 @@ describe("exploration", () => {
       applied: false,
       script: "case.nani",
       label: "Intro"
+    });
+  });
+
+  it("returns director-owned start-trial results without mutating gameplay", () => {
+    const initial = grantEvidence(createGameplayState(), "evidence:keycard");
+    const applied = applyExplorationOutcome(initial, {
+      type: "start-trial",
+      trialId: "trial:case-01",
+      segmentId: "debate:door"
+    });
+
+    expect(applied.state).toBe(initial);
+    expect(applied.result).toEqual({
+      type: "start-trial",
+      owner: "director",
+      applied: false,
+      trialId: "trial:case-01",
+      segmentId: "debate:door"
     });
   });
 

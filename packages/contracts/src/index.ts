@@ -904,6 +904,7 @@ export const InteractableDefSchema = z.object({
   radius: z.number().positive().default(1),
   action: z.discriminatedUnion("type", [
     z.object({ type: z.literal("start-script"), script: z.string(), label: z.string().optional() }),
+    z.object({ type: z.literal("start-trial"), trialId: IdSchema, segmentId: IdSchema.optional() }),
     z.object({ type: z.literal("change-map"), mapId: IdSchema, spawnId: IdSchema.optional(), pose: PlayerPoseSchema.optional() }),
     z.object({ type: z.literal("grant-item"), itemId: IdSchema, quantity: z.number().int().positive().default(1) }),
     z.object({ type: z.literal("grant-evidence"), evidenceId: IdSchema }),

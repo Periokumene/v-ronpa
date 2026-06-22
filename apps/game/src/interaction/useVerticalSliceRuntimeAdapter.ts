@@ -9,6 +9,8 @@ import type {
   RuntimeCommand,
   SaveData,
   GameplayEvent,
+  TrialDefinition,
+  TrialRuntimeState,
   WorldMapDef
 } from "@v-ronpa/contracts";
 import { applyGameplayEvent, createGameplayState, type ExplorationOutcome, type GameplayState } from "@v-ronpa/gameplay";
@@ -44,9 +46,22 @@ import {
   type StoryPlayState,
   type StoryPlayTimingPolicy
 } from "@v-ronpa/story-play";
-import { verticalSliceMaps, verticalSliceScript } from "../harness/fixtures/verticalSlice";
+import {
+  verticalSliceEvidence,
+  verticalSliceMaps,
+  verticalSliceScript,
+  verticalSliceTrial
+} from "../harness/fixtures/verticalSlice";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../harness/inputActions";
 import { useFirstPersonExplorationBridge } from "../harness/useFirstPersonExplorationBridge";
+import {
+  createInitialTrialState,
+  trialReducer,
+  validateTrialDefinition,
+  type TrialDefinitionDiagnostic,
+  type TrialDirectorOutcome,
+  type TrialEvent
+} from "@v-ronpa/trial-director";
 import {
   createVnRuntimePresentationTransaction,
   type VnRuntimeTransactionDiagnostic,
@@ -54,7 +69,7 @@ import {
 } from "../vnRuntimeTransaction";
 import type { VnOutputRouteTable, VnRuntimeProfile } from "../vnOutputRoutes";
 
-export type PosePresetId = "spawn" | "notebook" | "keycard" | "door" | "hall-door" | "witness" | "empty";
+export type PosePresetId = "spawn" | "notebook" | "keycard" | "door" | "hall-door" | "witness" | "trial-stand" | "empty";
 
 export interface PosePreset {
   id: PosePresetId;
@@ -75,7 +90,14 @@ export interface PixiStageRuntime {
   animate: boolean;
 }
 
-export type VerticalSliceDiagnosticSource = "parser" | "compiler" | "story" | "transaction";
+export interface TrialRuntime {
+  definition: TrialDefinition;
+  active: boolean;
+  state?: TrialRuntimeState;
+  lastOutcome: string;
+}
+
+export type VerticalSliceDiagnosticSource = "parser" | "compiler" | "story" | "transaction" | "trial";
 
 export interface VerticalSliceRuntimeDiagnostic {
   source: VerticalSliceDiagnosticSource;
@@ -92,6 +114,7 @@ export interface VerticalSliceRuntimeRestorePlan {
   playerPose?: PlayerPose;
   storyRuntime: StoryRuntime;
   storyPlay: StoryPlayState;
+  trialRuntime: TrialRuntime;
   pixiStageRuntime: PixiStageRuntime;
 }
 
@@ -99,6 +122,8 @@ export interface VerticalSliceRuntimeAdapterOptions {
   profile?: VnRuntimeProfile;
   routeTable?: VnOutputRouteTable;
   storyPlayTiming?: StoryPlayTimingPolicy;
+  onEnterTrial?: () => void;
+  onEnterNavi?: () => void;
 }
 
 export interface VerticalSlicePresentationTransactionInput {
@@ -114,6 +139,7 @@ export const verticalSlicePosePresets: PosePreset[] = [
   { id: "door", label: "教室门", mapId: "map:academy-hall", pose: { position: [0, 1.7, -3.7], yaw: 3.14, pitch: 0 } },
   { id: "hall-door", label: "走廊门", mapId: "map:classroom", pose: { position: [0, 1.7, 3.1], yaw: 0, pitch: 0 } },
   { id: "witness", label: "证人", mapId: "map:academy-hall", pose: { position: [-1.7, 1.7, -1.5], yaw: 0.45, pitch: 0 } },
+  { id: "trial-stand", label: "审判入口", mapId: "map:academy-hall", pose: { position: [-2.7, 1.7, 1.2], yaw: 1.2, pitch: 0 } },
   { id: "empty", label: "空位", mapId: "map:academy-hall", pose: { position: [3.4, 1.7, 3.8], yaw: 0, pitch: 0 } }
 ];
 
@@ -129,13 +155,16 @@ export function useVerticalSliceRuntimeAdapter(
     []
   );
   const compiled = useMemo(() => compileRuntimeScript(parsed.scenario), [parsed]);
+  const trialDefinitionDiagnostics = useMemo(() => validateTrialDefinition(verticalSliceTrial), []);
   const initialRuntimeDiagnostics = useMemo(
-    () => createInitialVerticalSliceDiagnostics(parsed.diagnostics, compiled.diagnostics),
-    [parsed, compiled]
+    () => createInitialVerticalSliceDiagnostics(parsed.diagnostics, compiled.diagnostics, trialDefinitionDiagnostics),
+    [parsed, compiled, trialDefinitionDiagnostics]
   );
   const runtimeProfile = options.profile ?? "vn2d";
   const runtimeRouteTable = options.routeTable;
   const storyPlayTiming = options.storyPlayTiming;
+  const onEnterTrial = options.onEnterTrial;
+  const onEnterNavi = options.onEnterNavi;
   const [navi, setNavi] = useState<NaviRuntimeState>(() => ({
     ...createInitialNaviState(initialMap.id),
     playerPose: { position: initialMap.spawn, yaw: 0, pitch: 0 }
@@ -146,6 +175,7 @@ export function useVerticalSliceRuntimeAdapter(
     active: false
   }));
   const [storyPlay, setStoryPlay] = useState<StoryPlayState>(() => createInitialStoryPlayState());
+  const [trialRuntime, setTrialRuntime] = useState<TrialRuntime>(() => createInitialVerticalSliceTrialRuntime());
   const [pixiStageRuntime, setPixiStageRuntime] = useState<PixiStageRuntime>(() => createInitialPixiStageRuntime());
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<VerticalSliceRuntimeDiagnostic[]>(() => initialRuntimeDiagnostics);
   const [lastRuntimeCommandCount, setLastRuntimeCommandCount] = useState(0);
@@ -153,8 +183,8 @@ export function useVerticalSliceRuntimeAdapter(
   const [lastAction, setLastAction] = useState("boot");
   const [storySession, setStorySession] = useState(0);
   const activeMap = getActiveMap(navi);
-  const currentCameraMode = navi.inputLock === "none" && flowMode !== "title" ? "first-person" : "locked";
-  const inputActionsRef = useKeyboardInputActions(defaultHarnessInputBindings, "navi", navi.inputLock === "none" && flowMode !== "title");
+  const currentCameraMode = navi.inputLock === "none" && flowMode === "navi" ? "first-person" : "locked";
+  const inputActionsRef = useKeyboardInputActions(defaultHarnessInputBindings, "navi", navi.inputLock === "none" && flowMode === "navi");
   const interactionView = createNaviInteractionView(navi);
   const storyPlayHostRef = useRef<{ active: boolean; schedule: StoryPlaySchedule }>({
     active: false,
@@ -204,6 +234,7 @@ export function useVerticalSliceRuntimeAdapter(
     setGameplay(createGameplayState());
     setStoryRuntime({ state: createInitialStoryState(compiled.script), active: false });
     setStoryPlay(createInitialStoryPlayState());
+    setTrialRuntime(createInitialVerticalSliceTrialRuntime());
     setRuntimeDiagnostics(initialRuntimeDiagnostics);
     setPixiStageRuntime((current) => ({
       ...createInitialPixiStageRuntime(),
@@ -214,6 +245,7 @@ export function useVerticalSliceRuntimeAdapter(
     setLastAction("reset");
     firstPersonBridge.issuePoseCommand(spawnPose);
     setStorySession((session) => session + 1);
+    if (flowMode === "trial") onEnterNavi?.();
   }
 
   function moveToPreset(id: PosePresetId) {
@@ -241,12 +273,12 @@ export function useVerticalSliceRuntimeAdapter(
   const confirmInteraction = useCallback(
     (request?: FirstPersonInteractRequest) => {
       const report = createSensorReportFromRequest(request);
-      const confirmationMap = report
-        ? verticalSliceMaps.find((candidate) => candidate.id === report.mapId) ?? activeMap
-        : activeMap;
-      const confirmationNavi = report
-        ? focusNaviInteractionFromSensorReport(navi, confirmationMap, report).navi
-        : navi;
+      const reportMap = report ? verticalSliceMaps.find((candidate) => candidate.id === report.mapId) ?? activeMap : activeMap;
+      const reportFocus = report ? focusNaviInteractionFromSensorReport(navi, reportMap, report) : undefined;
+      const reportMatchesNaviFocus =
+        !navi.activeInteractableId || reportFocus?.view.activeInteractableId === navi.activeInteractableId;
+      const confirmationNavi = reportFocus && reportMatchesNaviFocus ? reportFocus.navi : navi;
+      const confirmationMap = verticalSliceMaps.find((candidate) => candidate.id === confirmationNavi.activeMapId) ?? reportMap;
       const resolution = confirmFocusedNaviInteraction(confirmationNavi, confirmationMap, gameplay, verticalSliceMaps);
 
       setNavi(resolution.navi);
@@ -257,8 +289,9 @@ export function useVerticalSliceRuntimeAdapter(
         firstPersonBridge.issuePoseCommand(resolution.navi.playerPose);
       }
       if (resolution.outcome.type === "start-script") startStoryOverlay();
+      if (resolution.outcome.type === "start-trial") startTrial(resolution.outcome);
     },
-    [activeMap, gameplay, navi, runtimeProfile, runtimeRouteTable]
+    [activeMap, gameplay, navi, onEnterTrial, runtimeProfile, runtimeRouteTable]
   );
 
   const firstPersonBridge = useFirstPersonExplorationBridge({
@@ -271,7 +304,12 @@ export function useVerticalSliceRuntimeAdapter(
     onInteractRequest: confirmInteraction
   });
 
+  function confirmFocusedInteraction() {
+    confirmInteraction();
+  }
+
   function startStoryOverlay() {
+    setTrialRuntime(createInitialVerticalSliceTrialRuntime());
     const initial = createInitialStoryState(compiled.script);
     const step = advanceStoryPlay(createInitialStoryPlayState(), {
       state: initial,
@@ -357,6 +395,75 @@ export function useVerticalSliceRuntimeAdapter(
     setStoryPlay((current) => stopStoryPlayAutomation(current, reason));
   }
 
+  function startTrial(outcome: Extract<ExplorationOutcome, { type: "start-trial" }>) {
+    cancelStoryPlayHostSchedule();
+    setStoryRuntime((current) => ({ ...current, active: false }));
+    setStoryPlay(createInitialStoryPlayState());
+
+    const definition = findVerticalSliceTrialDefinition(outcome.trialId);
+    if (!definition) {
+      appendRuntimeDiagnostics([
+        {
+          source: "trial",
+          code: "missing-trial-definition",
+          severity: "error",
+          message: `Trial definition '${outcome.trialId}' does not exist.`
+        }
+      ]);
+      setLastAction("trial:start");
+      setLastOutcome(`start-trial-missing:${outcome.trialId}`);
+      return;
+    }
+
+    const initial = createInitialTrialState(definition);
+    const entered = outcome.segmentId
+      ? trialReducer(definition, initial, { type: "ENTER_SEGMENT", segmentId: outcome.segmentId })
+      : { trial: initial, outcome: { type: "segment" as const, segmentId: initial.currentSegmentId } };
+
+    setTrialRuntime({
+      definition,
+      active: true,
+      state: entered.trial,
+      lastOutcome: formatTrialOutcome(entered.outcome)
+    });
+    setLastRuntimeCommandCount(0);
+    setLastAction(`trial:start:${definition.id}`);
+    setLastOutcome(formatOutcome(outcome));
+    onEnterTrial?.();
+  }
+
+  function resolveTrialKeywordWithEvidence(evidenceId = verticalSliceEvidence.id) {
+    applyTrialEvent({ type: "BREAK_KEYWORD", keywordId: "kw:door-lock", evidenceId }, `trial:keyword:${evidenceId}`);
+  }
+
+  function resolveTrialTimeout() {
+    applyTrialEvent({ type: "TIMEOUT" }, "trial:timeout");
+  }
+
+  function exitTrial() {
+    setTrialRuntime(createInitialVerticalSliceTrialRuntime());
+    setNavi((current) => naviReducer(current, { type: "ENTER_WALK" }));
+    setLastAction("trial:exit");
+    setLastOutcome("trial-exit");
+    onEnterNavi?.();
+  }
+
+  function applyTrialEvent(event: TrialEvent, action: string) {
+    let nextOutcome = "none";
+    setTrialRuntime((current) => {
+      if (!current.active || !current.state) return current;
+      const resolution = trialReducer(current.definition, current.state, event);
+      nextOutcome = formatTrialOutcome(resolution.outcome);
+      return {
+        ...current,
+        state: resolution.trial,
+        lastOutcome: nextOutcome
+      };
+    });
+    setLastAction(action);
+    setLastOutcome(nextOutcome);
+  }
+
   function closeStoryOverlay(action = "dialog:cancel") {
     cancelStoryPlayHostSchedule();
     setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
@@ -367,7 +474,7 @@ export function useVerticalSliceRuntimeAdapter(
     setLastOutcome("overlay-closed");
   }
 
-  function restoreFromSave(save: Pick<SaveData, "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters">) {
+  function restoreFromSave(save: Pick<SaveData, "mode" | "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters" | "trial">) {
     cancelStoryPlayHostSchedule();
     const plan = createVerticalSliceRuntimeRestorePlan(save, compiled.script);
     if (plan.navi) setNavi(plan.navi);
@@ -375,6 +482,7 @@ export function useVerticalSliceRuntimeAdapter(
     setGameplay(plan.gameplay);
     setStoryRuntime(plan.storyRuntime);
     setStoryPlay(plan.storyPlay);
+    setTrialRuntime(plan.trialRuntime);
     setRuntimeDiagnostics(initialRuntimeDiagnostics);
     setPixiStageRuntime((current) => ({
       ...plan.pixiStageRuntime,
@@ -433,14 +541,18 @@ export function useVerticalSliceRuntimeAdapter(
   }
 
   const interactionContext: GameInteractionContext = useMemo(
-    () => createVerticalSliceInteractionContext({ flowMode, navi, storyRuntime }),
+    () => createVerticalSliceInteractionContext({ flowMode, navi, storyRuntime, trialRuntime }),
     [
       flowMode,
       navi.inputLock,
       navi.substate,
       storyRuntime.active,
       storyRuntime.state.ended,
-      storyRuntime.state.pendingChoices.length
+      storyRuntime.state.pendingChoices.length,
+      trialRuntime.active,
+      trialRuntime.state?.currentSegmentId,
+      trialRuntime.state?.inputLock,
+      trialRuntime.state?.presentation
     ]
   );
 
@@ -449,6 +561,7 @@ export function useVerticalSliceRuntimeAdapter(
     advanceStory,
     chooseStory,
     closeStoryOverlay,
+    confirmFocusedInteraction,
     firstPersonBridge,
     gameplay,
     interactionContext,
@@ -463,14 +576,18 @@ export function useVerticalSliceRuntimeAdapter(
     resetSlice,
     restoreFromSave,
     runtimeDiagnostics,
+    resolveTrialKeywordWithEvidence,
+    resolveTrialTimeout,
     stopStoryAutomation,
     storyPlay,
     storyPlayActiveActions,
     storyPlaySchedule,
     storyRuntime,
     storySession,
+    trialRuntime,
     toggleStoryAuto,
-    toggleStorySkip
+    toggleStorySkip,
+    exitTrial
   };
 
   function appendRuntimeDiagnostics(diagnostics: VerticalSliceRuntimeDiagnostic[]) {
@@ -485,11 +602,13 @@ export function useVerticalSliceRuntimeAdapter(
 
 export function createInitialVerticalSliceDiagnostics(
   parserDiagnostics: ParserDiagnostic[],
-  compilerDiagnostics: RuntimeCompilerDiagnostic[]
+  compilerDiagnostics: RuntimeCompilerDiagnostic[],
+  trialDiagnostics: TrialDefinitionDiagnostic[] = []
 ): VerticalSliceRuntimeDiagnostic[] {
   return limitRuntimeDiagnostics([
     ...parserDiagnostics.map(toVerticalSliceParserDiagnostic),
-    ...compilerDiagnostics.map(toVerticalSliceCompilerDiagnostic)
+    ...compilerDiagnostics.map(toVerticalSliceCompilerDiagnostic),
+    ...trialDiagnostics.map(toVerticalSliceTrialDiagnostic)
   ]);
 }
 
@@ -509,12 +628,28 @@ export function collectVerticalSliceRuntimeDiagnostics({
 export function createVerticalSliceInteractionContext({
   flowMode,
   navi,
-  storyRuntime
+  storyRuntime,
+  trialRuntime = createInitialVerticalSliceTrialRuntime()
 }: {
   flowMode: GameInteractionContext["mode"];
   navi: Pick<NaviRuntimeState, "inputLock" | "substate">;
   storyRuntime: StoryRuntime;
+  trialRuntime?: TrialRuntime;
 }): GameInteractionContext {
+  if (flowMode === "trial" && trialRuntime.active && trialRuntime.state) {
+    return {
+      mode: flowMode,
+      overlayStack: [],
+      naviSubstate: navi.substate,
+      trialPresentation: trialRuntime.state.presentation,
+      inputLock: trialRuntime.state.inputLock,
+      hasActiveStory: false,
+      storyHasChoices: false,
+      storyEnded: false,
+      isAtStableStop: false
+    };
+  }
+
   return {
     mode: flowMode,
     overlayStack: [],
@@ -532,7 +667,7 @@ export function canToggleStoryAutomation(storyRuntime: StoryRuntime): boolean {
 }
 
 export function createVerticalSliceRuntimeRestorePlan(
-  save: Pick<SaveData, "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters">,
+  save: Pick<SaveData, "mode" | "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters" | "trial">,
   script: { scriptPath: string }
 ): VerticalSliceRuntimeRestorePlan {
   const storyRuntime = {
@@ -548,6 +683,15 @@ export function createVerticalSliceRuntimeRestorePlan(
     ...(save.navi?.playerPose ? { playerPose: save.navi.playerPose } : {}),
     storyRuntime,
     storyPlay: createInitialStoryPlayState(),
+    trialRuntime:
+      save.mode === "trial" && save.trial
+        ? {
+            definition: verticalSliceTrial,
+            active: true,
+            state: save.trial,
+            lastOutcome: "restored"
+          }
+        : createInitialVerticalSliceTrialRuntime(),
     pixiStageRuntime: {
       snapshot: save.pixiStage,
       hints: [],
@@ -563,6 +707,14 @@ export function createInitialPixiStageRuntime(): PixiStageRuntime {
     hints: [],
     hintSequence: 0,
     animate: false
+  };
+}
+
+export function createInitialVerticalSliceTrialRuntime(): TrialRuntime {
+  return {
+    definition: verticalSliceTrial,
+    active: false,
+    lastOutcome: "none"
   };
 }
 
@@ -607,8 +759,30 @@ function formatOutcome(outcome: ExplorationOutcome): string {
   if (outcome.type === "grant-item") return `grant-item:${outcome.itemId}:${outcome.quantity}`;
   if (outcome.type === "grant-evidence") return `grant-evidence:${outcome.evidenceId}`;
   if (outcome.type === "start-script") return `start-script:${outcome.script}`;
+  if (outcome.type === "start-trial") return `start-trial:${outcome.trialId}`;
   if (outcome.type === "change-map") return `change-map:${outcome.mapId}`;
   return `character-state:${outcome.characterId}:${outcome.affinityDelta}`;
+}
+
+function formatTrialOutcome(outcome: TrialDirectorOutcome): string {
+  if (outcome.type === "none") return "none";
+  if (outcome.type === "segment") return `segment:${outcome.segmentId}`;
+  if (outcome.type === "correct") return outcome.nextSegmentId ? `correct:${outcome.nextSegmentId}` : "correct";
+  if (outcome.type === "miss") return outcome.nextSegmentId ? `miss:${outcome.nextSegmentId}` : "miss";
+  if (outcome.type === "timeout") return outcome.nextSegmentId ? `timeout:${outcome.nextSegmentId}` : "timeout";
+  if (outcome.type === "evidence") {
+    const result = outcome.accepted ? "accepted" : "rejected";
+    return outcome.nextSegmentId ? `evidence:${result}:${outcome.nextSegmentId}` : `evidence:${result}`;
+  }
+  if (outcome.type === "minigame") {
+    return outcome.nextSegmentId ? `minigame:${outcome.success}:${outcome.nextSegmentId}` : `minigame:${outcome.success}`;
+  }
+  if (outcome.type === "invalid-segment") return `invalid-segment:${outcome.segmentId}`;
+  return `${outcome.type}:${outcome.keywordId}:${outcome.evidenceId}`;
+}
+
+function findVerticalSliceTrialDefinition(trialId: string): TrialDefinition | undefined {
+  return verticalSliceTrial.id === trialId ? verticalSliceTrial : undefined;
 }
 
 function toVerticalSliceParserDiagnostic(diagnostic: ParserDiagnostic): VerticalSliceRuntimeDiagnostic {
@@ -648,6 +822,16 @@ function toVerticalSliceTransactionDiagnostic(
     severity: "error",
     message: diagnostic.message,
     commandId: diagnostic.commandId
+  };
+}
+
+function toVerticalSliceTrialDiagnostic(diagnostic: TrialDefinitionDiagnostic): VerticalSliceRuntimeDiagnostic {
+  const details = [diagnostic.segmentId, diagnostic.ref].filter(Boolean).join(" ");
+  return {
+    source: "trial",
+    code: diagnostic.code,
+    severity: diagnostic.severity,
+    message: details ? `${diagnostic.message} (${details})` : diagnostic.message
   };
 }
 

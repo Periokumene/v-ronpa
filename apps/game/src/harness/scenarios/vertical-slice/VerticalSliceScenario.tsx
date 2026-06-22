@@ -1,7 +1,7 @@
-import { useMemo, useState, type ButtonHTMLAttributes } from "react";
+import { useCallback, useMemo, useState, type ButtonHTMLAttributes } from "react";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
-import { ExplorationStage3D } from "@v-ronpa/r3f-adapter";
+import { ExplorationStage3D, TrialRoundTableStage } from "@v-ronpa/r3f-adapter";
 import { InspectorLite } from "@v-ronpa/ui-kit";
 import { GameInteractionShell } from "../../../interaction/GameInteractionShell";
 import { useGameFlowActor } from "../../../interaction/useGameFlowActor";
@@ -27,7 +27,13 @@ export function VerticalSliceScenario() {
   const settings = useGameSettingsAdapter();
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
-  const runtime = useVerticalSliceRuntimeAdapter(flow.mode, { storyPlayTiming });
+  const enterTrialMode = useCallback(() => flow.send({ type: "ENTER_TRIAL" }), [flow.send]);
+  const enterNaviMode = useCallback(() => flow.send({ type: "ENTER_NAVI" }), [flow.send]);
+  const runtime = useVerticalSliceRuntimeAdapter(flow.mode, {
+    storyPlayTiming,
+    onEnterTrial: enterTrialMode,
+    onEnterNavi: enterNaviMode
+  });
   const save = useVerticalSliceSaveAdapter(runtime);
   const overlayPages = useOverlayPageAdapters({ flow, runtime, save, settings });
   const [activeDebugTab, setActiveDebugTab] = useState<DebugTabId>("runtime");
@@ -37,9 +43,18 @@ export function VerticalSliceScenario() {
       <section className="playfield" data-testid="playfield">
         <GameInteractionShell flow={flow} overlayPages={overlayPages} runtime={runtime}>
           <div className="scene-stack" data-testid="vertical-slice-shell">
-            <ExplorationStage3D {...runtime.firstPersonBridge.explorationStageProps} />
+            {flow.mode === "trial" && runtime.trialRuntime.state ? (
+              <TrialRoundTableStage
+                focusedSpeakerId={runtime.trialRuntime.state.selectedEvidenceId ? "character:ren" : "character:felix"}
+                inputLock={runtime.trialRuntime.state.inputLock}
+                presentationProfile={runtime.trialRuntime.state.presentation}
+                speakers={["character:felix", "character:mira", "character:ren"]}
+              />
+            ) : (
+              <ExplorationStage3D {...runtime.firstPersonBridge.explorationStageProps} />
+            )}
             <VnRuntimeDispatcher
-              active={runtime.storyRuntime.active}
+              active={flow.mode !== "trial" && runtime.storyRuntime.active}
               pixiAnimate={runtime.pixiStageRuntime.animate}
               pixiHintSequence={runtime.pixiStageRuntime.hintSequence}
               pixiHints={runtime.pixiStageRuntime.hints}
@@ -58,7 +73,7 @@ export function VerticalSliceScenario() {
           <div className="objective-chip">
             <span data-testid="harness-scenario-id">vertical-slice</span>
             <strong data-testid="harness-scenario-title">Navi To VN Vertical Slice</strong>
-            <small data-testid="harness-status">{flow.mode === "title" ? "标题界面" : runtime.storyRuntime.active ? "视觉小说覆盖层" : "Navi 探索"}</small>
+            <small data-testid="harness-status">{flow.mode === "title" ? "标题界面" : flow.mode === "trial" ? "Trial 模式" : runtime.storyRuntime.active ? "视觉小说覆盖层" : "Navi 探索"}</small>
           </div>
         </div>
       </section>
@@ -102,20 +117,31 @@ export function VerticalSliceScenario() {
                 latestDiagnostic={formatLatestDiagnostic(runtime.runtimeDiagnostics)}
                 lastOutcome={runtime.lastOutcome}
                 mapId={runtime.navi.activeMapId ?? "none"}
+                mode={flow.mode}
                 pixiBackground={runtime.pixiStageRuntime.snapshot.background?.backgroundId ?? "none"}
                 pixiRevision={String(runtime.pixiStageRuntime.snapshot.revision)}
                 pixiSlots={formatPixiStageSlots(runtime.pixiStageRuntime.snapshot)}
                 pointerLockStatus={runtime.firstPersonBridge.pointerLockStatus}
                 route={String(runtime.storyRuntime.state.variables.route ?? "none")}
                 substate={runtime.navi.substate}
+                trialInputLock={runtime.trialRuntime.state?.inputLock ?? "none"}
+                trialKeywords={formatTrialKeywordStates(runtime.trialRuntime.state?.keywordStates)}
+                trialOutcome={runtime.trialRuntime.lastOutcome}
+                trialPresentation={runtime.trialRuntime.state?.presentation ?? "none"}
+                trialSegment={runtime.trialRuntime.state?.currentSegmentId ?? "none"}
               />
               <VerticalSliceRuntimeControls
                 advanceDisabled={!runtime.storyRuntime.active}
+                onExitTrial={runtime.exitTrial}
                 onAdvanceStory={runtime.advanceStory}
                 onMoveToPreset={runtime.moveToPreset}
-                onRequestInteract={runtime.firstPersonBridge.requestInteract}
+                onRequestInteract={runtime.confirmFocusedInteraction}
                 onReset={runtime.resetSlice}
+                onResolveTrialCorrect={() => runtime.resolveTrialKeywordWithEvidence()}
+                onResolveTrialMiss={() => runtime.resolveTrialKeywordWithEvidence("evidence:wrong-card")}
+                onResolveTrialTimeout={runtime.resolveTrialTimeout}
                 pointerLockTriggerProps={runtime.firstPersonBridge.pointerLockTriggerProps}
+                trialActive={runtime.trialRuntime.active}
               />
             </div>
           ) : null}
@@ -128,14 +154,20 @@ export function VerticalSliceScenario() {
               role="tabpanel"
             >
               <InspectorLite
-                mode="navi"
-                {...(runtime.navi.activeMapId ? { detail: runtime.navi.activeMapId } : {})}
-                inputLock={runtime.navi.inputLock}
+                mode={flow.mode}
+                {...(flow.mode === "trial" && runtime.trialRuntime.state
+                  ? { detail: runtime.trialRuntime.state.currentSegmentId }
+                  : runtime.navi.activeMapId
+                    ? { detail: runtime.navi.activeMapId }
+                    : {})}
+                inputLock={flow.mode === "trial" ? runtime.trialRuntime.state?.inputLock ?? "none" : runtime.navi.inputLock}
                 naviSubstate={runtime.navi.substate}
+                {...(runtime.trialRuntime.state?.presentation ? { trialPresentation: runtime.trialRuntime.state.presentation } : {})}
                 scriptPointer={runtime.storyRuntime.state.instructionPointer}
                 variables={runtime.storyRuntime.state.variables}
                 inventoryItems={runtime.gameplay.inventory.items}
                 evidenceIds={runtime.gameplay.evidence.ownedEvidenceIds}
+                {...(runtime.trialRuntime.state?.currentSegmentId ? { trialSegmentId: runtime.trialRuntime.state.currentSegmentId } : {})}
                 runtimeCommandCount={runtime.lastRuntimeCommandCount}
                 diagnosticCount={runtime.runtimeDiagnostics.length}
                 latestDiagnostic={formatLatestDiagnostic(runtime.runtimeDiagnostics)}
@@ -182,17 +214,27 @@ function DebugTabButton({
 function VerticalSliceRuntimeControls({
   advanceDisabled,
   onAdvanceStory,
+  onExitTrial,
   onMoveToPreset,
   onRequestInteract,
   onReset,
-  pointerLockTriggerProps
+  onResolveTrialCorrect,
+  onResolveTrialMiss,
+  onResolveTrialTimeout,
+  pointerLockTriggerProps,
+  trialActive
 }: {
   advanceDisabled: boolean;
   onAdvanceStory: () => void;
+  onExitTrial: () => void;
   onMoveToPreset: (id: PosePresetId) => void;
   onRequestInteract: () => void;
   onReset: () => void;
+  onResolveTrialCorrect: () => void;
+  onResolveTrialMiss: () => void;
+  onResolveTrialTimeout: () => void;
   pointerLockTriggerProps: ButtonHTMLAttributes<HTMLButtonElement>;
+  trialActive: boolean;
 }) {
   return (
     <section
@@ -224,6 +266,18 @@ function VerticalSliceRuntimeControls({
         <button data-testid="vertical-slice-advance" type="button" onClick={onAdvanceStory} disabled={advanceDisabled}>
           推进剧情
         </button>
+        <button data-testid="vertical-slice-trial-correct" type="button" onClick={onResolveTrialCorrect} disabled={!trialActive}>
+          审判：正确证据
+        </button>
+        <button data-testid="vertical-slice-trial-miss" type="button" onClick={onResolveTrialMiss} disabled={!trialActive}>
+          审判：错误证据
+        </button>
+        <button data-testid="vertical-slice-trial-timeout" type="button" onClick={onResolveTrialTimeout} disabled={!trialActive}>
+          审判：超时
+        </button>
+        <button data-testid="vertical-slice-trial-exit" type="button" onClick={onExitTrial} disabled={!trialActive}>
+          退出审判
+        </button>
         <button data-testid="vertical-slice-reset" type="button" onClick={onReset}>
           重置
         </button>
@@ -250,6 +304,11 @@ function formatPixiStageSlots(stage: Pick<PixiStageSnapshot, "slots">): string {
   return entries.length > 0 ? entries.join(", ") : "empty";
 }
 
+function formatTrialKeywordStates(keywordStates: Record<string, "pending" | "broken" | "missed"> | undefined): string {
+  const entries = Object.entries(keywordStates ?? {});
+  return entries.length > 0 ? entries.map(([id, state]) => `${id}:${state}`).join(", ") : "empty";
+}
+
 function displayStorySpeaker(speaker: string): string {
   const labels: Record<string, string> = {
     Felix: "菲利克斯",
@@ -272,12 +331,18 @@ function VerticalSliceReadout({
   latestDiagnostic,
   lastOutcome,
   mapId,
+  mode,
   pixiBackground,
   pixiRevision,
   pixiSlots,
   pointerLockStatus,
   route,
-  substate
+  substate,
+  trialInputLock,
+  trialKeywords,
+  trialOutcome,
+  trialPresentation,
+  trialSegment
 }: {
   activeInteractableId: string;
   blockedReason: string;
@@ -290,12 +355,18 @@ function VerticalSliceReadout({
   latestDiagnostic: string;
   lastOutcome: string;
   mapId: string;
+  mode: string;
   pixiBackground: string;
   pixiRevision: string;
   pixiSlots: string;
   pointerLockStatus: string;
   route: string;
   substate: string;
+  trialInputLock: string;
+  trialKeywords: string;
+  trialOutcome: string;
+  trialPresentation: string;
+  trialSegment: string;
 }) {
   return (
     <section aria-label="Vertical slice readout" className="vertical-slice-readout">
@@ -304,6 +375,7 @@ function VerticalSliceReadout({
         <strong>{substate}</strong>
       </header>
       <div className="vertical-slice-readout-grid">
+        <Readout label="Mode" testId="vertical-slice-mode" value={mode} />
         <Readout label="Map" testId="vertical-slice-map" value={mapId} />
         <Readout label="Substate" testId="vertical-slice-substate" value={substate} />
         <Readout label="Input" testId="vertical-slice-input-lock" value={inputLock} />
@@ -318,6 +390,11 @@ function VerticalSliceReadout({
         <Readout label="Pixi BG" testId="vertical-slice-pixi-background" value={pixiBackground} />
         <Readout label="Pixi Rev" testId="vertical-slice-pixi-revision" value={pixiRevision} />
         <Readout label="Pixi Slots" testId="vertical-slice-pixi-slots" value={pixiSlots} wide />
+        <Readout label="Trial Segment" testId="vertical-slice-trial-segment" value={trialSegment} wide />
+        <Readout label="Trial View" testId="vertical-slice-trial-presentation" value={trialPresentation} />
+        <Readout label="Trial Input" testId="vertical-slice-trial-input-lock" value={trialInputLock} />
+        <Readout label="Trial Keywords" testId="vertical-slice-trial-keywords" value={trialKeywords} wide />
+        <Readout label="Trial Outcome" testId="vertical-slice-trial-outcome" value={trialOutcome} wide />
         <Readout label="Latest Diag" testId="vertical-slice-latest-diagnostic" value={latestDiagnostic} wide />
         <Readout label="Outcome" testId="vertical-slice-last-outcome" value={lastOutcome} wide />
         <Readout label="Action" testId="vertical-slice-last-action" value={lastAction} wide />

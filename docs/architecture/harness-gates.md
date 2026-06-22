@@ -31,6 +31,7 @@ dependency matrix.
   - `test-results/vertical-slice-save-load.png`
   - `test-results/vertical-slice-pause-menu.png`
   - `test-results/vertical-slice-map-change.png`
+  - `test-results/vertical-slice-trial-entry.png`
   - `test-results/vertical-slice-vn-choice.png`
   - `test-results/vertical-slice-branch-b.png`
 - Failure screenshots under `test-results/`
@@ -64,11 +65,13 @@ Smoke gates confirm the app boots into the accepted vertical slice title page,
 title load/settings entries open, Settings edits persist outside save slots, New
 Game enters Navi, Navi can move through first-person exploration, no-target
 interactions are rejected, items and evidence update gameplay state, map
-transitions remain director-owned, VN dialog can branch, VN dialog display
-settings update the real `VnDialogSurface`, VN AUTO timing responds to settings,
+transitions remain director-owned, the existing scene can enter Trial mode
+through a Navi interactable, Trial presentation/input state comes from
+`trial-director`, VN dialog can branch, VN dialog display settings update the
+real `VnDialogSurface`, VN AUTO timing responds to settings,
 VN toolbar/backlog/save-load surfaces are interactive, Navi ESC opens the pause
-menu, canvas layers are present, and `InputLockState` changes at Navi/VN/menu
-boundaries.
+menu, canvas layers are present, and `InputLockState` changes at Navi/Trial/VN
+and menu boundaries.
 
 The first app build intentionally allows the large R3F/Pixi/Three bundle
 warning. A later performance task should add route or adapter code splitting
@@ -82,7 +85,7 @@ vertical-slice harness remains active.
 
 | Entry | Owning worktree | Modules allowed to change |
 |---|---|---|
-| `/?scenario=vertical-slice` | accepted integration baseline; see `docs/archive/completed-tasks/vertical-slice-integration.md` and `docs/archive/completed-tasks/game-interaction-shell.md` | integration harness, title-first flow, interaction shell overlays, save/load smoke evidence |
+| `/?scenario=vertical-slice` | accepted integration baseline; see `docs/archive/completed-tasks/vertical-slice-integration.md` and `docs/archive/completed-tasks/game-interaction-shell.md` | integration harness, title-first flow, Trial entry, interaction shell overlays, save/load smoke evidence |
 
 Completed temporary subsystem entries are archived under
 `docs/archive/completed-tasks/`. Future slices should add new scenario entries

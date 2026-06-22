@@ -110,6 +110,11 @@ as `vn3d`, but it is not just `vn3d` with a different camera. Trial requires a
 `TrialDefinition`, `TrialRuntimeState`, and `trial-director` logic on top of
 story presentation.
 
+The accepted vertical-slice harness enters Trial from an in-scene Navi
+interactable using `start-trial`. The same scenario remains active; the app
+switches from Navi staging to the Trial stage based on `GameMode` and the
+current `TrialRuntimeState`.
+
 See `docs/architecture/vn-runtime-dispatcher.md` for the app-layer route table.
 
 ## Evidence Ownership Boundary

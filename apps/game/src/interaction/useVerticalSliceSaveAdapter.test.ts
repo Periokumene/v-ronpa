@@ -51,6 +51,41 @@ describe("vertical slice save adapter", () => {
     expect(save).not.toHaveProperty("summary");
   });
 
+  it("can include optional Trial runtime state without adding transient UI playback", () => {
+    const runtimeScript = compileScenario("Felix: Trial save.", "trial-save-test.nani");
+    const gameplay = createGameplayState();
+    const trial = {
+      trialId: "trial:door-lock",
+      currentSegmentId: "debate:door-lock",
+      presentation: "debate3d" as const,
+      inputLock: "trial-targeting" as const,
+      selectedEvidenceId: "evidence:keycard",
+      keywordStates: { "kw:door-lock": "broken" as const }
+    };
+
+    const save = createVerticalSliceSaveData({
+      mode: "trial",
+      savedAt: "2026-06-20T00:00:00.000Z",
+      navi: { substate: "walk", activeMapId: "map:academy-hall", inputLock: "none" },
+      story: createInitialStoryState(runtimeScript),
+      pixiStage: createInitialPixiStageSnapshot(),
+      gameplay,
+      trial
+    });
+
+    expect(save).toMatchObject({
+      mode: "trial",
+      trial: {
+        trialId: "trial:door-lock",
+        currentSegmentId: "debate:door-lock",
+        presentation: "debate3d",
+        inputLock: "trial-targeting"
+      }
+    });
+    expect(save).not.toHaveProperty("storyPlay");
+    expect(save).not.toHaveProperty("playback");
+  });
+
   it("keeps the vertical-slice slot id policy in the app adapter layer", () => {
     expect(verticalSliceSaveSlotIds).toEqual([
       "slot:vertical:1",

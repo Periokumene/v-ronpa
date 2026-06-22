@@ -113,6 +113,17 @@ describe("contracts", () => {
               action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
             },
             {
+              id: "interactable:trial-door",
+              label: "Trial Door",
+              position: [-1, 1, -2],
+              radius: 1,
+              action: {
+                type: "start-trial",
+                trialId: "trial:case-01",
+                segmentId: "debate:door"
+              }
+            },
+            {
               id: "interactable:classroom-door",
               label: "Classroom Door",
               position: [0, 1, -3],
@@ -158,7 +169,8 @@ describe("contracts", () => {
 
     expect(manifest.maps[0]?.walkBounds?.min).toEqual([-3, 0, -4]);
     expect(manifest.maps[0]?.interactables[0]?.action.type).toBe("grant-evidence");
-    expect(manifest.maps[0]?.interactables[1]?.action.type).toBe("change-map");
+    expect(manifest.maps[0]?.interactables[1]?.action.type).toBe("start-trial");
+    expect(manifest.maps[0]?.interactables[2]?.action.type).toBe("change-map");
     expect(manifest.evidence[0]?.shortLabel).toBe("Keycard");
     expect(manifest.input?.bindings[1]?.action).toBe("fire-truth-bullet");
     expect(manifest.uiAssets[0]?.role).toBe("title-background");

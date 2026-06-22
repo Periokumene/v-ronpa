@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { NaviRuntimeState, PixiStageSnapshot, SaveData, SaveSlotSummary } from "@v-ronpa/contracts";
+import type { NaviRuntimeState, PixiStageSnapshot, SaveData, SaveSlotSummary, TrialRuntimeState } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
 import { createDexieSavePort, createSaveSlotSummary, type SavePort } from "@v-ronpa/media-save";
 import { storyRuntimeSnapshot, type StoryRuntimeState } from "@v-ronpa/story-engine";
@@ -11,24 +11,28 @@ const VERTICAL_SLICE_DB = "v-ronpa-vertical-slice-v2";
 export const verticalSliceSaveSlotIds = ["slot:vertical:1", "slot:vertical:2", "slot:vertical:3", "slot:vertical:4"];
 
 export interface VerticalSliceSaveDataInput {
+  mode?: SaveData["mode"];
   savedAt: string;
   navi: NaviRuntimeState;
   story: StoryRuntimeState;
   pixiStage: PixiStageSnapshot;
   gameplay: GameplayState;
+  trial?: TrialRuntimeState;
 }
 
 export function createVerticalSliceSaveData({
   gameplay,
+  mode = "navi",
   navi,
   pixiStage,
   savedAt,
-  story
+  story,
+  trial
 }: VerticalSliceSaveDataInput): SaveData {
-  return {
+  const data: SaveData = {
     version: 2,
     savedAt,
-    mode: "navi",
+    mode,
     navi,
     story: storyRuntimeSnapshot(story),
     pixiStage,
@@ -36,6 +40,8 @@ export function createVerticalSliceSaveData({
     evidence: gameplay.evidence,
     characters: gameplay.characters
   };
+  if (trial) data.trial = trial;
+  return data;
 }
 
 export function useVerticalSliceSaveAdapter(runtime: VerticalSliceRuntimeAdapter, port?: SavePort) {
@@ -58,7 +64,9 @@ export function useVerticalSliceSaveAdapter(runtime: VerticalSliceRuntimeAdapter
         navi: runtime.navi,
         story: runtime.storyRuntime.state,
         pixiStage: runtime.pixiStageRuntime.snapshot,
-        gameplay: runtime.gameplay
+        gameplay: runtime.gameplay,
+        mode: runtime.trialRuntime.active ? "trial" : "navi",
+        ...(runtime.trialRuntime.active && runtime.trialRuntime.state ? { trial: runtime.trialRuntime.state } : {})
       });
     },
     [

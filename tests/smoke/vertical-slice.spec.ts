@@ -101,6 +101,27 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await page.getByTestId("vertical-slice-confirm").click();
   await expect(page.getByTestId("vertical-slice-evidence")).toContainText("evidence:keycard");
 
+  await page.getByTestId("vertical-slice-move-trial-stand").click();
+  await expect(page.getByTestId("vertical-slice-active-interactable")).toHaveText("interactable:trial-stand");
+  await page.getByTestId("vertical-slice-confirm").click();
+  await expect(page.getByTestId("harness-status")).toHaveText("Trial 模式");
+  await expect(page.getByTestId("vertical-slice-mode")).toHaveText("trial");
+  await expect(page.getByTestId("vertical-slice-last-outcome")).toHaveText("start-trial:trial:door-lock");
+  await expect(page.getByTestId("vertical-slice-trial-segment")).toHaveText("debate:door-lock");
+  await expect(page.getByTestId("vertical-slice-trial-presentation")).toHaveText("debate3d");
+  await expect(page.getByTestId("vertical-slice-trial-input-lock")).toHaveText("trial-targeting");
+  await expect(page.getByTestId("trial-r3f-canvas")).toBeVisible();
+  await expect(page.getByTestId("vn-command-bar")).toBeHidden();
+  await page.getByTestId("vertical-slice-trial-correct").click();
+  await expect(page.getByTestId("vertical-slice-trial-keywords")).toContainText("kw:door-lock:broken");
+  await expect(page.getByTestId("vertical-slice-trial-segment")).toHaveText("discussion:trial-close");
+  await expect(page.getByTestId("vertical-slice-trial-outcome")).toHaveText("correct:discussion:trial-close");
+  await page.screenshot({ path: "test-results/vertical-slice-trial-entry.png", fullPage: true });
+  await page.getByTestId("vertical-slice-trial-exit").click();
+  await expect(page.getByTestId("harness-status")).toHaveText("Navi 探索");
+  await expect(page.getByTestId("vertical-slice-mode")).toHaveText("navi");
+  await expect(page.getByTestId("vertical-slice-trial-segment")).toHaveText("none");
+
   await page.getByTestId("vertical-slice-move-door").click();
   await expect(page.getByTestId("vertical-slice-active-interactable")).toHaveText("interactable:classroom-door");
   await page.getByTestId("vertical-slice-confirm").click();

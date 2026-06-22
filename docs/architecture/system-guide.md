@@ -146,6 +146,12 @@ branches, and minigame transitions. `.nani` scripts provide the narrative and
 visual timing for those segments, while TrialDirector applies graph transitions
 after Gameplay returns pure rule judgments.
 
+Exploration enters Trial through the director-owned `InteractableDef.action`
+variant `start-trial`. Navi remains authoritative for focus and confirmation;
+the app runtime adapter creates `TrialRuntimeState` and enters `GameMode`
+`trial`. Trial entry must not be hidden inside `start-script` labels or separate
+query-param scenarios.
+
 ## First-Round Thin Slices
 
 - Parse labels, comments, commands, text, inline commands, choices, and jumps.
