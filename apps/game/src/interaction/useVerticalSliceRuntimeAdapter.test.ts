@@ -7,11 +7,13 @@ import { createInitialPixiStageSnapshot, reducePixiStageCommand } from "@v-ronpa
 import { advanceToNextStop, createInitialStoryState, storyRuntimeSnapshot } from "@v-ronpa/story-engine";
 import type { VnOutputRouteTable } from "../vnOutputRoutes";
 import {
+  canToggleStoryAutomation,
   collectVerticalSliceRuntimeDiagnostics,
   createInitialVerticalSliceDiagnostics,
   createVerticalSliceInteractionContext,
   createVerticalSlicePresentationTransaction,
   createVerticalSliceRuntimeRestorePlan,
+  shouldAnimateStoryPlayPacing,
   type StoryRuntime
 } from "./useVerticalSliceRuntimeAdapter";
 
@@ -184,12 +186,31 @@ describe("vertical slice runtime adapter helpers", () => {
     });
     expect(plan.storyRuntime.state).not.toHaveProperty("presentationCommands");
     expect(plan.storyRuntime.state).not.toHaveProperty("effects");
+    expect(plan.storyPlay).toEqual({ mode: "manual" });
     expect(plan.pixiStageRuntime).toEqual({
       snapshot: pixiStage,
       hints: [],
       hintSequence: 0,
       animate: false
     });
+  });
+
+  it("keeps story automation availability and presentation pacing as adapter decisions", () => {
+    const runtimeScript = compileScenario("Felix: Adapter.", "adapter-playback-test.nani");
+    const storyRuntime: StoryRuntime = {
+      active: true,
+      state: createInitialStoryState(runtimeScript)
+    };
+
+    expect(canToggleStoryAutomation(storyRuntime)).toBe(true);
+    expect(
+      canToggleStoryAutomation({
+        ...storyRuntime,
+        state: { ...storyRuntime.state, pendingChoices: [{ text: "Choice" }] }
+      })
+    ).toBe(false);
+    expect(shouldAnimateStoryPlayPacing("normal")).toBe(true);
+    expect(shouldAnimateStoryPlayPacing("skip")).toBe(false);
   });
 });
 

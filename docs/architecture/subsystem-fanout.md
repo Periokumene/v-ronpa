@@ -6,6 +6,7 @@ Use this after the contract and harness baseline is frozen.
 |---|---|---|
 | nani-parser | `packages/nani-parser/**`, parser fixtures | `.nani` AST/IR snapshots |
 | story-engine | `packages/story-engine/**` | runtime state snapshots |
+| story-play | `packages/story-play/**`, app runtime adapter when assigned | playback mode and schedule tests |
 | gameplay | `packages/gameplay/**` | trial and inventory outcome tests |
 | navi-director | `packages/navi-director/**` | Navi substate and interaction tests |
 | trial-director | `packages/trial-director/**` | Trial segment/profile/outcome tests |

@@ -71,6 +71,9 @@ importers:
       '@v-ronpa/story-engine':
         specifier: workspace:*
         version: link:../../packages/story-engine
+      '@v-ronpa/story-play':
+        specifier: workspace:*
+        version: link:../../packages/story-play
       '@v-ronpa/trial-director':
         specifier: workspace:*
         version: link:../../packages/trial-director
@@ -193,6 +196,15 @@ importers:
       '@v-ronpa/contracts':
         specifier: workspace:*
         version: link:../contracts
+
+  packages/story-play:
+    dependencies:
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@v-ronpa/story-engine':
+        specifier: workspace:*
+        version: link:../story-engine
 
   packages/trial-director:
     dependencies:

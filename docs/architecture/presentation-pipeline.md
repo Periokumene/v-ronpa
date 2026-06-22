@@ -49,6 +49,12 @@ Expression params such as `duration:{flashDuration}` are preserved by the
 compiler, evaluated by StoryEngine against story variables, and should be
 resolved before app adapters consume emitted runtime commands.
 
+`story-play` sits above StoryEngine for playback control only. It decides when
+manual, AUTO, SKIP, or one-shot `autoNext` should request the next StoryEngine
+step and emits a pacing intent such as normal or skip. App adapters host the
+actual browser timer and map skip pacing to presentation choices such as
+disabled Pixi animation; renderer packages do not own AUTO/SKIP scheduling.
+
 `trial-keyword` is a visual anchor for overlays and subtitles. It may carry
 debug metadata, but it is not the rule source for which evidence breaks which
 statement. Debate rules, accepted evidence, and next-segment transitions live in

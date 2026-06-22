@@ -172,6 +172,7 @@ export function calculateInteractionCapabilities(context: GameInteractionContext
   const inTitle = mode === "title";
   const inPlayableMode = mode === "navi" || mode === "trial";
   const inVnStory = context.hasActiveStory && context.inputLock === "dialog";
+  const canAutomateStory = inVnStory && !context.storyEnded && !context.storyHasChoices;
   const canSave = inPlayableMode && context.isAtStableStop && !(context.hasActiveStory && context.storyEnded);
   const canLoad = inTitle || inPlayableMode || mode === "paused";
 
@@ -182,8 +183,8 @@ export function calculateInteractionCapabilities(context: GameInteractionContext
     canOpenSettings: true,
     canOpenBacklog: inVnStory && (context.naviSubstate === "vn2d-overlay" || context.trialPresentation === "vn2d"),
     canOpenPauseMenu: inPlayableMode && context.inputLock !== "menu",
-    canAuto: inVnStory && !context.storyEnded,
-    canSkip: inVnStory && !context.storyEnded,
+    canAuto: canAutomateStory,
+    canSkip: canAutomateStory,
     canReturnTitle: inPlayableMode || mode === "paused"
   });
 }

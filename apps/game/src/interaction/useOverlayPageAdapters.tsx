@@ -61,6 +61,16 @@ export function useOverlayPageAdapters({
   save: VerticalSliceSaveAdapter;
 }) {
   function dispatchUiAction(action: GameUiAction) {
+    if (action === "toggle-auto") {
+      runtime.toggleStoryAuto();
+      return;
+    }
+
+    if (action === "toggle-skip") {
+      runtime.toggleStorySkip();
+      return;
+    }
+
     if (action === "new-game") {
       runtime.resetSlice();
       flow.dispatchAction("new-game");
@@ -69,6 +79,7 @@ export function useOverlayPageAdapters({
 
     const overlay = overlayKindForUiAction(action, flow.mode);
     if (overlay) {
+      runtime.stopStoryAutomation("overlay");
       flow.openOverlay(overlay);
       return;
     }

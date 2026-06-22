@@ -26,6 +26,7 @@ Preferred fan-out:
 
 - `nani-parser`
 - `story-engine`
+- `story-play`
 - `gameplay`
 - `navi-director`
 - `trial-director`

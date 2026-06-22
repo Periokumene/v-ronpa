@@ -8,6 +8,7 @@ const packageRoots = {
   "nani-parser": "packages/nani-parser",
   "nani-runtime-compiler": "packages/nani-runtime-compiler",
   "story-engine": "packages/story-engine",
+  "story-play": "packages/story-play",
   "gameplay": "packages/gameplay",
   "navi-director": "packages/navi-director",
   "trial-director": "packages/trial-director",
@@ -24,6 +25,7 @@ const allowedWorkspaceDeps = {
   "nani-parser": [],
   "nani-runtime-compiler": ["contracts", "nani-parser"],
   "story-engine": ["contracts"],
+  "story-play": ["contracts", "story-engine"],
   "gameplay": ["contracts"],
   "navi-director": ["contracts", "gameplay"],
   "trial-director": ["contracts", "gameplay"],
@@ -43,6 +45,7 @@ const allowedWorkspaceDeps = {
     "pixi-presenter",
     "r3f-adapter",
     "story-engine",
+    "story-play",
     "trial-director",
     "ui-kit"
   ]
@@ -65,6 +68,7 @@ const forbiddenExternalDeps = {
   "nani-parser": rendererAndBrowserAdapters,
   "nani-runtime-compiler": rendererAndBrowserAdapters,
   "story-engine": rendererAndBrowserAdapters,
+  "story-play": rendererAndBrowserAdapters,
   "gameplay": rendererAndBrowserAdapters,
   "navi-director": rendererAndBrowserAdapters,
   "trial-director": rendererAndBrowserAdapters,

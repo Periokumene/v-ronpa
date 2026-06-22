@@ -14,6 +14,7 @@
     { "path": "../../packages/nani-parser" },
     { "path": "../../packages/nani-runtime-compiler" },
     { "path": "../../packages/story-engine" },
+    { "path": "../../packages/story-play" },
     { "path": "../../packages/game-flow-machine" },
     { "path": "../../packages/gameplay" },
     { "path": "../../packages/media-save" },

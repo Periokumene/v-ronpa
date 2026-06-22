@@ -212,15 +212,17 @@ delete, split, or execute entries from it.
   - `GameUiAction` entries for `toggle-auto` and `toggle-skip`
   - `VnCommandBar` in `packages/ui-kit/src/surfaces/GameInteractionSurfaces.tsx`
 - Current Observation: AUTO and SKIP have command bar entries and capability
-  flags, but no scheduler or StoryEngine stepping policy is implemented.
-- Why Not Actionable Yet: Auto/skip needs timing, input cancellation,
-  unread/read text policy, choice-stop policy, and interaction with future
-  voice/audio playback.
+  flags. The accepted implementation path is `story-play` as a pure playback
+  state machine, with app adapters hosting browser timers and mapping playback
+  pacing into presentation commits.
+- Why Not Actionable Yet: Closed for the vertical-slice harness. Reopen only if
+  future work adds persisted read-history, configurable skip-all/read-only
+  policy, or audio/voice readiness contracts.
 - Auto Action: Forbidden
 - Review Cadence: Review before implementing VN auto or skip runtime behavior.
 - Next Review: TBD
-- Status: Watching
-- Linked Task / ADR / CCR: TBD
+- Status: Closed
+- Linked Task / ADR / CCR: story-play AUTO/SKIP implementation
 
 ### RW-0010: Pixi Presenter Differential Reconcile
 

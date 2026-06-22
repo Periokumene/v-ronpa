@@ -95,6 +95,23 @@ describe("game flow machine", () => {
       calculateInteractionCapabilities({
         mode: "navi",
         overlayStack: [],
+        naviSubstate: "vn2d-overlay",
+        inputLock: "dialog",
+        hasActiveStory: true,
+        storyHasChoices: true,
+        storyEnded: false,
+        isAtStableStop: true
+      })
+    ).toMatchObject({
+      canAuto: false,
+      canSkip: false,
+      canOpenBacklog: true
+    });
+
+    expect(
+      calculateInteractionCapabilities({
+        mode: "navi",
+        overlayStack: [],
         naviSubstate: "walk",
         inputLock: "none",
         hasActiveStory: false,

@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   GameInteractionContext,
+  GameUiAction,
   NaviInteractionSensorReport,
   NaviRuntimeState,
   PlayerPose,
@@ -23,12 +24,25 @@ import {
 import { createInitialPixiStageSnapshot, type PixiStageRenderHint } from "@v-ronpa/pixi-presenter";
 import type { FirstPersonInteractRequest } from "@v-ronpa/r3f-adapter";
 import {
-  advanceToNextStop,
-  chooseStoryOption,
   createInitialStoryState,
   type StoryStepperDiagnostic,
+  type StoryStepperResult,
   type StoryRuntimeState
 } from "@v-ronpa/story-engine";
+import {
+  advanceStoryPlay,
+  chooseStoryPlayOption,
+  createInitialStoryPlayState,
+  selectStoryPlaySchedule,
+  stopStoryPlayAutomation,
+  toggleAutoStoryPlay,
+  toggleSkipStoryPlay,
+  type StoryPlayAdvanceSource,
+  type StoryPlayPacing,
+  type StoryPlaySchedule,
+  type StoryPlayStopReason,
+  type StoryPlayState
+} from "@v-ronpa/story-play";
 import { verticalSliceMaps, verticalSliceScript } from "../harness/fixtures/verticalSlice";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../harness/inputActions";
 import { useFirstPersonExplorationBridge } from "../harness/useFirstPersonExplorationBridge";
@@ -76,6 +90,7 @@ export interface VerticalSliceRuntimeRestorePlan {
   navi?: NaviRuntimeState;
   playerPose?: PlayerPose;
   storyRuntime: StoryRuntime;
+  storyPlay: StoryPlayState;
   pixiStageRuntime: PixiStageRuntime;
 }
 
@@ -127,6 +142,7 @@ export function useVerticalSliceRuntimeAdapter(
     state: createInitialStoryState(compiled.script),
     active: false
   }));
+  const [storyPlay, setStoryPlay] = useState<StoryPlayState>(() => createInitialStoryPlayState());
   const [pixiStageRuntime, setPixiStageRuntime] = useState<PixiStageRuntime>(() => createInitialPixiStageRuntime());
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<VerticalSliceRuntimeDiagnostic[]>(() => initialRuntimeDiagnostics);
   const [lastRuntimeCommandCount, setLastRuntimeCommandCount] = useState(0);
@@ -137,8 +153,45 @@ export function useVerticalSliceRuntimeAdapter(
   const currentCameraMode = navi.inputLock === "none" && flowMode !== "title" ? "first-person" : "locked";
   const inputActionsRef = useKeyboardInputActions(defaultHarnessInputBindings, "navi", navi.inputLock === "none" && flowMode !== "title");
   const interactionView = createNaviInteractionView(navi);
+  const storyPlayHostRef = useRef<{ active: boolean; schedule: StoryPlaySchedule }>({
+    active: false,
+    schedule: { type: "idle" }
+  });
+  const storyPlaySchedule = useMemo(
+    () =>
+      selectStoryPlaySchedule(storyPlay, storyRuntime.state, {
+        active: storyRuntime.active,
+        hostReadyForAuto: true
+      }),
+    [storyPlay, storyRuntime.active, storyRuntime.state]
+  );
+  const storyPlayActiveActions: Partial<Record<GameUiAction, boolean>> = useMemo(
+    () => ({
+      "toggle-auto": storyPlay.mode === "auto",
+      "toggle-skip": storyPlay.mode === "skip"
+    }),
+    [storyPlay.mode]
+  );
+
+  useEffect(() => {
+    storyPlayHostRef.current = { active: storyRuntime.active, schedule: storyPlaySchedule };
+  }, [storyPlaySchedule, storyRuntime.active]);
+
+  useEffect(() => {
+    if (!storyRuntime.active) return;
+    if (storyPlaySchedule.type === "idle") return;
+    const delayMs = storyPlaySchedule.type === "wait" ? storyPlaySchedule.delayMs : 0;
+    const scheduled = storyPlaySchedule;
+    const timeout = window.setTimeout(() => {
+      const currentHost = storyPlayHostRef.current;
+      if (!currentHost.active || currentHost.schedule !== scheduled) return;
+      advanceStory(scheduled.source);
+    }, delayMs);
+    return () => window.clearTimeout(timeout);
+  }, [storyPlaySchedule, storyRuntime.active]);
 
   function resetSlice() {
+    cancelStoryPlayHostSchedule();
     const spawnPose: PlayerPose = { position: initialMap.spawn, yaw: 0, pitch: 0 };
     setNavi({
       ...createInitialNaviState(initialMap.id),
@@ -146,6 +199,7 @@ export function useVerticalSliceRuntimeAdapter(
     });
     setGameplay(createGameplayState());
     setStoryRuntime({ state: createInitialStoryState(compiled.script), active: false });
+    setStoryPlay(createInitialStoryPlayState());
     setRuntimeDiagnostics(initialRuntimeDiagnostics);
     setPixiStageRuntime((current) => ({
       ...createInitialPixiStageRuntime(),
@@ -215,68 +269,108 @@ export function useVerticalSliceRuntimeAdapter(
 
   function startStoryOverlay() {
     const initial = createInitialStoryState(compiled.script);
-    const advanced = advanceToNextStop(initial, compiled.script);
+    const step = advanceStoryPlay(createInitialStoryPlayState(), {
+      state: initial,
+      script: compiled.script,
+      source: "start"
+    });
     const initialPixiStage = createInitialPixiStageSnapshot();
     setStorySession((session) => session + 1);
+    setStoryPlay(step.play);
     commitStoryTransaction({
-      nextStory: advanced.state,
-      runtimeCommands: advanced.emittedRuntimeCommands,
+      storyStep: step.story,
       previousPixiStage: initialPixiStage,
-      storyDiagnostics: advanced.diagnostics,
       active: true,
+      pacing: step.intent.pacing,
       forcePixiCommit: true
     });
   }
 
-  function advanceStory() {
-    const current = storyRuntime.state;
-    const advanced = advanceToNextStop(current, compiled.script);
-    const nextStory = advanced.state;
+  function advanceStory(source: StoryPlayAdvanceSource = "manual") {
+    if (source === "manual") cancelStoryPlayHostSchedule();
+    const step = advanceStoryPlay(storyPlay, {
+      state: storyRuntime.state,
+      script: compiled.script,
+      source
+    });
+    const nextStory = step.story.state;
+    setStoryPlay(step.play);
     commitStoryTransaction({
-      nextStory,
-      runtimeCommands: advanced.emittedRuntimeCommands,
+      storyStep: step.story,
       previousPixiStage: pixiStageRuntime.snapshot,
-      storyDiagnostics: advanced.diagnostics,
-      active: !nextStory.ended
+      active: !nextStory.ended,
+      pacing: step.intent.pacing
     });
     if (nextStory.ended) {
       closeStoryOverlay("story:end");
     } else {
-      setLastAction("story:advance");
+      setLastAction(source === "manual" ? "story:advance" : `story:${source}`);
       setLastOutcome(nextStory.pendingChoices.length > 0 ? "choices" : "line");
     }
   }
 
   function chooseStory(index: number) {
-    const current = storyRuntime.state;
-    const chosen = chooseStoryOption(current, compiled.script, index);
-    const advanced = advanceToNextStop(chosen.state, compiled.script);
-    const nextStory = advanced.state;
-    commitStoryTransaction({
-      nextStory,
-      runtimeCommands: advanced.emittedRuntimeCommands,
-      previousPixiStage: pixiStageRuntime.snapshot,
-      storyDiagnostics: [...chosen.diagnostics, ...advanced.diagnostics],
-      active: true
+    cancelStoryPlayHostSchedule();
+    const step = chooseStoryPlayOption(storyPlay, {
+      state: storyRuntime.state,
+      script: compiled.script,
+      index
     });
-    setLastAction(`choice:${index}`);
-    setLastOutcome(nextStory.variables.route ? `route:${String(nextStory.variables.route)}` : "choice");
+    const nextStory = step.story.state;
+    setStoryPlay(step.play);
+    commitStoryTransaction({
+      storyStep: step.story,
+      previousPixiStage: pixiStageRuntime.snapshot,
+      active: !nextStory.ended,
+      pacing: step.intent.pacing
+    });
+    if (nextStory.ended) {
+      closeStoryOverlay("story:end");
+    } else {
+      setLastAction(`choice:${index}`);
+      setLastOutcome(nextStory.variables.route ? `route:${String(nextStory.variables.route)}` : "choice");
+    }
+  }
+
+  function toggleStoryAuto() {
+    if (!canToggleStoryAutomation(storyRuntime)) return;
+    if (storyPlay.mode === "auto") cancelStoryPlayHostSchedule();
+    setStoryPlay((current) => toggleAutoStoryPlay(current));
+    setLastAction("story:auto");
+    setLastOutcome(storyPlay.mode === "auto" ? "manual" : "auto");
+  }
+
+  function toggleStorySkip() {
+    if (!canToggleStoryAutomation(storyRuntime)) return;
+    if (storyPlay.mode === "skip") cancelStoryPlayHostSchedule();
+    setStoryPlay((current) => toggleSkipStoryPlay(current));
+    setLastAction("story:skip");
+    setLastOutcome(storyPlay.mode === "skip" ? "manual" : "skip");
+  }
+
+  function stopStoryAutomation(reason: StoryPlayStopReason) {
+    cancelStoryPlayHostSchedule();
+    setStoryPlay((current) => stopStoryPlayAutomation(current, reason));
   }
 
   function closeStoryOverlay(action = "dialog:cancel") {
+    cancelStoryPlayHostSchedule();
     setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
     setStoryRuntime((current) => ({ ...current, active: false }));
+    setStoryPlay(createInitialStoryPlayState());
     setLastRuntimeCommandCount(0);
     setLastAction(action);
     setLastOutcome("overlay-closed");
   }
 
   function restoreFromSave(save: Pick<SaveData, "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters">) {
+    cancelStoryPlayHostSchedule();
     const plan = createVerticalSliceRuntimeRestorePlan(save, compiled.script);
     if (plan.navi) setNavi(plan.navi);
     if (plan.playerPose) firstPersonBridge.issuePoseCommand(plan.playerPose);
     setGameplay(plan.gameplay);
     setStoryRuntime(plan.storyRuntime);
+    setStoryPlay(plan.storyPlay);
     setRuntimeDiagnostics(initialRuntimeDiagnostics);
     setPixiStageRuntime((current) => ({
       ...plan.pixiStageRuntime,
@@ -289,22 +383,20 @@ export function useVerticalSliceRuntimeAdapter(
   }
 
   function commitStoryTransaction({
-    nextStory,
-    runtimeCommands,
+    storyStep,
     previousPixiStage,
-    storyDiagnostics = [],
     active,
+    pacing = "normal",
     forcePixiCommit = false
   }: {
-    nextStory: StoryRuntimeState;
-    runtimeCommands: RuntimeCommand[];
+    storyStep: StoryStepperResult;
     previousPixiStage: PixiStageSnapshot;
-    storyDiagnostics?: StoryStepperDiagnostic[];
     active: boolean;
+    pacing?: StoryPlayPacing;
     forcePixiCommit?: boolean;
   }) {
     const transaction = createVerticalSlicePresentationTransaction({
-      runtimeCommands,
+      runtimeCommands: storyStep.emittedRuntimeCommands,
       previousPixiStage,
       options: {
         profile: runtimeProfile,
@@ -313,11 +405,11 @@ export function useVerticalSliceRuntimeAdapter(
     });
     appendRuntimeDiagnostics(
       collectVerticalSliceRuntimeDiagnostics({
-        storyDiagnostics,
+        storyDiagnostics: storyStep.diagnostics,
         transactionDiagnostics: transaction.diagnostics
       })
     );
-    setLastRuntimeCommandCount(runtimeCommands.length);
+    setLastRuntimeCommandCount(storyStep.emittedRuntimeCommands.length);
     if (transaction.gameplayEvents.length > 0) {
       setGameplay((currentGameplay) => applyGameplayEvents(currentGameplay, transaction.gameplayEvents));
     }
@@ -330,10 +422,10 @@ export function useVerticalSliceRuntimeAdapter(
         snapshot: transaction.pixiStage,
         hints: transaction.pixiHints,
         hintSequence: current.hintSequence + 1,
-        animate: true
+        animate: shouldAnimateStoryPlayPacing(pacing)
       }));
     }
-    setStoryRuntime({ state: nextStory, active });
+    setStoryRuntime({ state: storyStep.state, active });
   }
 
   const interactionContext: GameInteractionContext = useMemo(
@@ -367,13 +459,23 @@ export function useVerticalSliceRuntimeAdapter(
     resetSlice,
     restoreFromSave,
     runtimeDiagnostics,
+    stopStoryAutomation,
+    storyPlay,
+    storyPlayActiveActions,
+    storyPlaySchedule,
     storyRuntime,
-    storySession
+    storySession,
+    toggleStoryAuto,
+    toggleStorySkip
   };
 
   function appendRuntimeDiagnostics(diagnostics: VerticalSliceRuntimeDiagnostic[]) {
     if (diagnostics.length === 0) return;
     setRuntimeDiagnostics((current) => limitRuntimeDiagnostics([...current, ...diagnostics]));
+  }
+
+  function cancelStoryPlayHostSchedule() {
+    storyPlayHostRef.current = { active: storyRuntime.active, schedule: { type: "idle" } };
   }
 }
 
@@ -421,6 +523,10 @@ export function createVerticalSliceInteractionContext({
   };
 }
 
+export function canToggleStoryAutomation(storyRuntime: StoryRuntime): boolean {
+  return storyRuntime.active && !storyRuntime.state.ended && storyRuntime.state.pendingChoices.length === 0;
+}
+
 export function createVerticalSliceRuntimeRestorePlan(
   save: Pick<SaveData, "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters">,
   script: { scriptPath: string }
@@ -437,6 +543,7 @@ export function createVerticalSliceRuntimeRestorePlan(
     ...(save.navi ? { navi: save.navi } : {}),
     ...(save.navi?.playerPose ? { playerPose: save.navi.playerPose } : {}),
     storyRuntime,
+    storyPlay: createInitialStoryPlayState(),
     pixiStageRuntime: {
       snapshot: save.pixiStage,
       hints: [],
@@ -453,6 +560,10 @@ export function createInitialPixiStageRuntime(): PixiStageRuntime {
     hintSequence: 0,
     animate: false
   };
+}
+
+export function shouldAnimateStoryPlayPacing(pacing: StoryPlayPacing): boolean {
+  return pacing !== "skip";
 }
 
 export function createVerticalSlicePresentationTransaction({

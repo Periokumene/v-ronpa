@@ -45,6 +45,8 @@ describe("vertical slice save adapter", () => {
       evidence: { ownedEvidenceIds: ["evidence:keycard"] }
     });
     expect(save).not.toHaveProperty("overlayStack");
+    expect(save).not.toHaveProperty("storyPlay");
+    expect(save).not.toHaveProperty("playback");
     expect(save).not.toHaveProperty("summary");
   });
 

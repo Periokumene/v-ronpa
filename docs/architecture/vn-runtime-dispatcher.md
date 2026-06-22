@@ -21,6 +21,9 @@ VN runtime output is split in two app-layer steps:
 - `StoryEngine` owns script execution, variables, backlog, pending choices,
   instruction pointer, expression evaluation, end state, and per-step
   `emittedRuntimeCommands`.
+- `story-play` owns StoryEngine playback control: manual/AUTO/SKIP mode,
+  one-shot `autoNext`, schedule selection, pacing intent, and automation stop
+  reasons. It does not own timers, React effects, Pixi, DOM, or save data.
 - `StoryRuntimeState` is saveable story state only. It must not store runtime
   command streams, presentation logs, or transient effects.
 - `createVnRuntimePresentationTransaction` owns app-level fanout from emitted
@@ -75,6 +78,7 @@ The vertical-slice harness uses:
 
 - `parseScenario` followed by `compileRuntimeScript`.
 - `StoryEngine` stepping over `RuntimeScript`.
+- `story-play` selection of AUTO/SKIP/manual playback schedule and pacing.
 - `createVnRuntimePresentationTransaction` for emitted command fanout.
 - `VnRuntimeDispatcher` for Pixi snapshot + VN dialog rendering.
 - `PixiStageSnapshot` as the saveable terminal state for VN 2D staging.
@@ -88,7 +92,9 @@ into the runtime adapter instead.
 VN toolbar actions are intentionally outside `VnRuntimeDispatcher`. LOG, SKIP,
 AUTO, SAVE, LOAD, and SETTING are shell UI actions derived from
 `InteractionCapabilitySnapshot`; they should enter the app through
-`GameInteractionShell` and its overlay/page adapters.
+`GameInteractionShell` and its overlay/page adapters. AUTO/SKIP actions are
+routed from those adapters into the runtime adapter, which hosts web timers and
+delegates playback rules to `story-play`.
 
 ## Future Branches
 

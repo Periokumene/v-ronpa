@@ -41,10 +41,11 @@ export function TitleSurface({ capabilities, onAction, title = "V-Ronpa" }: Titl
 
 export interface VnCommandBarProps {
   capabilities: InteractionCapabilitySnapshot;
+  activeActions?: Partial<Record<GameUiAction, boolean>>;
   onAction: (action: GameUiAction) => void;
 }
 
-export function VnCommandBar({ capabilities, onAction }: VnCommandBarProps) {
+export function VnCommandBar({ activeActions = {}, capabilities, onAction }: VnCommandBarProps) {
   const commands: Array<{ action: GameUiAction; label: string; enabled: boolean; testId: string }> = [
     { action: "open-backlog", label: "LOG", enabled: capabilities.canOpenBacklog, testId: "vn-command-backlog" },
     { action: "toggle-skip", label: "SKIP", enabled: capabilities.canSkip, testId: "vn-command-skip" },
@@ -57,26 +58,31 @@ export function VnCommandBar({ capabilities, onAction }: VnCommandBarProps) {
   return (
     <Tooltip.Provider delayDuration={120}>
       <nav aria-label="VN command bar" data-testid="vn-command-bar" style={commandBarStyle}>
-        {commands.map((command) => (
-          <Tooltip.Root key={command.testId}>
-            <Tooltip.Trigger asChild>
-              <button
-                data-testid={command.testId}
-                disabled={!command.enabled}
-                onClick={() => onAction(command.action)}
-                style={command.enabled ? commandButtonStyle : disabledCommandButtonStyle}
-                type="button"
-              >
-                {command.label}
-              </button>
-            </Tooltip.Trigger>
-            <Tooltip.Portal>
-              <Tooltip.Content side="top" style={tooltipStyle}>
-                {command.label}
-              </Tooltip.Content>
-            </Tooltip.Portal>
-          </Tooltip.Root>
-        ))}
+        {commands.map((command) => {
+          const active = Boolean(activeActions[command.action]);
+          const toggleCommand = command.action === "toggle-auto" || command.action === "toggle-skip";
+          return (
+            <Tooltip.Root key={command.testId}>
+              <Tooltip.Trigger asChild>
+                <button
+                  {...(toggleCommand ? { "aria-pressed": active } : {})}
+                  data-testid={command.testId}
+                  disabled={!command.enabled}
+                  onClick={() => onAction(command.action)}
+                  style={!command.enabled ? disabledCommandButtonStyle : active ? activeCommandButtonStyle : commandButtonStyle}
+                  type="button"
+                >
+                  {command.label}
+                </button>
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content side="top" style={tooltipStyle}>
+                  {command.label}
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          );
+        })}
       </nav>
     </Tooltip.Provider>
   );
@@ -279,6 +285,7 @@ const primaryButtonStyle: CSSProperties = { borderRadius: 6, border: "1px solid 
 const secondaryButtonStyle: CSSProperties = { borderRadius: 6, border: "1px solid rgba(255,255,255,0.28)", background: "rgba(8,13,18,0.78)", color: "#f8fbff" };
 const commandBarStyle: CSSProperties = { position: "absolute", zIndex: 10, top: 16, right: 16, display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" };
 const commandButtonStyle: CSSProperties = { borderRadius: 5, border: "1px solid rgba(255, 209, 102, 0.62)", background: "rgba(10,16,22,0.78)", color: "#fff4cf", fontSize: 12 };
+const activeCommandButtonStyle: CSSProperties = { ...commandButtonStyle, background: "rgba(255, 209, 102, 0.92)", color: "#111827" };
 const disabledCommandButtonStyle: CSSProperties = { ...commandButtonStyle, opacity: 0.42 };
 const tooltipStyle: CSSProperties = { padding: "4px 8px", borderRadius: 4, background: "#0f1720", color: "#fff", fontSize: 12 };
 const overlayHostStyle: CSSProperties = { position: "absolute", zIndex: 32, inset: 0, display: "grid", placeItems: "center", background: "rgba(2, 6, 10, 0.5)", border: "1px solid transparent" };

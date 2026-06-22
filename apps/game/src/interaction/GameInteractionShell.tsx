@@ -50,7 +50,11 @@ export function GameInteractionShell({
     <>
       {children}
       {runtime.storyRuntime.active && flow.mode !== "title" ? (
-        <VnCommandBar capabilities={flow.capabilities} onAction={overlayPages.dispatchUiAction} />
+        <VnCommandBar
+          activeActions={runtime.storyPlayActiveActions}
+          capabilities={flow.capabilities}
+          onAction={overlayPages.dispatchUiAction}
+        />
       ) : null}
       {flow.mode === "title" ? <TitleSurface capabilities={flow.capabilities} onAction={overlayPages.dispatchUiAction} /> : null}
       <GameOverlayHost activeOverlay={flow.activeOverlay}>{overlayPages.renderOverlay(flow.activeOverlay)}</GameOverlayHost>

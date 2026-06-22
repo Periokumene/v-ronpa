@@ -22,6 +22,7 @@
     "@v-ronpa/pixi-presenter": "workspace:*",
     "@v-ronpa/r3f-adapter": "workspace:*",
     "@v-ronpa/story-engine": "workspace:*",
+    "@v-ronpa/story-play": "workspace:*",
     "@v-ronpa/trial-director": "workspace:*",
     "@v-ronpa/ui-kit": "workspace:*",
     "@xstate/react": "^6.1.0",

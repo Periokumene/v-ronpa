@@ -49,6 +49,10 @@ adapters and apps
 - `StoryEngine` owns script semantics, variables, backlog, choices,
   expression evaluation, serializable Story snapshots, and per-step
   `emittedRuntimeCommands`.
+- `story-play` owns VN story playback control over StoryEngine: AUTO/SKIP mode,
+  one-shot `autoNext` scheduling, pacing intent, and automation stop reasons.
+  It is a pure playback state machine; browser timers and renderer commits stay
+  in app adapters.
 - `gameplay` owns domain reducers for exploration, inventory, evidence
   ownership, character state, and pure trial rule judgments.
 - `media-save` owns Dexie IndexedDB save storage, Howler audio playback,
@@ -110,6 +114,7 @@ submission remains a Trial UI action routed through `trial-director`.
   -> nani-parser AST/IR
   -> nani-runtime-compiler RuntimeScript / RuntimeCommand
   -> StoryEngine story state + emittedRuntimeCommands
+  -> story-play playback state + pacing schedule
   -> VN runtime transaction + route table
   -> PixiStageSnapshot / PixiStageRenderHint / gameplay events
   -> VnRuntimeDispatcher renders DOM dialog and Pixi snapshot
