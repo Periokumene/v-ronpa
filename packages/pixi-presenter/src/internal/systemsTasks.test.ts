@@ -24,6 +24,18 @@ describe("pixi presentation task system integration", () => {
     expect(tasks.snapshot()).toEqual([]);
   });
 
+  it("creates and completes no-op actor wait tasks when the snapshot transition has no visual delta", () => {
+    const { actors, tasks, tweens } = createSystems();
+    actors.reconcile(stageWithActor(backgroundActor({ durationMs: 0 }), 1), false);
+    actors.reconcile(stageWithActor(backgroundActor({ durationMs: 100, wait: true }), 2), true);
+
+    expect(tasks.snapshot()).toMatchObject([{ kind: "actor-transition", target: "MainBackground", revision: 2, status: "running" }]);
+
+    tick(tweens, 120);
+
+    expect(tasks.snapshot()).toEqual([]);
+  });
+
   it("creates and completes flash tasks through transient effects", () => {
     const { effects, tasks, tweens } = createSystems();
     effects.run([{ type: "flash", color: "#ffffff", durationMs: 80, wait: false }], 2);
@@ -42,6 +54,34 @@ describe("pixi presentation task system integration", () => {
     weather.reconcile(stageWithWeather(weatherSnapshot({ power: 0.85, durationMs: 100 }), 2), true);
 
     expect(tasks.snapshot()).toMatchObject([{ kind: "weather-transition", target: "rain", revision: 2, status: "running" }]);
+
+    tick(tweens, 120);
+
+    expect(tasks.snapshot()).toEqual([]);
+  });
+
+  it("creates and completes weather transition tasks for removal hints", () => {
+    const { tasks, tweens, weather } = createSystems();
+    weather.reconcile(stageWithWeather(weatherSnapshot({ power: 0.85, durationMs: 0 }), 1), false);
+    weather.reconcile(
+      { ...createInitialPixiStageSnapshot(), revision: 2 },
+      true,
+      [{ type: "weather-remove", kind: "rain", durationMs: 100, wait: true }]
+    );
+
+    expect(tasks.snapshot()).toMatchObject([{ kind: "weather-transition", target: "rain", revision: 2, status: "running" }]);
+
+    tick(tweens, 120);
+
+    expect(tasks.snapshot()).toEqual([]);
+  });
+
+  it("creates and completes actor transition tasks for filter-only changes", () => {
+    const { actors, tasks, tweens } = createSystems();
+    actors.reconcile(stageWithActor(backgroundActor({ durationMs: 0 }), 1), false);
+    actors.reconcile(stageWithActor({ ...backgroundActor({ durationMs: 100 }), filters: { bokeh: 0.5 } }, 2), true);
+
+    expect(tasks.snapshot()).toMatchObject([{ kind: "actor-transition", target: "MainBackground", revision: 2, status: "running" }]);
 
     tick(tweens, 120);
 
@@ -74,7 +114,7 @@ function stageWithActor(actor: PixiActorSnapshot, revision: number): PixiStageSn
   };
 }
 
-function backgroundActor({ durationMs }: { durationMs: number }): PixiActorSnapshot {
+function backgroundActor({ durationMs, wait = false }: { durationMs: number; wait?: boolean }): PixiActorSnapshot {
   return {
     id: "MainBackground",
     kind: "background",
@@ -83,7 +123,7 @@ function backgroundActor({ durationMs }: { durationMs: number }): PixiActorSnaps
     alpha: 1,
     z: 0,
     filters: {},
-    transition: { durationMs, lazy: false, wait: false }
+    transition: { durationMs, lazy: false, wait }
   };
 }
 

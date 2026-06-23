@@ -339,7 +339,9 @@ function executeCommand(
             ...advancedState,
             presentationWait: {
               commandId: resolved.command.commandId,
+              commandIndex: state.instructionPointer,
               durationMs: presentationWaitDurationMs(resolved.command),
+              expectedTasks: [],
               ...(stringParam(resolved.command, "target") ? { target: stringParam(resolved.command, "target") } : {})
             }
           },

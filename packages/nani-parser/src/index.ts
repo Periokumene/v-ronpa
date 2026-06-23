@@ -1,5 +1,6 @@
 export type {
   AssetRef,
+  CommandArgIR,
   CommandIR,
   CommentIR,
   ConditionIR,
@@ -18,6 +19,7 @@ export type {
 } from "./types";
 import type {
   CommandIR,
+  CommandArgIR,
   Diagnostic,
   NaniValue,
   ParseScenarioInput,
@@ -192,6 +194,7 @@ function findClosingBracket(text: string, start: number): number {
 function parseCommand(source: string, loc: SourceLocation): CommandIR {
   const parts = splitCommandParts(source);
   const commandId = (parts.shift() ?? "noop").toLowerCase();
+  const args: CommandArgIR[] = [];
   const params: Record<string, NaniValue> = {};
   const flags: Record<string, boolean> = {};
   let primary: NaniValue | undefined;
@@ -200,12 +203,16 @@ function parseCommand(source: string, loc: SourceLocation): CommandIR {
 
   for (const part of parts) {
     if (part.endsWith("!") && !part.startsWith("!")) {
-      flags[part.slice(0, -1)] = true;
+      const key = part.slice(0, -1);
+      args.push({ kind: "flag", raw: part, key, value: true });
+      flags[key] = true;
       continue;
     }
 
     if (part.startsWith("!") && part.length > 1) {
-      flags[part.slice(1)] = false;
+      const key = part.slice(1);
+      args.push({ kind: "flag", raw: part, key, value: false });
+      flags[key] = false;
       continue;
     }
 
@@ -213,26 +220,27 @@ function parseCommand(source: string, loc: SourceLocation): CommandIR {
     if (colon > 0) {
       const key = part.slice(0, colon);
       const value = part.slice(colon + 1);
-      if (!primary && shouldTreatColonPartAsPrimary(commandId, key)) {
-        primary = parseValue(part);
-        continue;
-      }
+      const parsedValue = parseValue(value);
+      args.push({ kind: "param", raw: part, key, value: parsedValue });
       if (key === "if") {
         condition = { source: unwrapExpression(value) };
       } else if (key === "unless") {
         unless = { source: unwrapExpression(value) };
       } else {
-        params[key] = parseValue(value);
+        params[key] = parsedValue;
       }
       continue;
     }
 
-    primary ??= parseValue(part);
+    const parsedValue = parseValue(part);
+    args.push({ kind: "value", raw: part, value: parsedValue });
+    primary ??= parsedValue;
   }
 
   const command: CommandIR = {
     kind: "command",
     commandId,
+    args,
     params,
     flags,
     loc
@@ -242,144 +250,6 @@ function parseCommand(source: string, loc: SourceLocation): CommandIR {
   if (unless) command.unless = unless;
   return command;
 }
-
-function shouldTreatColonPartAsPrimary(commandId: string, key: string): boolean {
-  if (commandId === "set") return false;
-  if (key === "if" || key === "unless") return false;
-  return !knownParameterKeys.has(key.toLowerCase());
-}
-
-const knownParameterKeys = new Set(
-  [
-    "additive",
-    "allowToggle",
-    "anchor",
-    "appearance",
-    "appearanceAndTransition",
-    "append",
-    "as",
-    "assetId",
-    "at",
-    "author",
-    "authorId",
-    "avatar",
-    "bgmPath",
-    "block",
-    "button",
-    "charIdAndAllow",
-    "choiceSummary",
-    "color",
-    "complete",
-    "count",
-    "default",
-    "delta",
-    "deltaPower",
-    "deltaTime",
-    "destroy",
-    "dissolve",
-    "dist",
-    "duration",
-    "effect",
-    "easing",
-    "enable",
-    "evidence",
-    "evidenceId",
-    "exclude",
-    "expression",
-    "fade",
-    "fadeTime",
-    "from",
-    "goto",
-    "gosub",
-    "gravity",
-    "group",
-    "handler",
-    "handlerId",
-    "hide",
-    "hideOther",
-    "hold",
-    "hor",
-    "id",
-    "idAndAppearance",
-    "inputEnabled",
-    "intensity",
-    "intro",
-    "item",
-    "itemId",
-    "lazy",
-    "lock",
-    "look",
-    "loop",
-    "moviePath",
-    "name",
-    "nostop",
-    "offset",
-    "only",
-    "ortho",
-    "path",
-    "params",
-    "pause",
-    "portrait",
-    "pos",
-    "pose",
-    "position",
-    "power",
-    "printer",
-    "printerId",
-    "quantity",
-    "release",
-    "reset",
-    "restart",
-    "resume",
-    "roll",
-    "rotation",
-    "scale",
-    "sceneName",
-    "set",
-    "sfxPath",
-    "show",
-    "skill",
-    "skillId",
-    "slot",
-    "speaker",
-    "speed",
-    "status",
-    "stop",
-    "summary",
-    "target",
-    "templates",
-    "text",
-    "time",
-    "tint",
-    "to",
-    "toggle",
-    "trackId",
-    "transition",
-    "type",
-    "uINames",
-    "uRL",
-    "value",
-    "variableName",
-    "ver",
-    "via",
-    "visible",
-    "voicePath",
-    "volume",
-    "wait",
-    "waitInput",
-    "waitMode",
-    "weight",
-    "xSpeed",
-    "ySpeed",
-    "zone",
-    "zoom",
-    "actorId",
-    "actorIds",
-    "characterId",
-    "characterPositions",
-    "inputEnabled"
-  ].map((key) => key.toLowerCase())
-);
 
 function splitCommandParts(source: string): string[] {
   const parts: string[] = [];
@@ -446,12 +316,13 @@ function collectCommandMetadata(
   dependencies: ScenarioIR["dependencies"]
 ): void {
   const assetKind = commandAssetKinds[command.commandId];
-  if (assetKind && command.primary?.type === "string") {
-    assets.push({ id: command.primary.value, kind: assetKind });
+  const firstArgValue = firstCommandArgValue(command);
+  if (assetKind && firstArgValue?.type === "string") {
+    assets.push({ id: firstArgValue.value, kind: assetKind });
   }
 
-  if ((command.commandId === "goto" || command.commandId === "call") && command.primary?.type === "raw") {
-    const endpoint = command.primary.value;
+  if ((command.commandId === "goto" || command.commandId === "call") && firstArgValue?.type === "raw") {
+    const endpoint = firstArgValue.value;
     if (!endpoint.startsWith("#")) dependencies.push({ endpoint });
   }
 }
@@ -497,14 +368,26 @@ function collectCommandLocalLabelReferenceDiagnostics(
 function localLabelTargetsForCommand(command: CommandIR): string[] {
   const targets: string[] = [];
 
-  if (command.primary?.type === "raw" && command.primary.value.startsWith("#")) {
-    targets.push(command.primary.value);
+  const firstArgValue = firstCommandArgValue(command);
+  if (firstArgValue?.type === "raw" && firstArgValue.value.startsWith("#")) {
+    targets.push(firstArgValue.value);
   }
 
   const goto = command.params.goto;
   if (goto) collectLocalLabelTargetsFromValue(goto, targets);
 
   return targets;
+}
+
+function firstCommandArgValue(command: CommandIR): NaniValue | undefined {
+  const first = command.args.find((arg) => arg.kind === "value" || (arg.kind === "param" && !isConditionArgKey(arg.key)));
+  if (!first) return command.primary;
+  return first.kind === "value" ? first.value : parseValue(first.raw);
+}
+
+function isConditionArgKey(key: string): boolean {
+  const normalized = key.toLowerCase();
+  return normalized === "if" || normalized === "unless";
 }
 
 function collectLocalLabelTargetsFromValue(value: NaniValue, targets: string[]): void {

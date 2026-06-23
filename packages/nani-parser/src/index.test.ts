@@ -78,6 +78,17 @@ describe("nani parser", () => {
           },
           {
             "command": {
+              "args": [
+                {
+                  "key": "speed",
+                  "kind": "param",
+                  "raw": "speed:0.5",
+                  "value": {
+                    "type": "number",
+                    "value": 0.5,
+                  },
+                },
+              ],
               "commandId": "<",
               "flags": {},
               "inlineIndex": 1,
@@ -103,6 +114,7 @@ describe("nani parser", () => {
           },
           {
             "command": {
+              "args": [],
               "commandId": ">",
               "flags": {},
               "inlineIndex": 3,
@@ -154,9 +166,10 @@ describe("nani parser", () => {
               "commandId": "back",
               "line": 7,
               "params": {
+                "bg": "harness",
                 "effect": "fade",
               },
-              "primary": "bg:harness",
+              "primary": undefined,
             },
             {
               "commandId": "char",
@@ -322,9 +335,10 @@ describe("nani parser", () => {
               "commandId": "back",
               "line": 7,
               "params": {
+                "bg": "trial-room",
                 "effect": "fade",
               },
-              "primary": "bg:trial-room",
+              "primary": undefined,
             },
             {
               "commandId": "char",
@@ -354,9 +368,10 @@ describe("nani parser", () => {
               "commandId": "focus",
               "line": 11,
               "params": {
+                "character": "mira",
                 "duration": 420,
               },
-              "primary": "character:mira",
+              "primary": undefined,
             },
             {
               "commandId": "choice",
@@ -525,6 +540,7 @@ describe("nani parser", () => {
       sourceText: `#Start
 @choice "Known choice" goto:#Known
 @goto #Known
+@goto if:{ready} #Known
 #Known
 @end`,
       scriptPath: "known-local-label.nani"
@@ -582,6 +598,27 @@ describe("nani parser", () => {
           zoom: "fast"
         }
       }
+    ]);
+  });
+
+  it("preserves ordered args for colon-like primary values, flags, and command conditions", () => {
+    const result = parseScenario({
+      sourceText: "@back bg:harness if:{showBg} wait! !lazy",
+      scriptPath: "ordered-args.nani"
+    });
+    const command = result.scenario.statements[0] as CommandIR;
+
+    expect(result.diagnostics).toEqual([]);
+    expect(command.primary).toBeUndefined();
+    expect(command.params).toEqual({
+      bg: { type: "string", value: "harness" }
+    });
+    expect(command.condition).toEqual({ source: "showBg" });
+    expect(command.args).toEqual([
+      { kind: "param", raw: "bg:harness", key: "bg", value: { type: "string", value: "harness" } },
+      { kind: "param", raw: "if:{showBg}", key: "if", value: { type: "expression", source: "showBg" } },
+      { kind: "flag", raw: "wait!", key: "wait", value: true },
+      { kind: "flag", raw: "!lazy", key: "lazy", value: false }
     ]);
   });
 });

@@ -40,9 +40,10 @@ hints, tween progress, and effect overlays are not persisted. Loading a save
 renders the saved snapshot with animation disabled and an empty active task
 list.
 
-This CCR does not complete `wait:true` / `wait!` semantics. Existing
-presentation-wait behavior remains timer-based until a later task wires
-StoryEngine resume to real Pixi completion.
+This CCR originally did not complete `wait:true` / `wait!` semantics. The
+follow-up CCR `docs/ccr/pixi-wait-parser-compiler-control-flow.md` wires
+StoryEngine presentation waits to real Pixi task completion with duration as a
+fallback diagnostic only.
 
 ## Fixtures And Tests
 

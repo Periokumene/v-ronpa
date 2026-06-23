@@ -111,8 +111,9 @@ commands reach app adapters.
 
 Command declarations live in the contracts `commandCatalog`. The catalog stores
 Naninovel canonical names, lowercase runtime ids, categories, parameter specs,
-children support, implementation status, and command source. The compiler
-derives validation and normalization from it.
+children support, implementation status, command source, and execution
+boundary. The compiler derives validation, primary/param binding, and
+normalization from it.
 
 Story scripts can emit gameplay runtime commands, for example
 `@gameplay grant-evidence id:evidence:keycard`. These events can update
@@ -127,9 +128,15 @@ submission remains a Trial UI action routed through `trial-director`.
   -> story-play playback state + pacing schedule
   -> VN runtime transaction + route table
   -> routed RuntimeCommand consumption
-  -> PixiStageSnapshot / PixiStageRenderHint / gameplay events
+  -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events
   -> VnRuntimeDispatcher renders DOM dialog and Pixi snapshot
 ```
+
+For Pixi presentation commands, `wait!` is opt-in. StoryEngine creates a
+presentation wait, app transaction code attaches Pixi expected task descriptors,
+and Pixi task completion resumes the story. Manual continue during a wait
+settles Pixi to the terminal snapshot before resuming; saved data still stores
+only the terminal `PixiStageSnapshot`.
 
 See also:
 

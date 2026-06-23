@@ -31,10 +31,22 @@ the handler does not consume yet may still produce an
 `unsupported-command-param` warning. That warning is expected and does not
 demote the command unless the supported V-Ronpa behavior is no longer covered.
 
-Pixi `PresentationTask` debug snapshots do not change `wait:true` / `wait!`
-script semantics in this baseline. Pixi can now observe renderer-side effect
-completion internally, but StoryEngine resume is still not driven by real Pixi
-task completion until the dedicated wait follow-up is implemented.
+Command definitions also expose an `execution` boundary:
+
+- `story-control`: consumed by StoryEngine and normally not emitted downstream.
+- `pixi-presentation`: emitted as presentation work and eligible for Pixi
+  `wait!` task synchronization.
+- `gameplay`: emitted as typed gameplay event input.
+- `declared-only`: catalog-declared for compatibility, but outside the current
+  execution boundary. The compiler diagnoses these commands instead of silently
+  pretending to support them.
+
+Pixi `wait:true` / `wait!` follows the current V-Ronpa/Naninovel baseline:
+Wait By Default is false, only explicit wait flags block, and Complete On
+Continue is true. StoryEngine creates a `presentationWait`, app transaction
+code enriches it with Pixi `expectedTasks`, and Pixi task completion resumes the
+story. Duration is retained as a fallback diagnostic timeout, not as the primary
+release mechanism.
 
 ## Categories
 
@@ -57,8 +69,9 @@ task completion until the dedicated wait follow-up is implemented.
   catalog. This keeps the official parameter list auditable.
 - `nani-runtime-compiler` binds catalog metadata to compiled RuntimeCommand
   output. It rejects or diagnoses commands and params against the catalog.
-- Parser IR remains generic. It preserves known parameter names, but the runtime
-  compiler owns catalog-derived parameter validation and normalization.
+- Parser IR remains generic. It preserves ordered command args with raw token
+  text plus compatibility `primary`/`params`/`flags`; the runtime compiler owns
+  catalog-derived primary-vs-param decisions, validation, and normalization.
 - Implemented RuntimeCommand params use canonical runtime field names only.
   Raw aliases stay in `sourceCommand`.
 - `{...}` parameter expressions are preserved by the compiler and evaluated by

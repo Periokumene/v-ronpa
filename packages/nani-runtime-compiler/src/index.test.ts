@@ -35,11 +35,11 @@ describe("nani runtime compiler", () => {
       }),
       expect.objectContaining({
         commandId: "flash",
-        params: expect.objectContaining({ color: "#fff", duration: 120 })
+        params: expect.objectContaining({ color: "#fff", durationMs: 120, wait: false })
       })
     ]);
     expect(result.script.commands[0]?.params).not.toHaveProperty("backgroundId");
-    expect(result.script.commands[1]?.params).not.toHaveProperty("durationMs");
+    expect(result.script.commands[1]?.params).not.toHaveProperty("duration");
   });
 
   it("normalizes aliases, defaults, flags, and labels", () => {
@@ -107,7 +107,8 @@ describe("nani runtime compiler", () => {
     expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
     expect(result.script.commands[0]?.params).toEqual({
       color: "#fff",
-      duration: { type: "expression", source: "flashDuration" }
+      durationMs: { type: "expression", source: "flashDuration" },
+      wait: false
     });
     expect(result.script.commands[1]?.params).toEqual({
       target: "hero",
@@ -130,7 +131,11 @@ describe("nani runtime compiler", () => {
 
   it("compiles command conditions and unless expressions onto runtime commands", () => {
     const { scenario } = parseScenario({
-      sourceText: ["@choice \"Open\" goto:#Open if:{affinity>=3}", "@flash duration:120 unless:{flashDisabled}"].join("\n"),
+      sourceText: [
+        "@back bg:harness if:{showBg}",
+        "@choice \"Open\" goto:#Open if:{affinity>=3}",
+        "@flash duration:120 unless:{flashDisabled}"
+      ].join("\n"),
       scriptPath: "conditions.nani"
     });
     const result = compileRuntimeScript(scenario);
@@ -138,11 +143,22 @@ describe("nani runtime compiler", () => {
     expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
     expect(result.script.commands[0]).toEqual(
       expect.objectContaining({
+        commandId: "back",
+        condition: { type: "expression", source: "showBg" },
+        params: expect.objectContaining({ appearance: "bg:harness" }),
+        sourceCommand: expect.objectContaining({
+          rawPrimary: "bg:harness",
+          rawParams: {}
+        })
+      })
+    );
+    expect(result.script.commands[1]).toEqual(
+      expect.objectContaining({
         commandId: "choice",
         condition: { type: "expression", source: "affinity>=3" }
       })
     );
-    expect(result.script.commands[1]).toEqual(
+    expect(result.script.commands[2]).toEqual(
       expect.objectContaining({
         commandId: "flash",
         unless: { type: "expression", source: "flashDisabled" }
@@ -182,6 +198,49 @@ describe("nani runtime compiler", () => {
         severity: "error"
       }
     ]);
+  });
+
+  it("diagnoses declared-only Naninovel async track commands without skipping compilation", () => {
+    const { scenario } = parseScenario({
+      sourceText: "@async CameraPan loop!",
+      scriptPath: "declared-only.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.script.commands).toHaveLength(1);
+    expect(result.script.commands[0]).toEqual(
+      expect.objectContaining({
+        commandId: "async",
+        status: "stubbed",
+        params: expect.objectContaining({ primary: "CameraPan", loop: true })
+      })
+    );
+    expect(result.diagnostics).toContainEqual({
+      code: "declared-only-command",
+      message: "@async is declared for Naninovel compatibility, but this runtime does not implement its execution boundary yet.",
+      severity: "warning"
+    });
+  });
+
+  it("diagnoses shake loop as an unsupported Pixi boundary instead of silently approximating it", () => {
+    const { scenario } = parseScenario({
+      sourceText: "@shake Camera loop! wait!",
+      scriptPath: "shake-loop.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.script.commands[0]).toEqual(
+      expect.objectContaining({
+        commandId: "shake",
+        params: expect.objectContaining({ target: "Camera", loop: true, wait: true })
+      })
+    );
+    expect(result.diagnostics).toContainEqual({
+      code: "unsupported-command-param",
+      message:
+        "@shake loop! is declared by Naninovel, but this Pixi runtime does not implement indefinite loop effects in the main story track; the command is diagnosed instead of approximated.",
+      severity: "warning"
+    });
   });
 
 });

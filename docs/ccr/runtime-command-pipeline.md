@@ -32,9 +32,10 @@ own.
   raw aliases remain in `sourceCommand`.
 - `RuntimeCommand` may carry `condition` and `unless` expressions compiled from
   parser `CommandIR`.
-- RuntimeCommand effect durations use `params.duration`; Pixi render hints may
-  keep renderer-local `durationMs`, but the app dispatch input remains
-  `RuntimeCommand`.
+- RuntimeCommand effect durations originally used `params.duration`; later Pixi
+  presentation compiler work canonicalized Pixi timing to `params.durationMs`
+  while keeping V-Ronpa `duration` as a compatibility script input. The app
+  dispatch input remains `RuntimeCommand`.
 - `RuntimeScript` carries compiled commands, labels, assets, and dependencies.
 - StoryEngine state remains saveable story state only. Stepper results carry the
   current step's emitted runtime commands, and save data does not persist command

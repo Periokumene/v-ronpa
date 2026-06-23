@@ -87,11 +87,13 @@ describe("pixi presenter port", () => {
     expect(reducePixiRuntimeCommand(initial, flash)).toEqual({
       snapshot: initial,
       hints: [{ type: "flash", color: "#ffffff", durationMs: 160, wait: false }],
+      waitTasks: [],
       diagnostics: []
     });
     expect(reducePixiRuntimeCommand(initial, keyword)).toEqual({
       snapshot: initial,
       hints: [{ type: "trial-keyword", keywordId: "kw:door", text: "locked", evidenceId: "evidence:keycard" }],
+      waitTasks: [],
       diagnostics: []
     });
   });
@@ -102,6 +104,7 @@ describe("pixi presenter port", () => {
     expect(reducePixiRuntimeCommand(initial, runtimeCommand("focus", "effect", { target: "stage", duration: 500 }))).toEqual({
       snapshot: initial,
       hints: [],
+      waitTasks: [],
       diagnostics: [
         {
           code: "unsupported-pixi-command",
@@ -118,6 +121,7 @@ describe("pixi presenter port", () => {
     expect(reducePixiRuntimeCommand(initial, runtimeCommand("back", "scene", {}))).toEqual({
       snapshot: initial,
       hints: [],
+      waitTasks: [],
       diagnostics: [
         {
           code: "unsupported-pixi-params",
@@ -131,6 +135,7 @@ describe("pixi presenter port", () => {
     ).toEqual({
       snapshot: initial,
       hints: [],
+      waitTasks: [],
       diagnostics: [
         {
           code: "unsupported-pixi-params",
@@ -155,6 +160,7 @@ describe("pixi presenter port", () => {
     ).toEqual({
       snapshot: initial,
       hints: [],
+      waitTasks: [],
       diagnostics: [
         {
           code: "unresolved-runtime-expression",
@@ -311,6 +317,72 @@ describe("pixi presenter port", () => {
         from: [0.15, 0.5],
         to: [0.85, 0]
       }
+    });
+  });
+
+  it("returns wait task descriptors for waitable Pixi presentation commands", () => {
+    const withActor = reducePixiRuntimeCommand(
+      createInitialPixiStageSnapshot(),
+      runtimeCommand("char", "actor", {
+        target: "character:felix",
+        appearance: "portrait:felix:neutral",
+        durationMs: 400,
+        wait: true
+      })
+    );
+    expect(withActor.waitTasks).toEqual([
+      { kind: "actor-transition", target: "character:felix", revision: withActor.snapshot.revision }
+    ]);
+
+    const flash = reducePixiRuntimeCommand(
+      withActor.snapshot,
+      runtimeCommand("flash", "effect", { color: "#ffffff", durationMs: 120, wait: true })
+    );
+    expect(flash.waitTasks).toEqual([{ kind: "flash", target: "screen", revision: withActor.snapshot.revision }]);
+
+    const rain = reducePixiRuntimeCommand(
+      withActor.snapshot,
+      runtimeCommand("rain", "effect", { power: 0.6, durationMs: 300, wait: true })
+    );
+    expect(rain.waitTasks).toEqual([{ kind: "weather-transition", target: "rain", revision: rain.snapshot.revision }]);
+
+    const rainOff = reducePixiRuntimeCommand(
+      rain.snapshot,
+      runtimeCommand("rain", "effect", { power: 0, durationMs: 300, wait: true })
+    );
+    expect(rainOff.snapshot.weather).not.toHaveProperty("rain");
+    expect(rainOff.hints).toEqual([{ type: "weather-remove", kind: "rain", durationMs: 300, wait: true }]);
+    expect(rainOff.waitTasks).toEqual([{ kind: "weather-transition", target: "rain", revision: rainOff.snapshot.revision }]);
+
+    const inactiveWeatherOff = reducePixiRuntimeCommand(
+      withActor.snapshot,
+      runtimeCommand("snow", "effect", { power: 0, durationMs: 300, wait: true })
+    );
+    expect(inactiveWeatherOff.hints).toEqual([]);
+    expect(inactiveWeatherOff.waitTasks).toEqual([]);
+
+    const inactiveBokehOff = reducePixiRuntimeCommand(
+      withActor.snapshot,
+      runtimeCommand("bokeh", "effect", { power: 0, durationMs: 300, wait: true })
+    );
+    expect(inactiveBokehOff.waitTasks).toEqual([]);
+  });
+
+  it("diagnoses unsupported loop shake instead of creating a finite approximation", () => {
+    const initial = createInitialPixiStageSnapshot();
+
+    expect(reducePixiRuntimeCommand(initial, runtimeCommand("shake", "effect", { target: "stage", loop: true, wait: true }))).toEqual({
+      snapshot: initial,
+      hints: [],
+      waitTasks: [],
+      diagnostics: [
+        {
+          code: "unsupported-pixi-params",
+          commandId: "shake",
+          message:
+            "@shake is routed to Pixi but cannot be consumed: @shake loop! is not implemented by this Pixi runtime; disable loop or issue a finite shake."
+        }
+      ]
     });
   });
 

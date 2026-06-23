@@ -173,6 +173,7 @@ export class ActorSystem {
     const contentKey = `${actor.kind}:${actor.appearance ?? "missing"}:${actor.pose ?? ""}`;
     const shouldAnimate = animate && actor.transition.durationMs > 0;
     const transition = shouldAnimate ? this.createActorTransitionScheduler(actor, revision) : undefined;
+    const filtersChanged = !sameActorFilters(actor.filters, previous.filters);
     let contentAlphaAnimated = false;
     if (record.contentKey !== contentKey) {
       record.contentGeneration += 1;
@@ -193,6 +194,12 @@ export class ActorSystem {
       }
     }
     this.applyTransform(record.container, actor, previous, animate, transition, contentAlphaAnimated);
+    if (shouldAnimate && filtersChanged) {
+      transition?.tween({ value: 0 }, { value: 1 }, actor.transition.durationMs, actor.transition.easing);
+    }
+    if (shouldAnimate && actor.transition.wait && transition && !transition.hasWork()) {
+      transition.tween({ value: 0 }, { value: 1 }, actor.transition.durationMs, actor.transition.easing);
+    }
     record.actor = actor;
     this.filters.applyActorFilters(record.container, actor);
   }
@@ -225,6 +232,7 @@ export class ActorSystem {
       easingName?: string,
       onComplete?: () => void
     ) => void;
+    hasWork: () => boolean;
   } {
     let task: PixiPresentationTaskHandle | undefined;
     let pending = 0;
@@ -245,6 +253,7 @@ export class ActorSystem {
       return task;
     };
     return {
+      hasWork: () => pending > 0 || Boolean(task),
       tween: (target, to, durationMs, easingName, onComplete) => {
         ensureTask();
         pending += 1;
@@ -340,6 +349,13 @@ export class ActorSystem {
     const target = this.toScreenPosition(actor, actor.pos);
     const shouldAnimate = animate && actor.transition.durationMs > 0;
     const targetAlpha = actor.visible ? actor.alpha : 0;
+    if (shouldAnimate && !actor.transition.lazy) {
+      const previousTarget = this.toScreenPosition(previous, previous.pos);
+      container.x = previousTarget.x;
+      container.y = previousTarget.y;
+      container.alpha = previous.visible ? previous.alpha : 0;
+      container.visible = previous.visible || actor.visible;
+    }
     container.visible = actor.visible || (shouldAnimate && previous.visible);
     container.zIndex = actor.z;
     if (shouldAnimate && (actor.transition.name === "slide" || !sameVector2(actor.pos, previous.pos))) {
@@ -414,7 +430,12 @@ export class WeatherSystem {
     options.root.addChild(this.backLayer, this.frontLayer);
   }
 
-  reconcile(snapshot: PixiStageSnapshot, animate: boolean): void {
+  reconcile(snapshot: PixiStageSnapshot, animate: boolean, hints: PixiStageRenderHint[] = []): void {
+    const removalHints = new Map(
+      hints
+        .filter((hint): hint is Extract<PixiStageRenderHint, { type: "weather-remove" }> => hint.type === "weather-remove")
+        .map((hint) => [hint.kind, hint])
+    );
     for (const [kind, weather] of Object.entries(snapshot.weather)) {
       if (weather.power <= 0) {
         this.remove(kind);
@@ -423,7 +444,10 @@ export class WeatherSystem {
       this.upsert(kind, weather, animate, snapshot.revision);
     }
     for (const kind of [...this.records.keys()]) {
-      if (!snapshot.weather[kind as keyof typeof snapshot.weather]) this.remove(kind);
+      if (snapshot.weather[kind as keyof typeof snapshot.weather]) continue;
+      const removal = removalHints.get(kind as PixiWeatherSnapshot["kind"]);
+      if (animate && removal && removal.durationMs > 0) this.fadeOutAndRemove(kind, removal, snapshot.revision);
+      else this.remove(kind);
     }
   }
 
@@ -562,10 +586,43 @@ export class WeatherSystem {
     });
   }
 
-  private remove(kind: string): void {
+  private fadeOutAndRemove(
+    kind: string,
+    hint: Extract<PixiStageRenderHint, { type: "weather-remove" }>,
+    revision: number
+  ): void {
     const record = this.records.get(kind);
     if (!record) return;
-    this.tasks.cancelTarget(kind);
+    let handle: TweenHandle | undefined;
+    const cleanup = () => {
+      handle?.stop();
+      this.remove(kind, false);
+    };
+    const task = this.tasks.start({
+      kind: "weather-transition",
+      target: kind,
+      revision,
+      durationMs: hint.durationMs,
+      onCancel: cleanup,
+      onSettle: cleanup
+    });
+    handle = this.tweens.tween(
+      record.container as unknown as Record<string, number>,
+      { alpha: 0 },
+      hint.durationMs,
+      hint.easing,
+      () => {
+        if (!task.isCurrent()) return;
+        this.remove(kind, false);
+        task.complete();
+      }
+    );
+  }
+
+  private remove(kind: string, cancelTasks = true): void {
+    const record = this.records.get(kind);
+    if (!record) return;
+    if (cancelTasks) this.tasks.cancelTarget(kind);
     record.container.removeFromParent();
     record.container.destroy({ children: true });
     this.records.delete(kind);
@@ -933,6 +990,10 @@ function sameVector2(left: [number, number] | undefined, right: [number, number]
   if (!left && !right) return true;
   if (!left || !right) return false;
   return Math.abs(left[0] - right[0]) < 0.0001 && Math.abs(left[1] - right[1]) < 0.0001;
+}
+
+function sameActorFilters(left: PixiActorSnapshot["filters"], right: PixiActorSnapshot["filters"]): boolean {
+  return Math.abs((left.blur ?? 0) - (right.blur ?? 0)) < 0.0001 && Math.abs((left.bokeh ?? 0) - (right.bokeh ?? 0)) < 0.0001;
 }
 
 function fitSprite(sprite: Sprite, texture: Texture, maxWidth: number, maxHeight: number): void {

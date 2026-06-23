@@ -36,7 +36,9 @@ commands, so `wait:true` cannot be honored.
 - Legacy `background` and `slots` fields remain temporarily as app/harness
   readout compatibility fields; Pixi rendering should read actor tables.
 - `StoryRuntimeSnapshot` may include `presentationWait` with command id,
-  duration, and optional target.
+  duration, and optional target. The follow-up wait/control-flow CCR extends
+  this shape with command index, stage revision, and Pixi expected task
+  descriptors for renderer-driven completion.
 - Story execution may stop with a presentation wait result when an implemented
   presentation command has `wait:true`.
 - `charenter` is no longer the preferred runtime surface. Official `char`

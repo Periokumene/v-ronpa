@@ -130,7 +130,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
       effects?.clear();
     }
     actors?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision);
-    weather?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision);
+    weather?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision, reconcileOptions.hints ?? []);
     screenOverlays?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision);
     filters.applyScreenFilters(stageRoot, snapshot);
     effects?.clearTrialOverlays();

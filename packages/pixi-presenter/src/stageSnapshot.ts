@@ -4,11 +4,13 @@ import type {
   PixiStageSlotId,
   PixiWeatherKind,
   RuntimeCommand,
-  RuntimeValue
+  RuntimeValue,
+  StoryPresentationWaitTask
 } from "@v-ronpa/contracts";
 
 export type PixiStageRenderHint =
   | { type: "flash"; color: string; durationMs: number; wait?: boolean }
+  | { type: "weather-remove"; kind: PixiWeatherKind; durationMs: number; easing?: string; wait?: boolean }
   | {
       type: "shake";
       target: string;
@@ -54,6 +56,7 @@ export interface PixiRuntimeCommandDiagnostic {
 export interface PixiRuntimeCommandReduction {
   snapshot: PixiStageSnapshot;
   hints: PixiStageRenderHint[];
+  waitTasks: StoryPresentationWaitTask[];
   diagnostics: PixiRuntimeCommandDiagnostic[];
 }
 
@@ -91,6 +94,7 @@ export function reducePixiRuntimeCommand(
     return {
       snapshot,
       hints: [],
+      waitTasks: [],
       diagnostics: [
         {
           code: "unresolved-runtime-expression",
@@ -131,10 +135,14 @@ export function reducePixiRuntimeCommand(
             wait: booleanParam(command, "wait", false)
           }
         ],
+        waitTasks: waitTask(command, "flash", "screen", snapshot.revision),
         diagnostics: []
       };
     case "shake":
       {
+        if (booleanParam(command, "loop", false)) {
+          return unsupportedPixiParams(snapshot, command, "@shake loop! is not implemented by this Pixi runtime; disable loop or issue a finite shake");
+        }
         const deltaTimeMs = numberParam(command, "deltaTime");
         const deltaPower = numberParam(command, "deltaPower");
         const hint: Extract<PixiStageRenderHint, { type: "shake" }> = {
@@ -153,6 +161,7 @@ export function reducePixiRuntimeCommand(
         return {
           snapshot,
           hints: [hint],
+          waitTasks: waitTask(command, "shake", hint.target, snapshot.revision),
           diagnostics: []
         };
       }
@@ -167,6 +176,7 @@ export function reducePixiRuntimeCommand(
             wait: booleanParam(command, "wait", false)
           }
         ],
+        waitTasks: waitTask(command, "glitch", "screen", snapshot.revision),
         diagnostics: []
       };
     case "trialkeyword":
@@ -238,24 +248,24 @@ function reduceBack(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiR
   });
   if (target === "*") {
     const visibleBackgrounds = Object.values(snapshot.backgroundsById).filter((actor) => actor.visible);
-    if (visibleBackgrounds.length === 0) return { snapshot, hints: [], diagnostics: [] };
+    if (visibleBackgrounds.length === 0) return emptyReduction(snapshot);
     const backgroundsById = { ...snapshot.backgroundsById };
     for (const actor of visibleBackgrounds) backgroundsById[actor.id] = updateActor(actor.id, actor);
-    return changedSnapshot({
+    return withWaitTasks(command, changedSnapshot({
       ...snapshot,
       backgroundsById,
       background: backgroundsById[MAIN_BACKGROUND_ID]?.appearance ? { backgroundId: backgroundsById[MAIN_BACKGROUND_ID].appearance } : snapshot.background
-    });
+    }), "actor-transition", visibleBackgrounds.map((actor) => actor.id));
   }
   const actor: PixiActorSnapshot = {
     ...updateActor(target, previous)
   };
-  return changedSnapshot({
+  return withWaitTasks(command, changedSnapshot({
     ...snapshot,
     backgroundsById: { ...snapshot.backgroundsById, [target]: actor },
     actorOrder: ensureActorOrder(snapshot.actorOrder, target),
     ...(target === MAIN_BACKGROUND_ID ? { background: { backgroundId: appearance } } : {})
-  });
+  }), "actor-transition", [target]);
 }
 
 function reduceChar(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
@@ -266,22 +276,22 @@ function reduceChar(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiR
     const visibleActors = snapshot.actorOrder
       .map((id) => snapshot.charactersById[id])
       .filter((actor): actor is PixiActorSnapshot => Boolean(actor?.visible));
-    if (visibleActors.length === 0) return { snapshot, hints: [], diagnostics: [] };
+    if (visibleActors.length === 0) return emptyReduction(snapshot);
     const charactersById = { ...snapshot.charactersById };
     for (const actor of visibleActors) {
       charactersById[actor.id] = buildCharacterActor(snapshot, command, actor.id, transform, actor);
     }
-    return changedSnapshot(withLegacySlots({ ...snapshot, charactersById }));
+    return withWaitTasks(command, changedSnapshot(withLegacySlots({ ...snapshot, charactersById })), "actor-transition", visibleActors.map((actor) => actor.id));
   }
   const previous = snapshot.charactersById[target];
   const actor = buildCharacterActor(snapshot, command, target, transform, previous);
-  return changedSnapshot(
+  return withWaitTasks(command, changedSnapshot(
     withLegacySlots({
       ...snapshot,
       charactersById: { ...snapshot.charactersById, [target]: actor },
       actorOrder: ensureActorOrder(snapshot.actorOrder, target)
     })
-  );
+  ), "actor-transition", [target]);
 }
 
 function reduceArrange(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
@@ -303,7 +313,7 @@ function reduceArrange(snapshot: PixiStageSnapshot, command: RuntimeCommand): Pi
     };
   });
 
-  return changedSnapshot(withLegacySlots({ ...snapshot, charactersById }));
+  return withWaitTasks(command, changedSnapshot(withLegacySlots({ ...snapshot, charactersById })), "actor-transition", visibleActors.map((actor) => actor.id));
 }
 
 function reduceHideChars(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
@@ -313,7 +323,7 @@ function reduceHideChars(snapshot: PixiStageSnapshot, command: RuntimeCommand): 
       { ...actor, visible: false, transition: timingTransition(command) }
     ])
   );
-  return changedSnapshot(withLegacySlots({ ...snapshot, charactersById }));
+  return withWaitTasks(command, changedSnapshot(withLegacySlots({ ...snapshot, charactersById })), "actor-transition", Object.keys(snapshot.charactersById));
 }
 
 function reduceSlide(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
@@ -341,7 +351,7 @@ function reduceSlide(snapshot: PixiStageSnapshot, command: RuntimeCommand): Pixi
     actor.kind === "background"
       ? { ...snapshot, backgroundsById: { ...snapshot.backgroundsById, [target]: nextActor } }
       : { ...snapshot, charactersById: { ...snapshot.charactersById, [target]: nextActor } };
-  return changedSnapshot(withLegacySlots(next));
+  return withWaitTasks(command, changedSnapshot(withLegacySlots(next)), "actor-transition", [target]);
 }
 
 function reduceBlur(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
@@ -365,16 +375,18 @@ function reduceBlur(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiR
         ? { ...next, backgroundsById: { ...next.backgroundsById, [target]: updated } }
         : { ...next, charactersById: { ...next.charactersById, [target]: updated } };
   }
-  return changedSnapshot(next);
+  return withWaitTasks(command, changedSnapshot(next), "actor-transition", targets);
 }
 
 function reduceBokeh(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
   const power = numberParam(command, "power", 0);
   if (power <= 0) {
+    const hadBokeh = Boolean(snapshot.screenFilters.bokeh);
     const { bokeh: _bokeh, ...screenFilters } = snapshot.screenFilters;
-    return changedSnapshot({ ...snapshot, screenFilters });
+    const reduction = changedSnapshot({ ...snapshot, screenFilters });
+    return hadBokeh ? withWaitTasks(command, reduction, "screen-filter-transition", ["bokeh"]) : reduction;
   }
-  return changedSnapshot({
+  return withWaitTasks(command, changedSnapshot({
     ...snapshot,
     screenFilters: {
       ...snapshot.screenFilters,
@@ -385,17 +397,35 @@ function reduceBokeh(snapshot: PixiStageSnapshot, command: RuntimeCommand): Pixi
         transition: timingTransition(command)
       }
     }
-  });
+  }), "screen-filter-transition", ["bokeh"]);
 }
 
 function reduceWeather(snapshot: PixiStageSnapshot, command: RuntimeCommand, kind: PixiWeatherKind): PixiRuntimeCommandReduction {
   const power = numberParam(command, "power", 1);
   if (power <= 0) {
+    const hadWeather = Boolean(snapshot.weather[kind]);
     const weather = { ...snapshot.weather };
     delete weather[kind];
-    return changedSnapshot({ ...snapshot, weather });
+    const reduction = changedSnapshot({ ...snapshot, weather });
+    const durationMs = durationMsParam(command, 0);
+    if (!hadWeather) return reduction;
+    const easing = stringParam(command, "easing");
+    return {
+      ...withWaitTasks(command, reduction, "weather-transition", [kind]),
+      hints: durationMs > 0
+        ? [
+            {
+              type: "weather-remove",
+              kind,
+              durationMs,
+              ...(easing ? { easing } : {}),
+              wait: booleanParam(command, "wait", false)
+            }
+          ]
+        : []
+    };
   }
-  return changedSnapshot({
+  return withWaitTasks(command, changedSnapshot({
     ...snapshot,
     weather: {
       ...snapshot.weather,
@@ -411,7 +441,7 @@ function reduceWeather(snapshot: PixiStageSnapshot, command: RuntimeCommand, kin
         transition: timingTransition(command)
       }
     }
-  });
+  }), "weather-transition", [kind]);
 }
 
 function buildCharacterActor(
@@ -454,15 +484,43 @@ function reduceTrialKeyword(snapshot: PixiStageSnapshot, command: RuntimeCommand
   if (evidenceId) hint.evidenceId = evidenceId;
   const speakerId = stringParam(command, "speakerId");
   if (speakerId) hint.speakerId = speakerId;
-  return { snapshot, hints: [hint], diagnostics: [] };
+  return { snapshot, hints: [hint], waitTasks: [], diagnostics: [] };
 }
 
 function changedSnapshot(snapshot: PixiStageSnapshot): PixiRuntimeCommandReduction {
   return {
     snapshot: { ...snapshot, revision: snapshot.revision + 1 },
     hints: [],
+    waitTasks: [],
     diagnostics: []
   };
+}
+
+function emptyReduction(snapshot: PixiStageSnapshot): PixiRuntimeCommandReduction {
+  return { snapshot, hints: [], waitTasks: [], diagnostics: [] };
+}
+
+function withWaitTasks(
+  command: RuntimeCommand,
+  reduction: PixiRuntimeCommandReduction,
+  kind: StoryPresentationWaitTask["kind"],
+  targets: string[]
+): PixiRuntimeCommandReduction {
+  if (!booleanParam(command, "wait", false) || durationMsParam(command, 0) <= 0) return reduction;
+  return {
+    ...reduction,
+    waitTasks: targets.map((target) => ({ kind, target, revision: reduction.snapshot.revision }))
+  };
+}
+
+function waitTask(
+  command: RuntimeCommand,
+  kind: StoryPresentationWaitTask["kind"],
+  target: string,
+  revision: number
+): StoryPresentationWaitTask[] {
+  if (!booleanParam(command, "wait", false) || durationMsParam(command, 0) <= 0) return [];
+  return [{ kind, target, revision }];
 }
 
 function withLegacySlots(snapshot: PixiStageSnapshot): PixiStageSnapshot {
@@ -519,6 +577,7 @@ function unsupportedPixiCommand(snapshot: PixiStageSnapshot, command: RuntimeCom
   return {
     snapshot,
     hints: [],
+    waitTasks: [],
     diagnostics: [
       {
         code: "unsupported-pixi-command",
@@ -537,6 +596,7 @@ function unsupportedPixiParams(
   return {
     snapshot,
     hints: [],
+    waitTasks: [],
     diagnostics: [
       {
         code: "unsupported-pixi-params",

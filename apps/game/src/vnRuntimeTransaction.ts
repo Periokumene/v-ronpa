@@ -1,4 +1,4 @@
-import type { GameplayEvent, PixiStageSnapshot, RuntimeCommand, RuntimeValue } from "@v-ronpa/contracts";
+import type { GameplayEvent, PixiStageSnapshot, RuntimeCommand, RuntimeValue, StoryPresentationWaitTask } from "@v-ronpa/contracts";
 import {
   reducePixiRuntimeCommand,
   type PixiRuntimeCommandReduction,
@@ -21,6 +21,7 @@ export interface VnRuntimePresentationTransactionInput {
 export interface VnRuntimePresentationTransaction {
   pixiStage: PixiStageSnapshot;
   pixiHints: PixiStageRenderHint[];
+  pixiWaitTasks: StoryPresentationWaitTask[];
   gameplayEvents: GameplayEvent[];
   diagnostics: VnRuntimeTransactionDiagnostic[];
 }
@@ -53,10 +54,11 @@ export function createVnRuntimePresentationTransaction({
       return {
         snapshot: next.snapshot,
         hints: [...current.hints, ...next.hints],
+        waitTasks: [...current.waitTasks, ...next.waitTasks],
         diagnostics: [...current.diagnostics, ...next.diagnostics]
       };
     },
-    { snapshot: previousPixiStage, hints: [], diagnostics: [] }
+    { snapshot: previousPixiStage, hints: [], waitTasks: [], diagnostics: [] }
   );
   const gameplayEvents = selectRuntimeCommandsForTarget(runtimeCommands, "gameplay", routeTable, routeContext)
     .map(runtimeCommandToGameplayEvent)
@@ -65,6 +67,7 @@ export function createVnRuntimePresentationTransaction({
   return {
     pixiStage: pixiReduction.snapshot,
     pixiHints: pixiReduction.hints,
+    pixiWaitTasks: pixiReduction.waitTasks,
     gameplayEvents,
     diagnostics: [...diagnostics, ...pixiReduction.diagnostics]
   };

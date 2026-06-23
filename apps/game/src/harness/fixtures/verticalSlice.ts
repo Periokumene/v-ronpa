@@ -159,20 +159,20 @@ export const verticalSliceScript = `#Start
 @set route:"intro"
 @back bg:harness effect:fade time:0.15
 @char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
-Narrator: 视觉小说联调剧本：这是测试入口，不是剧情样例。请先确认背景和 Felix 中央立绘可见。[>]
+Narrator: CHECKPOINT 00 - baseline。视觉小说联调剧本：这是测试入口，不是剧情样例。请先确认背景和 Felix 中央立绘可见。[>]
 Narrator: 请选择测试路径。分支 1 快速结束，只验证 StoryEngine 的 choice、goto、set、end；分支 2 是完整 Pixi 命令视觉验收。
 @choice "分支1：快速结束剧情逻辑测试" goto:#LogicFastExit
 @choice "分支2：完整 Pixi 命令视觉验收" goto:#PixiCommandShowcase
 
 #LogicFastExit
 @set route:"return"
-Narrator: 分支 1 检查点：route 应切换为 return，选择跳转成功，下一步直接结束覆盖层。
+Narrator: CHECKPOINT LOGIC 01 - fast exit。route 应切换为 return，选择跳转成功；下一步直接结束覆盖层，不进入 Pixi showcase。
 @end
 
 #PixiCommandShowcase
 @set route:"classroom"
 @gameplay grant-evidence id:evidence:keycard
-Narrator: 分支 2 开始：右侧 Runtime 面板的 route 应为 classroom，evidence 应包含 evidence:keycard。
+Narrator: CHECKPOINT 00B - runtime state。分支 2 开始：右侧 Runtime 面板的 route 应为 classroom，evidence 应包含 evidence:keycard。
 @back bg:harness effect:fade time:0.2
 @rain power:1 time:0.1 xSpeed:-1.4 ySpeed:7
 Narrator: CHECKPOINT 01A - rain only。背景为 bg:harness，画面前景应出现清晰、持续下落的斜向雨线；此处不叠加 blur、bokeh 或 sun。
@@ -190,8 +190,8 @@ Narrator: CHECKPOINT 02 - char。Felix、Mira、Ren 三个 actor 均应可见；
 @arrange ren.18,felix.50,mira.82 look! time:0.25
 Narrator: CHECKPOINT 03 - arrange。三名角色应重新排到左、中、右；右侧 Pixi Slots 应显示 left/center/right。
 @flash color:#8fd3ff duration:160
-Narrator: CHECKPOINT 04 - flash。刚才应看到一次蓝白色短闪光。
-@slide character:felix.portrait:felix:neutral from:38,0 to:50,0 time:0.35 easing:easeOut wait!
+Narrator: CHECKPOINT 04 - flash。刚才应看到一次蓝白色短闪光；下一次 advance 会触发 Felix 的 wait! slide，滑动中再次 advance 应立即完成动画并进入 CHECKPOINT 05。
+@slide character:felix.portrait:felix:neutral from:38,0 to:50,0 time:0.8 easing:easeOut wait!
 Narrator: CHECKPOINT 05 - slide + wait。Felix 应从偏左滑回中央；本句应在滑动等待结束后出现。
 @shake actorId:character:ren power:0.36 time:0.08 count:4 deltaPower:0.06 hor! ver!
 Narrator: CHECKPOINT 06 - shake。Ren 或其 fallback 应进行水平和垂直抖动。
@@ -211,13 +211,13 @@ Narrator: CHECKPOINT 09 - rain + snow coexist。背景切到 bg:classroom，雨�
 @flash color:#ffffff duration:120
 @slide character:mira.portrait:mira:neutral from:15,0 to:24,0 time:0.25 easing:easeOut
 @shake actorId:stage power:0.2 time:0.07 count:3 hor! ver!
-Narrator: CHECKPOINT 10 - white flash、Mira slide、stage shake。应看到白闪，Mira 从更左侧滑入，随后整个 Pixi stage 轻微抖动。
+Narrator: CHECKPOINT 10 - white flash、Mira slide、stage shake。应看到白闪，Mira 从更左侧滑入，随后整个 Pixi stage 轻微抖动；下一步 cleanup 会连续 wait! 关闭 screen/weather 效果。
 @bokeh power:0 time:0.2
-@blur actorId:MainBackground power:0 time:0.2
-@rain power:0 time:0.2
-@snow power:0 time:0.2
-@sun power:0 time:0.2
-Narrator: CHECKPOINT 11 - cleanup。bokeh、blur、rain、snow、sun 均应被移除，画面恢复清晰稳定；背景保持 bg:classroom。
+@blur actorId:MainBackground power:0 time:0.2 wait!
+@rain power:0 time:0.2 wait!
+@snow power:0 time:0.2 wait!
+@sun power:0 time:0.2 wait!
+Narrator: CHECKPOINT 11 - cleanup + consecutive wait。bokeh、blur、rain、snow、sun 均应被移除，画面恢复清晰稳定；本句出现代表连续 cleanup wait 已全部完成，背景保持 bg:classroom。
 @hideChars time:0.2 wait!
 Narrator: CHECKPOINT 12 - hideChars + wait。角色应已隐藏；本句出现后覆盖层即将结束。
 @end`;

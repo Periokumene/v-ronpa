@@ -575,6 +575,25 @@ describe("contracts", () => {
     expect(NaniCommandStatusSchema.parse("stubbed")).toBe("stubbed");
   });
 
+  it("marks command execution boundaries for Pixi waits and declared-only Naninovel tracks", () => {
+    expect(getNaniCommandDefinition("char")).toMatchObject({
+      status: "implemented",
+      execution: "pixi-presentation"
+    });
+    expect(getNaniCommandDefinition("flash")).toMatchObject({
+      source: "v-ronpa",
+      execution: "pixi-presentation"
+    });
+    expect(getNaniCommandDefinition("async")).toMatchObject({
+      status: "stubbed",
+      execution: "declared-only"
+    });
+    expect(getNaniCommandDefinition("await")).toMatchObject({
+      status: "stubbed",
+      execution: "declared-only"
+    });
+  });
+
   it("marks migrated V-Ronpa compatibility params without pretending they are official Naninovel params", () => {
     expect(getNaniCommandDefinition("back")?.params).toContainEqual({
       name: "effect",

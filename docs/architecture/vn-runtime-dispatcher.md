@@ -15,9 +15,10 @@ VN runtime output is split in two app-layer steps:
 
 - `nani-parser` owns `.nani` parsing and `CommandIR` / `TextIR` production.
 - `nani-runtime-compiler` owns `ScenarioIR` to `RuntimeScript` compilation:
-  command id normalization, alias resolution, stable params, source metadata,
-  and compiler diagnostics. Implemented commands expose canonical runtime params
-  only; raw script aliases stay in `sourceCommand`.
+  command id normalization, catalog-aware ordered arg binding, alias
+  resolution, stable params, source metadata, and compiler diagnostics.
+  Implemented commands expose canonical runtime params only; raw script aliases
+  stay in `sourceCommand`.
 - `StoryEngine` owns script execution, variables, backlog, pending choices,
   instruction pointer, expression evaluation, end state, and per-step
   `emittedRuntimeCommands`.
@@ -32,7 +33,9 @@ VN runtime output is split in two app-layer steps:
   from committed runtime state.
 - Pixi `PresentationTask` snapshots flow from `pixi-presenter` to app debug UI
   through `onTasksChanged`. They are renderer-local lifecycle observations, not
-  StoryEngine state, story-play scheduling input, or save data.
+  save data. When StoryEngine is stopped on an explicit Pixi `wait!`, the app
+  matches the wait's `expectedTasks` against these snapshots to resume story
+  flow on real Pixi completion.
 - Settings are not routed through StoryEngine or RuntimeCommand output.
   `apps/game` derives VN dialog display props and story-play timing policy from
   the canonical settings snapshot, then passes those narrow values into runtime
@@ -74,13 +77,21 @@ render hints before React rendering. Saves store the snapshot and
 story/gameplay state, not runtime command streams or active Pixi
 `PresentationTask` records.
 
-RuntimeCommand durations use `params.duration`. Pixi render hints may keep a
-renderer-local `durationMs` field for scheduler code, but the public command
-stream remains `RuntimeCommand`. App adapters expect StoryEngine-resolved
-params; if an expression reaches this layer, the adapter skips the output and
-reports a transaction diagnostic instead of falling back. Pixi reducers also
-return diagnostic no-op output for commands with missing or unsupported
-Pixi-consumable params rather than writing placeholder stage ids.
+Pixi presentation timing uses canonical `params.durationMs`; compiler input may
+still accept Naninovel `time` seconds and V-Ronpa compatibility `duration`.
+The public command stream remains `RuntimeCommand`. App adapters expect
+StoryEngine-resolved params; if an expression reaches this layer, the adapter
+skips the output and reports a transaction diagnostic instead of falling back.
+Pixi reducers also return diagnostic no-op output for commands with missing or
+unsupported Pixi-consumable params rather than writing placeholder stage ids.
+
+Presentation wait release is task-driven. `createVnRuntimePresentationTransaction`
+returns Pixi wait descriptors, the runtime adapter stores them on
+`StoryRuntimeState.presentationWait.expectedTasks`, and `onTasksChanged`
+completion triggers `PRESENTATION_COMPLETE` followed by immediate StoryEngine
+resume. App timers are fallback diagnostics only, not the primary wait release
+mechanism. Manual advance during the wait settles Pixi to the terminal snapshot
+and then resumes story flow.
 
 ## Vertical Slice Migration
 

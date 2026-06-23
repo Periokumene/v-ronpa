@@ -23,9 +23,29 @@ export interface ConditionIR {
   source: string;
 }
 
+export type CommandArgIR =
+  | {
+      kind: "value";
+      raw: string;
+      value: NaniValue;
+    }
+  | {
+      kind: "param";
+      raw: string;
+      key: string;
+      value: NaniValue;
+    }
+  | {
+      kind: "flag";
+      raw: string;
+      key: string;
+      value: boolean;
+    };
+
 export interface CommandIR {
   kind: "command";
   commandId: string;
+  args: CommandArgIR[];
   primary?: NaniValue;
   params: Record<string, NaniValue>;
   flags: Record<string, boolean>;

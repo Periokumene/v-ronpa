@@ -75,7 +75,29 @@ describe("VN runtime presentation transaction", () => {
 
     expect(transaction.pixiStage).toBe(initialPixiStage);
     expect(transaction.pixiHints).toEqual([{ type: "flash", color: "#ffffff", durationMs: 120, wait: false }]);
+    expect(transaction.pixiWaitTasks).toEqual([]);
     expect(transaction.diagnostics).toEqual([]);
+  });
+
+  it("projects waitable Pixi commands into task descriptors for Story/Pixi synchronization", () => {
+    const runtimeScript = compileScenario(
+      ["@char character:felix.portrait:felix:neutral time:0.25 wait!", "Felix: After wait."].join("\n"),
+      "transaction-wait-test.nani"
+    );
+    const advanced = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+    const transaction = createVnRuntimePresentationTransaction({
+      runtimeCommands: advanced.emittedRuntimeCommands,
+      previousPixiStage: createInitialPixiStageSnapshot()
+    });
+
+    expect(advanced.state.presentationWait).toMatchObject({
+      commandId: "char",
+      commandIndex: 0,
+      durationMs: 250
+    });
+    expect(transaction.pixiWaitTasks).toEqual([
+      { kind: "actor-transition", target: "character:felix", revision: transaction.pixiStage.revision }
+    ]);
   });
 
   it("reports unsupported Pixi-routed runtime commands without changing stage state", () => {
@@ -95,6 +117,7 @@ describe("VN runtime presentation transaction", () => {
 
     expect(transaction.pixiStage).toBe(initialPixiStage);
     expect(transaction.pixiHints).toEqual([]);
+    expect(transaction.pixiWaitTasks).toEqual([]);
     expect(transaction.diagnostics).toEqual([
       {
         code: "unsupported-pixi-command",
@@ -119,6 +142,7 @@ describe("VN runtime presentation transaction", () => {
     });
 
     expect(transaction.pixiStage).toBe(initialPixiStage);
+    expect(transaction.pixiWaitTasks).toEqual([]);
     expect(transaction.gameplayEvents).toEqual([{ type: "grant-evidence", evidenceId: "evidence:keycard" }]);
     expect(transaction.diagnostics).toEqual([]);
   });
@@ -166,6 +190,7 @@ describe("VN runtime presentation transaction", () => {
 
     expect(transaction.pixiStage).toBe(initialPixiStage);
     expect(transaction.pixiHints).toEqual([]);
+    expect(transaction.pixiWaitTasks).toEqual([]);
     expect(transaction.gameplayEvents).toEqual([]);
     expect(transaction.diagnostics).toEqual([
       {

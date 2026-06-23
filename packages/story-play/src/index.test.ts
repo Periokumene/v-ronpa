@@ -134,7 +134,7 @@ describe("story play", () => {
     expect(
       selectStoryPlaySchedule(play, {
         ...story,
-        presentationWait: { commandId: "char", durationMs: 250, target: "character:felix" }
+        presentationWait: { commandId: "char", durationMs: 250, target: "character:felix", expectedTasks: [] }
       })
     ).toEqual({ type: "idle" });
   });

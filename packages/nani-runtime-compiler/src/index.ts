@@ -1,6 +1,7 @@
 import {
   getNaniCommandDefinition,
   type NaniCommandDefinition,
+  type NaniCommandParamSpec,
   type RuntimeCommand,
   type RuntimeScript,
   type RuntimeValue
@@ -10,7 +11,8 @@ import type { CommandIR, NaniValue, ScenarioIR, StatementIR, TextIR } from "@v-r
 export type RuntimeCompilerDiagnosticCode =
   | "unknown-command"
   | "invalid-command-param"
-  | "unsupported-command-param";
+  | "unsupported-command-param"
+  | "declared-only-command";
 
 export interface RuntimeCompilerDiagnostic {
   code: RuntimeCompilerDiagnosticCode;
@@ -26,6 +28,14 @@ export interface CompileRuntimeScriptResult {
 interface NormalizedCommandParams {
   params: Record<string, RuntimeValue>;
   consumesParams: string[];
+}
+
+interface CommandShape {
+  primary?: NaniValue;
+  params: Record<string, NaniValue>;
+  flags: Record<string, boolean>;
+  condition?: CommandIR["condition"];
+  unless?: CommandIR["unless"];
 }
 
 export function compileRuntimeScript(scenario: ScenarioIR): CompileRuntimeScriptResult {
@@ -103,18 +113,30 @@ function compileCommand(command: CommandIR, diagnostics: RuntimeCompilerDiagnost
     return undefined;
   }
 
-  const validationDiagnostics = validateCommandAgainstCatalog(command, definition);
+  const shape = resolveCommandShape(command, definition);
+  if (definition.execution === "declared-only") {
+    diagnostics.push(
+      createDiagnostic(
+        "declared-only-command",
+        `@${definition.canonicalName} is declared for Naninovel compatibility, but this runtime does not implement its execution boundary yet.`,
+        "warning"
+      )
+    );
+  }
+
+  const validationDiagnostics = validateCommandAgainstCatalog(shape, definition);
   diagnostics.push(...validationDiagnostics);
   if (validationDiagnostics.some((diagnostic) => diagnostic.severity === "error")) return undefined;
 
-  const normalized = normalizeCommandParams(command, definition);
-  diagnostics.push(...diagnoseUnsupportedImplementedParams(command, definition, normalized.consumesParams));
+  const normalized = normalizeCommandParams(shape, definition);
+  diagnostics.push(...diagnoseUnsupportedImplementedParams(shape, definition, normalized.consumesParams));
+  diagnostics.push(...diagnoseExecutionBoundaryParams(shape, definition));
 
   const sourceCommand = {
     rawCommandId: command.commandId,
-    ...(command.primary ? { rawPrimary: plainCommandValue(command.primary) } : {}),
-    rawParams: plainParamRecord(command.params),
-    rawFlags: { ...command.flags }
+    ...(shape.primary ? { rawPrimary: plainCommandValue(shape.primary) } : {}),
+    rawParams: plainParamRecord(shape.params),
+    rawFlags: { ...shape.flags }
   };
 
   return {
@@ -124,14 +146,95 @@ function compileCommand(command: CommandIR, diagnostics: RuntimeCompilerDiagnost
     source: definition.source,
     status: definition.status,
     params: normalized.params,
-    ...(command.condition ? { condition: { type: "expression" as const, source: command.condition.source } } : {}),
-    ...(command.unless ? { unless: { type: "expression" as const, source: command.unless.source } } : {}),
+    ...(shape.condition ? { condition: { type: "expression" as const, source: shape.condition.source } } : {}),
+    ...(shape.unless ? { unless: { type: "expression" as const, source: shape.unless.source } } : {}),
     loc: command.loc,
     sourceCommand
   };
 }
 
-function normalizeCommandParams(command: CommandIR, definition: NaniCommandDefinition): NormalizedCommandParams {
+function resolveCommandShape(command: CommandIR, definition: NaniCommandDefinition): CommandShape {
+  const specsByName = commandParamSpecsByName(definition);
+  const shape: CommandShape = {
+    params: {},
+    flags: {},
+    ...(command.condition ? { condition: command.condition } : {}),
+    ...(command.unless ? { unless: command.unless } : {})
+  };
+
+  if (!command.args || command.args.length === 0) {
+    return {
+      ...shape,
+      ...(command.primary ? { primary: command.primary } : {}),
+      params: { ...command.params },
+      flags: { ...command.flags }
+    };
+  }
+
+  for (const arg of command.args) {
+    if (arg.kind === "flag") {
+      const spec = specsByName.get(normalizeParamName(arg.key));
+      shape.flags[spec?.name ?? arg.key] = arg.value;
+      continue;
+    }
+
+    if (arg.kind === "value") {
+      shape.primary ??= arg.value;
+      continue;
+    }
+
+    const normalizedKey = normalizeParamName(arg.key);
+    if (normalizedKey === "if") {
+      shape.condition ??= conditionFromArgValue(arg.value);
+      continue;
+    }
+    if (normalizedKey === "unless") {
+      shape.unless ??= conditionFromArgValue(arg.value);
+      continue;
+    }
+    const spec = specsByName.get(normalizedKey);
+    if (definition.id === "set" && !spec) {
+      shape.params[arg.key] = arg.value;
+      continue;
+    }
+    if (spec) {
+      shape.params[spec.name] = arg.value;
+      continue;
+    }
+
+    if (!shape.primary) {
+      shape.primary = runtimePrimaryValueFromRawParam(arg.raw);
+    } else {
+      shape.params[arg.key] = arg.value;
+    }
+  }
+
+  return shape;
+}
+
+function conditionFromArgValue(value: NaniValue): NonNullable<CommandShape["condition"]> {
+  if (value.type === "expression") return { source: value.source };
+  return { source: String(staticScalarValue(value) ?? "") };
+}
+
+function commandParamSpecsByName(definition: NaniCommandDefinition): Map<string, NaniCommandParamSpec> {
+  const specs = new Map<string, NaniCommandParamSpec>();
+  for (const spec of definition.params) {
+    specs.set(normalizeParamName(spec.name), spec);
+    for (const alias of spec.aliases ?? []) specs.set(normalizeParamName(alias), spec);
+  }
+  return specs;
+}
+
+function runtimePrimaryValueFromRawParam(raw: string): NaniValue {
+  return raw.startsWith("#") ? { type: "raw", value: raw } : raw.includes(",") ? parseRawList(raw) : { type: "string", value: raw };
+}
+
+function parseRawList(raw: string): NaniValue {
+  return { type: "list", value: raw.split(",").map(runtimePrimaryValueFromRawParam) };
+}
+
+function normalizeCommandParams(command: CommandShape, definition: NaniCommandDefinition): NormalizedCommandParams {
   switch (definition.id) {
     case "print":
       return {
@@ -168,15 +271,16 @@ function normalizeCommandParams(command: CommandIR, definition: NaniCommandDefin
       return {
         params: compactParams({
           color: runtimeParam(command, "color") ?? "#ffffff",
-          duration: runtimeParam(command, "duration") ?? 160
+          durationMs: runtimeParam(command, "duration") ?? 160,
+          wait: runtimeParam(command, "wait") ?? false
         }),
-        consumesParams: ["color", "duration"]
+        consumesParams: ["color", "duration", "wait"]
       };
     case "focus":
       return {
         params: compactParams({
           target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "target") ?? "stage",
-          duration: runtimeParam(command, "duration") ?? 500
+          durationMs: runtimeParam(command, "duration") ?? 500
         }),
         consumesParams: ["target", "duration"]
       };
@@ -253,7 +357,7 @@ function normalizeCommandParams(command: CommandIR, definition: NaniCommandDefin
   }
 }
 
-function normalizeBackCommand(command: CommandIR): NormalizedCommandParams {
+function normalizeBackCommand(command: CommandShape): NormalizedCommandParams {
   const named = splitNamedString(runtimeCommandValue(command.primary) ?? runtimeParam(command, "appearanceAndTransition"));
   return {
     params: compactParams({
@@ -288,7 +392,7 @@ function normalizeBackCommand(command: CommandIR): NormalizedCommandParams {
   };
 }
 
-function normalizeCharCommand(command: CommandIR): NormalizedCommandParams {
+function normalizeCharCommand(command: CommandShape): NormalizedCommandParams {
   const named = splitNamedString(runtimeCommandValue(command.primary) ?? runtimeParam(command, "idAndAppearance"));
   return {
     params: compactParams({
@@ -326,7 +430,7 @@ function normalizeCharCommand(command: CommandIR): NormalizedCommandParams {
   };
 }
 
-function normalizeArrangeCommand(command: CommandIR): NormalizedCommandParams {
+function normalizeArrangeCommand(command: CommandShape): NormalizedCommandParams {
   return {
     params: compactParams({
       characterPositions: runtimeCommandValue(command.primary) ?? runtimeParam(command, "characterPositions"),
@@ -337,14 +441,14 @@ function normalizeArrangeCommand(command: CommandIR): NormalizedCommandParams {
   };
 }
 
-function normalizeHideCharsCommand(command: CommandIR): NormalizedCommandParams {
+function normalizeHideCharsCommand(command: CommandShape): NormalizedCommandParams {
   return {
     params: compactParams(normalizeTimingParams(command)),
     consumesParams: ["time", "lazy", "wait"]
   };
 }
 
-function normalizeSlideCommand(command: CommandIR): NormalizedCommandParams {
+function normalizeSlideCommand(command: CommandShape): NormalizedCommandParams {
   const named = splitNamedString(runtimeCommandValue(command.primary) ?? runtimeParam(command, "idAndAppearance"));
   return {
     params: compactParams({
@@ -359,7 +463,7 @@ function normalizeSlideCommand(command: CommandIR): NormalizedCommandParams {
   };
 }
 
-function normalizeShakeCommand(command: CommandIR): NormalizedCommandParams {
+function normalizeShakeCommand(command: CommandShape): NormalizedCommandParams {
   return {
     params: compactParams({
       target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "actorId") ?? runtimeParam(command, "target") ?? "stage",
@@ -391,7 +495,7 @@ function normalizeShakeCommand(command: CommandIR): NormalizedCommandParams {
   };
 }
 
-function normalizeBlurCommand(command: CommandIR): NormalizedCommandParams {
+function normalizeBlurCommand(command: CommandShape): NormalizedCommandParams {
   return {
     params: compactParams({
       target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "actorId") ?? "MainBackground",
@@ -402,7 +506,7 @@ function normalizeBlurCommand(command: CommandIR): NormalizedCommandParams {
   };
 }
 
-function normalizeBokehCommand(command: CommandIR): NormalizedCommandParams {
+function normalizeBokehCommand(command: CommandShape): NormalizedCommandParams {
   return {
     params: compactParams({
       focus: runtimeParam(command, "focus"),
@@ -414,7 +518,7 @@ function normalizeBokehCommand(command: CommandIR): NormalizedCommandParams {
   };
 }
 
-function normalizeGlitchCommand(command: CommandIR): NormalizedCommandParams {
+function normalizeGlitchCommand(command: CommandShape): NormalizedCommandParams {
   return {
     params: compactParams({
       power: runtimeParam(command, "power") ?? 1,
@@ -424,7 +528,7 @@ function normalizeGlitchCommand(command: CommandIR): NormalizedCommandParams {
   };
 }
 
-function normalizeWeatherCommand(command: CommandIR, kind: string): NormalizedCommandParams {
+function normalizeWeatherCommand(command: CommandShape, kind: string): NormalizedCommandParams {
   return {
     params: compactParams({
       kind,
@@ -441,7 +545,7 @@ function normalizeWeatherCommand(command: CommandIR, kind: string): NormalizedCo
   };
 }
 
-function normalizeActorTransformParams(command: CommandIR): Record<string, RuntimeValue | undefined> {
+function normalizeActorTransformParams(command: CommandShape): Record<string, RuntimeValue | undefined> {
   return {
     pos: runtimeParam(command, "pos"),
     position: runtimeParam(command, "position"),
@@ -453,7 +557,7 @@ function normalizeActorTransformParams(command: CommandIR): Record<string, Runti
   };
 }
 
-function normalizeTimingParams(command: CommandIR): Record<string, RuntimeValue | undefined> {
+function normalizeTimingParams(command: CommandShape): Record<string, RuntimeValue | undefined> {
   return {
     easing: runtimeParam(command, "easing"),
     durationMs: durationMsValue(runtimeParam(command, "time")),
@@ -478,7 +582,7 @@ function durationMsValue(value: RuntimeValue | undefined): RuntimeValue | undefi
   return value;
 }
 
-function createGenericParams(command: CommandIR): Record<string, RuntimeValue> {
+function createGenericParams(command: CommandShape): Record<string, RuntimeValue> {
   const params: Record<string, RuntimeValue> = {};
   if (command.primary) params.primary = runtimeValue(command.primary);
   for (const [key, value] of Object.entries(command.params)) params[key] = runtimeValue(value);
@@ -487,11 +591,11 @@ function createGenericParams(command: CommandIR): Record<string, RuntimeValue> {
 }
 
 function validateCommandAgainstCatalog(
-  command: CommandIR,
+  command: CommandShape,
   definition: NaniCommandDefinition
 ): RuntimeCompilerDiagnostic[] {
   const diagnostics: RuntimeCompilerDiagnostic[] = [];
-  const specsByName = new Map(definition.params.map((spec) => [normalizeParamName(spec.name), spec]));
+  const specsByName = commandParamSpecsByName(definition);
 
   for (const spec of definition.params) {
     if (spec.name === "params") continue;
@@ -558,14 +662,14 @@ function validateCommandAgainstCatalog(
 }
 
 function diagnoseUnsupportedImplementedParams(
-  command: CommandIR,
+  command: CommandShape,
   definition: NaniCommandDefinition,
   consumesParams: string[]
 ): RuntimeCompilerDiagnostic[] {
   if (definition.status !== "implemented") return [];
 
   const consumed = new Set(consumesParams.map(normalizeParamName));
-  const specsByName = new Map(definition.params.map((spec) => [normalizeParamName(spec.name), spec]));
+  const specsByName = commandParamSpecsByName(definition);
   const diagnostics: RuntimeCompilerDiagnostic[] = [];
 
   for (const [key, value] of Object.entries(command.params)) {
@@ -581,6 +685,22 @@ function diagnoseUnsupportedImplementedParams(
   }
 
   return diagnostics;
+}
+
+function diagnoseExecutionBoundaryParams(
+  command: CommandShape,
+  definition: NaniCommandDefinition
+): RuntimeCompilerDiagnostic[] {
+  if (definition.id === "shake" && runtimeParam(command, "loop") === true) {
+    return [
+      createDiagnostic(
+        "unsupported-command-param",
+        "@shake loop! is declared by Naninovel, but this Pixi runtime does not implement indefinite loop effects in the main story track; the command is diagnosed instead of approximated.",
+        "warning"
+      )
+    ];
+  }
+  return [];
 }
 
 function allowsDynamicAssignmentParam(definition: NaniCommandDefinition): boolean {
@@ -605,14 +725,14 @@ function isCompatibleCommandValue(value: NaniValue, officialType: string): boole
   return value.type === "string" || value.type === "raw" || value.type === "expression";
 }
 
-function getCommandParam(command: CommandIR, key: string): NaniValue | undefined {
+function getCommandParam(command: CommandShape, key: string): NaniValue | undefined {
   const direct = command.params[key];
   if (direct) return direct;
   const normalized = normalizeParamName(key);
   return Object.entries(command.params).find(([candidate]) => normalizeParamName(candidate) === normalized)?.[1];
 }
 
-function runtimeParam(command: CommandIR, key: string): RuntimeValue | undefined {
+function runtimeParam(command: CommandShape, key: string): RuntimeValue | undefined {
   const value = runtimeCommandValue(getCommandParam(command, key));
   if (value !== undefined) return value;
   const normalized = normalizeParamName(key);

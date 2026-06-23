@@ -46,6 +46,10 @@ and merge the change through the integration baseline first.
   Three.js objects.
 - Renderer-specific objects must not appear in contracts.
 - Script source locations must be preserved through parse and compile outputs.
+- `.nani` `CommandIR.args` must preserve ordered command tokens with raw
+  value/param/flag information. Legacy `primary`, `params`, and `flags` may
+  exist for migration, but compiler logic should derive command shape from
+  ordered args plus `commandCatalog`.
 - RuntimeCommand params must use canonical runtime field names only. Raw parser
   aliases and source params belong in `sourceCommand`.
 - RuntimeCommand may carry unresolved expression values and `condition/unless`
@@ -54,9 +58,15 @@ and merge the change through the integration baseline first.
 - `commandCatalog` is the only declaration source for `.nani` commands.
   Runtime handler registries bind execution only; they must not define command
   metadata independently.
+- `commandCatalog.execution` is the public boundary for whether a command is
+  StoryEngine control flow, Pixi presentation, gameplay, or declared-only
+  compatibility.
 - `NaniCommandStatus` is the command maturity signal. `implemented` means
   V-Ronpa has tested runtime behavior for the command; it is not a promise that
   every official Naninovel parameter is fully compatible.
+- Explicit Pixi `wait!` stores a `StoryPresentationWait` with `expectedTasks`
+  supplied by app/Pixi transaction code. Active Pixi tasks and tween progress
+  are not save data.
 - Official Naninovel commands and V-Ronpa project commands are declared
   explicitly. Branch-local experiments must add catalog entries before they can
   compile to `RuntimeCommand`.

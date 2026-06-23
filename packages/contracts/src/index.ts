@@ -198,6 +198,14 @@ export type NaniCommandStatus = z.infer<typeof NaniCommandStatusSchema>;
 export const NaniCommandSourceSchema = z.enum(["naninovel", "v-ronpa"]);
 export type NaniCommandSource = z.infer<typeof NaniCommandSourceSchema>;
 
+export const NaniCommandExecutionSchema = z.enum([
+  "story-control",
+  "pixi-presentation",
+  "gameplay",
+  "declared-only"
+]);
+export type NaniCommandExecution = z.infer<typeof NaniCommandExecutionSchema>;
+
 export interface NaniCommandParamSpec {
   name: string;
   type: string;
@@ -214,6 +222,7 @@ export interface NaniCommandDefinition {
   category: NaniCommandCategory;
   source: NaniCommandSource;
   status: NaniCommandStatus;
+  execution: NaniCommandExecution;
   supportsChildren: boolean;
   params: NaniCommandParamSpec[];
   aliases?: string[];
@@ -238,6 +247,7 @@ export const NaniCommandDefinitionSchema = z
     category: NaniCommandCategorySchema,
     source: NaniCommandSourceSchema,
     status: NaniCommandStatusSchema,
+    execution: NaniCommandExecutionSchema,
     supportsChildren: z.boolean(),
     params: z.array(NaniCommandParamSpecSchema),
     aliases: z.array(z.string().min(1).regex(/^[a-z0-9:_./<>-]+$/)).optional()
@@ -263,6 +273,34 @@ const officialCommandStatuses: Partial<Record<string, NaniCommandStatus>> = {
   sun: "implemented"
 };
 
+const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
+  arrange: "pixi-presentation",
+  back: "pixi-presentation",
+  blur: "pixi-presentation",
+  bokeh: "pixi-presentation",
+  char: "pixi-presentation",
+  flash: "pixi-presentation",
+  focus: "pixi-presentation",
+  glitch: "pixi-presentation",
+  hidechars: "pixi-presentation",
+  rain: "pixi-presentation",
+  shake: "pixi-presentation",
+  slide: "pixi-presentation",
+  snow: "pixi-presentation",
+  sun: "pixi-presentation",
+  choice: "story-control",
+  end: "story-control",
+  gameplay: "gameplay",
+  goto: "story-control",
+  print: "story-control",
+  set: "story-control",
+  trialkeyword: "pixi-presentation",
+  async: "declared-only",
+  await: "declared-only",
+  stop: "declared-only",
+  sync: "declared-only"
+};
+
 function param(
   name: string,
   type: string,
@@ -284,12 +322,14 @@ function official(
   supportsChildren = false
 ): NaniCommandDefinition {
   const id = normalizeNaniCommandId(canonicalName);
+  const status = officialCommandStatuses[id] ?? "stubbed";
   return {
     id,
     canonicalName,
     category,
     source: "naninovel",
-    status: officialCommandStatuses[id] ?? "stubbed",
+    status,
+    execution: commandExecutions[id] ?? (status === "implemented" ? "story-control" : "declared-only"),
     supportsChildren,
     params
   };
@@ -308,6 +348,7 @@ function vRonpa(
     category,
     source: "v-ronpa",
     status,
+    execution: commandExecutions[id] ?? (status === "implemented" ? "story-control" : "declared-only"),
     supportsChildren: false,
     params,
     ...(aliases.length > 0 ? { aliases } : {})
@@ -624,7 +665,7 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
     ["char-enter"],
     "stubbed"
   ),
-  vRonpa("flash", "effect", [param("color", "string"), param("duration", "decimal")]),
+  vRonpa("flash", "effect", [param("color", "string"), param("duration", "decimal"), param("wait", "boolean")]),
   vRonpa("focus", "effect", [param("target", "string"), param("duration", "decimal")]),
   vRonpa("trialkeyword", "ui", [param("id", "string"), param("text", "string"), param("speaker", "string"), param("evidence", "string")], [
     "trial-keyword"
@@ -1109,10 +1150,30 @@ export const StoryChoiceOptionSchema = z.object({
 });
 export type StoryChoiceOption = z.infer<typeof StoryChoiceOptionSchema>;
 
+export const PixiPresentationTaskKindSchema = z.enum([
+  "actor-transition",
+  "screen-filter-transition",
+  "weather-transition",
+  "flash",
+  "shake",
+  "glitch"
+]);
+export type PixiPresentationTaskKind = z.infer<typeof PixiPresentationTaskKindSchema>;
+
+export const StoryPresentationWaitTaskSchema = z.object({
+  kind: PixiPresentationTaskKindSchema,
+  target: z.string().min(1),
+  revision: z.number().int().nonnegative()
+});
+export type StoryPresentationWaitTask = z.infer<typeof StoryPresentationWaitTaskSchema>;
+
 export const StoryPresentationWaitSchema = z.object({
   commandId: z.string().min(1),
+  commandIndex: z.number().int().nonnegative().optional(),
   durationMs: z.number().int().nonnegative(),
-  target: z.string().min(1).optional()
+  target: z.string().min(1).optional(),
+  stageRevision: z.number().int().nonnegative().optional(),
+  expectedTasks: z.array(StoryPresentationWaitTaskSchema).default([])
 });
 export type StoryPresentationWait = z.infer<typeof StoryPresentationWaitSchema>;
 

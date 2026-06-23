@@ -57,6 +57,32 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
   expect(consoleErrors).toEqual([]);
 });
 
+test("VN wait! resumes from Pixi task completion and manual continue settles the task", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && !isExpectedPointerLockError(message.text())) consoleErrors.push(message.text());
+  });
+
+  await page.addInitScript(() => localStorage.removeItem("v-ronpa:settings:v1"));
+  await page.goto("/?scenario=vertical-slice");
+  await page.getByTestId("title-new-game").click();
+  await startWitnessStory(page);
+
+  await advanceUntilChoices(page);
+  await page.getByTestId("vn-dialog-choice-1").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 2 开始");
+  await advanceUntilText(page, "CHECKPOINT 04", 12);
+  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
+
+  await page.getByTestId("vn-dialog-advance").click();
+  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toContainText("actor-transition:character:felix", { timeout: 1_000 });
+  await page.getByTestId("vn-dialog-advance").click();
+
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT 05", { timeout: 2_000 });
+  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
+  expect(consoleErrors).toEqual([]);
+});
+
 async function startWitnessStory(page: Page) {
   await page.getByTestId("vertical-slice-move-witness").click();
   await expect(page.getByTestId("vertical-slice-active-interactable")).toHaveText("interactable:witness");
@@ -64,6 +90,15 @@ async function startWitnessStory(page: Page) {
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("vn2d-overlay");
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
+}
+
+async function advanceUntilText(page: Page, text: string, maxSteps: number) {
+  for (let attempt = 0; attempt < maxSteps; attempt += 1) {
+    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) return;
+    await page.getByTestId("vn-dialog-advance").click();
+  }
+
+  await expect(page.getByTestId("vn-dialog-text")).toContainText(text);
 }
 
 async function advanceUntilChoices(page: Page) {

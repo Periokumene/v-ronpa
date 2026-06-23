@@ -32,7 +32,10 @@ Naninovel's `0..100` scene-percent syntax; `pixi-presenter` normalizes those
 values to `0..1` only when reducing commands into `PixiStageSnapshot`.
 
 `.nani` command declarations live in `commandCatalog`. Naninovel official
-commands and V-Ronpa project commands must be explicit catalog entries.
+commands and V-Ronpa project commands must be explicit catalog entries. The
+catalog also declares each command's execution boundary, so compiler and app
+dispatch can distinguish StoryEngine control flow, Pixi presentation, gameplay
+events, and declared-only compatibility commands.
 
 App fanout is handled by `createVnRuntimePresentationTransaction` and
 `VnOutputRouteTable`. Route tables classify normalized
@@ -63,8 +66,16 @@ Pixi keeps a separate presentation clock inside `pixi-presenter`. Actor
 transitions, transient effects, and screen/weather fades may run after the app
 has synchronously committed the latest StoryEngine step. These active visual
 lifecycles are tracked as Pixi-local `PresentationTask` snapshots and can be
-reported to app debug UI through `onTasksChanged`, but they are not story state
-and do not decide whether manual, AUTO, or SKIP may advance.
+reported to app debug UI through `onTasksChanged`.
+
+For explicit Pixi `wait!`, StoryEngine stops with `presentationWait` and the app
+matches that wait against the transaction's `expectedTasks`. Pixi task
+completion is the primary resume source. A duration-based fallback exists only
+to diagnose and settle stuck tasks. Manual continue during a wait performs
+Complete On Continue: the app commits the terminal Pixi snapshot with animation
+disabled, clears the wait through `PRESENTATION_COMPLETE`, and immediately
+resumes to the next text, choice, end, or wait stop. Pixi task snapshots remain
+unsaved renderer lifecycle data and must not be treated as durable story state.
 
 Save/load persists the terminal `PixiStageSnapshot` only. Active
 `PresentationTask` records, tween progress, transient render hints, and overlay

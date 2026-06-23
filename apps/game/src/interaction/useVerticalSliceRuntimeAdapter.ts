@@ -188,6 +188,11 @@ export function useVerticalSliceRuntimeAdapter(
   const [lastOutcome, setLastOutcome] = useState("spawn");
   const [lastAction, setLastAction] = useState("boot");
   const [storySession, setStorySession] = useState(0);
+  const storyRuntimeRef = useRef<StoryRuntime>({ state: createInitialStoryState(compiled.script), active: false });
+  const storyPlayRef = useRef<StoryPlayState>(createInitialStoryPlayState());
+  const pixiStageRuntimeRef = useRef<PixiStageRuntime>(createInitialPixiStageRuntime());
+  const observedWaitTasksRef = useRef<{ waitKey: string; observed: Set<string> } | undefined>(undefined);
+  const completingWaitKeyRef = useRef<string | undefined>(undefined);
   const activeMap = getActiveMap(navi);
   const currentCameraMode = navi.inputLock === "none" && flowMode === "navi" ? "first-person" : "locked";
   const inputActionsRef = useKeyboardInputActions(defaultHarnessInputBindings, "navi", navi.inputLock === "none" && flowMode === "navi");
@@ -218,6 +223,41 @@ export function useVerticalSliceRuntimeAdapter(
   }, [storyPlaySchedule, storyRuntime.active]);
 
   useEffect(() => {
+    storyRuntimeRef.current = storyRuntime;
+  }, [storyRuntime]);
+
+  useEffect(() => {
+    storyPlayRef.current = storyPlay;
+  }, [storyPlay]);
+
+  useEffect(() => {
+    pixiStageRuntimeRef.current = pixiStageRuntime;
+  }, [pixiStageRuntime]);
+
+  useEffect(() => {
+    const key = storyRuntime.state.presentationWait ? presentationWaitKey(storyRuntime.state.presentationWait) : undefined;
+    if (key !== completingWaitKeyRef.current) completingWaitKeyRef.current = undefined;
+  }, [storyRuntime.state.presentationWait]);
+
+  function setStoryRuntimeNow(next: StoryRuntime | ((current: StoryRuntime) => StoryRuntime)) {
+    const resolved = typeof next === "function" ? next(storyRuntimeRef.current) : next;
+    storyRuntimeRef.current = resolved;
+    setStoryRuntime(resolved);
+  }
+
+  function setStoryPlayNow(next: StoryPlayState | ((current: StoryPlayState) => StoryPlayState)) {
+    const resolved = typeof next === "function" ? next(storyPlayRef.current) : next;
+    storyPlayRef.current = resolved;
+    setStoryPlay(resolved);
+  }
+
+  function setPixiStageRuntimeNow(next: PixiStageRuntime | ((current: PixiStageRuntime) => PixiStageRuntime)) {
+    const resolved = typeof next === "function" ? next(pixiStageRuntimeRef.current) : next;
+    pixiStageRuntimeRef.current = resolved;
+    setPixiStageRuntime(resolved);
+  }
+
+  useEffect(() => {
     if (!storyRuntime.active) return;
     if (storyPlaySchedule.type === "idle") return;
     const delayMs = storyPlaySchedule.type === "wait" ? storyPlaySchedule.delayMs : 0;
@@ -231,31 +271,42 @@ export function useVerticalSliceRuntimeAdapter(
   }, [storyPlaySchedule, storyRuntime.active]);
 
   useEffect(() => {
-    if (!storyRuntime.active || !storyRuntime.state.presentationWait) return;
     const wait = storyRuntime.state.presentationWait;
+    if (!storyRuntime.active || !wait) return;
+    const expectedTasks = wait.expectedTasks ?? [];
+    if (expectedTasks.length === 0) {
+      const timeout = window.setTimeout(() => completePresentationWaitAndAdvance("system"), 0);
+      return () => window.clearTimeout(timeout);
+    }
     const timeout = window.setTimeout(() => {
-      setStoryRuntime((current) => {
-        if (current.state.presentationWait !== wait) return current;
-        const completed = storyReducer(current.state, { type: "PRESENTATION_COMPLETE", script: compiled.script });
-        return { ...current, state: completed.state };
-      });
-    }, wait.durationMs);
+      appendRuntimeDiagnostics([
+        {
+          source: "story",
+          code: "presentation-wait-timeout",
+          severity: "warning",
+          message: `Presentation wait for @${wait.commandId} exceeded its Pixi task duration fallback; completing the wait.`
+        }
+      ]);
+      completePresentationWaitAndAdvance("system", { settlePixi: true });
+    }, Math.max(1000, wait.durationMs + 1000));
     return () => window.clearTimeout(timeout);
-  }, [compiled.script, storyRuntime.active, storyRuntime.state.presentationWait]);
+  }, [storyRuntime.active, storyRuntime.state.presentationWait]);
 
   function resetSlice() {
     cancelStoryPlayHostSchedule();
+    observedWaitTasksRef.current = undefined;
+    completingWaitKeyRef.current = undefined;
     const spawnPose: PlayerPose = { position: initialMap.spawn, yaw: 0, pitch: 0 };
     setNavi({
       ...createInitialNaviState(initialMap.id),
       playerPose: spawnPose
     });
     setGameplay(createGameplayState());
-    setStoryRuntime({ state: createInitialStoryState(compiled.script), active: false });
-    setStoryPlay(createInitialStoryPlayState());
+    setStoryRuntimeNow({ state: createInitialStoryState(compiled.script), active: false });
+    setStoryPlayNow(createInitialStoryPlayState());
     setTrialRuntime(createInitialVerticalSliceTrialRuntime());
     setRuntimeDiagnostics(initialRuntimeDiagnostics);
-    setPixiStageRuntime((current) => ({
+    setPixiStageRuntimeNow((current) => ({
       ...createInitialPixiStageRuntime(),
       hintSequence: current.hintSequence + 1
     }));
@@ -337,7 +388,7 @@ export function useVerticalSliceRuntimeAdapter(
     });
     const initialPixiStage = createInitialPixiStageSnapshot();
     setStorySession((session) => session + 1);
-    setStoryPlay(step.play);
+    setStoryPlayNow(step.play);
     commitStoryTransaction({
       storyStep: step.story,
       previousPixiStage: initialPixiStage,
@@ -349,13 +400,17 @@ export function useVerticalSliceRuntimeAdapter(
 
   function advanceStory(source: StoryPlayAdvanceSource = "manual") {
     if (source === "manual") cancelStoryPlayHostSchedule();
+    if (storyRuntime.state.presentationWait) {
+      completePresentationWaitAndAdvance(source, { settlePixi: true });
+      return;
+    }
     const step = advanceStoryPlay(storyPlay, {
       state: storyRuntime.state,
       script: compiled.script,
       source
     });
     const nextStory = step.story.state;
-    setStoryPlay(step.play);
+    setStoryPlayNow(step.play);
     commitStoryTransaction({
       storyStep: step.story,
       previousPixiStage: pixiStageRuntime.snapshot,
@@ -378,7 +433,7 @@ export function useVerticalSliceRuntimeAdapter(
       index
     });
     const nextStory = step.story.state;
-    setStoryPlay(step.play);
+    setStoryPlayNow(step.play);
     commitStoryTransaction({
       storyStep: step.story,
       previousPixiStage: pixiStageRuntime.snapshot,
@@ -396,7 +451,7 @@ export function useVerticalSliceRuntimeAdapter(
   function toggleStoryAuto() {
     if (!canToggleStoryAutomation(storyRuntime)) return;
     if (storyPlay.mode === "auto") cancelStoryPlayHostSchedule();
-    setStoryPlay((current) => toggleAutoStoryPlay(current));
+    setStoryPlayNow((current) => toggleAutoStoryPlay(current));
     setLastAction("story:auto");
     setLastOutcome(storyPlay.mode === "auto" ? "manual" : "auto");
   }
@@ -404,20 +459,22 @@ export function useVerticalSliceRuntimeAdapter(
   function toggleStorySkip() {
     if (!canToggleStoryAutomation(storyRuntime)) return;
     if (storyPlay.mode === "skip") cancelStoryPlayHostSchedule();
-    setStoryPlay((current) => toggleSkipStoryPlay(current));
+    setStoryPlayNow((current) => toggleSkipStoryPlay(current));
     setLastAction("story:skip");
     setLastOutcome(storyPlay.mode === "skip" ? "manual" : "skip");
   }
 
   function stopStoryAutomation(reason: StoryPlayStopReason) {
     cancelStoryPlayHostSchedule();
-    setStoryPlay((current) => stopStoryPlayAutomation(current, reason));
+    setStoryPlayNow((current) => stopStoryPlayAutomation(current, reason));
   }
 
   function startTrial(outcome: Extract<ExplorationOutcome, { type: "start-trial" }>) {
     cancelStoryPlayHostSchedule();
-    setStoryRuntime((current) => ({ ...current, active: false }));
-    setStoryPlay(createInitialStoryPlayState());
+    observedWaitTasksRef.current = undefined;
+    completingWaitKeyRef.current = undefined;
+    setStoryRuntimeNow((current) => ({ ...current, active: false }));
+    setStoryPlayNow(createInitialStoryPlayState());
 
     const definition = findVerticalSliceTrialDefinition(outcome.trialId);
     if (!definition) {
@@ -485,9 +542,11 @@ export function useVerticalSliceRuntimeAdapter(
 
   function closeStoryOverlay(action = "dialog:cancel") {
     cancelStoryPlayHostSchedule();
+    observedWaitTasksRef.current = undefined;
+    completingWaitKeyRef.current = undefined;
     setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
-    setStoryRuntime((current) => ({ ...current, active: false }));
-    setStoryPlay(createInitialStoryPlayState());
+    setStoryRuntimeNow((current) => ({ ...current, active: false }));
+    setStoryPlayNow(createInitialStoryPlayState());
     setLastRuntimeCommandCount(0);
     setLastAction(action);
     setLastOutcome("overlay-closed");
@@ -495,15 +554,17 @@ export function useVerticalSliceRuntimeAdapter(
 
   function restoreFromSave(save: Pick<SaveData, "mode" | "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters" | "trial">) {
     cancelStoryPlayHostSchedule();
+    observedWaitTasksRef.current = undefined;
+    completingWaitKeyRef.current = undefined;
     const plan = createVerticalSliceRuntimeRestorePlan(save, compiled.script);
     if (plan.navi) setNavi(plan.navi);
     if (plan.playerPose) firstPersonBridge.issuePoseCommand(plan.playerPose);
     setGameplay(plan.gameplay);
-    setStoryRuntime(plan.storyRuntime);
-    setStoryPlay(plan.storyPlay);
+    setStoryRuntimeNow(plan.storyRuntime);
+    setStoryPlayNow(plan.storyPlay);
     setTrialRuntime(plan.trialRuntime);
     setRuntimeDiagnostics(initialRuntimeDiagnostics);
-    setPixiStageRuntime((current) => ({
+    setPixiStageRuntimeNow((current) => ({
       ...plan.pixiStageRuntime,
       hintSequence: current.hintSequence + 1
     }));
@@ -544,13 +605,23 @@ export function useVerticalSliceRuntimeAdapter(
     if (transaction.gameplayEvents.length > 0) {
       setGameplay((currentGameplay) => applyGameplayEvents(currentGameplay, transaction.gameplayEvents));
     }
+    const animatePixi = shouldAnimateStoryPlayPacing(pacing);
+    const nextStoryState = storyStep.state.presentationWait
+      ? {
+          ...storyStep.state,
+          presentationWait: {
+            ...storyStep.state.presentationWait,
+            stageRevision: transaction.pixiStage.revision,
+            expectedTasks: animatePixi ? transaction.pixiWaitTasks : []
+          }
+        }
+      : storyStep.state;
     if (
       forcePixiCommit ||
       transaction.pixiStage !== previousPixiStage ||
       transaction.pixiHints.length > 0
     ) {
-      const animatePixi = shouldAnimateStoryPlayPacing(pacing);
-      setPixiStageRuntime((current) => ({
+      setPixiStageRuntimeNow((current) => ({
         snapshot: transaction.pixiStage,
         hints: transaction.pixiHints,
         hintSequence: current.hintSequence + 1,
@@ -558,15 +629,81 @@ export function useVerticalSliceRuntimeAdapter(
         presentationTasks: animatePixi ? current.presentationTasks : []
       }));
     }
-    setStoryRuntime({ state: storyStep.state, active });
+    const nextStoryRuntime = { state: nextStoryState, active };
+    setStoryRuntimeNow(nextStoryRuntime);
   }
 
-  const updatePixiPresentationTasks = useCallback((tasks: PixiPresentationTaskSnapshot[]) => {
-    setPixiStageRuntime((current) => ({
+  function updatePixiPresentationTasks(tasks: PixiPresentationTaskSnapshot[]) {
+    setPixiStageRuntimeNow((current) => ({
       ...current,
       presentationTasks: tasks
     }));
-  }, []);
+    observePixiPresentationTasks(tasks);
+  }
+
+  function observePixiPresentationTasks(tasks: PixiPresentationTaskSnapshot[]) {
+    const currentStory = storyRuntimeRef.current;
+    const wait = currentStory.state.presentationWait;
+    if (!currentStory.active || !wait) return;
+    const expectedTasks = wait.expectedTasks ?? [];
+    if (expectedTasks.length === 0) return;
+    const waitKey = presentationWaitKey(wait);
+    if (observedWaitTasksRef.current?.waitKey !== waitKey) {
+      observedWaitTasksRef.current = { waitKey, observed: new Set() };
+    }
+    const observed = observedWaitTasksRef.current.observed;
+    const activeTaskKeys = new Set(tasks.map(pixiPresentationTaskKey));
+    const expectedTaskKeys = expectedTasks.map(presentationWaitTaskKey);
+    for (const key of expectedTaskKeys) {
+      if (activeTaskKeys.has(key)) observed.add(key);
+    }
+    if (expectedTaskKeys.every((key) => observed.has(key)) && expectedTaskKeys.every((key) => !activeTaskKeys.has(key))) {
+      completePresentationWaitAndAdvance("system");
+    }
+  }
+
+  function completePresentationWaitAndAdvance(
+    source: StoryPlayAdvanceSource,
+    options: { settlePixi?: boolean } = {}
+  ) {
+    const currentStory = storyRuntimeRef.current;
+    const wait = currentStory.state.presentationWait;
+    if (!currentStory.active || !wait) return;
+    const waitKey = presentationWaitKey(wait);
+    if (completingWaitKeyRef.current === waitKey) return;
+    completingWaitKeyRef.current = waitKey;
+    observedWaitTasksRef.current = undefined;
+
+    if (options.settlePixi) {
+      setPixiStageRuntimeNow((current) => ({
+        ...current,
+        hints: [],
+        hintSequence: current.hintSequence + 1,
+        animate: false,
+        presentationTasks: []
+      }));
+    }
+
+    const completed = storyReducer(currentStory.state, { type: "PRESENTATION_COMPLETE", script: compiled.script });
+    const step = advanceStoryPlay(storyPlayRef.current, {
+      state: completed.state,
+      script: compiled.script,
+      source
+    });
+    setStoryPlayNow(step.play);
+    commitStoryTransaction({
+      storyStep: step.story,
+      previousPixiStage: pixiStageRuntimeRef.current.snapshot,
+      active: !step.story.state.ended,
+      pacing: step.intent.pacing
+    });
+    if (step.story.state.ended) {
+      closeStoryOverlay("story:end");
+    } else {
+      setLastAction(source === "manual" ? "story:advance" : `story:${source}`);
+      setLastOutcome(step.story.state.presentationWait ? "presentation-wait" : step.story.state.pendingChoices.length > 0 ? "choices" : "line");
+    }
+  }
 
   const interactionContext: GameInteractionContext = useMemo(
     () => createVerticalSliceInteractionContext({ flowMode, navi, storyRuntime, trialRuntime }),
@@ -625,7 +762,7 @@ export function useVerticalSliceRuntimeAdapter(
   }
 
   function cancelStoryPlayHostSchedule() {
-    storyPlayHostRef.current = { active: storyRuntime.active, schedule: { type: "idle" } };
+    storyPlayHostRef.current = { active: storyRuntimeRef.current.active, schedule: { type: "idle" } };
   }
 }
 
@@ -751,6 +888,19 @@ export function createInitialVerticalSliceTrialRuntime(): TrialRuntime {
 
 export function shouldAnimateStoryPlayPacing(pacing: StoryPlayPacing): boolean {
   return pacing !== "skip";
+}
+
+function presentationWaitKey(wait: NonNullable<StoryRuntimeState["presentationWait"]>): string {
+  const tasks = (wait.expectedTasks ?? []).map(presentationWaitTaskKey).join("|");
+  return `${wait.commandIndex ?? "unknown"}:${wait.commandId}:${wait.stageRevision ?? "none"}:${tasks}`;
+}
+
+function presentationWaitTaskKey(task: NonNullable<StoryRuntimeState["presentationWait"]>["expectedTasks"][number]): string {
+  return `${task.kind}:${task.target}:${task.revision}`;
+}
+
+function pixiPresentationTaskKey(task: PixiPresentationTaskSnapshot): string {
+  return `${task.kind}:${task.target}:${task.revision}`;
 }
 
 export function createVerticalSlicePresentationTransaction({
