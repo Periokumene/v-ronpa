@@ -27,6 +27,7 @@ import { createInitialPixiStageSnapshot, type PixiStageRenderHint } from "@v-ron
 import type { FirstPersonInteractRequest } from "@v-ronpa/r3f-adapter";
 import {
   createInitialStoryState,
+  storyReducer,
   type StoryStepperDiagnostic,
   type StoryStepperResult,
   type StoryRuntimeState
@@ -224,6 +225,19 @@ export function useVerticalSliceRuntimeAdapter(
     return () => window.clearTimeout(timeout);
   }, [storyPlaySchedule, storyRuntime.active]);
 
+  useEffect(() => {
+    if (!storyRuntime.active || !storyRuntime.state.presentationWait) return;
+    const wait = storyRuntime.state.presentationWait;
+    const timeout = window.setTimeout(() => {
+      setStoryRuntime((current) => {
+        if (current.state.presentationWait !== wait) return current;
+        const completed = storyReducer(current.state, { type: "PRESENTATION_COMPLETE", script: compiled.script });
+        return { ...current, state: completed.state };
+      });
+    }, wait.durationMs);
+    return () => window.clearTimeout(timeout);
+  }, [compiled.script, storyRuntime.active, storyRuntime.state.presentationWait]);
+
   function resetSlice() {
     cancelStoryPlayHostSchedule();
     const spawnPose: PlayerPose = { position: initialMap.spawn, yaw: 0, pitch: 0 };
@@ -347,7 +361,7 @@ export function useVerticalSliceRuntimeAdapter(
       closeStoryOverlay("story:end");
     } else {
       setLastAction(source === "manual" ? "story:advance" : `story:${source}`);
-      setLastOutcome(nextStory.pendingChoices.length > 0 ? "choices" : "line");
+      setLastOutcome(nextStory.presentationWait ? "presentation-wait" : nextStory.pendingChoices.length > 0 ? "choices" : "line");
     }
   }
 
@@ -370,7 +384,7 @@ export function useVerticalSliceRuntimeAdapter(
       closeStoryOverlay("story:end");
     } else {
       setLastAction(`choice:${index}`);
-      setLastOutcome(nextStory.variables.route ? `route:${String(nextStory.variables.route)}` : "choice");
+      setLastOutcome(nextStory.presentationWait ? "presentation-wait" : nextStory.variables.route ? `route:${String(nextStory.variables.route)}` : "choice");
     }
   }
 
@@ -663,7 +677,7 @@ export function createVerticalSliceInteractionContext({
 }
 
 export function canToggleStoryAutomation(storyRuntime: StoryRuntime): boolean {
-  return storyRuntime.active && !storyRuntime.state.ended && storyRuntime.state.pendingChoices.length === 0;
+  return storyRuntime.active && !storyRuntime.state.ended && storyRuntime.state.pendingChoices.length === 0 && !storyRuntime.state.presentationWait;
 }
 
 export function createVerticalSliceRuntimeRestorePlan(

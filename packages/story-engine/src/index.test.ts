@@ -22,11 +22,11 @@ const trialRuntimeScript = runtimeScript(
   "trial.nani",
   [
     runtimeCommand("back", "scene", { appearance: "bg:court", effect: "fade" }, { source: "naninovel" }),
-    runtimeCommand("charenter", "actor", {
-      characterId: "character:felix",
-      portraitId: "portrait:felix:neutral",
-      slot: "center"
-    }),
+    runtimeCommand("char", "actor", {
+      target: "character:felix",
+      appearance: "portrait:felix:neutral",
+      pos: [0.5, 0]
+    }, { source: "naninovel" }),
     runtimeCommand("print", "text", { text: "The door was locked.", speaker: "Felix", autoNext: true }),
     runtimeCommand("trialkeyword", "ui", {
       keywordId: "kw:locked",
@@ -47,11 +47,11 @@ const vnStepperRuntimeScript = runtimeScript(
   "story-vn.nani",
   [
     runtimeCommand("back", "scene", { appearance: "bg:harness", effect: "fade" }, { source: "naninovel" }),
-    runtimeCommand("charenter", "actor", {
-      characterId: "character:felix",
-      portraitId: "portrait:felix:neutral",
-      slot: "center"
-    }),
+    runtimeCommand("char", "actor", {
+      target: "character:felix",
+      appearance: "portrait:felix:neutral",
+      pos: [0.5, 0]
+    }, { source: "naninovel" }),
     runtimeCommand("print", "text", {
       text: "This is the first playable slice. Move, inspect, then choose a route.",
       speaker: "Felix",
@@ -118,7 +118,7 @@ describe("story engine", () => {
     `);
     expect(storyRuntimeSnapshot(state)).not.toHaveProperty("presentationCommands");
     expect(storyRuntimeSnapshot(state)).not.toHaveProperty("effects");
-    expect(emittedCommandIds).toEqual(["back", "charenter", "print", "trialkeyword"]);
+    expect(emittedCommandIds).toEqual(["back", "char", "print", "trialkeyword"]);
 
     state = reduceWithoutDiagnostics(state, { type: "CHOOSE", script: runtimeScript, index: 0 }).state;
     result = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript });
@@ -162,7 +162,7 @@ describe("story engine", () => {
       text: "This is the first playable slice. Move, inspect, then choose a route."
     });
     expect(state.pendingChoices).toEqual([]);
-    expect(result.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "charenter", "print"]);
+    expect(result.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "char", "print"]);
 
     result = advanceToNextStop(state, runtimeScript);
     state = result.state;
@@ -211,19 +211,66 @@ describe("story engine", () => {
     const implementedRuntimeCommands = commandCatalog.filter((command) => command.status === "implemented");
 
     expect(implementedRuntimeCommands.map((command) => command.id)).toEqual([
+      "arrange",
       "back",
+      "blur",
+      "bokeh",
+      "char",
       "choice",
+      "glitch",
       "goto",
+      "hidechars",
       "print",
+      "rain",
       "set",
       "shake",
+      "slide",
+      "snow",
+      "sun",
       "end",
       "gameplay",
-      "charenter",
       "flash",
       "focus",
       "trialkeyword"
     ]);
+  });
+
+  it("stops on waitable presentation commands until the presenter reports completion", () => {
+    const runtimeScript = runtimeScriptFixture("presentation-wait.nani", [
+      runtimeCommand("char", "actor", {
+        target: "character:felix",
+        appearance: "portrait:felix:neutral",
+        durationMs: 250,
+        wait: true
+      }, { source: "naninovel" }),
+      runtimeCommand("print", "text", { speaker: "Felix", text: "After animation.", autoNext: false })
+    ]);
+    const first = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+
+    expect(first.stopReason).toBe("presentation-wait");
+    expect(first.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["char"]);
+    expect(first.state).toMatchObject({
+      instructionPointer: 1,
+      presentationWait: {
+        commandId: "char",
+        durationMs: 250,
+        target: "character:felix"
+      },
+      backlog: []
+    });
+
+    const blocked = advanceToNextStop(first.state, runtimeScript);
+    expect(blocked.stopReason).toBe("presentation-wait");
+    expect(blocked.state).toBe(first.state);
+    expect(blocked.emittedRuntimeCommands).toEqual([]);
+
+    const completed = reduceWithoutDiagnostics(first.state, { type: "PRESENTATION_COMPLETE", script: runtimeScript });
+    expect(completed.state.presentationWait).toBeUndefined();
+
+    const resumed = advanceToNextStop(completed.state, runtimeScript);
+    expect(resumed.stopReason).toBe("text");
+    expect(resumed.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["print"]);
+    expect(resumed.state.backlog).toEqual([{ speaker: "Felix", text: "After animation." }]);
   });
 
   it("resolves expression params before emitting runtime commands", () => {

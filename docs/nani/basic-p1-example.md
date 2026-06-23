@@ -29,7 +29,7 @@ The fixture command set is intentionally small:
 
 - `@set`
 - `@back`
-- `@charEnter`
+- `@char`
 - `@choice`
 - `@goto`
 - `@gameplay grant-evidence`
@@ -54,7 +54,7 @@ timeline commands.
 #Start
 @set route:"intro"
 @back bg:harness effect:fade
-@charEnter character:felix portrait:portrait:felix:neutral slot:center
+@char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
 Felix.Neutral: This hallway is quiet.[< speed:0.8] We should check the case file.[>]
 Mira.Calm: Keep your voice down. The door still listens.[>]
 
@@ -86,8 +86,8 @@ Mira.Calm: The keycard belongs to the west door.[>]
 #TrialOpening
 @set trialMood:"opening"
 @back bg:trial-room effect:fade
-@charEnter character:felix portrait:portrait:felix:serious slot:center
-@charEnter character:mira portrait:portrait:mira:calm slot:right
+@char idAndAppearance:character:felix.portrait:felix:serious pos:50,0
+@char idAndAppearance:character:mira.portrait:mira:calm pos:76,0
 Felix.Serious: The testimony starts before the evidence does.[>]
 @focus character:mira duration:420
 Mira.Calm: Then listen for the contradiction before naming it.[< speed:0.8][>]

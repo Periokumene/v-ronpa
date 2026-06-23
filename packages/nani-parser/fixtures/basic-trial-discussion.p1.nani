@@ -5,8 +5,8 @@
 #TrialOpening
 @set trialMood:"opening"
 @back bg:trial-room effect:fade
-@charEnter character:felix portrait:portrait:felix:serious slot:center
-@charEnter character:mira portrait:portrait:mira:calm slot:right
+@char idAndAppearance:character:felix.portrait:felix:serious pos:50,0
+@char idAndAppearance:character:mira.portrait:mira:calm pos:76,0
 Felix.Serious: The testimony starts before the evidence does.[>]
 @focus character:mira duration:420
 Mira.Calm: Then listen for the contradiction before naming it.[< speed:0.8][>]

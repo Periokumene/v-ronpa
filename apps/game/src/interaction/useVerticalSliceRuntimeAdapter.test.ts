@@ -5,6 +5,7 @@ import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ronpa/pixi-presenter";
 import { advanceToNextStop, createInitialStoryState, storyRuntimeSnapshot } from "@v-ronpa/story-engine";
+import { verticalSliceScript } from "../harness/fixtures/verticalSlice";
 import type { VnOutputRouteTable } from "../vnOutputRoutes";
 import {
   canToggleStoryAutomation,
@@ -18,6 +19,32 @@ import {
 } from "./useVerticalSliceRuntimeAdapter";
 
 describe("vertical slice runtime adapter helpers", () => {
+  it("keeps the vertical-slice script as a Pixi command showcase without parser or compiler diagnostics", () => {
+    const parsed = parseScenario({ sourceText: verticalSliceScript, scriptPath: "harness/vertical-slice.nani" });
+    const compiled = compileRuntimeScript(parsed.scenario);
+
+    expect(parsed.diagnostics).toEqual([]);
+    expect(compiled.diagnostics).toEqual([]);
+    const commandIds = new Set(compiled.script.commands.map((command) => command.commandId));
+    for (const commandId of [
+      "back",
+      "char",
+      "arrange",
+      "hidechars",
+      "slide",
+      "shake",
+      "flash",
+      "blur",
+      "bokeh",
+      "glitch",
+      "rain",
+      "snow",
+      "sun"
+    ]) {
+      expect(commandIds.has(commandId)).toBe(true);
+    }
+  });
+
   it("extracts a small GameInteractionContext from vertical slice runtime state", () => {
     const runtimeScript = compileScenario("Felix: Hello.\n- Choice A", "context-test.nani");
     const storyRuntime: StoryRuntime = {
@@ -85,7 +112,7 @@ describe("vertical slice runtime adapter helpers", () => {
     const runtimeScript = compileScenario(
       [
         "@back bg:harness effect:fade",
-        "@charEnter character:felix portrait:portrait:felix:neutral slot:center",
+        "@char character:felix.portrait:felix:neutral pos:50,0",
         "@gameplay grant-evidence id:evidence:keycard",
         "Felix: Routed."
       ].join("\n"),
@@ -95,7 +122,7 @@ describe("vertical slice runtime adapter helpers", () => {
       commands: {
         print: ["debug"],
         back: ["debug"],
-        charenter: ["debug"],
+        char: ["debug"],
         gameplay: ["debug"]
       },
       categories: {}
@@ -182,11 +209,10 @@ describe("vertical slice runtime adapter helpers", () => {
     };
     const pixiStage = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
-      runtimeCommand("charenter", "actor", {
-        characterId: "character:felix",
-        portraitId: "portrait:felix:neutral",
-        slot: "center",
-        effect: "fadeIn"
+      runtimeCommand("char", "actor", {
+        target: "character:felix",
+        appearance: "portrait:felix:neutral",
+        pos: [0.5, 0]
       })
     ).snapshot;
     const save = {

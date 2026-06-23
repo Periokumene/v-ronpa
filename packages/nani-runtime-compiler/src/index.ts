@@ -143,32 +143,27 @@ function normalizeCommandParams(command: CommandIR, definition: NaniCommandDefin
         consumesParams: ["text", "speaker", "author", "autoNext"]
       };
     case "back":
-      return {
-        params: compactParams({
-          appearance: runtimeCommandValue(command.primary) ?? runtimeParam(command, "appearanceAndTransition") ?? runtimeParam(command, "id"),
-          effect: runtimeParam(command, "effect")
-        }),
-        consumesParams: ["appearanceAndTransition", "id", "effect"]
-      };
-    case "charenter":
-      return {
-        params: compactParams({
-          characterId: runtimeCommandValue(command.primary) ?? runtimeParam(command, "character") ?? "character:unknown",
-          portraitId: runtimeParam(command, "portrait"),
-          slot: runtimeParam(command, "slot") ?? "center",
-          effect: runtimeParam(command, "effect") ?? "fadeIn"
-        }),
-        consumesParams: ["character", "portrait", "slot", "effect"]
-      };
+      return normalizeBackCommand(command);
+    case "char":
+      return normalizeCharCommand(command);
+    case "arrange":
+      return normalizeArrangeCommand(command);
+    case "hidechars":
+      return normalizeHideCharsCommand(command);
+    case "slide":
+      return normalizeSlideCommand(command);
+    case "blur":
+      return normalizeBlurCommand(command);
+    case "bokeh":
+      return normalizeBokehCommand(command);
+    case "glitch":
+      return normalizeGlitchCommand(command);
+    case "rain":
+    case "snow":
+    case "sun":
+      return normalizeWeatherCommand(command, definition.id);
     case "shake":
-      return {
-        params: compactParams({
-          target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "actorId") ?? runtimeParam(command, "target") ?? "stage",
-          intensity: runtimeParam(command, "intensity") ?? 0.35,
-          duration: runtimeParam(command, "duration") ?? 280
-        }),
-        consumesParams: ["actorId", "target", "intensity", "duration"]
-      };
+      return normalizeShakeCommand(command);
     case "flash":
       return {
         params: compactParams({
@@ -256,6 +251,231 @@ function normalizeCommandParams(command: CommandIR, definition: NaniCommandDefin
     default:
       return { params: createGenericParams(command), consumesParams: [] };
   }
+}
+
+function normalizeBackCommand(command: CommandIR): NormalizedCommandParams {
+  const named = splitNamedString(runtimeCommandValue(command.primary) ?? runtimeParam(command, "appearanceAndTransition"));
+  return {
+    params: compactParams({
+      target: runtimeParam(command, "id") ?? "MainBackground",
+      appearance: runtimeParam(command, "appearance") ?? named.id,
+      pose: runtimeParam(command, "pose"),
+      transition: runtimeParam(command, "via") ?? named.value ?? runtimeParam(command, "effect"),
+      transitionParams: runtimeParam(command, "params"),
+      dissolve: runtimeParam(command, "dissolve"),
+      ...normalizeActorTransformParams(command)
+    }),
+    consumesParams: [
+      "appearanceAndTransition",
+      "id",
+      "appearance",
+      "pose",
+      "via",
+      "params",
+      "dissolve",
+      "pos",
+      "position",
+      "rotation",
+      "scale",
+      "tint",
+      "easing",
+      "time",
+      "lazy",
+      "wait",
+      "visible",
+      "effect"
+    ]
+  };
+}
+
+function normalizeCharCommand(command: CommandIR): NormalizedCommandParams {
+  const named = splitNamedString(runtimeCommandValue(command.primary) ?? runtimeParam(command, "idAndAppearance"));
+  return {
+    params: compactParams({
+      target: runtimeParam(command, "id") ?? named.id,
+      appearance: runtimeParam(command, "appearance") ?? named.value,
+      pose: runtimeParam(command, "pose"),
+      transition: runtimeParam(command, "via"),
+      transitionParams: runtimeParam(command, "params"),
+      dissolve: runtimeParam(command, "dissolve"),
+      look: runtimeParam(command, "look"),
+      avatar: runtimeParam(command, "avatar"),
+      ...normalizeActorTransformParams(command)
+    }),
+    consumesParams: [
+      "idAndAppearance",
+      "id",
+      "appearance",
+      "pose",
+      "via",
+      "params",
+      "dissolve",
+      "look",
+      "avatar",
+      "pos",
+      "position",
+      "rotation",
+      "scale",
+      "tint",
+      "easing",
+      "time",
+      "lazy",
+      "wait",
+      "visible"
+    ]
+  };
+}
+
+function normalizeArrangeCommand(command: CommandIR): NormalizedCommandParams {
+  return {
+    params: compactParams({
+      characterPositions: runtimeCommandValue(command.primary) ?? runtimeParam(command, "characterPositions"),
+      look: runtimeParam(command, "look"),
+      ...normalizeTimingParams(command)
+    }),
+    consumesParams: ["characterPositions", "look", "time", "wait"]
+  };
+}
+
+function normalizeHideCharsCommand(command: CommandIR): NormalizedCommandParams {
+  return {
+    params: compactParams(normalizeTimingParams(command)),
+    consumesParams: ["time", "lazy", "wait"]
+  };
+}
+
+function normalizeSlideCommand(command: CommandIR): NormalizedCommandParams {
+  const named = splitNamedString(runtimeCommandValue(command.primary) ?? runtimeParam(command, "idAndAppearance"));
+  return {
+    params: compactParams({
+      target: named.id,
+      appearance: named.value,
+      from: runtimeParam(command, "from"),
+      to: runtimeParam(command, "to"),
+      visible: runtimeParam(command, "visible"),
+      ...normalizeTimingParams(command)
+    }),
+    consumesParams: ["idAndAppearance", "from", "to", "visible", "easing", "time", "lazy", "wait"]
+  };
+}
+
+function normalizeShakeCommand(command: CommandIR): NormalizedCommandParams {
+  return {
+    params: compactParams({
+      target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "actorId") ?? runtimeParam(command, "target") ?? "stage",
+      count: runtimeParam(command, "count"),
+      loop: runtimeParam(command, "loop"),
+      deltaTime: durationMsValue(runtimeParam(command, "deltaTime")),
+      power: runtimeParam(command, "power") ?? runtimeParam(command, "intensity") ?? 0.5,
+      deltaPower: runtimeParam(command, "deltaPower"),
+      hor: runtimeParam(command, "hor"),
+      ver: runtimeParam(command, "ver"),
+      durationMs: runtimeParam(command, "duration") ?? durationMsValue(runtimeParam(command, "time")),
+      wait: runtimeParam(command, "wait") ?? false
+    }),
+    consumesParams: [
+      "actorId",
+      "target",
+      "count",
+      "loop",
+      "time",
+      "deltaTime",
+      "power",
+      "deltaPower",
+      "hor",
+      "ver",
+      "wait",
+      "intensity",
+      "duration"
+    ]
+  };
+}
+
+function normalizeBlurCommand(command: CommandIR): NormalizedCommandParams {
+  return {
+    params: compactParams({
+      target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "actorId") ?? "MainBackground",
+      power: runtimeParam(command, "power") ?? 0,
+      ...normalizeTimingParams(command)
+    }),
+    consumesParams: ["actorId", "power", "time", "wait"]
+  };
+}
+
+function normalizeBokehCommand(command: CommandIR): NormalizedCommandParams {
+  return {
+    params: compactParams({
+      focus: runtimeParam(command, "focus"),
+      dist: runtimeParam(command, "dist"),
+      power: runtimeParam(command, "power") ?? 0,
+      ...normalizeTimingParams(command)
+    }),
+    consumesParams: ["focus", "dist", "power", "time", "wait"]
+  };
+}
+
+function normalizeGlitchCommand(command: CommandIR): NormalizedCommandParams {
+  return {
+    params: compactParams({
+      power: runtimeParam(command, "power") ?? 1,
+      ...normalizeTimingParams(command)
+    }),
+    consumesParams: ["time", "power", "wait"]
+  };
+}
+
+function normalizeWeatherCommand(command: CommandIR, kind: string): NormalizedCommandParams {
+  return {
+    params: compactParams({
+      kind,
+      power: runtimeParam(command, "power") ?? 1,
+      xSpeed: runtimeParam(command, "xSpeed"),
+      ySpeed: runtimeParam(command, "ySpeed"),
+      pos: runtimeParam(command, "pos"),
+      position: runtimeParam(command, "position"),
+      rotation: runtimeParam(command, "rotation"),
+      scale: runtimeParam(command, "scale"),
+      ...normalizeTimingParams(command)
+    }),
+    consumesParams: ["power", "time", "xSpeed", "ySpeed", "pos", "position", "rotation", "scale", "wait"]
+  };
+}
+
+function normalizeActorTransformParams(command: CommandIR): Record<string, RuntimeValue | undefined> {
+  return {
+    pos: runtimeParam(command, "pos"),
+    position: runtimeParam(command, "position"),
+    rotation: runtimeParam(command, "rotation"),
+    scale: runtimeParam(command, "scale"),
+    tint: runtimeParam(command, "tint"),
+    visible: runtimeParam(command, "visible"),
+    ...normalizeTimingParams(command)
+  };
+}
+
+function normalizeTimingParams(command: CommandIR): Record<string, RuntimeValue | undefined> {
+  return {
+    easing: runtimeParam(command, "easing"),
+    durationMs: durationMsValue(runtimeParam(command, "time")),
+    lazy: runtimeParam(command, "lazy") ?? false,
+    wait: runtimeParam(command, "wait") ?? false
+  };
+}
+
+function splitNamedString(value: RuntimeValue | undefined): { id?: RuntimeValue; value?: RuntimeValue } {
+  if (value === undefined) return {};
+  if (typeof value !== "string") return { id: value };
+  const dot = value.indexOf(".");
+  if (dot < 0) return { id: value };
+  return { id: value.slice(0, dot), value: value.slice(dot + 1) };
+}
+
+function durationMsValue(value: RuntimeValue | undefined): RuntimeValue | undefined {
+  if (typeof value === "number") return Math.max(0, Math.round(value * 1000));
+  if (value && !Array.isArray(value) && typeof value === "object" && value.type === "expression") {
+    return { type: "expression", source: `(${value.source})*1000` };
+  }
+  return value;
 }
 
 function createGenericParams(command: CommandIR): Record<string, RuntimeValue> {
@@ -393,7 +613,11 @@ function getCommandParam(command: CommandIR, key: string): NaniValue | undefined
 }
 
 function runtimeParam(command: CommandIR, key: string): RuntimeValue | undefined {
-  return runtimeCommandValue(getCommandParam(command, key));
+  const value = runtimeCommandValue(getCommandParam(command, key));
+  if (value !== undefined) return value;
+  const normalized = normalizeParamName(key);
+  const flag = Object.entries(command.flags).find(([candidate]) => normalizeParamName(candidate) === normalized);
+  return flag?.[1];
 }
 
 function runtimeCommandValue(value: NaniValue | undefined): RuntimeValue | undefined {

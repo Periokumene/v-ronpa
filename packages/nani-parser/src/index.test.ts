@@ -159,13 +159,16 @@ describe("nani parser", () => {
               "primary": "bg:harness",
             },
             {
-              "commandId": "charenter",
+              "commandId": "char",
               "line": 8,
               "params": {
-                "portrait": "portrait:felix:neutral",
-                "slot": "center",
+                "idAndAppearance": "character:felix.portrait:felix:neutral",
+                "pos": [
+                  50,
+                  0,
+                ],
               },
-              "primary": "character:felix",
+              "primary": undefined,
             },
             {
               "commandId": "choice",
@@ -324,22 +327,28 @@ describe("nani parser", () => {
               "primary": "bg:trial-room",
             },
             {
-              "commandId": "charenter",
+              "commandId": "char",
               "line": 8,
               "params": {
-                "portrait": "portrait:felix:serious",
-                "slot": "center",
+                "idAndAppearance": "character:felix.portrait:felix:serious",
+                "pos": [
+                  50,
+                  0,
+                ],
               },
-              "primary": "character:felix",
+              "primary": undefined,
             },
             {
-              "commandId": "charenter",
+              "commandId": "char",
               "line": 9,
               "params": {
-                "portrait": "portrait:mira:calm",
-                "slot": "right",
+                "idAndAppearance": "character:mira.portrait:mira:calm",
+                "pos": [
+                  76,
+                  0,
+                ],
               },
-              "primary": "character:mira",
+              "primary": undefined,
             },
             {
               "commandId": "focus",

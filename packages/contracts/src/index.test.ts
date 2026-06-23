@@ -201,8 +201,46 @@ describe("contracts", () => {
 
   it("validates Pixi stage snapshots without command history or renderer runtime", () => {
     const snapshot = PixiStageSnapshotSchema.parse({
-      version: 1,
+      version: 2,
       revision: 3,
+      backgroundsById: {
+        MainBackground: {
+          id: "MainBackground",
+          kind: "background",
+          appearance: "bg:harness"
+        }
+      },
+      charactersById: {
+        "character:felix": {
+          id: "character:felix",
+          kind: "character",
+          appearance: "portrait:felix:neutral",
+          pos: [0.5, 0],
+          visible: true,
+          transition: {
+            name: "slide",
+            durationMs: 400,
+            from: [0.15, 0.5],
+            to: [0.5, 0]
+          }
+        }
+      },
+      actorOrder: ["MainBackground", "character:felix"],
+      weather: {
+        rain: {
+          kind: "rain",
+          power: 0.5,
+          transition: { durationMs: 400 }
+        }
+      },
+      screenFilters: {
+        bokeh: {
+          focus: "character:felix",
+          dist: 0.3,
+          power: 0.75,
+          transition: { durationMs: 200 }
+        }
+      },
       background: { backgroundId: "bg:harness" },
       slots: {
         center: {
@@ -213,9 +251,50 @@ describe("contracts", () => {
       }
     });
 
-    expect(snapshot).toEqual({
-      version: 1,
+    expect(snapshot).toMatchObject({
+      version: 2,
       revision: 3,
+      backgroundsById: {
+        MainBackground: {
+          id: "MainBackground",
+          kind: "background",
+          appearance: "bg:harness",
+          visible: true,
+          alpha: 1,
+          z: 0
+        }
+      },
+      charactersById: {
+        "character:felix": {
+          id: "character:felix",
+          kind: "character",
+          appearance: "portrait:felix:neutral",
+          pos: [0.5, 0],
+          transition: {
+            name: "slide",
+            durationMs: 400,
+            from: [0.15, 0.5],
+            to: [0.5, 0]
+          },
+          visible: true
+        }
+      },
+      actorOrder: ["MainBackground", "character:felix"],
+      weather: {
+        rain: {
+          kind: "rain",
+          power: 0.5,
+          transition: { durationMs: 400, lazy: false, wait: false }
+        }
+      },
+      screenFilters: {
+        bokeh: {
+          focus: "character:felix",
+          dist: 0.3,
+          power: 0.75,
+          transition: { durationMs: 200, lazy: false, wait: false }
+        }
+      },
       background: { backgroundId: "bg:harness" },
       slots: {
         center: {
@@ -229,7 +308,7 @@ describe("contracts", () => {
     expect(snapshot).not.toHaveProperty("displayObjects");
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 1,
+        version: 2,
         slots: { left: { slot: "right", characterId: "character:mira" } }
       })
     ).toThrow();
@@ -475,7 +554,8 @@ describe("contracts", () => {
     expect(getNaniCommandDefinition("char-enter")).toMatchObject({
       canonicalName: "charenter",
       id: "charenter",
-      source: "v-ronpa"
+      source: "v-ronpa",
+      status: "stubbed"
     });
   });
 
@@ -569,8 +649,26 @@ describe("contracts", () => {
         ended: false
       },
       pixiStage: {
-        version: 1,
+        version: 2,
         revision: 2,
+        backgroundsById: {
+          MainBackground: {
+            id: "MainBackground",
+            kind: "background",
+            appearance: "bg:harness"
+          }
+        },
+        charactersById: {
+          "character:felix": {
+            id: "character:felix",
+            kind: "character",
+            appearance: "portrait:felix:neutral",
+            pos: [0.5, 0]
+          }
+        },
+        actorOrder: ["MainBackground", "character:felix"],
+        weather: {},
+        screenFilters: {},
         background: { backgroundId: "bg:harness" },
         slots: {
           center: { slot: "center", characterId: "character:felix", portraitId: "portrait:felix:neutral" }
@@ -621,7 +719,7 @@ describe("contracts", () => {
         ended: false,
         emittedRuntimeCommands: []
       },
-      pixiStage: { version: 1, revision: 0, slots: {} },
+      pixiStage: { version: 2, revision: 0, backgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {}, slots: {} },
       inventory: { items: {} },
       evidence: { ownedEvidenceIds: [] },
       characters: {}

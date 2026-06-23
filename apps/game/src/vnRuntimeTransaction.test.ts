@@ -11,7 +11,7 @@ describe("VN runtime presentation transaction", () => {
     const runtimeScript = compileScenario(
       [
         "@back bg:harness effect:fade",
-        "@charEnter character:felix portrait:portrait:felix:neutral slot:center",
+        "@char character:felix.portrait:felix:neutral pos:50,0",
         "Felix: Hello."
       ].join("\n"),
       "transaction-test.nani"
@@ -26,10 +26,26 @@ describe("VN runtime presentation transaction", () => {
     });
 
     expect(advanced.state.backlog).toEqual([{ speaker: "Felix", text: "Hello." }]);
-    expect(advanced.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "charenter", "print"]);
-    expect(transaction.pixiStage).toEqual({
-      version: 1,
+    expect(advanced.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "char", "print"]);
+    expect(transaction.pixiStage).toMatchObject({
+      version: 2,
       revision: 2,
+      backgroundsById: {
+        MainBackground: {
+          id: "MainBackground",
+          kind: "background",
+          appearance: "bg:harness"
+        }
+      },
+      charactersById: {
+        "character:felix": {
+          id: "character:felix",
+          kind: "character",
+          appearance: "portrait:felix:neutral",
+          pos: [0.5, 0]
+        }
+      },
+      actorOrder: ["MainBackground", "character:felix"],
       background: { backgroundId: "bg:harness" },
       slots: {
         center: {
@@ -58,7 +74,7 @@ describe("VN runtime presentation transaction", () => {
     });
 
     expect(transaction.pixiStage).toBe(initialPixiStage);
-    expect(transaction.pixiHints).toEqual([{ type: "flash", color: "#ffffff", durationMs: 120 }]);
+    expect(transaction.pixiHints).toEqual([{ type: "flash", color: "#ffffff", durationMs: 120, wait: false }]);
     expect(transaction.diagnostics).toEqual([]);
   });
 

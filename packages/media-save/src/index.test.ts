@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { SaveDataSchema } from "@v-ronpa/contracts";
 import { createMemorySavePort, createSaveMigrator, createSaveSlotSummary } from "./index";
 
-const baseSave = {
+const baseSave = SaveDataSchema.parse({
   version: 2 as const,
   savedAt: "2026-06-14T00:00:00.000Z",
   mode: "navi" as const,
@@ -14,8 +15,26 @@ const baseSave = {
     ended: false
   },
   pixiStage: {
-    version: 1 as const,
+    version: 2 as const,
     revision: 2,
+    backgroundsById: {
+      MainBackground: {
+        id: "MainBackground",
+        kind: "background",
+        appearance: "bg:harness"
+      }
+    },
+    charactersById: {
+      "character:felix": {
+        id: "character:felix",
+        kind: "character",
+        appearance: "portrait:felix:neutral",
+        pos: [0.5, 0]
+      }
+    },
+    actorOrder: ["MainBackground", "character:felix"],
+    weather: {},
+    screenFilters: {},
     background: { backgroundId: "bg:harness" },
     slots: {
       center: { slot: "center" as const, characterId: "character:felix", portraitId: "portrait:felix:neutral" }
@@ -24,7 +43,7 @@ const baseSave = {
   inventory: { items: { "gift:coffee": 1 } },
   evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] },
   characters: {}
-};
+});
 
 describe("media save contracts", () => {
   it("validates saves through the versioned migrator boundary", () => {
@@ -41,8 +60,13 @@ describe("media save contracts", () => {
         ended: false
       },
       pixiStage: {
-        version: 1,
+        version: 2,
         revision: 0,
+        backgroundsById: {},
+        charactersById: {},
+        actorOrder: [],
+        weather: {},
+        screenFilters: {},
         slots: {}
       },
       inventory: { items: { "gift:coffee": 1 } },

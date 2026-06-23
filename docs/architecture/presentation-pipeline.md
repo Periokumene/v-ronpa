@@ -14,8 +14,8 @@
 Scripts use preset commands rather than renderer-specific instructions:
 
 ```nani
-@charEnter hero slot:center effect:fadeIn
-@shake actorId:hero intensity:0.4 duration:280
+@char idAndAppearance:hero.portrait:hero:neutral pos:50,0
+@shake actorId:hero power:0.4 time:0.28
 @flash color:#ffffff duration:160
 @focus target:witness duration:500
 @camera zoom:0.5 time:0.5
@@ -25,10 +25,11 @@ Scripts use preset commands rather than renderer-specific instructions:
 
 The public script-to-runtime command bridge is `RuntimeCommand`. It is produced
 by `nani-runtime-compiler` from parser IR before StoryEngine execution.
-RuntimeCommand params use canonical runtime names; for example `shake`,
-`flash`, and `focus` use `duration`. Pixi render hints may use renderer-local
-`durationMs` internally, but routed Pixi consumption starts from
-`RuntimeCommand`.
+RuntimeCommand params use canonical runtime names; for example Naninovel
+timing params are normalized to `durationMs` before Pixi consumption while
+project-specific `flash` still accepts `duration`. `.nani` scene positions keep
+Naninovel's `0..100` scene-percent syntax; `pixi-presenter` normalizes those
+values to `0..1` only when reducing commands into `PixiStageSnapshot`.
 
 `.nani` command declarations live in `commandCatalog`. Naninovel official
 commands and V-Ronpa project commands must be explicit catalog entries.
@@ -40,7 +41,7 @@ App fanout is handled by `createVnRuntimePresentationTransaction` and
 StoryEngine state stores story semantics only: script path, instruction pointer,
 variables, backlog, pending choices, and end state. It returns the current
 step's emitted runtime commands as an incremental stream. For Pixi, emitted
-commands such as `back`, `charenter`, `shake`, `flash`, `focus`, and
+commands such as `back`, `char`, `shake`, `flash`, `focus`, and
 `trialkeyword` are reduced into `PixiStageSnapshot` plus transient render hints
 before React rendering. Saves store the snapshot and story/gameplay state, not
 the runtime command stream or presenter trace.

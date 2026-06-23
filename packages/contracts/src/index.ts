@@ -245,12 +245,22 @@ export const NaniCommandDefinitionSchema = z
   .strict();
 
 const officialCommandStatuses: Partial<Record<string, NaniCommandStatus>> = {
+  arrange: "implemented",
   back: "implemented",
+  blur: "implemented",
+  bokeh: "implemented",
+  char: "implemented",
   choice: "implemented",
+  glitch: "implemented",
   goto: "implemented",
+  hidechars: "implemented",
   print: "implemented",
+  rain: "implemented",
   set: "implemented",
-  shake: "implemented"
+  shake: "implemented",
+  slide: "implemented",
+  snow: "implemented",
+  sun: "implemented"
 };
 
 function param(
@@ -289,14 +299,15 @@ function vRonpa(
   id: string,
   category: NaniCommandCategory,
   params: NaniCommandParamSpec[] = [],
-  aliases: string[] = []
+  aliases: string[] = [],
+  status: NaniCommandStatus = "implemented"
 ): NaniCommandDefinition {
   return {
     id,
     canonicalName: id,
     category,
     source: "v-ronpa",
-    status: "implemented",
+    status,
     supportsChildren: false,
     params,
     ...(aliases.length > 0 ? { aliases } : {})
@@ -606,9 +617,13 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
     ],
     ["gameplay-event"]
   ),
-  vRonpa("charenter", "actor", [param("character", "string"), param("portrait", "string"), param("slot", "string"), param("effect", "string")], [
-    "char-enter"
-  ]),
+  vRonpa(
+    "charenter",
+    "actor",
+    [param("character", "string"), param("portrait", "string"), param("slot", "string"), param("effect", "string")],
+    ["char-enter"],
+    "stubbed"
+  ),
   vRonpa("flash", "effect", [param("color", "string"), param("duration", "decimal")]),
   vRonpa("focus", "effect", [param("target", "string"), param("duration", "decimal")]),
   vRonpa("trialkeyword", "ui", [param("id", "string"), param("text", "string"), param("speaker", "string"), param("evidence", "string")], [
@@ -887,6 +902,91 @@ export type WorldMapDef = z.infer<typeof WorldMapDefSchema>;
 export const PixiStageSlotIdSchema = z.enum(["left", "center", "right"]);
 export type PixiStageSlotId = z.infer<typeof PixiStageSlotIdSchema>;
 
+export const PixiActorKindSchema = z.enum(["background", "character"]);
+export type PixiActorKind = z.infer<typeof PixiActorKindSchema>;
+
+export const PixiVector2Schema = z.tuple([z.number(), z.number()]);
+export type PixiVector2 = z.infer<typeof PixiVector2Schema>;
+
+export const PixiVector3Schema = z.tuple([z.number(), z.number(), z.number()]);
+export type PixiVector3 = z.infer<typeof PixiVector3Schema>;
+
+export const PixiActorFilterSnapshotSchema = z
+  .object({
+    blur: z.number().nonnegative().optional(),
+    bokeh: z.number().nonnegative().optional()
+  })
+  .default({});
+export type PixiActorFilterSnapshot = z.infer<typeof PixiActorFilterSnapshotSchema>;
+
+export const PixiActorTransitionSnapshotSchema = z
+  .object({
+    name: z.string().optional(),
+    durationMs: z.number().int().nonnegative().default(0),
+    easing: z.string().optional(),
+    lazy: z.boolean().default(false),
+    wait: z.boolean().default(false),
+    from: PixiVector2Schema.optional(),
+    to: PixiVector2Schema.optional()
+  })
+  .default({ durationMs: 0, lazy: false, wait: false });
+export type PixiActorTransitionSnapshot = z.infer<typeof PixiActorTransitionSnapshotSchema>;
+
+export const PixiActorSnapshotSchema = z.object({
+  id: IdSchema,
+  kind: PixiActorKindSchema,
+  appearance: IdSchema.optional(),
+  pose: z.string().optional(),
+  visible: z.boolean().default(true),
+  pos: PixiVector2Schema.optional(),
+  position: PixiVector3Schema.optional(),
+  rotation: PixiVector3Schema.optional(),
+  scale: PixiVector3Schema.optional(),
+  tint: z.string().optional(),
+  alpha: z.number().min(0).max(1).default(1),
+  z: z.number().default(0),
+  filters: PixiActorFilterSnapshotSchema,
+  look: z.string().optional(),
+  transition: PixiActorTransitionSnapshotSchema
+});
+export type PixiActorSnapshot = z.infer<typeof PixiActorSnapshotSchema>;
+
+export const PixiWeatherKindSchema = z.enum(["rain", "snow", "sun"]);
+export type PixiWeatherKind = z.infer<typeof PixiWeatherKindSchema>;
+
+export const PixiWeatherSnapshotSchema = z.object({
+  kind: PixiWeatherKindSchema,
+  power: z.number().nonnegative().default(0),
+  xSpeed: z.number().optional(),
+  ySpeed: z.number().optional(),
+  pos: PixiVector2Schema.optional(),
+  position: PixiVector3Schema.optional(),
+  rotation: PixiVector3Schema.optional(),
+  scale: PixiVector3Schema.optional(),
+  transition: PixiActorTransitionSnapshotSchema
+});
+export type PixiWeatherSnapshot = z.infer<typeof PixiWeatherSnapshotSchema>;
+
+export const PixiScreenFiltersSnapshotSchema = z
+  .object({
+    bokeh: z
+      .object({
+        focus: z.string().optional(),
+        dist: z.number().optional(),
+        power: z.number().nonnegative().default(0),
+        transition: PixiActorTransitionSnapshotSchema
+      })
+      .optional(),
+    glitch: z
+      .object({
+        power: z.number().nonnegative().default(0),
+        transition: PixiActorTransitionSnapshotSchema
+      })
+      .optional()
+  })
+  .default({});
+export type PixiScreenFiltersSnapshot = z.infer<typeof PixiScreenFiltersSnapshotSchema>;
+
 export const PixiStageBackgroundSnapshotSchema = z.object({
   backgroundId: IdSchema
 });
@@ -920,8 +1020,13 @@ export const PixiStageSlotsSnapshotSchema = z
 export type PixiStageSlotsSnapshot = z.infer<typeof PixiStageSlotsSnapshotSchema>;
 
 export const PixiStageSnapshotSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   revision: z.number().int().nonnegative().default(0),
+  backgroundsById: z.record(IdSchema, PixiActorSnapshotSchema).default({}),
+  charactersById: z.record(IdSchema, PixiActorSnapshotSchema).default({}),
+  actorOrder: z.array(IdSchema).default([]),
+  weather: z.partialRecord(PixiWeatherKindSchema, PixiWeatherSnapshotSchema).default({}),
+  screenFilters: PixiScreenFiltersSnapshotSchema,
   background: PixiStageBackgroundSnapshotSchema.optional(),
   slots: PixiStageSlotsSnapshotSchema
 });
@@ -1004,6 +1109,13 @@ export const StoryChoiceOptionSchema = z.object({
 });
 export type StoryChoiceOption = z.infer<typeof StoryChoiceOptionSchema>;
 
+export const StoryPresentationWaitSchema = z.object({
+  commandId: z.string().min(1),
+  durationMs: z.number().int().nonnegative(),
+  target: z.string().min(1).optional()
+});
+export type StoryPresentationWait = z.infer<typeof StoryPresentationWaitSchema>;
+
 export const GameplayEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("grant-item"), itemId: IdSchema, quantity: z.number().int().positive().default(1) }),
   z.object({ type: z.literal("remove-item"), itemId: IdSchema, quantity: z.number().int().positive().default(1) }),
@@ -1023,6 +1135,7 @@ export const StoryRuntimeSnapshotSchema = z.object({
   variables: z.record(z.string(), StoryScalarSchema).default({}),
   backlog: z.array(StoryBacklogEntrySchema).default([]),
   pendingChoices: z.array(StoryChoiceOptionSchema).default([]),
+  presentationWait: StoryPresentationWaitSchema.optional(),
   ended: z.boolean().default(false)
 });
 export type StoryRuntimeSnapshot = z.infer<typeof StoryRuntimeSnapshotSchema>;

@@ -68,15 +68,15 @@ demote the command unless the supported V-Ronpa behavior is no longer covered.
 |---|---|---|---|---|---|
 | `addChoice` | `addchoice` | choice | `choiceSummary:string`, `id:string`, `lock:string`, `button:string`, `pos:decimal list`, `handler:string`, `goto:string`, `gosub:string`, `set:string`, `show:boolean`, `time:decimal` | no | stubbed |
 | `append` | `append` | text | `text:string`, `printer:string`, `author:string` | no | stubbed |
-| `arrange` | `arrange` | actor | `characterPositions:named decimal list`, `look:boolean`, `time:decimal`, `wait:boolean` | no | stubbed |
+| `arrange` | `arrange` | actor | `characterPositions:named decimal list`, `look:boolean`, `time:decimal`, `wait:boolean` | no | implemented |
 | `async` | `async` | flow | `trackId:string`, `loop:boolean` | yes | stubbed |
 | `await` | `await` | flow | `trackId:string`, `complete:boolean` | no | stubbed |
 | `back` | `back` | scene | `appearanceAndTransition:named string`, `pos:decimal list`, actor transform params | no | implemented |
 | `bgm` | `bgm` | media | `bgmPath:string`, `intro:string`, audio params | no | stubbed |
-| `blur` | `blur` | effect | `actorId:string`, `power:decimal`, `time:decimal`, `wait:boolean` | no | stubbed |
-| `bokeh` | `bokeh` | effect | `focus:string`, `dist:decimal`, `power:decimal`, `time:decimal`, `wait:boolean` | no | stubbed |
+| `blur` | `blur` | effect | `actorId:string`, `power:decimal`, `time:decimal`, `wait:boolean` | no | implemented |
+| `bokeh` | `bokeh` | effect | `focus:string`, `dist:decimal`, `power:decimal`, `time:decimal`, `wait:boolean` | no | implemented |
 | `camera` | `camera` | scene | `offset:decimal list`, `roll:decimal`, `rotation:decimal list`, `zoom:decimal`, `ortho:boolean`, `toggle:string list`, `set:named boolean list`, `easing:string`, `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
-| `char` | `char` | actor | `idAndAppearance:named string`, `look:string`, `avatar:string`, `pos:decimal list`, actor transform params | no | stubbed |
+| `char` | `char` | actor | `idAndAppearance:named string`, `look:string`, `avatar:string`, `pos:decimal list`, actor transform params | no | implemented |
 | `choice` | `choice` | choice | same as `addChoice` | no | implemented |
 | `choiceHandler` | `choicehandler` | choice | `handlerId:string`, `default:boolean`, actor transform params | no | stubbed |
 | `clearBacklog` | `clearbacklog` | text | none | no | stubbed |
@@ -88,13 +88,13 @@ demote the command unless the supported V-Ronpa behavior is no longer covered.
 | `enterDialogue` | `enterdialogue` | text | none | no | stubbed |
 | `exitDialogue` | `exitdialogue` | text | `destroy:boolean` | no | stubbed |
 | `format` | `format` | text | `templates:named string list`, `printer:string` | no | stubbed |
-| `glitch` | `glitch` | effect | `time:decimal`, `power:decimal`, `wait:boolean` | no | stubbed |
+| `glitch` | `glitch` | effect | `time:decimal`, `power:decimal`, `wait:boolean` | no | implemented |
 | `gosub` | `gosub` | flow | `path:string` | no | stubbed |
 | `goto` | `goto` | flow | `path:string`, `reset:string list`, `hold:boolean`, `release:boolean` | no | implemented |
 | `group` | `group` | flow | none | yes | stubbed |
 | `hide` | `hide` | actor | `actorIds:string list`, `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
 | `hideAll` | `hideall` | actor | `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
-| `hideChars` | `hidechars` | actor | `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
+| `hideChars` | `hidechars` | actor | `time:decimal`, `lazy:boolean`, `wait:boolean` | no | implemented |
 | `hidePrinter` | `hideprinter` | text | `printerId:string`, `time:decimal`, `wait:boolean` | no | stubbed |
 | `hideUI` | `hideui` | ui | `uINames:string list`, `allowToggle:boolean`, `time:decimal`, `wait:boolean` | no | stubbed |
 | `if` | `if` | flow | `expression:string` | yes | stubbed |
@@ -109,7 +109,7 @@ demote the command unless the supported V-Ronpa behavior is no longer covered.
 | `printer` | `printer` | text | `idAndAppearance:named string`, `default:boolean`, `hideOther:boolean`, `anchor:boolean`, `pos:decimal list`, actor transform params | no | stubbed |
 | `processInput` | `processinput` | ui | `inputEnabled:boolean`, `set:named boolean list` | no | stubbed |
 | `purgeRollback` | `purgerollback` | state | none | no | stubbed |
-| `rain` | `rain` | effect | `power:decimal`, `time:decimal`, `xSpeed:decimal`, `ySpeed:decimal`, `pos:decimal list`, `position:decimal list`, `rotation:decimal list`, `scale:decimal list`, `wait:boolean` | no | stubbed |
+| `rain` | `rain` | effect | `power:decimal`, `time:decimal`, `xSpeed:decimal`, `ySpeed:decimal`, `pos:decimal list`, `position:decimal list`, `rotation:decimal list`, `scale:decimal list`, `wait:boolean` | no | implemented |
 | `random` | `random` | flow | `weight:decimal list` | yes | stubbed |
 | `remove` | `remove` | actor | `actorIds:string list` | no | stubbed |
 | `resetState` | `resetstate` | state | `exclude:string list`, `only:string list` | no | stubbed |
@@ -124,14 +124,14 @@ demote the command unless the supported V-Ronpa behavior is no longer covered.
 | `showPrinter` | `showprinter` | text | `printerId:string`, `time:decimal`, `wait:boolean` | no | stubbed |
 | `showUI` | `showui` | ui | `uINames:string list`, `time:decimal`, `wait:boolean` | no | stubbed |
 | `skip` | `skip` | ui | `enable:boolean` | no | stubbed |
-| `slide` | `slide` | actor | `idAndAppearance:named string`, `from:decimal list`, `to:decimal list`, `visible:boolean`, `easing:string`, `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
-| `snow` | `snow` | effect | particle params | no | stubbed |
+| `slide` | `slide` | actor | `idAndAppearance:named string`, `from:decimal list`, `to:decimal list`, `visible:boolean`, `easing:string`, `time:decimal`, `lazy:boolean`, `wait:boolean` | no | implemented |
+| `snow` | `snow` | effect | particle params | no | implemented |
 | `spawn` | `spawn` | actor | `path:string`, `params:string list`, `pos:decimal list`, `position:decimal list`, `rotation:decimal list`, `scale:decimal list`, `wait:boolean` | no | stubbed |
 | `stop` | `stop` | flow | `trackId:string` | no | stubbed |
 | `stopBgm` | `stopbgm` | media | `bgmPath:string`, `fade:decimal`, `wait:boolean` | no | stubbed |
 | `stopSfx` | `stopsfx` | media | `sfxPath:string`, `fade:decimal`, `wait:boolean` | no | stubbed |
 | `stopVoice` | `stopvoice` | media | none | no | stubbed |
-| `sun` | `sun` | effect | particle params | no | stubbed |
+| `sun` | `sun` | effect | particle params | no | implemented |
 | `sync` | `sync` | flow | `trackId:string` | no | stubbed |
 | `timeline` | `timeline` | media | `name:string`, `stop:boolean`, `pause:boolean`, `resume:boolean`, `wait:boolean` | no | stubbed |
 | `title` | `title` | ui | none | no | stubbed |
@@ -146,6 +146,9 @@ demote the command unless the supported V-Ronpa behavior is no longer covered.
 
 Shared shorthand:
 
+- `pos`, `from`, `to`, and effect `pos` parameters use Naninovel scene
+  percent syntax in scripts: `0,0` is bottom-left and `100,100` is top-right.
+  `pixi-presenter` stores the reduced snapshot as normalized `0..1` values.
 - `actor transform params`: `id:string`, `appearance:string`, `pose:string`,
   `via:string`, `params:decimal list`, `dissolve:string`, `visible:boolean`,
   `position:decimal list`, `rotation:decimal list`, `scale:decimal list`,
@@ -166,7 +169,8 @@ handler registration cannot drift:
 - `gameplay` alias `gameplay-event`; params `type`, `id`, `quantity`, `item`,
   `itemId`, `evidence`, `evidenceId`, `character`, `characterId`, `status`,
   `skill`, `skillId`, `delta`, and `affinityDelta`
-- `charenter` with `.nani` source alias `char-enter`
+- `charenter` with `.nani` source alias `char-enter`; migration stub only,
+  prefer official `char`
 - `flash`
 - `focus`
 - `trialkeyword` alias `trial-keyword`

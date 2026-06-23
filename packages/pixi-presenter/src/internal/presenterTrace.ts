@@ -43,18 +43,16 @@ export function createPresenterTraceRecorder(): PresenterTraceRecorder {
         if (appearance) trace.backgroundId = appearance;
       }
 
-      if (command.commandId === "charenter") {
-        const rawSlot = stringParam(command, "slot");
-        if (rawSlot && !isPortraitSlot(rawSlot)) return undefined;
-        const slot: PortraitSlot = rawSlot && isPortraitSlot(rawSlot) ? rawSlot : "center";
-        const characterId = stringParam(command, "characterId");
+      if (command.commandId === "char") {
+        const characterId = stringParam(command, "target");
         if (!characterId) return undefined;
+        const slot = legacySlotForPos(command);
         trace.portraits = trace.portraits.filter((portrait) => portrait.slot !== slot);
         const portrait: PresenterTracePortrait = {
           characterId,
           slot
         };
-        const portraitId = stringParam(command, "portraitId");
+        const portraitId = stringParam(command, "appearance");
         if (portraitId) portrait.portraitId = portraitId;
         trace.portraits.push(portrait);
       }
@@ -65,7 +63,7 @@ export function createPresenterTraceRecorder(): PresenterTraceRecorder {
           command,
           blocksUserNext: false
         };
-        const duration = numberParam(command, "duration");
+        const duration = numberParam(command, "durationMs") ?? numberParam(command, "duration");
         if (duration !== undefined) perform.durationMs = duration;
         trace.activePerforms.push(perform);
         return perform;
@@ -91,8 +89,12 @@ export function createPresenterTraceRecorder(): PresenterTraceRecorder {
   };
 }
 
-function isPortraitSlot(value: string): value is PortraitSlot {
-  return value === "left" || value === "center" || value === "right";
+function legacySlotForPos(command: RuntimeCommand): PortraitSlot {
+  const pos = vectorParam(command, "pos");
+  const x = pos?.[0] ?? 0.5;
+  if (x < 0.38) return "left";
+  if (x > 0.62) return "right";
+  return "center";
 }
 
 function stringParam(command: RuntimeCommand, key: string): string | undefined {
@@ -103,6 +105,12 @@ function stringParam(command: RuntimeCommand, key: string): string | undefined {
 function numberParam(command: RuntimeCommand, key: string): number | undefined {
   const value = scalarValue(command.params[key]);
   return typeof value === "number" ? value : undefined;
+}
+
+function vectorParam(command: RuntimeCommand, key: string): number[] | undefined {
+  const value = command.params[key];
+  if (Array.isArray(value)) return value.map(scalarValue).filter((item): item is number => typeof item === "number");
+  return undefined;
 }
 
 function scalarValue(value: RuntimeValue | undefined): string | number | boolean | undefined {

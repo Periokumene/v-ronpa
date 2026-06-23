@@ -31,7 +31,7 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands).toEqual([
       expect.objectContaining({
         commandId: "back",
-        params: expect.objectContaining({ appearance: "bg:harness", effect: "fade" })
+        params: expect.objectContaining({ target: "MainBackground", appearance: "bg:harness", transition: "fade" })
       }),
       expect.objectContaining({
         commandId: "flash",
@@ -44,7 +44,13 @@ describe("nani runtime compiler", () => {
 
   it("normalizes aliases, defaults, flags, and labels", () => {
     const { scenario } = parseScenario({
-      sourceText: ["#Start", "@char-enter character:felix portrait:p:felix", "@shake actorId:stage wait!"].join("\n"),
+      sourceText: [
+        "#Start",
+        "@back bg:flower id:Flower",
+        "@char character:felix.p:felix pos:50,0",
+        "@char id:* tint:#ffdc22",
+        "@shake actorId:stage wait!"
+      ].join("\n"),
       scriptPath: "aliases.nani"
     });
     const result = compileRuntimeScript(scenario);
@@ -52,30 +58,46 @@ describe("nani runtime compiler", () => {
     expect(result.script.labels).toEqual({ Start: 0 });
     expect(result.script.commands[0]).toEqual(
       expect.objectContaining({
-        commandId: "charenter",
+        commandId: "back",
         params: expect.objectContaining({
-          characterId: "character:felix",
-          portraitId: "p:felix",
-          slot: "center",
-          effect: "fadeIn"
+          target: "Flower",
+          appearance: "bg:flower"
         })
       })
     );
     expect(result.script.commands[1]).toEqual(
       expect.objectContaining({
-        commandId: "shake",
-        params: expect.objectContaining({ target: "stage", intensity: 0.35, duration: 280 })
+        commandId: "char",
+        params: expect.objectContaining({
+          target: "character:felix",
+          appearance: "p:felix",
+          pos: [50, 0],
+          lazy: false,
+          wait: false
+        })
       })
     );
-    expect(result.script.commands[1]?.params).not.toHaveProperty("actorId");
-    expect(result.script.commands[1]?.params).not.toHaveProperty("wait");
+    expect(result.script.commands[2]).toEqual(
+      expect.objectContaining({
+        commandId: "char",
+        params: expect.objectContaining({ target: "*", tint: "#ffdc22" })
+      })
+    );
+    expect(result.script.commands[3]).toEqual(
+      expect.objectContaining({
+        commandId: "shake",
+        params: expect.objectContaining({ target: "stage", power: 0.5, wait: true })
+      })
+    );
+    expect(result.script.commands[3]?.params).not.toHaveProperty("actorId");
+    expect(result.script.commands[3]?.params).not.toHaveProperty("intensity");
   });
 
   it("preserves expression params in canonical fields without default fallback", () => {
     const { scenario } = parseScenario({
       sourceText: [
         "@flash color:#fff duration:{flashDuration}",
-        "@shake actorId:hero intensity:{shakePower} duration:{shakeDuration}",
+        "@shake actorId:hero power:{shakePower} time:{shakeDuration}",
         "@gameplay grant-item item:key quantity:{itemCount}"
       ].join("\n"),
       scriptPath: "expressions.nani"
@@ -89,8 +111,9 @@ describe("nani runtime compiler", () => {
     });
     expect(result.script.commands[1]?.params).toEqual({
       target: "hero",
-      intensity: { type: "expression", source: "shakePower" },
-      duration: { type: "expression", source: "shakeDuration" }
+      power: { type: "expression", source: "shakePower" },
+      durationMs: { type: "expression", source: "(shakeDuration)*1000" },
+      wait: false
     });
     expect(result.script.commands[2]?.params).toEqual({
       type: "grant-item",
@@ -140,11 +163,6 @@ describe("nani runtime compiler", () => {
         code: "invalid-command-param",
         message: "@back parameter time expected decimal.",
         severity: "error"
-      },
-      {
-        code: "unsupported-command-param",
-        message: "@back accepts time:decimal, but the current runtime compiler does not consume it yet.",
-        severity: "warning"
       }
     ]);
   });

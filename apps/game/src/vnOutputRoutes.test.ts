@@ -25,7 +25,7 @@ describe("VN output routes", () => {
     const commands: RuntimeCommand[] = [
       runtimeCommand("print", "text", { text: "Line", autoNext: false }),
       runtimeCommand("back", "scene", { appearance: "bg:harness" }),
-      runtimeCommand("charenter", "actor", { characterId: "character:felix", slot: "center", effect: "fadeIn" })
+      runtimeCommand("char", "actor", { target: "character:felix", appearance: "portrait:felix:neutral", pos: [50, 0] })
     ];
 
     expect(selectRuntimeCommandsForTarget(commands, "pixi")).toEqual([commands[1], commands[2]]);

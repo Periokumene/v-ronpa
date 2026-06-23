@@ -26,27 +26,42 @@ describe("pixi presenter port", () => {
     const withBackground = reducePixiRuntimeCommand(initial, runtimeCommand("back", "scene", { appearance: "bg:harness" }));
     const withPortrait = reducePixiRuntimeCommand(
       withBackground.snapshot,
-      runtimeCommand("charenter", "actor", {
-        characterId: "character:felix",
-        portraitId: "portrait:felix:neutral",
-        slot: "center",
-        effect: "fadeIn"
+      runtimeCommand("char", "actor", {
+        target: "character:felix",
+        appearance: "portrait:felix:neutral",
+        pos: [50, 0]
       })
     );
 
-    expect(withBackground).toEqual({
+    expect(withBackground).toMatchObject({
       snapshot: {
-        version: 1,
+        version: 2,
         revision: 1,
-        background: { backgroundId: "bg:harness" },
-        slots: {}
+        backgroundsById: {
+          MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness", visible: true }
+        },
+        actorOrder: ["MainBackground"],
+        background: { backgroundId: "bg:harness" }
       },
       hints: [],
       diagnostics: []
     });
-    expect(withPortrait.snapshot).toEqual({
-      version: 1,
+    expect(withPortrait.snapshot).toMatchObject({
+      version: 2,
       revision: 2,
+      backgroundsById: {
+        MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness" }
+      },
+      charactersById: {
+        "character:felix": {
+          id: "character:felix",
+          kind: "character",
+          appearance: "portrait:felix:neutral",
+          pos: [0.5, 0],
+          visible: true
+        }
+      },
+      actorOrder: ["MainBackground", "character:felix"],
       background: { backgroundId: "bg:harness" },
       slots: {
         center: {
@@ -71,7 +86,7 @@ describe("pixi presenter port", () => {
 
     expect(reducePixiRuntimeCommand(initial, flash)).toEqual({
       snapshot: initial,
-      hints: [{ type: "flash", color: "#ffffff", durationMs: 160 }],
+      hints: [{ type: "flash", color: "#ffffff", durationMs: 160, wait: false }],
       diagnostics: []
     });
     expect(reducePixiRuntimeCommand(initial, keyword)).toEqual({
@@ -112,21 +127,15 @@ describe("pixi presenter port", () => {
       ]
     });
     expect(
-      reducePixiRuntimeCommand(
-        initial,
-        runtimeCommand("charenter", "actor", {
-          characterId: "character:felix",
-          slot: "upper-left"
-        })
-      )
+      reducePixiRuntimeCommand(initial, runtimeCommand("slide", "actor", { target: "character:missing", to: [50, 0] }))
     ).toEqual({
       snapshot: initial,
       hints: [],
       diagnostics: [
         {
           code: "unsupported-pixi-params",
-          commandId: "charenter",
-          message: "@charenter is routed to Pixi but cannot be consumed: unsupported slot: upper-left."
+          commandId: "slide",
+          message: "@slide is routed to Pixi but cannot be consumed: unknown actor target: character:missing."
         }
       ]
     });
@@ -163,45 +172,57 @@ describe("pixi presenter port", () => {
     ).snapshot;
     stage = reducePixiRuntimeCommand(
       stage,
-      runtimeCommand("charenter", "actor", {
-        characterId: "character:ren",
-        portraitId: "portrait:ren:neutral",
-        slot: "left",
-        effect: "fadeIn"
+      runtimeCommand("char", "actor", {
+        target: "character:ren",
+        appearance: "portrait:ren:neutral",
+        pos: [24, 0]
       })
     ).snapshot;
     stage = reducePixiRuntimeCommand(
       stage,
-      runtimeCommand("charenter", "actor", {
-        characterId: "character:felix",
-        portraitId: "portrait:felix:neutral",
-        slot: "center",
-        effect: "fadeIn"
+      runtimeCommand("char", "actor", {
+        target: "character:felix",
+        appearance: "portrait:felix:neutral",
+        pos: [50, 0]
       })
     ).snapshot;
     stage = reducePixiRuntimeCommand(
       stage,
-      runtimeCommand("charenter", "actor", {
-        characterId: "character:mira",
-        portraitId: "portrait:mira:neutral",
-        slot: "right",
-        effect: "fadeIn"
+      runtimeCommand("char", "actor", {
+        target: "character:mira",
+        appearance: "portrait:mira:neutral",
+        pos: [76, 0]
       })
     ).snapshot;
     const replacedCenter = reducePixiRuntimeCommand(
       stage,
-      runtimeCommand("charenter", "actor", {
-        characterId: "character:felix",
-        portraitId: "portrait:felix:concerned",
-        slot: "center",
-        effect: "fadeIn"
+      runtimeCommand("char", "actor", {
+        target: "character:felix",
+        appearance: "portrait:felix:concerned"
       })
     ).snapshot;
 
-    expect(replacedCenter).toEqual({
-      version: 1,
+    expect(replacedCenter).toMatchObject({
+      version: 2,
       revision: 5,
       background: { backgroundId: "bg:harness" },
+      charactersById: {
+        "character:ren": {
+          id: "character:ren",
+          appearance: "portrait:ren:neutral",
+          pos: [0.24, 0]
+        },
+        "character:felix": {
+          id: "character:felix",
+          appearance: "portrait:felix:concerned",
+          pos: [0.5, 0]
+        },
+        "character:mira": {
+          id: "character:mira",
+          appearance: "portrait:mira:neutral",
+          pos: [0.76, 0]
+        }
+      },
       slots: {
         left: { slot: "left", characterId: "character:ren", portraitId: "portrait:ren:neutral" },
         center: { slot: "center", characterId: "character:felix", portraitId: "portrait:felix:concerned" },
@@ -217,12 +238,100 @@ describe("pixi presenter port", () => {
     ).snapshot;
     const second = reducePixiRuntimeCommand(first, runtimeCommand("back", "scene", { appearance: "bg:harness" })).snapshot;
 
-    expect(second).toEqual({
-      version: 1,
+    expect(second).toMatchObject({
+      version: 2,
       revision: 2,
-      background: { backgroundId: "bg:harness" },
-      slots: {}
+      backgroundsById: {
+        MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness" }
+      },
+      background: { backgroundId: "bg:harness" }
     });
+  });
+
+  it("applies wildcard character commands to visible actors instead of creating a literal star actor", () => {
+    let stage = reducePixiRuntimeCommand(
+      createInitialPixiStageSnapshot(),
+      runtimeCommand("char", "actor", { target: "character:ren", appearance: "portrait:ren:neutral", pos: [24, 0] })
+    ).snapshot;
+    stage = reducePixiRuntimeCommand(
+      stage,
+      runtimeCommand("char", "actor", { target: "character:mira", appearance: "portrait:mira:neutral", pos: [76, 0] })
+    ).snapshot;
+
+    const tinted = reducePixiRuntimeCommand(stage, runtimeCommand("char", "actor", { target: "*", tint: "#ffdc22" })).snapshot;
+
+    expect(tinted.charactersById).not.toHaveProperty("*");
+    expect(tinted.charactersById["character:ren"]).toMatchObject({ tint: "#ffdc22", pos: [0.24, 0] });
+    expect(tinted.charactersById["character:mira"]).toMatchObject({ tint: "#ffdc22", pos: [0.76, 0] });
+  });
+
+  it("stores explicitly targeted background actors without overwriting the main background compatibility field", () => {
+    let stage = reducePixiRuntimeCommand(
+      createInitialPixiStageSnapshot(),
+      runtimeCommand("back", "scene", { target: "MainBackground", appearance: "bg:harness" })
+    ).snapshot;
+    stage = reducePixiRuntimeCommand(stage, runtimeCommand("back", "scene", { target: "Flower", appearance: "Bloomed" })).snapshot;
+
+    expect(stage.backgroundsById).toMatchObject({
+      MainBackground: { id: "MainBackground", appearance: "bg:harness" },
+      Flower: { id: "Flower", appearance: "Bloomed" }
+    });
+    expect(stage.background).toEqual({ backgroundId: "bg:harness" });
+    expect(stage.actorOrder).toEqual(["MainBackground", "Flower"]);
+  });
+
+  it("uses official scene-percent positions for slide and stores from/to transition metadata", () => {
+    const stage = reducePixiRuntimeCommand(
+      createInitialPixiStageSnapshot(),
+      runtimeCommand("char", "actor", {
+        target: "character:felix",
+        appearance: "portrait:felix:neutral",
+        pos: [50, 0],
+        visible: false
+      })
+    ).snapshot;
+    const slid = reducePixiRuntimeCommand(
+      stage,
+      runtimeCommand("slide", "actor", {
+        target: "character:felix",
+        appearance: "portrait:felix:concerned",
+        from: [15, 50],
+        to: [85, 0],
+        durationMs: 500
+      })
+    ).snapshot;
+
+    expect(slid.charactersById["character:felix"]).toMatchObject({
+      appearance: "portrait:felix:concerned",
+      visible: true,
+      pos: [0.85, 0],
+      transition: {
+        name: "slide",
+        durationMs: 500,
+        from: [0.15, 0.5],
+        to: [0.85, 0]
+      }
+    });
+  });
+
+  it("removes zero-power blur, bokeh, and weather state instead of leaving inert saved filters", () => {
+    let stage = reducePixiRuntimeCommand(
+      createInitialPixiStageSnapshot(),
+      runtimeCommand("back", "scene", { appearance: "bg:harness" })
+    ).snapshot;
+    stage = reducePixiRuntimeCommand(stage, runtimeCommand("blur", "effect", { target: "MainBackground", power: 0.4 })).snapshot;
+    stage = reducePixiRuntimeCommand(stage, runtimeCommand("bokeh", "effect", { focus: "MainBackground", power: 0.5 })).snapshot;
+    stage = reducePixiRuntimeCommand(stage, runtimeCommand("rain", "effect", { power: 0.6 })).snapshot;
+
+    const noBlur = reducePixiRuntimeCommand(stage, runtimeCommand("blur", "effect", { target: "MainBackground", power: 0 })).snapshot;
+    const noBokeh = reducePixiRuntimeCommand(noBlur, runtimeCommand("bokeh", "effect", { power: 0 })).snapshot;
+    const noRain = reducePixiRuntimeCommand(noBokeh, runtimeCommand("rain", "effect", { power: 0 })).snapshot;
+
+    const mainBackground = noRain.backgroundsById.MainBackground;
+    expect(mainBackground).toBeDefined();
+    expect(mainBackground?.filters).not.toHaveProperty("blur");
+    expect(noRain.screenFilters).not.toHaveProperty("bokeh");
+    expect(noRain.weather).not.toHaveProperty("rain");
   });
 });
 

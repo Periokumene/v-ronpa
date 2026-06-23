@@ -17,7 +17,7 @@ export const defaultVnOutputRouteTable: VnOutputRouteTable = {
   commands: {
     print: ["debug"],
     back: ["pixi"],
-    charenter: ["pixi"],
+    charenter: ["debug"],
     shake: ["pixi"],
     flash: ["pixi"],
     focus: ["pixi"],

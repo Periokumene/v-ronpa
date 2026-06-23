@@ -133,7 +133,8 @@ export function chooseStoryPlayOption(play: StoryPlayState, input: ChooseStoryPl
   const story: StoryStepperResult = {
     state: advanced.state,
     diagnostics: [...chosen.diagnostics, ...advanced.diagnostics],
-    emittedRuntimeCommands: advanced.emittedRuntimeCommands
+    emittedRuntimeCommands: advanced.emittedRuntimeCommands,
+    ...(advanced.stopReason ? { stopReason: advanced.stopReason } : {})
   };
   const stopped = stopStoryPlayAutomation(play, "choice");
   const playAfterStep = applyStoryStep(stopped, story, "choice");
@@ -154,7 +155,7 @@ export function selectStoryPlaySchedule(
   options: StoryPlayScheduleOptions = {}
 ): StoryPlaySchedule {
   const active = options.active ?? true;
-  if (!active || story.ended || story.pendingChoices.length > 0) return { type: "idle" };
+  if (!active || story.ended || story.pendingChoices.length > 0 || story.presentationWait) return { type: "idle" };
   if (options.hostBlocked || options.hostReadyForAuto === false) return { type: "idle" };
 
   const timing = { ...defaultStoryPlayTimingPolicy, ...options.timing };

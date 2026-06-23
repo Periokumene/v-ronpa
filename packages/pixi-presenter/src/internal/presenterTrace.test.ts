@@ -8,18 +8,17 @@ describe("presenter trace recorder", () => {
 
     recorder.apply(runtimeCommand("back", "scene", { appearance: "bg:court" }));
     recorder.apply(
-      runtimeCommand("charenter", "actor", {
-        characterId: "character:felix",
-        portraitId: "portrait:felix:neutral",
-        slot: "center",
-        effect: "fadeIn"
+      runtimeCommand("char", "actor", {
+        target: "character:felix",
+        appearance: "portrait:felix:neutral",
+        pos: [0.5, 0]
       })
     );
-    recorder.apply(runtimeCommand("shake", "effect", { target: "character:felix", intensity: 0.3, duration: 240 }));
+    recorder.apply(runtimeCommand("shake", "effect", { target: "character:felix", power: 0.3, durationMs: 240 }));
 
     const trace = recorder.getTrace();
     expect(trace.backgroundId).toBe("bg:court");
-    expect(trace.commands.map((command) => command.commandId)).toEqual(["back", "charenter", "shake"]);
+    expect(trace.commands.map((command) => command.commandId)).toEqual(["back", "char", "shake"]);
     expect(trace.portraits).toEqual([
       {
         characterId: "character:felix",
@@ -32,7 +31,7 @@ describe("presenter trace recorder", () => {
         blocksUserNext: false,
         durationMs: 240,
         id: "shake:3",
-        command: { commandId: "shake", params: { target: "character:felix", intensity: 0.3, duration: 240 } }
+        command: { commandId: "shake", params: { target: "character:felix", power: 0.3, durationMs: 240 } }
       }
     ]);
   });

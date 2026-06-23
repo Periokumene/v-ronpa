@@ -56,8 +56,10 @@ the current baseline intentionally uses the same fixed table for both.
 
 - `print` routes to `debug` only. DOM dialog text comes from
   `StoryRuntimeState.backlog`.
-- `back`, `charenter`, `shake`, `flash`, `focus`, and `trialkeyword` route to
+- `back`, `char`, `shake`, `flash`, `focus`, and `trialkeyword` route to
   `pixi`.
+- `charenter` routes to `debug` only as a migration stub; new scripts should
+  use official `char`.
 - `gameplay` routes to `gameplay`.
 - Media-category commands route to `media` when emitted.
 - Flow/state control commands are consumed by StoryEngine and normally do not

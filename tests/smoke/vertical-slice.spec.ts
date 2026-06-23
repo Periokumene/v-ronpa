@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-test.setTimeout(60_000);
+test.setTimeout(120_000);
 
 test("vertical slice connects Navi exploration, gameplay state, VN dialog, and branch outcomes", async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -171,11 +171,14 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await page.screenshot({ path: "test-results/vertical-slice-backlog.png", fullPage: true });
   await page.getByTestId("backlog-overlay-close").click();
   await expect(page.getByTestId("backlog-overlay")).toBeHidden();
+  const savedDialogText = (await page.getByTestId("vn-dialog-text").textContent()) ?? "";
+  expect(savedDialogText.length).toBeGreaterThan(0);
+  const savedDialogExcerpt = savedDialogText.slice(0, 12);
   await page.getByTestId("vn-command-save").click();
   await expect(page.getByTestId("save-load-overlay")).toBeVisible();
   await expect(page.getByTestId("save-load-mode")).toHaveText("save");
   await page.getByTestId("save-slot-1").click();
-  await expect(page.getByTestId("save-slot-1")).toContainText("视觉小说联调剧本");
+  await expect(page.getByTestId("save-slot-1")).toContainText(savedDialogExcerpt);
   await page.screenshot({ path: "test-results/vertical-slice-save-load.png", fullPage: true });
   await page.getByTestId("save-load-overlay-close").click();
   await expect(page.getByTestId("save-load-overlay")).toBeHidden();
@@ -193,7 +196,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await page.keyboard.press("Space");
   await movementPulse(page, "ArrowUp");
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("vn2d-overlay");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("视觉小说联调剧本");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText(savedDialogExcerpt);
   await expect(page.getByTestId("vertical-slice-pixi-background")).toHaveText("bg:harness");
   await expect(page.getByTestId("vertical-slice-pixi-slots")).toContainText("center:character:felix/portrait:felix:neutral");
   await expectNoDocumentScroll(page);

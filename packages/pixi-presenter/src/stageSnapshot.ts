@@ -1,8 +1,28 @@
-import type { PixiStageSnapshot, PixiStageSlotId, RuntimeCommand, RuntimeValue } from "@v-ronpa/contracts";
+import type {
+  PixiActorSnapshot,
+  PixiStageSnapshot,
+  PixiStageSlotId,
+  PixiWeatherKind,
+  RuntimeCommand,
+  RuntimeValue
+} from "@v-ronpa/contracts";
 
 export type PixiStageRenderHint =
-  | { type: "flash"; color: string; durationMs: number }
-  | { type: "shake"; target: string; intensity: number; durationMs: number }
+  | { type: "flash"; color: string; durationMs: number; wait?: boolean }
+  | {
+      type: "shake";
+      target: string;
+      intensity: number;
+      durationMs: number;
+      count?: number;
+      loop?: boolean;
+      deltaTimeMs?: number;
+      deltaPower?: number;
+      hor?: boolean;
+      ver?: boolean;
+      wait?: boolean;
+    }
+  | { type: "glitch"; power: number; durationMs: number; wait?: boolean }
   | {
       type: "trial-keyword";
       keywordId: string;
@@ -37,12 +57,28 @@ export interface PixiRuntimeCommandReduction {
   diagnostics: PixiRuntimeCommandDiagnostic[];
 }
 
+export interface NormalizedActorTransform {
+  pos?: [number, number];
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
+  tint?: string;
+  visible?: boolean;
+  transition: PixiActorSnapshot["transition"];
+}
+
+export const MAIN_BACKGROUND_ID = "MainBackground";
 export const pixiStageSlots: PixiStageSlotId[] = ["left", "center", "right"];
 
 export function createInitialPixiStageSnapshot(): PixiStageSnapshot {
   return {
-    version: 1,
+    version: 2,
     revision: 0,
+    backgroundsById: {},
+    charactersById: {},
+    actorOrder: [],
+    weather: {},
+    screenFilters: {},
     slots: {}
   };
 }
@@ -65,99 +101,418 @@ export function reducePixiRuntimeCommand(
     };
   }
 
-  if (command.commandId === "back") {
-    const appearance = stringParam(command, "appearance");
-    if (!appearance) return unsupportedPixiParams(snapshot, command, "missing required params: appearance");
-    return {
-      snapshot: {
-        ...snapshot,
-        revision: snapshot.revision + 1,
-        background: { backgroundId: appearance }
-      },
-      hints: [],
-      diagnostics: []
-    };
-  }
-
-  if (command.commandId === "charenter") {
-    const characterId = stringParam(command, "characterId");
-    if (!characterId) return unsupportedPixiParams(snapshot, command, "missing required params: characterId");
-    const rawSlot = stringParam(command, "slot");
-    if (rawSlot && !isPixiStageSlot(rawSlot)) {
-      return unsupportedPixiParams(snapshot, command, `unsupported slot: ${rawSlot}`);
-    }
-    const slot = rawSlot ?? "center";
-    const portrait = {
-      slot,
-      characterId,
-      ...(stringParam(command, "portraitId") ? { portraitId: stringParam(command, "portraitId") } : {})
-    };
-    return {
-      snapshot: {
-        ...snapshot,
-        revision: snapshot.revision + 1,
-        slots: {
-          ...snapshot.slots,
-          [slot]: portrait
-        }
-      },
-      hints: [],
-      diagnostics: []
-    };
-  }
-
-  if (command.commandId === "flash") {
-    return {
-      snapshot,
-      hints: [
-        {
-          type: "flash",
-          color: stringParam(command, "color") ?? "#ffffff",
-          durationMs: numberParam(command, "duration", 160)
-        }
-      ],
-      diagnostics: []
-    };
-  }
-
-  if (command.commandId === "shake") {
-    return {
-      snapshot,
-      hints: [
-        {
+  switch (command.commandId) {
+    case "back":
+      return reduceBack(snapshot, command);
+    case "char":
+      return reduceChar(snapshot, command);
+    case "arrange":
+      return reduceArrange(snapshot, command);
+    case "hidechars":
+      return reduceHideChars(snapshot, command);
+    case "slide":
+      return reduceSlide(snapshot, command);
+    case "blur":
+      return reduceBlur(snapshot, command);
+    case "bokeh":
+      return reduceBokeh(snapshot, command);
+    case "rain":
+    case "snow":
+    case "sun":
+      return reduceWeather(snapshot, command, command.commandId);
+    case "flash":
+      return {
+        snapshot,
+        hints: [
+          {
+            type: "flash",
+            color: stringParam(command, "color") ?? "#ffffff",
+            durationMs: durationMsParam(command, 160),
+            wait: booleanParam(command, "wait", false)
+          }
+        ],
+        diagnostics: []
+      };
+    case "shake":
+      {
+        const deltaTimeMs = numberParam(command, "deltaTime");
+        const deltaPower = numberParam(command, "deltaPower");
+        const hint: Extract<PixiStageRenderHint, { type: "shake" }> = {
           type: "shake",
           target: stringParam(command, "target") ?? "stage",
-          intensity: numberParam(command, "intensity", 0.35),
-          durationMs: numberParam(command, "duration", 280)
-        }
-      ],
-      diagnostics: []
-    };
+          intensity: numberParam(command, "power", 0.5),
+          durationMs: durationMsParam(command, 150),
+          count: numberParam(command, "count", 3),
+          loop: booleanParam(command, "loop", false),
+          hor: booleanParam(command, "hor", false),
+          ver: booleanParam(command, "ver", true),
+          wait: booleanParam(command, "wait", false)
+        };
+        if (deltaTimeMs !== undefined) hint.deltaTimeMs = deltaTimeMs;
+        if (deltaPower !== undefined) hint.deltaPower = deltaPower;
+        return {
+          snapshot,
+          hints: [hint],
+          diagnostics: []
+        };
+      }
+    case "glitch":
+      return {
+        snapshot,
+        hints: [
+          {
+            type: "glitch",
+            power: numberParam(command, "power", 1),
+            durationMs: durationMsParam(command, 1000),
+            wait: booleanParam(command, "wait", false)
+          }
+        ],
+        diagnostics: []
+      };
+    case "trialkeyword":
+      return reduceTrialKeyword(snapshot, command);
+    default:
+      return unsupportedPixiCommand(snapshot, command);
   }
+}
 
-  if (command.commandId === "trialkeyword") {
-    const keywordId = stringParam(command, "keywordId");
-    const text = stringParam(command, "text");
-    if (!keywordId || !text) {
-      const missingParams = [
-        keywordId ? undefined : "keywordId",
-        text ? undefined : "text"
-      ].filter((param): param is string => param !== undefined);
-      return unsupportedPixiParams(snapshot, command, `missing required params: ${missingParams.join(", ")}`);
+export function resolvePixiActorTarget(target: string | undefined, stage: PixiStageSnapshot): string[] {
+  if (!target || target === "MainBackground") return stage.backgroundsById[MAIN_BACKGROUND_ID] ? [MAIN_BACKGROUND_ID] : [];
+  if (target === "*") {
+    return [
+      ...Object.values(stage.backgroundsById).filter((actor) => actor.visible).map((actor) => actor.id),
+      ...Object.values(stage.charactersById).filter((actor) => actor.visible).map((actor) => actor.id)
+    ];
+  }
+  if (target === "stage" || target === "camera") return ["stage"];
+  if (stage.backgroundsById[target] || stage.charactersById[target]) return [target];
+  return [];
+}
+
+export function normalizeActorTransformParams(command: RuntimeCommand): NormalizedActorTransform {
+  const transform: NormalizedActorTransform = {
+    transition: {
+      name: stringParam(command, "transition"),
+      durationMs: durationMsParam(command, 0),
+      easing: stringParam(command, "easing"),
+      lazy: booleanParam(command, "lazy", false),
+      wait: booleanParam(command, "wait", false)
     }
-    const hint: PixiStageRenderHint = {
-      type: "trial-keyword",
-      keywordId,
-      text
-    };
-    const evidenceId = stringParam(command, "evidenceId");
-    if (evidenceId) hint.evidenceId = evidenceId;
-    const speakerId = stringParam(command, "speakerId");
-    if (speakerId) hint.speakerId = speakerId;
-    return { snapshot, hints: [hint], diagnostics: [] };
-  }
+  };
+  const pos = sceneVector2Param(command, "pos");
+  if (pos) transform.pos = pos;
+  const position = vector3Param(command, "position");
+  if (position) transform.position = position;
+  const rotation = vector3Param(command, "rotation");
+  if (rotation) transform.rotation = rotation;
+  const scale = vector3Param(command, "scale");
+  if (scale) transform.scale = scale;
+  const tint = stringParam(command, "tint");
+  if (tint !== undefined) transform.tint = tint;
+  const visible = booleanParam(command, "visible");
+  if (visible !== undefined) transform.visible = visible;
+  return transform;
+}
 
-  return unsupportedPixiCommand(snapshot, command);
+function reduceBack(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
+  const appearance = stringParam(command, "appearance");
+  if (!appearance) return unsupportedPixiParams(snapshot, command, "missing required params: appearance");
+  const target = stringParam(command, "target") ?? MAIN_BACKGROUND_ID;
+  const transform = normalizeActorTransformParams(command);
+  const previous = snapshot.backgroundsById[target];
+  const updateActor = (id: string, actor?: PixiActorSnapshot): PixiActorSnapshot => ({
+    id,
+    kind: "background",
+    appearance,
+    pose: stringParam(command, "pose") ?? actor?.pose,
+    visible: transform.visible ?? actor?.visible ?? true,
+    alpha: actor?.alpha ?? 1,
+    z: actor?.z ?? -100,
+    filters: actor?.filters ?? {},
+    transition: transform.transition,
+    ...(transform.pos ?? actor?.pos ? { pos: transform.pos ?? actor?.pos } : {}),
+    ...(transform.position ?? actor?.position ? { position: transform.position ?? actor?.position } : {}),
+    ...(transform.rotation ?? actor?.rotation ? { rotation: transform.rotation ?? actor?.rotation } : {}),
+    ...(transform.scale ?? actor?.scale ? { scale: transform.scale ?? actor?.scale } : {}),
+    ...(transform.tint ?? actor?.tint ? { tint: transform.tint ?? actor?.tint } : {})
+  });
+  if (target === "*") {
+    const visibleBackgrounds = Object.values(snapshot.backgroundsById).filter((actor) => actor.visible);
+    if (visibleBackgrounds.length === 0) return { snapshot, hints: [], diagnostics: [] };
+    const backgroundsById = { ...snapshot.backgroundsById };
+    for (const actor of visibleBackgrounds) backgroundsById[actor.id] = updateActor(actor.id, actor);
+    return changedSnapshot({
+      ...snapshot,
+      backgroundsById,
+      background: backgroundsById[MAIN_BACKGROUND_ID]?.appearance ? { backgroundId: backgroundsById[MAIN_BACKGROUND_ID].appearance } : snapshot.background
+    });
+  }
+  const actor: PixiActorSnapshot = {
+    ...updateActor(target, previous)
+  };
+  return changedSnapshot({
+    ...snapshot,
+    backgroundsById: { ...snapshot.backgroundsById, [target]: actor },
+    actorOrder: ensureActorOrder(snapshot.actorOrder, target),
+    ...(target === MAIN_BACKGROUND_ID ? { background: { backgroundId: appearance } } : {})
+  });
+}
+
+function reduceChar(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
+  const target = stringParam(command, "target");
+  if (!target) return unsupportedPixiParams(snapshot, command, "missing required params: target");
+  const transform = normalizeActorTransformParams(command);
+  if (target === "*") {
+    const visibleActors = snapshot.actorOrder
+      .map((id) => snapshot.charactersById[id])
+      .filter((actor): actor is PixiActorSnapshot => Boolean(actor?.visible));
+    if (visibleActors.length === 0) return { snapshot, hints: [], diagnostics: [] };
+    const charactersById = { ...snapshot.charactersById };
+    for (const actor of visibleActors) {
+      charactersById[actor.id] = buildCharacterActor(snapshot, command, actor.id, transform, actor);
+    }
+    return changedSnapshot(withLegacySlots({ ...snapshot, charactersById }));
+  }
+  const previous = snapshot.charactersById[target];
+  const actor = buildCharacterActor(snapshot, command, target, transform, previous);
+  return changedSnapshot(
+    withLegacySlots({
+      ...snapshot,
+      charactersById: { ...snapshot.charactersById, [target]: actor },
+      actorOrder: ensureActorOrder(snapshot.actorOrder, target)
+    })
+  );
+}
+
+function reduceArrange(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
+  const positions = namedPositionParam(command, "characterPositions");
+  const visibleActors = snapshot.actorOrder
+    .map((id) => snapshot.charactersById[id])
+    .filter((actor): actor is PixiActorSnapshot => Boolean(actor?.visible));
+  const fallbackPositions = evenlySpacedPositions(visibleActors.length);
+  const charactersById = { ...snapshot.charactersById };
+
+  visibleActors.forEach((actor, index) => {
+    const x = positions.get(actor.id) ?? positions.get(actor.id.replace(/^character:/, "")) ?? fallbackPositions[index] ?? 50;
+    const autoLook = positions.size === 0 ? booleanParam(command, "look", true) : booleanParam(command, "look", false);
+    charactersById[actor.id] = {
+      ...actor,
+      pos: [x / 100, actor.pos?.[1] ?? 0],
+      look: autoLook ? "camera" : actor.look,
+      transition: timingTransition(command)
+    };
+  });
+
+  return changedSnapshot(withLegacySlots({ ...snapshot, charactersById }));
+}
+
+function reduceHideChars(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
+  const charactersById = Object.fromEntries(
+    Object.entries(snapshot.charactersById).map(([id, actor]) => [
+      id,
+      { ...actor, visible: false, transition: timingTransition(command) }
+    ])
+  );
+  return changedSnapshot(withLegacySlots({ ...snapshot, charactersById }));
+}
+
+function reduceSlide(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
+  const target = stringParam(command, "target");
+  if (!target) return unsupportedPixiParams(snapshot, command, "missing required params: target");
+  const actor = snapshot.charactersById[target] ?? snapshot.backgroundsById[target];
+  if (!actor) return unsupportedPixiParams(snapshot, command, `unknown actor target: ${target}`);
+  const nextPos = sceneVector2Param(command, "to", actor.pos);
+  const explicitFrom = sceneVector2Param(command, "from", actor.pos);
+  const startPos = explicitFrom ?? defaultSlideFrom(actor, nextPos);
+  const transition = {
+    ...timingTransition(command),
+    name: "slide",
+    ...(startPos ? { from: startPos } : {}),
+    ...(nextPos ? { to: nextPos } : {})
+  };
+  const nextActor: PixiActorSnapshot = {
+    ...actor,
+    appearance: stringParam(command, "appearance") ?? actor.appearance,
+    visible: booleanParam(command, "visible", true),
+    transition,
+    ...(nextPos ? { pos: nextPos } : {})
+  };
+  const next =
+    actor.kind === "background"
+      ? { ...snapshot, backgroundsById: { ...snapshot.backgroundsById, [target]: nextActor } }
+      : { ...snapshot, charactersById: { ...snapshot.charactersById, [target]: nextActor } };
+  return changedSnapshot(withLegacySlots(next));
+}
+
+function reduceBlur(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
+  const targets = resolvePixiActorTarget(stringParam(command, "target"), snapshot);
+  if (targets.length === 0) return unsupportedPixiParams(snapshot, command, `unknown actor target: ${stringParam(command, "target") ?? MAIN_BACKGROUND_ID}`);
+  const power = numberParam(command, "power", 0);
+  let next = snapshot;
+  for (const target of targets) {
+    const actor = next.backgroundsById[target] ?? next.charactersById[target];
+    if (!actor) continue;
+    const filters = { ...actor.filters };
+    if (power <= 0) delete filters.blur;
+    else filters.blur = power;
+    const updated: PixiActorSnapshot = {
+      ...actor,
+      filters,
+      transition: timingTransition(command)
+    };
+    next =
+      actor.kind === "background"
+        ? { ...next, backgroundsById: { ...next.backgroundsById, [target]: updated } }
+        : { ...next, charactersById: { ...next.charactersById, [target]: updated } };
+  }
+  return changedSnapshot(next);
+}
+
+function reduceBokeh(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
+  const power = numberParam(command, "power", 0);
+  if (power <= 0) {
+    const { bokeh: _bokeh, ...screenFilters } = snapshot.screenFilters;
+    return changedSnapshot({ ...snapshot, screenFilters });
+  }
+  return changedSnapshot({
+    ...snapshot,
+    screenFilters: {
+      ...snapshot.screenFilters,
+      bokeh: {
+        focus: stringParam(command, "focus"),
+        dist: numberParam(command, "dist", 0),
+        power,
+        transition: timingTransition(command)
+      }
+    }
+  });
+}
+
+function reduceWeather(snapshot: PixiStageSnapshot, command: RuntimeCommand, kind: PixiWeatherKind): PixiRuntimeCommandReduction {
+  const power = numberParam(command, "power", 1);
+  if (power <= 0) {
+    const weather = { ...snapshot.weather };
+    delete weather[kind];
+    return changedSnapshot({ ...snapshot, weather });
+  }
+  return changedSnapshot({
+    ...snapshot,
+    weather: {
+      ...snapshot.weather,
+      [kind]: {
+        kind,
+        power,
+        xSpeed: numberParam(command, "xSpeed"),
+        ySpeed: numberParam(command, "ySpeed"),
+        pos: sceneVector2Param(command, "pos"),
+        position: vector3Param(command, "position"),
+        rotation: vector3Param(command, "rotation"),
+        scale: vector3Param(command, "scale"),
+        transition: timingTransition(command)
+      }
+    }
+  });
+}
+
+function buildCharacterActor(
+  snapshot: PixiStageSnapshot,
+  command: RuntimeCommand,
+  target: string,
+  transform: NormalizedActorTransform,
+  previous: PixiActorSnapshot | undefined
+): PixiActorSnapshot {
+  return {
+    id: target,
+    kind: "character",
+    appearance: stringParam(command, "appearance") ?? previous?.appearance,
+    pose: stringParam(command, "pose") ?? previous?.pose,
+    visible: transform.visible ?? previous?.visible ?? true,
+    alpha: previous?.alpha ?? 1,
+    z: previous?.z ?? snapshot.actorOrder.length,
+    filters: previous?.filters ?? {},
+    look: stringParam(command, "look") ?? previous?.look,
+    transition: transform.transition,
+    pos: transform.pos ?? previous?.pos ?? defaultCharacterPos(snapshot, target),
+    ...(transform.position ?? previous?.position ? { position: transform.position ?? previous?.position } : {}),
+    ...(transform.rotation ?? previous?.rotation ? { rotation: transform.rotation ?? previous?.rotation } : {}),
+    ...(transform.scale ?? previous?.scale ? { scale: transform.scale ?? previous?.scale } : {}),
+    ...(transform.tint ?? previous?.tint ? { tint: transform.tint ?? previous?.tint } : {})
+  };
+}
+
+function reduceTrialKeyword(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
+  const keywordId = stringParam(command, "keywordId");
+  const text = stringParam(command, "text");
+  if (!keywordId || !text) {
+    const missingParams = [keywordId ? undefined : "keywordId", text ? undefined : "text"].filter(
+      (param): param is string => param !== undefined
+    );
+    return unsupportedPixiParams(snapshot, command, `missing required params: ${missingParams.join(", ")}`);
+  }
+  const hint: PixiStageRenderHint = { type: "trial-keyword", keywordId, text };
+  const evidenceId = stringParam(command, "evidenceId");
+  if (evidenceId) hint.evidenceId = evidenceId;
+  const speakerId = stringParam(command, "speakerId");
+  if (speakerId) hint.speakerId = speakerId;
+  return { snapshot, hints: [hint], diagnostics: [] };
+}
+
+function changedSnapshot(snapshot: PixiStageSnapshot): PixiRuntimeCommandReduction {
+  return {
+    snapshot: { ...snapshot, revision: snapshot.revision + 1 },
+    hints: [],
+    diagnostics: []
+  };
+}
+
+function withLegacySlots(snapshot: PixiStageSnapshot): PixiStageSnapshot {
+  const visible = snapshot.actorOrder
+    .map((id) => snapshot.charactersById[id])
+    .filter((actor): actor is PixiActorSnapshot => Boolean(actor?.visible));
+  const slots: PixiStageSnapshot["slots"] = {};
+  visible.forEach((actor) => {
+    const slot = legacySlotForActor(actor);
+    slots[slot] = {
+      slot,
+      characterId: actor.id,
+      ...(actor.appearance ? { portraitId: actor.appearance } : {})
+    };
+  });
+  return { ...snapshot, slots };
+}
+
+function legacySlotForActor(actor: PixiActorSnapshot): PixiStageSlotId {
+  const x = actor.pos?.[0] ?? 0.5;
+  if (x < 0.38) return "left";
+  if (x > 0.62) return "right";
+  return "center";
+}
+
+function ensureActorOrder(order: string[], id: string): string[] {
+  return order.includes(id) ? order : [...order, id];
+}
+
+function defaultCharacterPos(snapshot: PixiStageSnapshot, id: string): [number, number] {
+  const visibleCount = snapshot.actorOrder.filter((actorId) => snapshot.charactersById[actorId]?.visible).length;
+  const positions = evenlySpacedPositions(Math.max(1, visibleCount + (snapshot.charactersById[id] ? 0 : 1)));
+  return [(positions.at(-1) ?? 50) / 100, 0];
+}
+
+function evenlySpacedPositions(count: number): number[] {
+  if (count <= 0) return [];
+  if (count === 1) return [50];
+  const step = 70 / (count - 1);
+  return Array.from({ length: count }, (_, index) => 15 + step * index);
+}
+
+function timingTransition(command: RuntimeCommand): PixiActorSnapshot["transition"] {
+  return {
+    name: stringParam(command, "transition"),
+    durationMs: durationMsParam(command, 0),
+    easing: stringParam(command, "easing"),
+    lazy: booleanParam(command, "lazy", false),
+    wait: booleanParam(command, "wait", false)
+  };
 }
 
 function unsupportedPixiCommand(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
@@ -192,18 +547,79 @@ function unsupportedPixiParams(
   };
 }
 
-function isPixiStageSlot(value: string): value is "left" | "center" | "right" {
-  return value === "left" || value === "center" || value === "right";
-}
-
 function stringParam(command: RuntimeCommand, key: string): string | undefined {
   const value = scalarValue(command.params[key]);
   return value === undefined ? undefined : String(value);
 }
 
-function numberParam(command: RuntimeCommand, key: string, fallback: number): number {
+function numberParam(command: RuntimeCommand, key: string): number | undefined;
+function numberParam(command: RuntimeCommand, key: string, fallback: number): number;
+function numberParam(command: RuntimeCommand, key: string, fallback?: number): number | undefined {
   const value = scalarValue(command.params[key]);
   return typeof value === "number" ? value : fallback;
+}
+
+function booleanParam(command: RuntimeCommand, key: string): boolean | undefined;
+function booleanParam(command: RuntimeCommand, key: string, fallback: boolean): boolean;
+function booleanParam(command: RuntimeCommand, key: string, fallback?: boolean): boolean | undefined {
+  const value = scalarValue(command.params[key]);
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function durationMsParam(command: RuntimeCommand, fallback: number): number {
+  return numberParam(command, "durationMs", numberParam(command, "duration", fallback)) ?? fallback;
+}
+
+function sceneVector2Param(
+  command: RuntimeCommand,
+  key: string,
+  fallback?: [number, number]
+): [number, number] | undefined {
+  const list = numericList(command.params[key]);
+  if (list.length === 0) return undefined;
+  const x = list[0] !== undefined ? list[0] / 100 : fallback?.[0];
+  const y = list[1] !== undefined ? list[1] / 100 : fallback?.[1];
+  if (x === undefined || y === undefined) return undefined;
+  return [x, y];
+}
+
+function vector3Param(command: RuntimeCommand, key: string): [number, number, number] | undefined {
+  const list = numericList(command.params[key]);
+  if (list.length === 2) return [list[0]!, list[1]!, 0];
+  return list.length >= 3 ? [list[0]!, list[1]!, list[2]!] : undefined;
+}
+
+function namedPositionParam(command: RuntimeCommand, key: string): Map<string, number> {
+  const value = command.params[key];
+  const items = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
+  const result = new Map<string, number>();
+  for (const item of items) {
+    const text = String(scalarValue(item) ?? "");
+    const dot = text.lastIndexOf(".");
+    if (dot <= 0) continue;
+    const actorId = text.slice(0, dot);
+    const position = Number(text.slice(dot + 1));
+    if (Number.isFinite(position)) result.set(actorId, position);
+  }
+  return result;
+}
+
+function defaultSlideFrom(actor: PixiActorSnapshot, to: [number, number] | undefined): [number, number] | undefined {
+  if (actor.visible && actor.pos) return actor.pos;
+  if (!to) return actor.pos;
+  return [to[0] < 0.5 ? 1.1 : -0.1, to[1]];
+}
+
+function numericList(value: RuntimeValue | undefined): number[] {
+  if (Array.isArray(value)) return value.map(scalarValue).filter((item): item is number => typeof item === "number");
+  if (typeof value === "number") return [value];
+  if (typeof value === "string" && value.includes(",")) {
+    return value
+      .split(",")
+      .map((item) => Number(item.trim()))
+      .filter((item) => Number.isFinite(item));
+  }
+  return [];
 }
 
 function scalarValue(value: RuntimeValue | undefined): string | number | boolean | undefined {

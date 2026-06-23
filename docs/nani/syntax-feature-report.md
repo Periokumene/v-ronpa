@@ -101,7 +101,7 @@ baseline and downstream StoryEngine expectations:
 
 - `@set`
 - `@back`
-- `@charEnter`
+- `@char`
 - `@choice`
 - `@goto`
 - `@gameplay grant-evidence`

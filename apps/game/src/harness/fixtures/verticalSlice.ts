@@ -157,74 +157,67 @@ export const verticalSliceMaps: WorldMapDef[] = [
 
 export const verticalSliceScript = `#Start
 @set route:"intro"
-@back bg:harness effect:fade
-@charEnter character:felix portrait:portrait:felix:neutral slot:center
-Felix: 这是视觉小说联调剧本的第一句。走廊、证人、门禁卡都会在这一段里被验证。[>]
-Mira: 我会记录每一次状态变化，尤其是证词和证物进入系统的时机。
-Felix: 先别急着追问。这个场景需要证明中文文本、分支和立绘演出可以稳定推进。
-@charEnter character:mira portrait:portrait:mira:neutral slot:right
-Mira: 右侧立绘已就位。接下来要确认多角色对话不会互相覆盖。
-Felix: 画面层交给 Pixi，对话框交给 DOM，剧情步进交给 StoryEngine。
-Mira: 而 Navi 只负责告诉我们：现在还在探索模式的视觉小说覆盖层里。
-@charEnter character:ren portrait:portrait:ren:neutral slot:left
-Ren: 你们终于来了。我就是刚才站在教室门口的证人。
-Felix: 你说自己一直没有离开走廊？
-Ren: 对，但我听见门锁响了一次。声音很轻，像有人刷过卡。
-Mira: 这和地上的红色门禁卡有关吗？
-Ren: 我没有碰过它。我只记得灯闪了一下，然后广播突然断掉。
-@flash color:#8fd3ff duration:140
-Narrator: 走廊灯带短暂闪烁，蓝白色的光扫过三个人的影子。
-Felix: 如果灯闪发生在门锁响之后，时间顺序就很关键。
-Mira: 我们需要一个完整的测试路径：留在走廊复盘，或者跟着证人进教室。
-Ren: 如果进教室，我可以指出声音传来的方向。
-Felix: 如果留在走廊，我们能检查门框和地面的痕迹。
-Mira: 两条路线都必须能回收变量、证据和结束态。
-Ren: 那就让你来决定。别忘了，这只是测试，但证词不能含糊。
-Narrator: 对话进入分支选择。当前脚本已经完成多角色登场、背景、闪光和长文本验证。
-@choice "留在走廊复盘证词" goto:#ReviewHall
-@choice "跟随证人进入教室" goto:#Classroom
+@back bg:harness effect:fade time:0.15
+@char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
+Narrator: 视觉小说联调剧本：这是测试入口，不是剧情样例。请先确认背景和 Felix 中央立绘可见。[>]
+Narrator: 请选择测试路径。分支 1 快速结束，只验证 StoryEngine 的 choice、goto、set、end；分支 2 是完整 Pixi 命令视觉验收。
+@choice "分支1：快速结束剧情逻辑测试" goto:#LogicFastExit
+@choice "分支2：完整 Pixi 命令视觉验收" goto:#PixiCommandShowcase
 
-#ReviewHall
+#LogicFastExit
 @set route:"return"
-Felix: 我们先留在走廊复盘证词。第一件事是确认门锁声音的来源。
-Mira: 我会把证人的说法拆成三个点：灯闪、门响、广播中断。
-Ren: 灯闪不是普通故障。它只闪了一次，而且方向像是从教室里漏出来的。
-Narrator: Felix 蹲下检查门框，指尖沿着金属边缘缓慢移动。
-@shake actorId:character:felix intensity:0.28 duration:240
-Felix: 门框没有被撬过，但读卡器边缘有一道新划痕。
-Mira: 也就是说，有人用过卡，却不一定熟悉这套门禁。
-Ren: 我听见的声音应该就是读卡器重启。它平时不会这么响。
-Felix: 证词在这里暂时成立，但我们还缺一个能确认时间点的物件。
-Mira: 走廊复盘路线不发放新证据，只保留路线变量，方便测试无证据分支。
-Narrator: 记录面板里，route 应该显示为 return，证据列表保持原样。
-Ren: 如果你们之后要进教室，我还可以继续配合。
-Felix: 这条路线足够了。我们先结束覆盖层，回到 Navi 探索。
-Mira: 对话结束后，输入锁应该释放，玩家可以重新移动。
-Narrator: 走廊路线完成。视觉小说覆盖层准备关闭。
+Narrator: 分支 1 检查点：route 应切换为 return，选择跳转成功，下一步直接结束覆盖层。
 @end
 
-#Classroom
+#PixiCommandShowcase
 @set route:"classroom"
 @gameplay grant-evidence id:evidence:keycard
-@back bg:classroom effect:fade
-@charEnter character:mira portrait:portrait:mira:neutral slot:left
-Mira: 我们进入教室路线。系统现在应该发放门禁卡证据。
-Felix: 证据更新发生在这句台词之前，方便 smoke 测试立刻检查状态。
-Ren: 声音就是从讲台左侧传来的。那里有一个备用读卡器。
-Narrator: 教室比走廊更暗，桌椅整齐得像从来没有人坐过。
+Narrator: 分支 2 开始：右侧 Runtime 面板的 route 应为 classroom，evidence 应包含 evidence:keycard。
+@back bg:harness effect:fade time:0.2
+@rain power:1 time:0.1 xSpeed:-1.4 ySpeed:7
+Narrator: CHECKPOINT 01A - rain only。背景为 bg:harness，画面前景应出现清晰、持续下落的斜向雨线；此处不叠加 blur、bokeh 或 sun。
+@rain power:0 time:0.1
+@snow power:1 time:0.1 scale:1.2,1.2,1
+Narrator: CHECKPOINT 01B - snow only。雨线应消失，画面前景应出现清晰、缓慢飘落的雪花；此处仍不叠加 blur、bokeh 或 sun。
+@snow power:0 time:0.1
+@sun power:0.3 time:0.2 pos:12,88 scale:1.1,1.1,1
+@blur actorId:MainBackground power:0.12 time:0.2
+Narrator: CHECKPOINT 01C - sun + blur。右上应出现柔和光束，背景轻微虚化；雨雪此时应已关闭。
+@char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
+@char idAndAppearance:character:mira.portrait:mira:neutral pos:78,0
+@char idAndAppearance:character:ren.portrait:ren:neutral pos:22,0
+Narrator: CHECKPOINT 02 - char。Felix、Mira、Ren 三个 actor 均应可见；Ren 没有真实资源时显示 fallback，占位也算通过。
+@arrange ren.18,felix.50,mira.82 look! time:0.25
+Narrator: CHECKPOINT 03 - arrange。三名角色应重新排到左、中、右；右侧 Pixi Slots 应显示 left/center/right。
+@flash color:#8fd3ff duration:160
+Narrator: CHECKPOINT 04 - flash。刚才应看到一次蓝白色短闪光。
+@slide character:felix.portrait:felix:neutral from:38,0 to:50,0 time:0.35 easing:easeOut wait!
+Narrator: CHECKPOINT 05 - slide + wait。Felix 应从偏左滑回中央；本句应在滑动等待结束后出现。
+@shake actorId:character:ren power:0.36 time:0.08 count:4 deltaPower:0.06 hor! ver!
+Narrator: CHECKPOINT 06 - shake。Ren 或其 fallback 应进行水平和垂直抖动。
+@bokeh focus:character:felix dist:10 power:0.55 time:0.2
+Narrator: CHECKPOINT 07 - bokeh only。画面应进入明显景深/柔焦状态，并出现柔和圆形光斑；下一步会先关闭 bokeh 再测试 glitch。
+@bokeh power:0 time:0.15
+@glitch power:0.9 time:2
+Narrator: CHECKPOINT 07B - glitch only。bokeh 已关闭；本句出现时应能直接看到明显的扫描线、色差、横向噪声条或画面扰动；此处不测试 wait。
+@glitch power:0.9 time:0.8 wait!
+Narrator: CHECKPOINT 08 - glitch only + wait。保留 wait 检查点用于后续专项修复；本轮独立 glitch 视觉验收以 CHECKPOINT 07B 为准。
+@back bg:classroom effect:fade time:0.2
+@snow power:0.85 time:0.2 pos:62,82 scale:1,1,1
+@rain power:0.85 time:0.2 xSpeed:0.5 ySpeed:5
+@char idAndAppearance:character:mira.portrait:mira:neutral pos:24,0
+@arrange ren.18,felix.50,mira.82 look! time:0.2
+Narrator: CHECKPOINT 09 - rain + snow coexist。背景切到 bg:classroom，雨雪应同时清晰存在；三名角色不应被天气层遮没。
 @flash color:#ffffff duration:120
-Mira: 白光闪烁。这个演出命令用来验证 Pixi 的 flash 效果。
-Felix: 门禁卡的编号被刮掉了一半，但红色涂层很新。
-Ren: 我见过这张卡。它不属于学生，也不属于普通教师。
-Mira: 那它可能是临时权限卡，能解释为什么广播会被切断。
-Felix: 如果有人刷卡进入教室，再切断广播，就能制造证词空窗。
-Narrator: 讲台抽屉里传来轻微震动，像有什么东西撞到木板。
-@shake actorId:character:ren intensity:0.42 duration:260
-Ren: 等等，我刚才没有碰那个抽屉。
-Felix: 别动。我们先把现有结论写清楚。
-Mira: 结论一：证人听见门锁。结论二：门禁卡能解释门锁。结论三：广播中断可能是人为。
-Ren: 结论四：我可能不是唯一听见声音的人。
-Felix: 这很好。测试剧本现在覆盖了证据发放、分支变量、多角色台词和演出命令。
-Mira: 对话结束后应该回到走廊或当前地图的 Navi 状态，输入锁解除。
-Narrator: 教室路线完成。门禁卡证据已进入 Inspector Lite，可供后续审判样例使用。
+@slide character:mira.portrait:mira:neutral from:15,0 to:24,0 time:0.25 easing:easeOut
+@shake actorId:stage power:0.2 time:0.07 count:3 hor! ver!
+Narrator: CHECKPOINT 10 - white flash、Mira slide、stage shake。应看到白闪，Mira 从更左侧滑入，随后整个 Pixi stage 轻微抖动。
+@bokeh power:0 time:0.2
+@blur actorId:MainBackground power:0 time:0.2
+@rain power:0 time:0.2
+@snow power:0 time:0.2
+@sun power:0 time:0.2
+Narrator: CHECKPOINT 11 - cleanup。bokeh、blur、rain、snow、sun 均应被移除，画面恢复清晰稳定；背景保持 bg:classroom。
+@hideChars time:0.2 wait!
+Narrator: CHECKPOINT 12 - hideChars + wait。角色应已隐藏；本句出现后覆盖层即将结束。
 @end`;

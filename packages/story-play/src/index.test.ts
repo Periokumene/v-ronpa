@@ -131,6 +131,12 @@ describe("story play", () => {
 
     expect(selectStoryPlaySchedule(play, story, { hostReadyForAuto: false })).toEqual({ type: "idle" });
     expect(selectStoryPlaySchedule(play, story, { hostBlocked: true })).toEqual({ type: "idle" });
+    expect(
+      selectStoryPlaySchedule(play, {
+        ...story,
+        presentationWait: { commandId: "char", durationMs: 250, target: "character:felix" }
+      })
+    ).toEqual({ type: "idle" });
   });
 
   it("chooses through StoryEngine and returns the combined existing story result shape", () => {
@@ -164,7 +170,8 @@ describe("story play", () => {
       diagnostics: [],
       emittedRuntimeCommands: [
         expect.objectContaining({ commandId: "print", params: expect.objectContaining({ text: "Chosen." }) })
-      ]
+      ],
+      stopReason: "text"
     });
   });
 

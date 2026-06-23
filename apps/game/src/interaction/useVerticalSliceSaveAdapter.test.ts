@@ -37,7 +37,7 @@ describe("vertical slice save adapter", () => {
       version: 2,
       mode: "navi",
       pixiStage: {
-        version: 1,
+        version: 2,
         revision: 1,
         background: { backgroundId: "bg:harness" }
       },

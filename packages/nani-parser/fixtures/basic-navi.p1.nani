@@ -5,7 +5,7 @@
 #Start
 @set route:"intro"
 @back bg:harness effect:fade
-@charEnter character:felix portrait:portrait:felix:neutral slot:center
+@char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
 Felix.Neutral: This hallway is quiet.[< speed:0.8] We should check the case file.[>]
 Mira.Calm: Keep your voice down. The door still listens.[>]
 
