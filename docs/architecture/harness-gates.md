@@ -70,8 +70,8 @@ through a Navi interactable, Trial presentation/input state comes from
 `trial-director`, VN dialog can branch, VN dialog display settings update the
 real `VnDialogSurface`, VN AUTO timing responds to settings,
 VN toolbar/backlog/save-load surfaces are interactive, Navi ESC opens the pause
-menu, canvas layers are present, and `InputLockState` changes at Navi/Trial/VN
-and menu boundaries.
+menu, canvas layers are present, Pixi task debug readouts stay terminal after
+load/skip, and `InputLockState` changes at Navi/Trial/VN and menu boundaries.
 
 The first app build intentionally allows the large R3F/Pixi/Three bundle
 warning. A later performance task should add route or adapter code splitting

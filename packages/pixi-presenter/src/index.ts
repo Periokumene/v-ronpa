@@ -9,6 +9,7 @@ import {
   WeatherSystem
 } from "./internal/systems";
 import { preloadBuiltInPixiFxAssets } from "./internal/fxAssets";
+import { PresentationTaskController, type PixiPresentationTaskSnapshot } from "./internal/presentationTasks";
 import { type PixiStageRenderHint } from "./stageSnapshot";
 
 export {
@@ -22,11 +23,13 @@ export {
   type PixiRuntimeCommandReduction,
   type PixiStageRenderHint
 } from "./stageSnapshot";
+export type { PixiPresentationTaskSnapshot } from "./internal/presentationTasks";
 
 export interface PixiPresenterOptions {
   host: HTMLElement;
   width?: number;
   height?: number;
+  onTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
 }
 
 export interface PixiStageReconcileOptions {
@@ -50,6 +53,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
   const app = new Application();
   const stageRoot = new Container({ label: "pixi-vn-stage" });
   const tweens = new TweenSystem();
+  const tasks = new PresentationTaskController(options.onTasksChanged);
   let actors: ActorSystem | undefined;
   let weather: WeatherSystem | undefined;
   let screenOverlays: ScreenOverlaySystem | undefined;
@@ -69,6 +73,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
 
   const tick = (ticker: Ticker) => {
     tweens.tick(ticker);
+    tasks.tick(ticker.deltaMS);
     weather?.tick(ticker);
   };
 
@@ -96,10 +101,10 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     options.host.appendChild(app.canvas);
     app.stage.addChild(stageRoot);
     const systemOptions = { root: stageRoot, width: size.width, height: size.height };
-    actors = new ActorSystem(systemOptions, filters, tweens);
-    weather = new WeatherSystem(systemOptions, filters);
-    screenOverlays = new ScreenOverlaySystem(systemOptions);
-    effects = new TransientEffectSystem(systemOptions, actors, filters, tweens);
+    actors = new ActorSystem(systemOptions, filters, tweens, tasks);
+    weather = new WeatherSystem(systemOptions, filters, tweens, tasks);
+    screenOverlays = new ScreenOverlaySystem(systemOptions, tweens, tasks);
+    effects = new TransientEffectSystem(systemOptions, actors, filters, tweens, tasks);
     app.ticker.add(tick);
     mounted = true;
     if (pendingReconcile) {
@@ -119,17 +124,23 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
 
   function renderSnapshot(snapshot: PixiStageSnapshot, reconcileOptions: PixiStageReconcileOptions) {
     const animate = reconcileOptions.animate ?? false;
-    effects?.clear();
+    if (!animate) {
+      tweens.clear();
+      tasks.settleAllNonHold();
+      effects?.clear();
+    }
     actors?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision);
-    weather?.reconcile(snapshot);
-    screenOverlays?.reconcile(snapshot);
+    weather?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision);
+    screenOverlays?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision);
     filters.applyScreenFilters(stageRoot, snapshot);
-    if (animate) effects?.run(reconcileOptions.hints ?? []);
+    effects?.clearTrialOverlays();
+    if (animate) effects?.run(reconcileOptions.hints ?? [], snapshot.revision);
     lastRenderedSnapshot = snapshot;
   }
 
   function clear() {
     pendingReconcile = undefined;
+    tasks.cancelAll();
     tweens.clear();
     actors?.clear();
     weather?.clear();

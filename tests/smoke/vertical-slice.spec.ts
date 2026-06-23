@@ -142,13 +142,16 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-textbox-opacity", "0.5");
   await expect(page.getByTestId("pixi-layer")).toBeVisible();
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("aria-hidden", "false");
-  await expect(page.getByTestId("vn-dialog-speaker")).toHaveText("菲利克斯");
+  await expect(page.getByTestId("vn-dialog-speaker")).toHaveText("旁白");
   await expect(page.getByTestId("vn-dialog-state")).toHaveText("可继续");
   await expect(page.getByTestId("vn-dialog-advance")).toHaveText("继续");
   await expect(page.getByTestId("vn-dialog-cancel")).toHaveText("取消");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("视觉小说联调剧本");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("请选择测试路径");
+  await advanceUntilChoices(page);
+  await expect(page.getByTestId("vn-dialog-state")).toHaveText("等待选择");
   await expect(page.getByTestId("vertical-slice-pixi-background")).toHaveText("bg:harness");
   await expect(page.getByTestId("vertical-slice-pixi-slots")).toContainText("center:character:felix/portrait:felix:neutral");
+  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
   await expect(page.getByTestId("vn-command-backlog")).toBeEnabled();
   await expect(page.getByTestId("vn-command-save")).toBeEnabled();
@@ -199,17 +202,17 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vn-dialog-text")).toContainText(savedDialogExcerpt);
   await expect(page.getByTestId("vertical-slice-pixi-background")).toHaveText("bg:harness");
   await expect(page.getByTestId("vertical-slice-pixi-slots")).toContainText("center:character:felix/portrait:felix:neutral");
+  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
   await expectNoDocumentScroll(page);
   await page.screenshot({ path: "test-results/vertical-slice-vn-choice.png", fullPage: true });
 
-  await advanceUntilChoices(page);
   await expect(page.getByTestId("vn-dialog-choices")).toBeVisible();
   await expect(page.getByTestId("vn-dialog-state")).toHaveText("等待选择");
-  await expect(page.getByTestId("vn-dialog-choice-0")).toHaveText("留在走廊复盘证词");
-  await expect(page.getByTestId("vn-dialog-choice-1")).toHaveText("跟随证人进入教室");
+  await expect(page.getByTestId("vn-dialog-choice-0")).toHaveText("分支1：快速结束剧情逻辑测试");
+  await expect(page.getByTestId("vn-dialog-choice-1")).toHaveText("分支2：完整 Pixi 命令视觉验收");
   await page.getByTestId("vn-dialog-choice-0").click();
   await expect(page.getByTestId("vertical-slice-route")).toHaveText("return");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("留在走廊复盘证词");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 1 检查点");
   await advanceUntilOverlayClosed(page);
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
   await page.keyboard.press("Escape");
@@ -228,7 +231,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await page.getByTestId("vn-dialog-choice-1").click();
   await expect(page.getByTestId("vertical-slice-route")).toHaveText("classroom");
   await expect(page.getByTestId("vertical-slice-evidence")).toContainText("evidence:keycard");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("进入教室路线");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 2 开始");
   await page.screenshot({ path: "test-results/vertical-slice-branch-b.png", fullPage: true });
 
   expect(consoleErrors).toEqual([]);

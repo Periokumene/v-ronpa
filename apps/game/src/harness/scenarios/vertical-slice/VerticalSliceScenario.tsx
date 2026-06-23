@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, type ButtonHTMLAttributes } from "react";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
+import type { PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
 import { ExplorationStage3D, TrialRoundTableStage } from "@v-ronpa/r3f-adapter";
 import { InspectorLite } from "@v-ronpa/ui-kit";
 import { GameInteractionShell } from "../../../interaction/GameInteractionShell";
@@ -58,6 +59,7 @@ export function VerticalSliceScenario() {
               pixiAnimate={runtime.pixiStageRuntime.animate}
               pixiHintSequence={runtime.pixiStageRuntime.hintSequence}
               pixiHints={runtime.pixiStageRuntime.hints}
+              pixiPresentationTasks={runtime.pixiStageRuntime.presentationTasks}
               pixiStage={runtime.pixiStageRuntime.snapshot}
               story={runtime.storyRuntime.state}
               storySession={runtime.storySession}
@@ -66,6 +68,7 @@ export function VerticalSliceScenario() {
               onAdvance={runtime.advanceStory}
               onChoice={runtime.chooseStory}
               onCancel={() => runtime.closeStoryOverlay()}
+              onPixiTasksChanged={runtime.updatePixiPresentationTasks}
             />
           </div>
         </GameInteractionShell>
@@ -121,6 +124,7 @@ export function VerticalSliceScenario() {
                 pixiBackground={runtime.pixiStageRuntime.snapshot.background?.backgroundId ?? "none"}
                 pixiRevision={String(runtime.pixiStageRuntime.snapshot.revision)}
                 pixiSlots={formatPixiStageSlots(runtime.pixiStageRuntime.snapshot)}
+                pixiTasks={formatPixiPresentationTasks(runtime.pixiStageRuntime.presentationTasks)}
                 pointerLockStatus={runtime.firstPersonBridge.pointerLockStatus}
                 route={String(runtime.storyRuntime.state.variables.route ?? "none")}
                 substate={runtime.navi.substate}
@@ -304,6 +308,13 @@ function formatPixiStageSlots(stage: Pick<PixiStageSnapshot, "slots">): string {
   return entries.length > 0 ? entries.join(", ") : "empty";
 }
 
+function formatPixiPresentationTasks(tasks: PixiPresentationTaskSnapshot[]): string {
+  if (tasks.length === 0) return "empty";
+  return tasks
+    .map((task) => `${task.kind}:${task.target}:${task.status}:${task.durationMs}ms:r${task.revision}`)
+    .join(", ");
+}
+
 function formatTrialKeywordStates(keywordStates: Record<string, "pending" | "broken" | "missed"> | undefined): string {
   const entries = Object.entries(keywordStates ?? {});
   return entries.length > 0 ? entries.map(([id, state]) => `${id}:${state}`).join(", ") : "empty";
@@ -335,6 +346,7 @@ function VerticalSliceReadout({
   pixiBackground,
   pixiRevision,
   pixiSlots,
+  pixiTasks,
   pointerLockStatus,
   route,
   substate,
@@ -359,6 +371,7 @@ function VerticalSliceReadout({
   pixiBackground: string;
   pixiRevision: string;
   pixiSlots: string;
+  pixiTasks: string;
   pointerLockStatus: string;
   route: string;
   substate: string;
@@ -390,6 +403,7 @@ function VerticalSliceReadout({
         <Readout label="Pixi BG" testId="vertical-slice-pixi-background" value={pixiBackground} />
         <Readout label="Pixi Rev" testId="vertical-slice-pixi-revision" value={pixiRevision} />
         <Readout label="Pixi Slots" testId="vertical-slice-pixi-slots" value={pixiSlots} wide />
+        <Readout label="Pixi Tasks" testId="vertical-slice-pixi-tasks" value={pixiTasks} wide />
         <Readout label="Trial Segment" testId="vertical-slice-trial-segment" value={trialSegment} wide />
         <Readout label="Trial View" testId="vertical-slice-trial-presentation" value={trialPresentation} />
         <Readout label="Trial Input" testId="vertical-slice-trial-input-lock" value={trialInputLock} />

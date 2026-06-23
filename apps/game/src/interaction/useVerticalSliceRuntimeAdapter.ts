@@ -23,7 +23,11 @@ import {
   focusNaviInteractionFromSensorReport,
   naviReducer
 } from "@v-ronpa/navi-director";
-import { createInitialPixiStageSnapshot, type PixiStageRenderHint } from "@v-ronpa/pixi-presenter";
+import {
+  createInitialPixiStageSnapshot,
+  type PixiPresentationTaskSnapshot,
+  type PixiStageRenderHint
+} from "@v-ronpa/pixi-presenter";
 import type { FirstPersonInteractRequest } from "@v-ronpa/r3f-adapter";
 import {
   createInitialStoryState,
@@ -89,6 +93,7 @@ export interface PixiStageRuntime {
   hints: PixiStageRenderHint[];
   hintSequence: number;
   animate: boolean;
+  presentationTasks: PixiPresentationTaskSnapshot[];
 }
 
 export interface TrialRuntime {
@@ -544,15 +549,24 @@ export function useVerticalSliceRuntimeAdapter(
       transaction.pixiStage !== previousPixiStage ||
       transaction.pixiHints.length > 0
     ) {
+      const animatePixi = shouldAnimateStoryPlayPacing(pacing);
       setPixiStageRuntime((current) => ({
         snapshot: transaction.pixiStage,
         hints: transaction.pixiHints,
         hintSequence: current.hintSequence + 1,
-        animate: shouldAnimateStoryPlayPacing(pacing)
+        animate: animatePixi,
+        presentationTasks: animatePixi ? current.presentationTasks : []
       }));
     }
     setStoryRuntime({ state: storyStep.state, active });
   }
+
+  const updatePixiPresentationTasks = useCallback((tasks: PixiPresentationTaskSnapshot[]) => {
+    setPixiStageRuntime((current) => ({
+      ...current,
+      presentationTasks: tasks
+    }));
+  }, []);
 
   const interactionContext: GameInteractionContext = useMemo(
     () => createVerticalSliceInteractionContext({ flowMode, navi, storyRuntime, trialRuntime }),
@@ -601,6 +615,7 @@ export function useVerticalSliceRuntimeAdapter(
     trialRuntime,
     toggleStoryAuto,
     toggleStorySkip,
+    updatePixiPresentationTasks,
     exitTrial
   };
 
@@ -710,7 +725,8 @@ export function createVerticalSliceRuntimeRestorePlan(
       snapshot: save.pixiStage,
       hints: [],
       hintSequence: 0,
-      animate: false
+      animate: false,
+      presentationTasks: []
     }
   };
 }
@@ -720,7 +736,8 @@ export function createInitialPixiStageRuntime(): PixiStageRuntime {
     snapshot: createInitialPixiStageSnapshot(),
     hints: [],
     hintSequence: 0,
-    animate: false
+    animate: false,
+    presentationTasks: []
   };
 }
 

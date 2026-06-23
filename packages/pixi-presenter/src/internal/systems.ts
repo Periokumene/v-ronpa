@@ -16,6 +16,7 @@ import { GlitchFilter, GodrayFilter, KawaseBlurFilter, RGBSplitFilter } from "pi
 import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "@v-ronpa/contracts";
 import type { PixiStageRenderHint } from "../stageSnapshot";
 import { getBuiltInPixiFxTexture } from "./fxAssets";
+import type { PixiPresentationTaskHandle, PresentationTaskController } from "./presentationTasks";
 import { calculatePortraitLayout, formatFallbackPortraitLabel, resolveHarnessPortraitUrl } from "./portraits";
 
 export interface PixiPresenterSystemsOptions {
@@ -28,6 +29,7 @@ interface ActorRecord {
   actor: PixiActorSnapshot;
   container: Container;
   contentKey: string;
+  contentGeneration: number;
 }
 
 interface WeatherRecord {
@@ -38,9 +40,14 @@ interface WeatherRecord {
 
 type WeatherParticle = Sprite | TilingSprite;
 
+interface TweenHandle {
+  stop(): void;
+}
+
 export class TweenSystem {
   private readonly group = new Group();
   private elapsedMs = 0;
+  private generation = 0;
 
   tween(
     target: Record<string, number>,
@@ -49,18 +56,27 @@ export class TweenSystem {
     easingName?: string,
     onComplete?: () => void,
     delayMs = 0
-  ): void {
+  ): TweenHandle {
     if (durationMs <= 0) {
       Object.assign(target, to);
       onComplete?.();
-      return;
+      return { stop: () => undefined };
     }
+    const generation = this.generation;
     const tween = new Tween(target, this.group)
       .to(to, durationMs)
       .easing(resolveEasing(easingName))
-      .onComplete(() => onComplete?.());
+      .onComplete(() => {
+        if (generation === this.generation) onComplete?.();
+      });
     if (delayMs > 0) tween.delay(delayMs);
     tween.start(this.elapsedMs);
+    return {
+      stop: () => {
+        tween.stop();
+        this.group.remove(tween);
+      }
+    };
   }
 
   tick(ticker: Ticker): void {
@@ -69,6 +85,7 @@ export class TweenSystem {
   }
 
   clear(): void {
+    this.generation += 1;
     this.group.removeAll();
   }
 }
@@ -118,7 +135,8 @@ export class ActorSystem {
   constructor(
     private readonly options: PixiPresenterSystemsOptions,
     private readonly filters: FilterSystem,
-    private readonly tweens: TweenSystem
+    private readonly tweens: TweenSystem,
+    private readonly tasks: PresentationTaskController
   ) {
     this.backgroundLayer.zIndex = 0;
     this.characterLayer.zIndex = 10;
@@ -132,11 +150,11 @@ export class ActorSystem {
       if (!activeIds.has(id)) this.remove(id);
     }
 
-    for (const actor of Object.values(snapshot.backgroundsById)) this.upsert(actor, animate);
+    for (const actor of Object.values(snapshot.backgroundsById)) this.upsert(actor, animate, snapshot.revision);
     const orderedCharacters = snapshot.actorOrder
       .map((id) => snapshot.charactersById[id])
       .filter((actor): actor is PixiActorSnapshot => Boolean(actor));
-    orderedCharacters.forEach((actor, index) => this.upsert({ ...actor, z: actor.z ?? index }, animate));
+    orderedCharacters.forEach((actor, index) => this.upsert({ ...actor, z: actor.z ?? index }, animate, snapshot.revision));
     this.characterLayer.sortableChildren = true;
   }
 
@@ -149,21 +167,32 @@ export class ActorSystem {
     return this.actors.get(target)?.container;
   }
 
-  private upsert(actor: PixiActorSnapshot, animate: boolean): void {
+  private upsert(actor: PixiActorSnapshot, animate: boolean, revision: number): void {
     const record = this.ensure(actor);
     const previous = record.actor;
     const contentKey = `${actor.kind}:${actor.appearance ?? "missing"}:${actor.pose ?? ""}`;
+    const shouldAnimate = animate && actor.transition.durationMs > 0;
+    const transition = shouldAnimate ? this.createActorTransitionScheduler(actor, revision) : undefined;
+    let contentAlphaAnimated = false;
     if (record.contentKey !== contentKey) {
+      record.contentGeneration += 1;
       record.container.removeChildren();
       if (actor.kind === "background") this.drawBackground(record.container, actor);
-      else this.drawCharacter(record.container, actor);
+      else this.drawCharacter(record, actor);
       record.contentKey = contentKey;
-      if (animate && actor.transition.durationMs > 0) {
+      const targetAlpha = actor.visible ? actor.alpha : 0;
+      if (shouldAnimate && targetAlpha > 0) {
         record.container.alpha = 0;
-        this.tweens.tween(record.container as unknown as Record<string, number>, { alpha: actor.alpha }, actor.transition.durationMs, actor.transition.easing);
+        transition?.tween(
+          record.container as unknown as Record<string, number>,
+          { alpha: targetAlpha },
+          actor.transition.durationMs,
+          actor.transition.easing
+        );
+        contentAlphaAnimated = true;
       }
     }
-    this.applyTransform(record.container, actor, previous, animate);
+    this.applyTransform(record.container, actor, previous, animate, transition, contentAlphaAnimated);
     record.actor = actor;
     this.filters.applyActorFilters(record.container, actor);
   }
@@ -174,7 +203,7 @@ export class ActorSystem {
     const container = new Container({ label: `actor:${actor.id}` });
     const layer = actor.kind === "background" ? this.backgroundLayer : this.characterLayer;
     layer.addChild(container);
-    const record: ActorRecord = { actor, container, contentKey: "" };
+    const record: ActorRecord = { actor, container, contentKey: "", contentGeneration: 0 };
     this.actors.set(actor.id, record);
     return record;
   }
@@ -182,9 +211,50 @@ export class ActorSystem {
   private remove(id: string): void {
     const record = this.actors.get(id);
     if (!record) return;
+    this.tasks.cancelTarget(id);
     record.container.removeFromParent();
     record.container.destroy({ children: true });
     this.actors.delete(id);
+  }
+
+  private createActorTransitionScheduler(actor: PixiActorSnapshot, revision: number): {
+    tween: (
+      target: Record<string, number>,
+      to: Record<string, number>,
+      durationMs: number,
+      easingName?: string,
+      onComplete?: () => void
+    ) => void;
+  } {
+    let task: PixiPresentationTaskHandle | undefined;
+    let pending = 0;
+    const handles: TweenHandle[] = [];
+    const completeOne = () => {
+      pending -= 1;
+      if (pending <= 0 && task?.isCurrent()) task.complete();
+    };
+    const ensureTask = () => {
+      task ??= this.tasks.start({
+        kind: "actor-transition",
+        target: actor.id,
+        revision,
+        durationMs: actor.transition.durationMs,
+        onCancel: () => handles.forEach((handle) => handle.stop()),
+        onSettle: () => handles.forEach((handle) => handle.stop())
+      });
+      return task;
+    };
+    return {
+      tween: (target, to, durationMs, easingName, onComplete) => {
+        ensureTask();
+        pending += 1;
+        const handle = this.tweens.tween(target, to, durationMs, easingName, () => {
+          if (task?.isCurrent()) onComplete?.();
+          completeOne();
+        });
+        handles.push(handle);
+      }
+    };
   }
 
   private drawBackground(container: Container, actor: PixiActorSnapshot): void {
@@ -205,7 +275,9 @@ export class ActorSystem {
     container.addChild(plate, title);
   }
 
-  private drawCharacter(container: Container, actor: PixiActorSnapshot): void {
+  private drawCharacter(record: ActorRecord, actor: PixiActorSnapshot): void {
+    const container = record.container;
+    const contentGeneration = record.contentGeneration;
     const width = this.options.width();
     const height = this.options.height();
     const layout = calculatePortraitLayout(width, height, nearestSlot(actor.pos?.[0] ?? 0.5));
@@ -220,7 +292,7 @@ export class ActorSystem {
       group.addChild(sprite);
       void Assets.load<Texture>(portraitUrl)
         .then((texture) => {
-          if (!sprite.parent) return;
+          if (!sprite.parent || record.contentGeneration !== contentGeneration) return;
           sprite.texture = texture;
           fitSprite(sprite, texture, layout.maxWidth, layout.maxHeight);
           sprite.visible = true;
@@ -257,19 +329,26 @@ export class ActorSystem {
     return fallback;
   }
 
-  private applyTransform(container: Container, actor: PixiActorSnapshot, previous: PixiActorSnapshot, animate: boolean): void {
+  private applyTransform(
+    container: Container,
+    actor: PixiActorSnapshot,
+    previous: PixiActorSnapshot,
+    animate: boolean,
+    transition?: ReturnType<ActorSystem["createActorTransitionScheduler"]>,
+    contentAlphaAnimated = false
+  ): void {
     const target = this.toScreenPosition(actor, actor.pos);
     const shouldAnimate = animate && actor.transition.durationMs > 0;
     const targetAlpha = actor.visible ? actor.alpha : 0;
     container.visible = actor.visible || (shouldAnimate && previous.visible);
     container.zIndex = actor.z;
-    if (shouldAnimate && (actor.transition.name === "slide" || actor.pos !== previous.pos)) {
+    if (shouldAnimate && (actor.transition.name === "slide" || !sameVector2(actor.pos, previous.pos))) {
       const from = actor.transition.from ? this.toScreenPosition(actor, actor.transition.from) : undefined;
       if (from) {
         container.x = from.x;
         container.y = from.y;
       }
-      this.tweens.tween(
+      transition?.tween(
         container as unknown as Record<string, number>,
         { x: target.x, y: target.y },
         actor.transition.durationMs,
@@ -279,8 +358,8 @@ export class ActorSystem {
       container.x = target.x;
       container.y = target.y;
     }
-    if (shouldAnimate && container.alpha !== targetAlpha) {
-      this.tweens.tween(
+    if (shouldAnimate && !contentAlphaAnimated && container.alpha !== targetAlpha) {
+      transition?.tween(
         container as unknown as Record<string, number>,
         { alpha: targetAlpha },
         actor.transition.durationMs,
@@ -323,20 +402,25 @@ export class WeatherSystem {
   private readonly frontLayer = new Container({ label: "weather-front" });
   private readonly records = new Map<string, WeatherRecord>();
 
-  constructor(private readonly options: PixiPresenterSystemsOptions, private readonly filters: FilterSystem) {
+  constructor(
+    private readonly options: PixiPresenterSystemsOptions,
+    private readonly filters: FilterSystem,
+    private readonly tweens: TweenSystem,
+    private readonly tasks: PresentationTaskController
+  ) {
     this.backLayer.zIndex = 5;
     this.frontLayer.zIndex = 20;
     options.root.sortableChildren = true;
     options.root.addChild(this.backLayer, this.frontLayer);
   }
 
-  reconcile(snapshot: PixiStageSnapshot): void {
+  reconcile(snapshot: PixiStageSnapshot, animate: boolean): void {
     for (const [kind, weather] of Object.entries(snapshot.weather)) {
       if (weather.power <= 0) {
         this.remove(kind);
         continue;
       }
-      this.upsert(kind, weather);
+      this.upsert(kind, weather, animate, snapshot.revision);
     }
     for (const kind of [...this.records.keys()]) {
       if (!snapshot.weather[kind as keyof typeof snapshot.weather]) this.remove(kind);
@@ -370,10 +454,12 @@ export class WeatherSystem {
     for (const kind of [...this.records.keys()]) this.remove(kind);
   }
 
-  private upsert(kind: string, snapshot: PixiWeatherSnapshot): void {
+  private upsert(kind: string, snapshot: PixiWeatherSnapshot, animate: boolean, revision: number): void {
     let record = this.records.get(kind);
+    const isNew = !record;
     if (!record) {
       const container = createWeatherContainer(kind);
+      container.alpha = 0;
       if (kind === "sun") this.backLayer.addChild(container);
       else this.frontLayer.addChild(container);
       record = { snapshot, container, particles: [] };
@@ -381,7 +467,36 @@ export class WeatherSystem {
       this.populate(record);
     }
     record.snapshot = snapshot;
-    record.container.alpha = kind === "sun" ? clamp01(snapshot.power) : 1;
+    const targetAlpha = clamp01(snapshot.power);
+    const shouldAnimate = animate && snapshot.transition.durationMs > 0 && (isNew || Math.abs(record.container.alpha - targetAlpha) > 0.001);
+    if (shouldAnimate) {
+      let handle: TweenHandle | undefined;
+      const task = this.tasks.start({
+        kind: "weather-transition",
+        target: kind,
+        revision,
+        durationMs: snapshot.transition.durationMs,
+        onCancel: () => {
+          handle?.stop();
+          record.container.alpha = targetAlpha;
+        },
+        onSettle: () => {
+          handle?.stop();
+          record.container.alpha = targetAlpha;
+        }
+      });
+      handle = this.tweens.tween(
+        record.container as unknown as Record<string, number>,
+        { alpha: targetAlpha },
+        snapshot.transition.durationMs,
+        snapshot.transition.easing,
+        () => {
+          if (task.isCurrent()) task.complete();
+        }
+      );
+    } else {
+      record.container.alpha = targetAlpha;
+    }
     if (kind === "sun") {
       record.container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
     }
@@ -450,6 +565,7 @@ export class WeatherSystem {
   private remove(kind: string): void {
     const record = this.records.get(kind);
     if (!record) return;
+    this.tasks.cancelTarget(kind);
     record.container.removeFromParent();
     record.container.destroy({ children: true });
     this.records.delete(kind);
@@ -460,15 +576,49 @@ export class ScreenOverlaySystem {
   private readonly layer = new Container({ label: "screen-filter-overlays" });
   private bokehKey = "";
 
-  constructor(private readonly options: PixiPresenterSystemsOptions) {
+  constructor(
+    private readonly options: PixiPresenterSystemsOptions,
+    private readonly tweens: TweenSystem,
+    private readonly tasks: PresentationTaskController
+  ) {
     this.layer.zIndex = 25;
     options.root.sortableChildren = true;
     options.root.addChild(this.layer);
   }
 
-  reconcile(snapshot: PixiStageSnapshot): void {
+  reconcile(snapshot: PixiStageSnapshot, animate: boolean): void {
     const power = clamp01(snapshot.screenFilters.bokeh?.power ?? 0);
+    const transition = snapshot.screenFilters.bokeh?.transition;
     if (power <= 0) {
+      if (animate && transition && transition.durationMs > 0 && this.layer.children.length > 0) {
+        let handle: TweenHandle | undefined;
+        const task = this.tasks.start({
+          kind: "screen-filter-transition",
+          target: "bokeh",
+          revision: snapshot.revision,
+          durationMs: transition.durationMs,
+          onCancel: () => {
+            handle?.stop();
+            this.clear(false);
+          },
+          onSettle: () => {
+            handle?.stop();
+            this.clear(false);
+          }
+        });
+        handle = this.tweens.tween(
+          this.layer as unknown as Record<string, number>,
+          { alpha: 0 },
+          transition.durationMs,
+          transition.easing,
+          () => {
+            if (!task.isCurrent()) return;
+            this.clear(false);
+            task.complete();
+          }
+        );
+        return;
+      }
       this.clear();
       return;
     }
@@ -478,11 +628,42 @@ export class ScreenOverlaySystem {
       this.clear();
       this.populateBokeh(power);
       this.bokehKey = key;
+      if (animate && transition && transition.durationMs > 0) this.layer.alpha = 0;
     }
-    this.layer.alpha = Math.min(0.96, 0.45 + power * 0.45);
+    const targetAlpha = Math.min(0.96, 0.45 + power * 0.45);
+    const shouldAnimate = animate && transition && transition.durationMs > 0 && Math.abs(this.layer.alpha - targetAlpha) > 0.001;
+    if (shouldAnimate) {
+      let handle: TweenHandle | undefined;
+      const task = this.tasks.start({
+        kind: "screen-filter-transition",
+        target: "bokeh",
+        revision: snapshot.revision,
+        durationMs: transition.durationMs,
+        onCancel: () => {
+          handle?.stop();
+          this.layer.alpha = targetAlpha;
+        },
+        onSettle: () => {
+          handle?.stop();
+          this.layer.alpha = targetAlpha;
+        }
+      });
+      handle = this.tweens.tween(
+        this.layer as unknown as Record<string, number>,
+        { alpha: targetAlpha },
+        transition.durationMs,
+        transition.easing,
+        () => {
+          if (task.isCurrent()) task.complete();
+        }
+      );
+    } else {
+      this.layer.alpha = targetAlpha;
+    }
   }
 
-  clear(): void {
+  clear(cancelTasks = true): void {
+    if (cancelTasks) this.tasks.cancelTarget("bokeh");
     this.layer.removeChildren().forEach((child) => child.destroy());
     this.bokehKey = "";
   }
@@ -521,7 +702,8 @@ export class TransientEffectSystem {
     private readonly options: PixiPresenterSystemsOptions,
     private readonly actors: ActorSystem,
     private readonly filters: FilterSystem,
-    private readonly tweens: TweenSystem
+    private readonly tweens: TweenSystem,
+    private readonly tasks: PresentationTaskController
   ) {
     this.layer.zIndex = 30;
     this.trialLayer.zIndex = 31;
@@ -529,11 +711,11 @@ export class TransientEffectSystem {
     options.root.addChild(this.layer, this.trialLayer);
   }
 
-  run(hints: PixiStageRenderHint[]): void {
+  run(hints: PixiStageRenderHint[], revision: number): void {
     for (const hint of hints) {
-      if (hint.type === "flash") this.flash(hint);
-      else if (hint.type === "shake") this.shake(hint);
-      else if (hint.type === "glitch") this.glitch(hint);
+      if (hint.type === "flash") this.flash(hint, revision);
+      else if (hint.type === "shake") this.shake(hint, revision);
+      else if (hint.type === "glitch") this.glitch(hint, revision);
       else if (hint.type === "trial-keyword") this.trialKeyword(hint.text);
       else if (hint.type === "trial-subtitle") this.trialKeyword(hint.text);
     }
@@ -546,24 +728,74 @@ export class TransientEffectSystem {
     }
     this.rootEffects.clear();
     this.layer.removeChildren().forEach((child) => child.destroy());
+    this.clearTrialOverlays();
+  }
+
+  clearTrialOverlays(): void {
     this.trialLayer.removeChildren().forEach((child) => child.destroy());
   }
 
-  private flash(hint: Extract<PixiStageRenderHint, { type: "flash" }>): void {
+  private flash(hint: Extract<PixiStageRenderHint, { type: "flash" }>, revision: number): void {
     const color = Number.parseInt(hint.color.replace("#", ""), 16);
     const flash = new Graphics().rect(0, 0, this.options.width(), this.options.height()).fill({ color, alpha: 0.55 });
     flash.alpha = 0.55;
     this.layer.addChild(flash);
-    this.tweens.tween(flash as unknown as Record<string, number>, { alpha: 0 }, hint.durationMs, "linear");
+    const cleanup = () => {
+      flash.removeFromParent();
+      flash.destroy();
+    };
+    let handle: TweenHandle | undefined;
+    const task = this.tasks.start({
+      kind: "flash",
+      target: "screen",
+      revision,
+      durationMs: hint.durationMs,
+      onCancel: () => {
+        handle?.stop();
+        cleanup();
+      },
+      onSettle: () => {
+        handle?.stop();
+        cleanup();
+      }
+    });
+    handle = this.tweens.tween(flash as unknown as Record<string, number>, { alpha: 0 }, hint.durationMs, "linear", () => {
+      if (!task.isCurrent()) return;
+      cleanup();
+      task.complete();
+    });
   }
 
-  private shake(hint: Extract<PixiStageRenderHint, { type: "shake" }>): void {
+  private shake(hint: Extract<PixiStageRenderHint, { type: "shake" }>, revision: number): void {
     const target = this.actors.getLayerForEffects(hint.target) ?? this.options.root;
     const origin = { x: target.x, y: target.y };
     const iterations = Math.max(1, Math.round(hint.loop ? Math.max(hint.count ?? 3, 6) : hint.count ?? 3));
+    const handles: TweenHandle[] = [];
+    const cleanup = () => {
+      handles.forEach((handle) => handle.stop());
+      target.x = origin.x;
+      target.y = origin.y;
+    };
+    const task = this.tasks.start({
+      kind: "shake",
+      target: hint.target,
+      revision,
+      durationMs: Math.max(0, hint.durationMs * iterations),
+      onCancel: cleanup,
+      onSettle: cleanup
+    });
+    const tween = (to: Record<string, number>, durationMs: number, onComplete?: () => void) => {
+      const handle = this.tweens.tween(target as unknown as Record<string, number>, to, durationMs, "easeOut", () => {
+        if (!task.isCurrent()) return;
+        onComplete?.();
+      });
+      handles.push(handle);
+    };
     const shakeOnce = (index: number) => {
       if (index >= iterations) {
-        this.tweens.tween(target as unknown as Record<string, number>, origin, Math.min(80, hint.durationMs), "easeOut");
+        tween(origin, Math.min(80, hint.durationMs), () => {
+          if (task.isCurrent()) task.complete();
+        });
         return;
       }
       const deltaPower = hint.deltaPower ?? 0;
@@ -575,14 +807,14 @@ export class TransientEffectSystem {
         x: hint.hor ? origin.x + amplitude * polarity : origin.x,
         y: hint.ver === false ? origin.y : origin.y + amplitude * polarity
       };
-      this.tweens.tween(target as unknown as Record<string, number>, displaced, durationMs / 2, "easeOut", () => {
-        this.tweens.tween(target as unknown as Record<string, number>, origin, durationMs / 2, "easeOut", () => shakeOnce(index + 1));
+      tween(displaced, durationMs / 2, () => {
+        tween(origin, durationMs / 2, () => shakeOnce(index + 1));
       });
     };
     shakeOnce(0);
   }
 
-  private glitch(hint: Extract<PixiStageRenderHint, { type: "glitch" }>): void {
+  private glitch(hint: Extract<PixiStageRenderHint, { type: "glitch" }>, revision: number): void {
     const group = new Container({ label: "glitch-overlay" });
     const width = this.options.width();
     const height = this.options.height();
@@ -628,12 +860,36 @@ export class TransientEffectSystem {
     this.rootEffects.add(group);
     this.options.root.addChild(group);
     const holdMs = Math.min(650, Math.max(120, hint.durationMs * 0.55));
-    this.tweens.tween(
+    const cleanup = () => {
+      this.rootEffects.delete(group);
+      group.removeFromParent();
+      group.destroy({ children: true });
+    };
+    let handle: TweenHandle | undefined;
+    const task = this.tasks.start({
+      kind: "glitch",
+      target: "screen",
+      revision,
+      durationMs: hint.durationMs,
+      onCancel: () => {
+        handle?.stop();
+        cleanup();
+      },
+      onSettle: () => {
+        handle?.stop();
+        cleanup();
+      }
+    });
+    handle = this.tweens.tween(
       group as unknown as Record<string, number>,
       { alpha: 0 },
       Math.max(80, hint.durationMs - holdMs),
       "linear",
-      undefined,
+      () => {
+        if (!task.isCurrent()) return;
+        cleanup();
+        task.complete();
+      },
       holdMs
     );
   }
@@ -671,6 +927,12 @@ function nearestSlot(x: number): "left" | "center" | "right" {
   if (x < 0.38) return "left";
   if (x > 0.62) return "right";
   return "center";
+}
+
+function sameVector2(left: [number, number] | undefined, right: [number, number] | undefined): boolean {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  return Math.abs(left[0] - right[0]) < 0.0001 && Math.abs(left[1] - right[1]) < 0.0001;
 }
 
 function fitSprite(sprite: Sprite, texture: Texture, maxWidth: number, maxHeight: number): void {

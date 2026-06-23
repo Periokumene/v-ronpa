@@ -30,6 +30,9 @@ VN runtime output is split in two app-layer steps:
   `RuntimeCommand` records.
 - `VnRuntimeDispatcher` owns React rendering of the DOM dialog and Pixi layer
   from committed runtime state.
+- Pixi `PresentationTask` snapshots flow from `pixi-presenter` to app debug UI
+  through `onTasksChanged`. They are renderer-local lifecycle observations, not
+  StoryEngine state, story-play scheduling input, or save data.
 - Settings are not routed through StoryEngine or RuntimeCommand output.
   `apps/game` derives VN dialog display props and story-play timing policy from
   the canonical settings snapshot, then passes those narrow values into runtime
@@ -68,7 +71,8 @@ the current baseline intentionally uses the same fixed table for both.
 Pixi-routed runtime commands are passed directly to `pixi-presenter`'s
 RuntimeCommand reducer and reduced into `PixiStageSnapshot` plus transient
 render hints before React rendering. Saves store the snapshot and
-story/gameplay state, not runtime command streams.
+story/gameplay state, not runtime command streams or active Pixi
+`PresentationTask` records.
 
 RuntimeCommand durations use `params.duration`. Pixi render hints may keep a
 renderer-local `durationMs` field for scheduler code, but the public command
@@ -100,7 +104,8 @@ AUTO, SAVE, LOAD, and SETTING are shell UI actions derived from
 `InteractionCapabilitySnapshot`; they should enter the app through
 `GameInteractionShell` and its overlay/page adapters. AUTO/SKIP actions are
 routed from those adapters into the runtime adapter, which hosts web timers and
-delegates playback rules to `story-play`.
+delegates playback rules to `story-play`. The Pixi active task debug list must
+not be used to enable or disable these controls.
 
 Settings overlay edits update app-owned canonical settings immediately and are
 debounced to localStorage by the app adapter. The overlay does not own draft

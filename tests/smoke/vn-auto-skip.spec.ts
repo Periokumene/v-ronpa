@@ -13,10 +13,12 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
   await page.getByTestId("title-new-game").click();
   await startWitnessStory(page);
 
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("视觉小说联调剧本的第一句");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("请选择测试路径");
+  await advanceUntilChoices(page);
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("vn-command-skip")).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("我会记录每一次状态变化", { timeout: 8_000 });
+  await page.getByTestId("vn-dialog-choice-1").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 2 开始");
 
   await page.getByTestId("vn-command-settings").click();
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
@@ -27,7 +29,7 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
 
   await page.getByTestId("vn-command-auto").click();
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("先别急着追问", { timeout: 1_500 });
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT 01A", { timeout: 4_000 });
 
   await page.getByTestId("vn-dialog-advance").click();
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "false");
@@ -49,10 +51,8 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
 
   await page.getByTestId("vn-command-skip").click();
   await expect(page.getByTestId("vn-command-skip")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("vn-dialog-choices")).toBeVisible({ timeout: 12_000 });
-  await expect(page.getByTestId("vn-command-skip")).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByTestId("vn-command-skip")).toBeDisabled();
-  await expect(page.getByTestId("vn-command-auto")).toBeDisabled();
+  await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk", { timeout: 15_000 });
+  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
 
   expect(consoleErrors).toEqual([]);
 });
@@ -64,6 +64,15 @@ async function startWitnessStory(page: Page) {
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("vn2d-overlay");
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
+}
+
+async function advanceUntilChoices(page: Page) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    if ((await page.getByTestId("vn-dialog-choices").count()) > 0) return;
+    await page.getByTestId("vn-dialog-advance").click();
+  }
+
+  await expect(page.getByTestId("vn-dialog-choices")).toBeVisible();
 }
 
 function isExpectedPointerLockError(text: string): boolean {

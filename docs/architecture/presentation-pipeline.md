@@ -59,6 +59,18 @@ step and emits a pacing intent such as normal or skip. App adapters host the
 actual browser timer and map skip pacing to presentation choices such as
 disabled Pixi animation; renderer packages do not own AUTO/SKIP scheduling.
 
+Pixi keeps a separate presentation clock inside `pixi-presenter`. Actor
+transitions, transient effects, and screen/weather fades may run after the app
+has synchronously committed the latest StoryEngine step. These active visual
+lifecycles are tracked as Pixi-local `PresentationTask` snapshots and can be
+reported to app debug UI through `onTasksChanged`, but they are not story state
+and do not decide whether manual, AUTO, or SKIP may advance.
+
+Save/load persists the terminal `PixiStageSnapshot` only. Active
+`PresentationTask` records, tween progress, transient render hints, and overlay
+objects are not saved. Restoring or resetting renders the terminal snapshot with
+animation disabled and clears the presenter task list.
+
 `trial-keyword` is a visual anchor for overlays and subtitles. It may carry
 debug metadata, but it is not the rule source for which evidence breaks which
 statement. Debate rules, accepted evidence, and next-segment transitions live in

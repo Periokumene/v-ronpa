@@ -254,7 +254,8 @@ describe("vertical slice runtime adapter helpers", () => {
       snapshot: pixiStage,
       hints: [],
       hintSequence: 0,
-      animate: false
+      animate: false,
+      presentationTasks: []
     });
   });
 

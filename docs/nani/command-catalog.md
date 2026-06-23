@@ -31,6 +31,11 @@ the handler does not consume yet may still produce an
 `unsupported-command-param` warning. That warning is expected and does not
 demote the command unless the supported V-Ronpa behavior is no longer covered.
 
+Pixi `PresentationTask` debug snapshots do not change `wait:true` / `wait!`
+script semantics in this baseline. Pixi can now observe renderer-side effect
+completion internally, but StoryEngine resume is still not driven by real Pixi
+task completion until the dedicated wait follow-up is implemented.
+
 ## Categories
 
 - `text`: dialogue printer, backlog, and text formatting commands.

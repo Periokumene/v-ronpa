@@ -1,27 +1,44 @@
 import { useEffect, useRef } from "react";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
-import { createPixiPresenter, type PixiPresenterPort, type PixiStageRenderHint } from "@v-ronpa/pixi-presenter";
+import {
+  createPixiPresenter,
+  type PixiPresentationTaskSnapshot,
+  type PixiPresenterPort,
+  type PixiStageRenderHint
+} from "@v-ronpa/pixi-presenter";
 
 export function PixiLayer({
   animate,
   hints,
   hintSequence,
+  onTasksChanged,
+  presentationTasks = [],
   snapshot,
   visible
 }: {
   animate: boolean;
   hints: PixiStageRenderHint[];
   hintSequence: number;
+  onTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
+  presentationTasks?: PixiPresentationTaskSnapshot[];
   snapshot: PixiStageSnapshot;
   visible: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const presenterRef = useRef<PixiPresenterPort | null>(null);
+  const onTasksChangedRef = useRef<typeof onTasksChanged>(onTasksChanged);
+
+  useEffect(() => {
+    onTasksChangedRef.current = onTasksChanged;
+  }, [onTasksChanged]);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const presenter = createPixiPresenter({ host });
+    const presenter = createPixiPresenter({
+      host,
+      onTasksChanged: (tasks) => onTasksChangedRef.current?.(tasks)
+    });
     presenterRef.current = presenter;
     void presenter.mount();
     return () => {
@@ -47,6 +64,7 @@ export function PixiLayer({
       data-pixi-hints={formatPixiHints(hints)}
       data-pixi-hint-sequence={String(hintSequence)}
       data-pixi-slots={formatPixiStageSlots(snapshot)}
+      data-pixi-active-tasks={formatPixiPresentationTasks(presentationTasks)}
       className={visible ? "pixi-layer" : "pixi-layer pixi-layer-hidden"}
       aria-hidden={!visible}
     />
@@ -55,6 +73,11 @@ export function PixiLayer({
 
 function formatPixiHints(hints: PixiStageRenderHint[]): string {
   return hints.length > 0 ? hints.map((hint) => hint.type).join(",") : "empty";
+}
+
+function formatPixiPresentationTasks(tasks: PixiPresentationTaskSnapshot[]): string {
+  if (tasks.length === 0) return "empty";
+  return tasks.map((task) => `${task.kind}:${task.target}:${task.status}:${task.durationMs}`).join(", ");
 }
 
 function formatPixiStageActors(snapshot: PixiStageSnapshot): string {
