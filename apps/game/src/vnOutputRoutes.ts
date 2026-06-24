@@ -1,4 +1,4 @@
-import type { NaniCommandCategory, RuntimeCommand } from "@v-ronpa/contracts";
+import { getNaniCommandDefinition, type NaniCommandCategory, type RuntimeCommand } from "@v-ronpa/contracts";
 
 export type VnRuntimeProfile = "vn2d" | "vn3d";
 
@@ -43,7 +43,28 @@ export function routeRuntimeCommand(
   context: VnOutputRouteContext = {}
 ): VnOutputRouteTarget[] {
   void context;
-  return routeTable.commands[command.commandId] ?? routeTable.categories[command.category] ?? ["debug"];
+  const explicitRoute = routeTable.commands[command.commandId];
+  if (explicitRoute) return explicitRoute;
+
+  const definition = getNaniCommandDefinition(command.commandId);
+  if (definition) {
+    switch (definition.execution) {
+      case "pixi-presentation":
+        return ["pixi"];
+      case "gameplay":
+        return ["gameplay"];
+      case "media-output":
+        return definition.status === "implemented" ? ["media"] : ["debug"];
+      case "ui-output":
+        return definition.status === "implemented" ? ["ui"] : ["debug"];
+      case "story-control":
+        return ["app"];
+      case "declared-only":
+        return ["debug"];
+    }
+  }
+
+  return routeTable.categories[command.category] ?? ["debug"];
 }
 
 export function selectRuntimeCommandsForTarget(

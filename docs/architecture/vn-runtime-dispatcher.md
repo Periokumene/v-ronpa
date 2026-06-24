@@ -7,9 +7,10 @@ VN runtime output is split in two app-layer steps:
 - `createVnRuntimePresentationTransaction` fans those emitted runtime commands
   out to runtime consumers such as Pixi stage snapshots, render hints, and
   gameplay events.
-- `VnRuntimeDispatcher` renders already-materialized Story UI state and Pixi
-  stage state. Dialog text and choices come from Story state, not from command
-  stream replay.
+- `VnRuntimeDispatcher` renders already-materialized Pixi stage state.
+  `GameInteractionShell` renders DOM runtime UI surfaces such as dialog,
+  command bar, toast, input prompt, and movie overlay. Dialog text and choices
+  come from Story state, not from command stream replay.
 
 ## Ownership
 
@@ -29,8 +30,12 @@ VN runtime output is split in two app-layer steps:
   command streams, presentation logs, or transient effects.
 - `createVnRuntimePresentationTransaction` owns app-level fanout from emitted
   `RuntimeCommand` records.
-- `VnRuntimeDispatcher` owns React rendering of the DOM dialog and Pixi layer
-  from committed runtime state.
+- `VnRuntimeDispatcher` owns React rendering of the Pixi layer from committed
+  runtime state.
+- `GameInteractionShell` owns React mounting for DOM runtime UI surfaces from
+  committed app runtime state. Script-controlled `showUI` / `hideUI` visibility
+  applies only to concrete runtime UI surfaces, not shell overlays, debug
+  readouts, or Pixi.
 - Pixi `PresentationTask` snapshots flow from `pixi-presenter` to app debug UI
   through `onTasksChanged`. They are renderer-local lifecycle observations, not
   save data. When StoryEngine is stopped on an explicit Pixi `wait!`, the app
@@ -39,7 +44,7 @@ VN runtime output is split in two app-layer steps:
 - Settings are not routed through StoryEngine or RuntimeCommand output.
   `apps/game` derives VN dialog display props and story-play timing policy from
   the canonical settings snapshot, then passes those narrow values into runtime
-  adapters and `VnDialogSurface`.
+  adapters and `GameInteractionShell` / `VnDialogSurface`.
 - DOM UI owns dialogue text, choices, menus, settings, save/load screens, and
   other accessibility-sensitive surfaces.
 - Pixi owns VN/trial 2D effects, backgrounds, portraits, filters, particles,
@@ -61,7 +66,7 @@ the current baseline intentionally uses the same fixed table for both.
 ## Default Targets
 
 - `print` routes to `debug` only. DOM dialog text comes from
-  `StoryRuntimeState.backlog`.
+  `StoryRuntimeState.text.current`, with legacy backlog fallback where needed.
 - `back`, `char`, `shake`, `flash`, `focus`, and `trialkeyword` route to
   `pixi`.
 - `charenter` routes to `debug` only as a migration stub; new scripts should
@@ -101,7 +106,9 @@ The vertical-slice harness uses:
 - `StoryEngine` stepping over `RuntimeScript`.
 - `story-play` selection of AUTO/SKIP/manual playback schedule and pacing.
 - `createVnRuntimePresentationTransaction` for emitted command fanout.
-- `VnRuntimeDispatcher` for Pixi snapshot + VN dialog rendering.
+- `VnRuntimeDispatcher` for Pixi snapshot rendering.
+- `GameInteractionShell` for VN dialog, command bar, toast, input prompt, movie
+  overlay, and durable shell overlay mounting.
 - `PixiStageSnapshot` as the saveable terminal state for VN 2D staging.
 - `InspectorLite` debug counters derived from the latest emitted command batch,
   not from a cumulative presentation log.
@@ -110,8 +117,8 @@ Scenario code should not manually filter runtime commands by renderer. Add or
 update `VnOutputRouteTable` routes and pass the desired `profile` / `routeTable`
 into the runtime adapter instead.
 
-VN toolbar actions are intentionally outside `VnRuntimeDispatcher`. LOG, SKIP,
-AUTO, SAVE, LOAD, and SETTING are shell UI actions derived from
+VN dialog and toolbar actions are intentionally outside `VnRuntimeDispatcher`.
+LOG, SKIP, AUTO, SAVE, LOAD, and SETTING are shell UI actions derived from
 `InteractionCapabilitySnapshot`; they should enter the app through
 `GameInteractionShell` and its overlay/page adapters. AUTO/SKIP actions are
 routed from those adapters into the runtime adapter, which hosts web timers and

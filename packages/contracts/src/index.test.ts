@@ -11,6 +11,7 @@ import {
   InteractionCapabilitySnapshotSchema,
   InteractionStyleProfileSchema,
   NaniCommandDefinitionSchema,
+  NaniCommandExecutionSchema,
   NaniCommandStatusSchema,
   NaviInteractionConfirmRequestSchema,
   NaviInteractionSensorReportSchema,
@@ -23,6 +24,9 @@ import {
   SaveDataSchema,
   SaveSlotSummarySchema,
   SettingsSnapshotSchema,
+  StoryRuntimeSnapshotSchema,
+  StoryRuntimeWaitSchema,
+  StoryTextStateSchema,
   createDefaultSettingsSnapshot,
   TrialDefinitionSchema,
   TrialRuntimeStateSchema,
@@ -532,6 +536,58 @@ describe("contracts", () => {
     ).toMatchObject({ assets: [{ role: "toolbar-icon" }], tokens: { accentColor: "#6ee7d8", panelOpacity: 0.9 } });
   });
 
+  it("validates additive story runtime text and runtime wait contracts", () => {
+    expect(
+      StoryRuntimeSnapshotSchema.parse({
+        currentScriptPath: "old.nani",
+        instructionPointer: 0,
+        backlog: [{ speaker: "Felix", text: "Old snapshot." }],
+        pendingChoices: [],
+        ended: false
+      })
+    ).not.toHaveProperty("runtimeWait");
+
+    expect(
+      StoryRuntimeWaitSchema.parse({
+        kind: "input",
+        commandId: "input",
+        commandIndex: 4,
+        variableName: "playerName",
+        summary: "Name?"
+      })
+    ).toMatchObject({ valueType: "string" });
+
+    expect(
+      StoryTextStateSchema.parse({
+        current: { speaker: "Mira", text: "Current line.", formatId: "warning" }
+      })
+    ).toMatchObject({
+      printerId: "default",
+      visible: true,
+      current: { speaker: "Mira", text: "Current line.", formatId: "warning" },
+      formats: {}
+    });
+
+    expect(
+      StoryRuntimeSnapshotSchema.parse({
+        currentScriptPath: "new.nani",
+        instructionPointer: 2,
+        runtimeWait: {
+          kind: "movie",
+          commandId: "movie",
+          commandIndex: 1,
+          moviePath: "video:validation-intro"
+        },
+        text: {
+          current: { text: "Paused on movie." }
+        }
+      })
+    ).toMatchObject({
+      runtimeWait: { allowSkip: true },
+      text: { printerId: "default", visible: true }
+    });
+  });
+
   it("pins the Naninovel command catalog as the command declaration source", () => {
     const officialCommands = naniCommandCatalog.filter((command) => command.source === "naninovel");
 
@@ -576,6 +632,8 @@ describe("contracts", () => {
   });
 
   it("marks command execution boundaries for Pixi waits and declared-only Naninovel tracks", () => {
+    expect(NaniCommandExecutionSchema.parse("media-output")).toBe("media-output");
+    expect(NaniCommandExecutionSchema.parse("ui-output")).toBe("ui-output");
     expect(getNaniCommandDefinition("char")).toMatchObject({
       status: "implemented",
       execution: "pixi-presentation"
@@ -589,6 +647,26 @@ describe("contracts", () => {
       execution: "declared-only"
     });
     expect(getNaniCommandDefinition("await")).toMatchObject({
+      status: "stubbed",
+      execution: "declared-only"
+    });
+    expect(getNaniCommandDefinition("bgm")).toMatchObject({
+      status: "implemented",
+      execution: "media-output"
+    });
+    expect(getNaniCommandDefinition("showUI")).toMatchObject({
+      status: "implemented",
+      execution: "ui-output"
+    });
+    expect(getNaniCommandDefinition("hideUI")).toMatchObject({
+      status: "implemented",
+      execution: "ui-output"
+    });
+    expect(getNaniCommandDefinition("input")).toMatchObject({
+      status: "implemented",
+      execution: "story-control"
+    });
+    expect(getNaniCommandDefinition("stopVoice")).toMatchObject({
       status: "stubbed",
       execution: "declared-only"
     });

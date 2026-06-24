@@ -147,6 +147,97 @@ describe("VN runtime presentation transaction", () => {
     expect(transaction.diagnostics).toEqual([]);
   });
 
+  it("routes media-output commands into pure media effects without touching Pixi or UI", () => {
+    const runtimeScript = compileScenario(
+      ["@bgm bgm:validation-main group:music volume:0.45", "@sfx sfx:rain group:rain loop!"].join("\n"),
+      "transaction-media-test.nani"
+    );
+    const advanced = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+    const initialPixiStage = createInitialPixiStageSnapshot();
+
+    const transaction = createVnRuntimePresentationTransaction({
+      runtimeCommands: advanced.emittedRuntimeCommands,
+      previousPixiStage: initialPixiStage
+    });
+
+    expect(transaction.pixiStage).toBe(initialPixiStage);
+    expect(transaction.pixiHints).toEqual([]);
+    expect(transaction.uiState).toMatchObject({ toasts: [] });
+    expect(transaction.mediaEffects).toEqual([
+      { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:validation-main", volume: 0.45 },
+      { type: "play-sfx", sourceRef: "sfx:rain", loop: true, fast: false, key: "rain", group: "rain" }
+    ]);
+  });
+
+  it("routes UI-output commands into UI runtime state without Pixi fallback", () => {
+    const runtimeScript = compileScenario(
+      ["@hideUI", "@showUI dialog", "@showUI commandBar visible:true", "@toast \"Ready\" time:1.2"].join("\n"),
+      "transaction-ui-test.nani"
+    );
+    const advanced = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+    const initialPixiStage = createInitialPixiStageSnapshot();
+
+    const transaction = createVnRuntimePresentationTransaction({
+      runtimeCommands: advanced.emittedRuntimeCommands,
+      previousPixiStage: initialPixiStage
+    });
+
+    expect(transaction.pixiStage).toBe(initialPixiStage);
+    expect(transaction.mediaEffects).toEqual([]);
+    expect(transaction.uiState.visible.dialog).toBe(true);
+    expect(transaction.uiState.visible.commandBar).toBe(true);
+    expect(transaction.uiState.visible.toastLayer).toBe(false);
+    expect(transaction.uiState.toasts).toEqual([{ id: "toast:1", text: "Ready", durationMs: 1200 }]);
+  });
+
+  it("does not leak story-control commands into media or UI via category fallback", () => {
+    const initialPixiStage = createInitialPixiStageSnapshot();
+    const runtimeScript: RuntimeScript = {
+      scriptPath: "transaction-story-control-routing.nani",
+      labels: {},
+      assets: [],
+      dependencies: [],
+      commands: [
+        {
+          commandId: "input",
+          canonicalName: "input",
+          category: "ui",
+          source: "naninovel",
+          status: "implemented",
+          params: { variableName: "name", valueType: "string" },
+          loc: { scriptPath: "transaction-story-control-routing.nani", line: 1, column: 1, raw: "@input name" }
+        },
+        {
+          commandId: "wait",
+          canonicalName: "wait",
+          category: "flow",
+          source: "naninovel",
+          status: "implemented",
+          params: { waitMode: "i" },
+          loc: { scriptPath: "transaction-story-control-routing.nani", line: 2, column: 1, raw: "@wait i" }
+        },
+        {
+          commandId: "stopvoice",
+          canonicalName: "stopVoice",
+          category: "media",
+          source: "naninovel",
+          status: "stubbed",
+          params: {},
+          loc: { scriptPath: "transaction-story-control-routing.nani", line: 3, column: 1, raw: "@stopVoice" }
+        }
+      ]
+    };
+
+    const transaction = createVnRuntimePresentationTransaction({
+      runtimeCommands: runtimeScript.commands,
+      previousPixiStage: initialPixiStage
+    });
+
+    expect(transaction.mediaEffects).toEqual([]);
+    expect(transaction.uiState).toMatchObject({ toasts: [] });
+    expect(transaction.pixiStage).toBe(initialPixiStage);
+  });
+
   it("skips adapter output for unresolved runtime expressions instead of falling back", () => {
     const initialPixiStage = createInitialPixiStageSnapshot();
     const runtimeScript: RuntimeScript = {

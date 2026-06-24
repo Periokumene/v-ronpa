@@ -30,11 +30,12 @@ export interface AudioHandle {
   id: string;
   stop(): void;
   fade(to: number, durationMs: number): void;
+  fadeOutAndStop(durationMs: number): void;
 }
 
 export interface AudioPort {
   playBgm(id: string, uri: string, options?: { loop?: boolean; volume?: number }): AudioHandle;
-  playSfx(id: string, uri: string, options?: { volume?: number }): AudioHandle;
+  playSfx(id: string, uri: string, options?: { loop?: boolean; volume?: number }): AudioHandle;
   stopAll(): void;
 }
 
@@ -42,6 +43,11 @@ export interface VideoPort {
   attach(element: HTMLVideoElement): void;
   play(uri: string): Promise<void>;
   stop(): void;
+}
+
+interface ActiveHowl {
+  howl: Howl;
+  release(stopHowl?: boolean): void;
 }
 
 interface SaveDbShape extends Dexie {
@@ -134,19 +140,46 @@ export function createMemorySavePort(initialSlots: SaveSlot[] = [], migrator = c
 }
 
 export function createHowlerAudioPort(): AudioPort {
-  const handles = new Map<string, Howl>();
+  const handles = new Map<string, ActiveHowl>();
+  const fadeTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-  function register(id: string, howl: Howl): AudioHandle {
-    handles.set(id, howl);
+  function register(id: string, howl: Howl, options: { releaseOnEnd?: boolean } = {}): AudioHandle {
+    const previous = handles.get(id);
+    if (previous) previous.release();
     howl.play();
+    let released = false;
+    const record: ActiveHowl = { howl, release };
+    handles.set(id, record);
+    function release(stopHowl = true) {
+      if (released) return;
+      released = true;
+      const timer = fadeTimers.get(id);
+      if (timer) globalThis.clearTimeout(timer);
+      fadeTimers.delete(id);
+      if (stopHowl) howl.stop();
+      if (handles.get(id) === record) handles.delete(id);
+    }
+    if (options.releaseOnEnd) howl.once("end", () => release(false));
     return {
       id,
       stop() {
-        howl.stop();
-        handles.delete(id);
+        release();
       },
       fade(to, durationMs) {
+        if (released) return;
         howl.fade(howl.volume(), to, durationMs);
+      },
+      fadeOutAndStop(durationMs) {
+        if (released) return;
+        const timer = fadeTimers.get(id);
+        if (timer) globalThis.clearTimeout(timer);
+        const clampedDurationMs = Math.max(0, Math.floor(durationMs));
+        howl.fade(howl.volume(), 0, clampedDurationMs);
+        if (clampedDurationMs === 0) {
+          release();
+          return;
+        }
+        fadeTimers.set(id, globalThis.setTimeout(release, clampedDurationMs));
       }
     };
   }
@@ -160,22 +193,27 @@ export function createHowlerAudioPort(): AudioPort {
           loop: options?.loop ?? true,
           volume: options?.volume ?? 0.7,
           html5: false
-        })
+        }),
+        { releaseOnEnd: false }
       );
     },
     playSfx(id, uri, options) {
+      const loop = options?.loop ?? false;
       return register(
         id,
         new Howl({
           src: [uri],
-          loop: false,
+          loop,
           volume: options?.volume ?? 1,
           html5: false
-        })
+        }),
+        { releaseOnEnd: !loop }
       );
     },
     stopAll() {
-      for (const howl of handles.values()) howl.stop();
+      for (const timer of fadeTimers.values()) globalThis.clearTimeout(timer);
+      fadeTimers.clear();
+      for (const { howl } of handles.values()) howl.stop();
       handles.clear();
     }
   };

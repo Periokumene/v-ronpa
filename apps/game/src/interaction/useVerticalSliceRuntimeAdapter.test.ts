@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { NaniCommandCategory, RuntimeCommand, RuntimeScript, RuntimeValue } from "@v-ronpa/contracts";
+import type { NaniCommandCategory, RuntimeAsset, RuntimeCommand, RuntimeScript, RuntimeValue } from "@v-ronpa/contracts";
 import { createGameplayState } from "@v-ronpa/gameplay";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
@@ -7,14 +7,19 @@ import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ron
 import { advanceToNextStop, createInitialStoryState, storyRuntimeSnapshot } from "@v-ronpa/story-engine";
 import { verticalSliceScript } from "../harness/fixtures/verticalSlice";
 import type { VnOutputRouteTable } from "../vnOutputRoutes";
+import type { AudioHandle, AudioPort, VideoPort } from "@v-ronpa/media-save";
 import {
+  applyMediaRuntimeEffects,
+  canCompletePauseRuntimeWaitFromSource,
   canToggleStoryAutomation,
   collectVerticalSliceRuntimeDiagnostics,
   createInitialVerticalSliceDiagnostics,
   createVerticalSliceInteractionContext,
   createVerticalSlicePresentationTransaction,
   createVerticalSliceRuntimeRestorePlan,
+  resolveMediaSource,
   shouldAnimateStoryPlayPacing,
+  syncRuntimeToastDismissalTimers,
   type StoryRuntime
 } from "./useVerticalSliceRuntimeAdapter";
 
@@ -51,7 +56,7 @@ describe("vertical slice runtime adapter helpers", () => {
       active: true,
       state: {
         ...createInitialStoryState(runtimeScript),
-        pendingChoices: [{ text: "Choice A" }]
+        pendingChoices: [{ text: "Choice A", enabled: true }]
       }
     };
 
@@ -195,6 +200,33 @@ describe("vertical slice runtime adapter helpers", () => {
     ]);
   });
 
+  it("keeps toast dismissal timers independent from toastLayer visibility", () => {
+    const timeouts: Record<string, number> = {};
+    const scheduled: Array<{ callback: () => void; durationMs: number }> = [];
+    const dismissed: string[] = [];
+
+    syncRuntimeToastDismissalTimers({
+      state: {
+        visible: { dialog: true, commandBar: true, toastLayer: false },
+        toasts: [{ id: "toast:1", text: "Hidden toast", durationMs: 100 }]
+      },
+      timeouts,
+      setTimeoutFn: (callback, durationMs) => {
+        scheduled.push({ callback, durationMs });
+        return 7;
+      },
+      clearTimeoutFn: viFn(),
+      dismissToastId: (toastId) => dismissed.push(toastId)
+    });
+
+    expect(timeouts["toast:1"]).toBe(7);
+    expect(scheduled.map(({ durationMs }) => durationMs)).toEqual([100]);
+
+    scheduled[0]?.callback();
+    expect(dismissed).toEqual(["toast:1"]);
+    expect(timeouts).toEqual({});
+  });
+
   it("plans restore of Navi, Story, and Gameplay without carrying transient UI state", () => {
     const runtimeScript = compileScenario("Felix: Restore me.", "restore-test.nani");
     const story = {
@@ -293,6 +325,129 @@ describe("vertical slice runtime adapter helpers", () => {
     expect(plan.storyRuntime.active).toBe(false);
   });
 
+  it("resolves media sources by runtime assets, manifest assets, script assets, then raw URI fallback", () => {
+    const runtimeAssets: RuntimeAsset[] = [
+      runtimeAsset("bgm:main", "/runtime-main.ogg"),
+      { ...runtimeAsset("bgm:source", "/runtime-source.ogg"), sourceUri: "source-main.ogg" }
+    ];
+    const manifestAssets = [{ id: "bgm:main", kind: "bgm" as const, uri: "/manifest-main.ogg", tags: [] }];
+    const scriptAssets = [{ id: "bgm:script", kind: "bgm" as const, uri: "/script-main.ogg", tags: [] }];
+
+    expect(resolveMediaSource({ sourceRef: "bgm:main", kind: "bgm", runtimeAssets, manifestAssets, scriptAssets })).toEqual({
+      uri: "/runtime-main.ogg"
+    });
+    expect(resolveMediaSource({ sourceRef: "source-main.ogg", kind: "bgm", runtimeAssets })).toEqual({
+      uri: "/runtime-source.ogg"
+    });
+    expect(resolveMediaSource({ sourceRef: "bgm:script", kind: "bgm", manifestAssets, scriptAssets })).toEqual({
+      uri: "/script-main.ogg"
+    });
+    expect(resolveMediaSource({ sourceRef: "/raw/sfx.ogg", kind: "sfx" })).toEqual({ uri: "/raw/sfx.ogg" });
+  });
+
+  it("emits adapter diagnostics for unresolved media and does not call AudioPort", async () => {
+    const playBgm = viFn(() => ({ id: "unused", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
+    const playSfx = viFn(() => ({ id: "unused", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
+    const audioPort: AudioPort = {
+      playBgm,
+      playSfx,
+      stopAll: viFn()
+    };
+    const diagnostics = await applyMediaRuntimeEffects({
+      audioPort,
+      handles: { bgm: {}, sfx: {}, oneShotSequence: 0 },
+      effects: [{ type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:missing" }],
+      resolver: ({ sourceRef, kind }) => resolveMediaSource({ sourceRef, kind })
+    });
+
+    expect(playBgm.calls).toEqual([]);
+    expect(diagnostics).toEqual([
+      {
+        source: "media",
+        code: "media-source-unresolved",
+        severity: "warning",
+        message: "Media source bgm:missing (bgm) could not be resolved."
+      }
+    ]);
+  });
+
+  it("applies audio effects through AudioPort handles with fade cleanup semantics", async () => {
+    const bgmHandle: AudioHandle = { id: "music", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
+    const sfxHandle: AudioHandle = { id: "rain", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
+    const handles = { bgm: {}, sfx: {}, oneShotSequence: 0 };
+    const playBgm = viFn(() => bgmHandle);
+    const playSfx = viFn(() => sfxHandle);
+    const audioPort: AudioPort = {
+      playBgm,
+      playSfx,
+      stopAll: viFn()
+    };
+
+    await applyMediaRuntimeEffects({
+      audioPort,
+      handles,
+      effects: [
+        { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:main", volume: 0.4 },
+        { type: "play-sfx", key: "rain", group: "rain", sourceRef: "sfx:rain", loop: true, fast: false, volume: 0.3 },
+        { type: "stop-bgm", key: "music", group: "music", fadeMs: 200 },
+        { type: "stop-sfx", key: "rain", group: "rain" }
+      ],
+      resolver: ({ sourceRef }) => ({ uri: `/resolved/${sourceRef}.ogg` })
+    });
+
+    expect(playBgm.calls).toEqual([["music", "/resolved/bgm:main.ogg", { loop: true, volume: 0.4 }]]);
+    expect(playSfx.calls).toEqual([["rain", "/resolved/sfx:rain.ogg", { loop: true, volume: 0.3 }]]);
+    expect((bgmHandle.fadeOutAndStop as ReturnType<typeof viFn>).calls).toEqual([[200]]);
+    expect((sfxHandle.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
+  });
+
+  it("can apply movie effects through an attached VideoPort when used directly", async () => {
+    const play = viFn(async () => undefined);
+    const videoPort: VideoPort = {
+      attach: viFn(),
+      play,
+      stop: viFn()
+    };
+    const diagnostics = await applyMediaRuntimeEffects({
+      videoPort,
+      handles: { bgm: {}, sfx: {}, oneShotSequence: 0 },
+      effects: [{ type: "play-movie", sourceRef: "video:intro", block: true }],
+      resolver: () => ({ uri: "/resolved/intro.mp4" })
+    });
+
+    expect(diagnostics).toEqual([]);
+    expect(play.calls).toEqual([["/resolved/intro.mp4"]]);
+  });
+
+  it("clears transient runtimeWait during restore with a diagnostic", () => {
+    const runtimeScript = compileScenario("Felix: Restore wait.", "restore-runtime-wait-test.nani");
+    const save = {
+      version: 2 as const,
+      savedAt: "2026-06-20T00:00:00.000Z",
+      mode: "navi" as const,
+      story: {
+        ...storyRuntimeSnapshot(createInitialStoryState(runtimeScript)),
+        runtimeWait: { kind: "pause" as const, commandId: "wait" as const, commandIndex: 0, mode: "confirm" as const }
+      },
+      pixiStage: createInitialPixiStageSnapshot(),
+      inventory: { items: {} },
+      evidence: { ownedEvidenceIds: [], submittedEvidenceIds: [] },
+      characters: {}
+    };
+
+    const plan = createVerticalSliceRuntimeRestorePlan(save, runtimeScript);
+
+    expect(plan.storyRuntime.state.runtimeWait).toBeUndefined();
+    expect(plan.diagnostics).toEqual([
+      {
+        source: "story",
+        code: "runtime-wait-cleared-on-load",
+        severity: "warning",
+        message: "Saved runtimeWait was cleared during restore because runtime waits are transient app state."
+      }
+    ]);
+  });
+
   it("keeps story automation availability and presentation pacing as adapter decisions", () => {
     const runtimeScript = compileScenario("Felix: Adapter.", "adapter-playback-test.nani");
     const storyRuntime: StoryRuntime = {
@@ -304,13 +459,68 @@ describe("vertical slice runtime adapter helpers", () => {
     expect(
       canToggleStoryAutomation({
         ...storyRuntime,
-        state: { ...storyRuntime.state, pendingChoices: [{ text: "Choice" }] }
+        state: { ...storyRuntime.state, pendingChoices: [{ text: "Choice", enabled: true }] }
+      })
+    ).toBe(false);
+    expect(
+      canToggleStoryAutomation({
+        ...storyRuntime,
+        state: { ...storyRuntime.state, runtimeWait: { kind: "pause", commandId: "wait", commandIndex: 0, mode: "confirm" } }
       })
     ).toBe(false);
     expect(shouldAnimateStoryPlayPacing("normal")).toBe(true);
     expect(shouldAnimateStoryPlayPacing("skip")).toBe(false);
   });
+
+  it("allows manual completion only for confirm-capable pause waits", () => {
+    expect(
+      canCompletePauseRuntimeWaitFromSource(
+        { kind: "pause", commandId: "wait", commandIndex: 0, mode: "confirm" },
+        "manual"
+      )
+    ).toBe(true);
+    expect(
+      canCompletePauseRuntimeWaitFromSource(
+        { kind: "pause", commandId: "wait", commandIndex: 0, mode: "timer-or-confirm", durationMs: 5000 },
+        "manual"
+      )
+    ).toBe(true);
+    expect(
+      canCompletePauseRuntimeWaitFromSource(
+        { kind: "pause", commandId: "wait", commandIndex: 0, mode: "timer", durationMs: 5000 },
+        "manual"
+      )
+    ).toBe(false);
+    expect(
+      canCompletePauseRuntimeWaitFromSource(
+        { kind: "pause", commandId: "wait", commandIndex: 0, mode: "timer", durationMs: 5000 },
+        "system"
+      )
+    ).toBe(true);
+  });
 });
+
+function runtimeAsset(id: string, optimizedUri: string): RuntimeAsset {
+  return {
+    id,
+    kind: "bgm",
+    optimizedUri,
+    format: "ogg",
+    compression: [],
+    lods: [],
+    collisionProxyIds: [],
+    tags: []
+  };
+}
+
+function viFn<T extends (...args: any[]) => any>(implementation?: T): T & { calls: unknown[][] } {
+  const calls: unknown[][] = [];
+  const fn = (...args: unknown[]) => {
+    calls.push(args);
+    return implementation?.(...(args as Parameters<T>));
+  };
+  return Object.assign(fn as T, { calls });
+}
 
 function compileScenario(sourceText: string, scriptPath: string): RuntimeScript {
   const parsed = parseScenario({ sourceText, scriptPath });

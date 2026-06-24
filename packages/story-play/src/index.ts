@@ -2,6 +2,7 @@ import type { RuntimeCommand, RuntimeScript, RuntimeValue } from "@v-ronpa/contr
 import {
   advanceToNextStop,
   chooseStoryOption,
+  selectCurrentStoryLine,
   type StoryRuntimeState,
   type StoryStepperResult
 } from "@v-ronpa/story-engine";
@@ -155,7 +156,7 @@ export function selectStoryPlaySchedule(
   options: StoryPlayScheduleOptions = {}
 ): StoryPlaySchedule {
   const active = options.active ?? true;
-  if (!active || story.ended || story.pendingChoices.length > 0 || story.presentationWait) return { type: "idle" };
+  if (!active || story.ended || story.pendingChoices.length > 0 || story.presentationWait || story.runtimeWait) return { type: "idle" };
   if (options.hostBlocked || options.hostReadyForAuto === false) return { type: "idle" };
 
   const timing = { ...defaultStoryPlayTimingPolicy, ...options.timing };
@@ -200,7 +201,7 @@ function withoutStopReason(play: StoryPlayState): Omit<StoryPlayState, "lastStop
 
 function createCurrentStop(story: StoryStepperResult, source: StoryPlayAdvanceSource): StoryPlayCurrentStop {
   const print = latestPrintCommand(story.emittedRuntimeCommands);
-  const text = stringParam(print, "text") ?? story.state.backlog.at(-1)?.text ?? "";
+  const text = stringParam(print, "text") ?? selectCurrentStoryLine(story.state)?.text ?? "";
   return {
     source,
     autoNext: booleanParam(print, "autoNext") ?? false,
@@ -211,7 +212,7 @@ function createCurrentStop(story: StoryStepperResult, source: StoryPlayAdvanceSo
 }
 
 function selectVisibleCharCount(play: StoryPlayState, story: StoryRuntimeState): number {
-  return play.currentStop?.visibleCharCount ?? countVisibleChars(story.backlog.at(-1)?.text ?? "");
+  return play.currentStop?.visibleCharCount ?? countVisibleChars(selectCurrentStoryLine(story)?.text ?? "");
 }
 
 function latestPrintCommand(commands: RuntimeCommand[]): RuntimeCommand | undefined {

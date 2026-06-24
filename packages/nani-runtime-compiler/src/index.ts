@@ -240,10 +240,151 @@ function normalizeCommandParams(command: CommandShape, definition: NaniCommandDe
       return {
         params: compactParams({
           text: runtimeCommandValue(command.primary) ?? runtimeParam(command, "text") ?? "",
-          speaker: runtimeParam(command, "speaker") ?? runtimeParam(command, "author"),
+          speaker: runtimeParam(command, "speaker") ?? runtimeParam(command, "author") ?? runtimeParam(command, "as"),
+          printerId: runtimeParam(command, "printer"),
+          speed: runtimeParam(command, "speed"),
+          reset: runtimeParam(command, "reset"),
           autoNext: runtimeParam(command, "autoNext") ?? false
         }),
-        consumesParams: ["text", "speaker", "author", "autoNext"]
+        consumesParams: ["text", "speaker", "author", "as", "printer", "speed", "reset", "autoNext"]
+      };
+    case "append":
+      return {
+        params: compactParams({
+          text: runtimeCommandValue(command.primary) ?? runtimeParam(command, "text") ?? "",
+          speaker: runtimeParam(command, "speaker") ?? runtimeParam(command, "author"),
+          printerId: runtimeParam(command, "printer")
+        }),
+        consumesParams: ["text", "speaker", "author", "printer"]
+      };
+    case "resettext":
+      return {
+        params: compactParams({
+          printerId: runtimeCommandValue(command.primary) ?? runtimeParam(command, "printerId")
+        }),
+        consumesParams: ["printerId"]
+      };
+    case "clearbacklog":
+      return { params: {}, consumesParams: [] };
+    case "format":
+      return {
+        params: compactParams({
+          templates: runtimeCommandValue(command.primary) ?? runtimeParam(command, "templates"),
+          printerId: runtimeParam(command, "printer")
+        }),
+        consumesParams: ["templates", "printer"]
+      };
+    case "showprinter":
+      return {
+        params: compactParams({
+          printerId: runtimeCommandValue(command.primary) ?? runtimeParam(command, "printerId") ?? "default",
+          durationMs: durationMsValue(runtimeParam(command, "time"))
+        }),
+        consumesParams: ["printerId", "time"]
+      };
+    case "showui":
+      return {
+        params: compactParams({
+          target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "uINames") ?? runtimeParam(command, "target"),
+          visible: runtimeParam(command, "visible") ?? true,
+          durationMs: durationMsValue(runtimeParam(command, "time"))
+        }),
+        consumesParams: ["uINames", "target", "visible", "time"]
+      };
+    case "hideui":
+      return {
+        params: compactParams({
+          target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "uINames") ?? runtimeParam(command, "target"),
+          visible: false,
+          durationMs: durationMsValue(runtimeParam(command, "time"))
+        }),
+        consumesParams: ["uINames", "target", "time"]
+      };
+    case "toast":
+      return {
+        params: compactParams({
+          text: runtimeCommandValue(command.primary) ?? runtimeParam(command, "text") ?? "",
+          appearance: runtimeParam(command, "appearance"),
+          durationMs: durationMsValue(runtimeParam(command, "time"))
+        }),
+        consumesParams: ["text", "appearance", "time"]
+      };
+    case "wait":
+      return {
+        params: compactParams({
+          waitMode: runtimeCommandValue(command.primary) ?? runtimeParam(command, "waitMode") ?? "i"
+        }),
+        consumesParams: ["waitMode"]
+      };
+    case "input":
+      return {
+        params: compactParams({
+          variableName: runtimeCommandValue(command.primary) ?? runtimeParam(command, "variableName") ?? "",
+          valueType: runtimeParam(command, "type") ?? "string",
+          summary: runtimeParam(command, "summary"),
+          defaultValue: runtimeParam(command, "value")
+        }),
+        consumesParams: ["variableName", "type", "summary", "value"]
+      };
+    case "bgm":
+      return {
+        params: compactParams({
+          bgmPath: runtimeCommandValue(command.primary) ?? runtimeParam(command, "bgmPath") ?? "",
+          volume: runtimeParam(command, "volume"),
+          loop: runtimeParam(command, "loop"),
+          fadeMs: durationMsValue(runtimeParam(command, "fade")),
+          durationMs: durationMsValue(runtimeParam(command, "time")),
+          group: runtimeParam(command, "group")
+        }),
+        consumesParams: ["bgmPath", "volume", "loop", "fade", "time", "group"]
+      };
+    case "stopbgm":
+      return {
+        params: compactParams({
+          bgmPath: runtimeCommandValue(command.primary) ?? runtimeParam(command, "bgmPath"),
+          fadeMs: durationMsValue(runtimeParam(command, "fade")),
+          group: runtimeParam(command, "group")
+        }),
+        consumesParams: ["bgmPath", "fade", "group"]
+      };
+    case "sfx":
+      return {
+        params: compactParams({
+          sfxPath: runtimeCommandValue(command.primary) ?? runtimeParam(command, "sfxPath") ?? "",
+          volume: runtimeParam(command, "volume"),
+          loop: runtimeParam(command, "loop"),
+          fadeMs: durationMsValue(runtimeParam(command, "fade")),
+          durationMs: durationMsValue(runtimeParam(command, "time")),
+          group: runtimeParam(command, "group")
+        }),
+        consumesParams: ["sfxPath", "volume", "loop", "fade", "time", "group"]
+      };
+    case "sfxfast":
+      return {
+        params: compactParams({
+          sfxPath: runtimeCommandValue(command.primary) ?? runtimeParam(command, "sfxPath") ?? "",
+          volume: runtimeParam(command, "volume"),
+          group: runtimeParam(command, "group")
+        }),
+        consumesParams: ["sfxPath", "volume", "group"]
+      };
+    case "stopsfx":
+      return {
+        params: compactParams({
+          sfxPath: runtimeCommandValue(command.primary) ?? runtimeParam(command, "sfxPath"),
+          fadeMs: durationMsValue(runtimeParam(command, "fade")),
+          group: runtimeParam(command, "group")
+        }),
+        consumesParams: ["sfxPath", "fade", "group"]
+      };
+    case "movie":
+      return {
+        params: compactParams({
+          moviePath: runtimeCommandValue(command.primary) ?? runtimeParam(command, "moviePath") ?? "",
+          durationMs: durationMsValue(runtimeParam(command, "time")),
+          block: runtimeParam(command, "block") ?? false
+        }),
+        consumesParams: ["moviePath", "time", "block"]
       };
     case "back":
       return normalizeBackCommand(command);
@@ -328,9 +469,19 @@ function normalizeCommandParams(command: CommandShape, definition: NaniCommandDe
       return {
         params: compactParams({
           text: runtimeCommandValue(command.primary) ?? "Choice",
-          goto: runtimeParam(command, "goto")
+          goto: runtimeParam(command, "goto"),
+          id: runtimeParam(command, "id"),
+          enabled: runtimeParam(command, "enabled"),
+          setExpression: runtimeParam(command, "set")
         }),
-        consumesParams: ["goto"]
+        consumesParams: ["goto", "id", "enabled", "set"]
+      };
+    case "clearchoice":
+      return {
+        params: compactParams({
+          id: runtimeCommandValue(command.primary) ?? runtimeParam(command, "id")
+        }),
+        consumesParams: ["id"]
       };
     case "goto":
       return {
@@ -679,6 +830,18 @@ function diagnoseUnsupportedImplementedParams(
       createDiagnostic(
         "unsupported-command-param",
         `@${definition.canonicalName} accepts ${key}:${spec.type}, but the current runtime compiler does not consume it yet.`,
+        "warning"
+      )
+    );
+  }
+
+  for (const key of Object.keys(command.flags)) {
+    const spec = specsByName.get(normalizeParamName(key));
+    if (!spec || consumed.has(normalizeParamName(key))) continue;
+    diagnostics.push(
+      createDiagnostic(
+        "unsupported-command-param",
+        `@${definition.canonicalName} accepts ${key}!:${spec.type}, but the current runtime compiler does not consume it yet.`,
         "warning"
       )
     );

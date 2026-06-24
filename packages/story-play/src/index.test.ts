@@ -106,8 +106,8 @@ describe("story play", () => {
 
     const choices = advanceStoryPlay(second.play, { state: second.story.state, script, source: "skip" });
     expect(choices.story.state.pendingChoices).toEqual([
-      { text: "A", goto: "#A" },
-      { text: "B", goto: "#B" }
+      { text: "A", goto: "#A", enabled: true },
+      { text: "B", goto: "#B", enabled: true }
     ]);
     expect(choices.play).toMatchObject({ mode: "manual", lastStopReason: "choice" });
     expect(selectStoryPlaySchedule(choices.play, choices.story.state)).toEqual({ type: "idle" });
@@ -137,6 +137,34 @@ describe("story play", () => {
         presentationWait: { commandId: "char", durationMs: 250, target: "character:felix", expectedTasks: [] }
       })
     ).toEqual({ type: "idle" });
+    expect(
+      selectStoryPlaySchedule(play, {
+        ...story,
+        runtimeWait: { kind: "pause", commandId: "wait", commandIndex: 0, mode: "confirm" }
+      })
+    ).toEqual({ type: "idle" });
+  });
+
+  it("does not let AUTO or SKIP bypass runtimeWait stops", () => {
+    const script = runtimeScript("runtime-wait.nani", [
+      runtimeCommand("print", "text", { speaker: "Felix", text: "Before wait.", autoNext: true }),
+      runtimeCommand("wait", "text", { waitMode: "i" }),
+      runtimeCommand("print", "text", { speaker: "Felix", text: "After wait.", autoNext: false })
+    ]);
+    const first = advanceStoryPlay(createInitialStoryPlayState(), {
+      state: createInitialStoryState(script),
+      script,
+      source: "start"
+    });
+    const waitStep = advanceStoryPlay(toggleSkipStoryPlay(first.play), {
+      state: first.story.state,
+      script,
+      source: "skip"
+    });
+
+    expect(waitStep.story.stopReason).toBe("runtime-wait");
+    expect(waitStep.story.state.runtimeWait).toMatchObject({ kind: "pause", commandId: "wait", mode: "confirm" });
+    expect(selectStoryPlaySchedule(waitStep.play, waitStep.story.state)).toEqual({ type: "idle" });
   });
 
   it("chooses through StoryEngine and returns the combined existing story result shape", () => {

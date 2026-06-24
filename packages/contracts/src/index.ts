@@ -201,6 +201,8 @@ export type NaniCommandSource = z.infer<typeof NaniCommandSourceSchema>;
 export const NaniCommandExecutionSchema = z.enum([
   "story-control",
   "pixi-presentation",
+  "media-output",
+  "ui-output",
   "gameplay",
   "declared-only"
 ]);
@@ -256,21 +258,37 @@ export const NaniCommandDefinitionSchema = z
 
 const officialCommandStatuses: Partial<Record<string, NaniCommandStatus>> = {
   arrange: "implemented",
+  append: "implemented",
   back: "implemented",
   blur: "implemented",
   bokeh: "implemented",
   char: "implemented",
   choice: "implemented",
+  clearbacklog: "implemented",
+  clearchoice: "implemented",
+  format: "implemented",
+  input: "implemented",
   glitch: "implemented",
   goto: "implemented",
   hidechars: "implemented",
+  hideui: "implemented",
+  movie: "implemented",
   print: "implemented",
   rain: "implemented",
+  resettext: "implemented",
   set: "implemented",
   shake: "implemented",
+  showprinter: "implemented",
+  showui: "implemented",
+  bgm: "implemented",
+  sfx: "implemented",
+  sfxfast: "implemented",
   slide: "implemented",
   snow: "implemented",
-  sun: "implemented"
+  stopbgm: "implemented",
+  stopsfx: "implemented",
+  sun: "implemented",
+  toast: "implemented"
 };
 
 const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
@@ -289,11 +307,28 @@ const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
   snow: "pixi-presentation",
   sun: "pixi-presentation",
   choice: "story-control",
+  append: "story-control",
+  clearbacklog: "story-control",
+  clearchoice: "story-control",
   end: "story-control",
+  format: "story-control",
   gameplay: "gameplay",
   goto: "story-control",
+  hideui: "ui-output",
+  input: "story-control",
+  movie: "media-output",
   print: "story-control",
+  resettext: "story-control",
   set: "story-control",
+  showprinter: "story-control",
+  wait: "story-control",
+  showui: "ui-output",
+  toast: "ui-output",
+  bgm: "media-output",
+  sfx: "media-output",
+  sfxfast: "media-output",
+  stopbgm: "media-output",
+  stopsfx: "media-output",
   trialkeyword: "pixi-presentation",
   async: "declared-only",
   await: "declared-only",
@@ -399,6 +434,7 @@ const audioParams = [
 const choiceParams = [
   param("choiceSummary", "string"),
   param("id", "string"),
+  param("enabled", "boolean", false, "v-ronpa"),
   param("lock", "string"),
   param("button", "string"),
   param("pos", "decimal list"),
@@ -493,7 +529,8 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
     param("uINames", "string list"),
     param("allowToggle", "boolean"),
     param("time", "decimal"),
-    param("wait", "boolean")
+    param("wait", "boolean"),
+    param("target", "string", false, "v-ronpa")
   ]),
   official("if", "flow", [param("expression", "string")], true),
   official("input", "ui", [
@@ -581,7 +618,13 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
   ]),
   official("show", "actor", [param("actorIds", "string list"), param("time", "decimal"), param("lazy", "boolean"), param("wait", "boolean")]),
   official("showPrinter", "text", [param("printerId", "string"), param("time", "decimal"), param("wait", "boolean")]),
-  official("showUI", "ui", [param("uINames", "string list"), param("time", "decimal"), param("wait", "boolean")]),
+  official("showUI", "ui", [
+    param("uINames", "string list"),
+    param("time", "decimal"),
+    param("wait", "boolean"),
+    param("target", "string", false, "v-ronpa"),
+    param("visible", "boolean", false, "v-ronpa")
+  ]),
   official("skip", "ui", [param("enable", "boolean")]),
   official("slide", "actor", [
     param("idAndAppearance", "named string"),
@@ -604,8 +647,18 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
     param("wait", "boolean")
   ]),
   official("stop", "flow", [param("trackId", "string")]),
-  official("stopBgm", "media", [param("bgmPath", "string"), param("fade", "decimal"), param("wait", "boolean")]),
-  official("stopSfx", "media", [param("sfxPath", "string"), param("fade", "decimal"), param("wait", "boolean")]),
+  official("stopBgm", "media", [
+    param("bgmPath", "string"),
+    param("fade", "decimal"),
+    param("wait", "boolean"),
+    param("group", "string", false, "v-ronpa")
+  ]),
+  official("stopSfx", "media", [
+    param("sfxPath", "string"),
+    param("fade", "decimal"),
+    param("wait", "boolean"),
+    param("group", "string", false, "v-ronpa")
+  ]),
   official("stopVoice", "media"),
   official("sun", "effect", particleParams),
   official("sync", "flow", [param("trackId", "string")]),
@@ -1146,9 +1199,53 @@ export type StoryBacklogEntry = z.infer<typeof StoryBacklogEntrySchema>;
 
 export const StoryChoiceOptionSchema = z.object({
   text: z.string(),
-  goto: z.string().optional()
+  goto: z.string().optional(),
+  id: z.string().optional(),
+  enabled: z.boolean().default(true),
+  setExpression: z.string().optional()
 });
 export type StoryChoiceOption = z.infer<typeof StoryChoiceOptionSchema>;
+
+export const StoryRuntimeWaitSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("pause"),
+    commandId: z.literal("wait"),
+    commandIndex: z.number().int().nonnegative(),
+    mode: z.enum(["timer", "confirm", "timer-or-confirm"]),
+    durationMs: z.number().int().nonnegative().optional()
+  }),
+  z.object({
+    kind: z.literal("input"),
+    commandId: z.literal("input"),
+    commandIndex: z.number().int().nonnegative(),
+    variableName: z.string().min(1),
+    valueType: z.enum(["string", "number", "boolean"]).default("string"),
+    summary: z.string().optional(),
+    defaultValue: StoryScalarSchema.optional()
+  }),
+  z.object({
+    kind: z.literal("movie"),
+    commandId: z.literal("movie"),
+    commandIndex: z.number().int().nonnegative(),
+    moviePath: z.string().min(1),
+    allowSkip: z.boolean().default(true)
+  })
+]);
+export type StoryRuntimeWait = z.infer<typeof StoryRuntimeWaitSchema>;
+
+export const StoryTextStateSchema = z.object({
+  printerId: z.string().default("default"),
+  visible: z.boolean().default(true),
+  current: z
+    .object({
+      speaker: z.string().optional(),
+      text: z.string(),
+      formatId: z.string().optional()
+    })
+    .optional(),
+  formats: z.record(z.string(), z.string()).default({})
+});
+export type StoryTextState = z.infer<typeof StoryTextStateSchema>;
 
 export const PixiPresentationTaskKindSchema = z.enum([
   "actor-transition",
@@ -1197,6 +1294,8 @@ export const StoryRuntimeSnapshotSchema = z.object({
   backlog: z.array(StoryBacklogEntrySchema).default([]),
   pendingChoices: z.array(StoryChoiceOptionSchema).default([]),
   presentationWait: StoryPresentationWaitSchema.optional(),
+  runtimeWait: StoryRuntimeWaitSchema.optional(),
+  text: StoryTextStateSchema.optional(),
   ended: z.boolean().default(false)
 });
 export type StoryRuntimeSnapshot = z.infer<typeof StoryRuntimeSnapshotSchema>;

@@ -243,4 +243,131 @@ describe("nani runtime compiler", () => {
     });
   });
 
+  it("normalizes non-Pixi text, UI, wait, input, media, and movie commands", () => {
+    const { scenario } = parseScenario({
+      sourceText: [
+        "@append \" continued\"",
+        "@resetText default",
+        "@clearBacklog",
+        "@format warning:\"red\"",
+        "@showPrinter default time:0.2",
+        "@showUI dialog time:0.1",
+        "@hideUI commandBar time:0.1",
+        "@toast \"Saved\" appearance:info time:1.5",
+        "@wait i5",
+        "@input playerName type:string summary:\"Name?\" value:Felix",
+        "@bgm bgm:validation-main group:music volume:0.45 fade:0.2",
+        "@sfx sfx:rain-inside-car-loop group:rain loop! volume:0.35",
+        "@sfxFast sfx:shock-fadeout group:shock volume:0.75",
+        "@stopSfx group:rain fade:0.2",
+        "@stopBgm group:music fade:0.5",
+        "@movie video:validation-intro block!"
+      ].join("\n"),
+      scriptPath: "non-pixi.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.script.commands.map((command) => command.commandId)).toEqual([
+      "append",
+      "resettext",
+      "clearbacklog",
+      "format",
+      "showprinter",
+      "showui",
+      "hideui",
+      "toast",
+      "wait",
+      "input",
+      "bgm",
+      "sfx",
+      "sfxfast",
+      "stopsfx",
+      "stopbgm",
+      "movie"
+    ]);
+    expect(result.script.commands[4]?.params).toMatchObject({ printerId: "default", durationMs: 200 });
+    expect(result.script.commands[5]?.params).toMatchObject({ target: "dialog", visible: true, durationMs: 100 });
+    expect(result.script.commands[6]?.params).toMatchObject({ target: "commandBar", visible: false, durationMs: 100 });
+    expect(result.script.commands[8]?.params).toEqual({ waitMode: "i5" });
+    expect(result.script.commands[9]?.params).toEqual({
+      variableName: "playerName",
+      valueType: "string",
+      summary: "Name?",
+      defaultValue: "Felix"
+    });
+    expect(result.script.commands[10]?.params).toMatchObject({
+      bgmPath: "bgm:validation-main",
+      group: "music",
+      volume: 0.45,
+      fadeMs: 200
+    });
+    expect(result.script.commands[11]?.params).toMatchObject({
+      sfxPath: "sfx:rain-inside-car-loop",
+      group: "rain",
+      loop: true,
+      volume: 0.35
+    });
+    expect(result.script.commands[15]?.params).toEqual({
+      moviePath: "video:validation-intro",
+      block: true
+    });
+  });
+
+  it("leaves no-target showUI and hideUI as scoped runtime UI commands", () => {
+    const { scenario } = parseScenario({
+      sourceText: ["@hideUI", "@showUI"].join("\n"),
+      scriptPath: "ui-no-target.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.script.commands.map((command) => command.commandId)).toEqual(["hideui", "showui"]);
+    expect(result.script.commands[0]?.params).toEqual({ visible: false });
+    expect(result.script.commands[1]?.params).toEqual({ visible: true });
+  });
+
+  it("diagnoses unsupported media wait and advanced input/UI/sfxFast params", () => {
+    const { scenario } = parseScenario({
+      sourceText: [
+        "@bgm bgm:validation-main wait!",
+        "@input playerName nostop!",
+        "@hideUI commandBar wait! allowToggle!",
+        "@sfxFast beep restart! additive! wait!"
+      ].join("\n"),
+      scriptPath: "unsupported-non-pixi.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.script.commands.map((command) => command.commandId)).toEqual(["bgm", "input", "hideui", "sfxfast"]);
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "unsupported-command-param",
+          message: expect.stringContaining("@bgm accepts wait!:boolean")
+        }),
+        expect.objectContaining({
+          code: "unsupported-command-param",
+          message: expect.stringContaining("@input accepts nostop!:boolean")
+        }),
+        expect.objectContaining({
+          code: "unsupported-command-param",
+          message: expect.stringContaining("@hideUI accepts wait!:boolean")
+        }),
+        expect.objectContaining({
+          code: "unsupported-command-param",
+          message: expect.stringContaining("@hideUI accepts allowToggle!:boolean")
+        }),
+        expect.objectContaining({
+          code: "unsupported-command-param",
+          message: expect.stringContaining("@sfxFast accepts restart!:boolean")
+        }),
+        expect.objectContaining({
+          code: "unsupported-command-param",
+          message: expect.stringContaining("@sfxFast accepts additive!:boolean")
+        })
+      ])
+    );
+  });
+
 });
