@@ -177,9 +177,19 @@ Narrator: CHECKPOINT 00B - runtime state。分支 2 开始：右侧 Runtime 面�
 @rain power:1 time:0.1 xSpeed:-1.4 ySpeed:7
 Narrator: CHECKPOINT 01A - rain only。背景为 bg:harness，画面前景应出现清晰、持续下落的斜向雨线；此处不叠加 blur、bokeh 或 sun。
 @rain power:0 time:0.1
-@snow power:1 time:0.1 scale:1.2,1.2,1
-Narrator: CHECKPOINT 01B - snow only。雨线应消失，画面前景应出现清晰、缓慢飘落的雪花；此处仍不叠加 blur、bokeh 或 sun。
+@back bg:black effect:fade time:0.12
+@char idAndAppearance:character:felix.portrait:felix:neutral pos:36,0
+@char idAndAppearance:character:mira.portrait:mira:neutral pos:68,0
+@snow power:0.55 time:0.1 xSpeed:-0.1 ySpeed:0.75 density:0.85 flakeScale:1 sway:0.45 fog:0.18 noise:0.012 seed:11
+Narrator: CHECKPOINT 01B-L1 - snow light。黑底与双立绘用于检查参数映射和轻雾染色：低档也应有明确雪粒、可见下落重力与轻微冷色雾。
+@snow power:0.78 time:0.1 xSpeed:-0.18 ySpeed:0.95 density:1.25 flakeScale:1.22 sway:0.78 fog:0.3 noise:0.024 seed:12
+Narrator: CHECKPOINT 01B-L2 - snow medium。相比 L1，雪点数量、尺寸、下落速度和横向摆动都应明显增强；立绘应出现更清楚的冷雾染色。
+@snow power:0.92 time:0.1 xSpeed:-0.25 ySpeed:1.15 density:1.6 flakeScale:1.48 sway:1.02 fog:0.42 noise:0.036 seed:13
+Narrator: CHECKPOINT 01B-L3 - snow heavy。黑底上应出现清晰大雪、较强重力下落和更明显轻雾；角色仍不应被雪层遮没。
+@snow power:1 time:0.1 xSpeed:-0.35 ySpeed:1.35 density:2 flakeScale:1.78 sway:1.28 fog:0.55 noise:0.055 seed:14
+Narrator: CHECKPOINT 01B-L4 - snow storm。黑底压力档：大雪、强重力、强摆动、较高雾与噪声同时开启，用于检查公开 snow 参数是否都能产生可见差异。
 @snow power:0 time:0.1
+@back bg:harness effect:fade time:0.12
 @sun power:0.3 time:0.2 pos:12,88 scale:1.1,1.1,1
 @blur actorId:MainBackground power:0.12 time:0.2
 Narrator: CHECKPOINT 01C - sun + blur。右上应出现柔和光束，背景轻微虚化；雨雪此时应已关闭。
@@ -203,7 +213,7 @@ Narrator: CHECKPOINT 07B - glitch only。bokeh 已关闭；本句出现时应能
 @glitch power:0.9 time:0.8 wait!
 Narrator: CHECKPOINT 08 - glitch only + wait。保留 wait 检查点用于后续专项修复；本轮独立 glitch 视觉验收以 CHECKPOINT 07B 为准。
 @back bg:classroom effect:fade time:0.2
-@snow power:0.85 time:0.2 pos:62,82 scale:1,1,1
+@snow power:0.85 time:0.2 xSpeed:-0.18 ySpeed:0.85 density:1.35 flakeScale:1.18 sway:0.82 fog:0.32 noise:0.03 seed:29
 @rain power:0.85 time:0.2 xSpeed:0.5 ySpeed:5
 @char idAndAppearance:character:mira.portrait:mira:neutral pos:24,0
 @arrange ren.18,felix.50,mira.82 look! time:0.2

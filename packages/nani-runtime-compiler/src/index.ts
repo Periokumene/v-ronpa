@@ -529,19 +529,32 @@ function normalizeGlitchCommand(command: CommandShape): NormalizedCommandParams 
 }
 
 function normalizeWeatherCommand(command: CommandShape, kind: string): NormalizedCommandParams {
+  const snowShaderParams =
+    kind === "snow"
+      ? {
+          density: runtimeParam(command, "density"),
+          flakeScale: runtimeParam(command, "flakeScale"),
+          sway: runtimeParam(command, "sway"),
+          fog: runtimeParam(command, "fog"),
+          noise: runtimeParam(command, "noise"),
+          seed: runtimeParam(command, "seed")
+        }
+      : {};
+  const snowShaderConsumes = kind === "snow" ? ["density", "flakeScale", "sway", "fog", "noise", "seed"] : [];
   return {
     params: compactParams({
       kind,
       power: runtimeParam(command, "power") ?? 1,
       xSpeed: runtimeParam(command, "xSpeed"),
       ySpeed: runtimeParam(command, "ySpeed"),
+      ...snowShaderParams,
       pos: runtimeParam(command, "pos"),
       position: runtimeParam(command, "position"),
       rotation: runtimeParam(command, "rotation"),
       scale: runtimeParam(command, "scale"),
       ...normalizeTimingParams(command)
     }),
-    consumesParams: ["power", "time", "xSpeed", "ySpeed", "pos", "position", "rotation", "scale", "wait"]
+    consumesParams: ["power", "time", "xSpeed", "ySpeed", ...snowShaderConsumes, "pos", "position", "rotation", "scale", "wait"]
   };
 }
 

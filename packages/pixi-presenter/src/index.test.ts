@@ -405,6 +405,51 @@ describe("pixi presenter port", () => {
     expect(noRain.screenFilters).not.toHaveProperty("bokeh");
     expect(noRain.weather).not.toHaveProperty("rain");
   });
+
+  it("preserves shader snow controls and removes weather kinds independently", () => {
+    let stage = createInitialPixiStageSnapshot();
+    stage = reducePixiRuntimeCommand(stage, runtimeCommand("rain", "effect", { power: 0.7, durationMs: 120 })).snapshot;
+    const withSnow = reducePixiRuntimeCommand(
+      stage,
+      runtimeCommand("snow", "effect", {
+        power: 0.9,
+        xSpeed: -0.35,
+        ySpeed: 0.72,
+        density: 1.45,
+        flakeScale: 1.2,
+        sway: 0.85,
+        fog: 0.32,
+        noise: 0.04,
+        seed: 17,
+        durationMs: 300,
+        wait: true
+      })
+    );
+
+    expect(withSnow.snapshot.weather.rain).toMatchObject({ kind: "rain", power: 0.7 });
+    expect(withSnow.snapshot.weather.snow).toMatchObject({
+      kind: "snow",
+      power: 0.9,
+      xSpeed: -0.35,
+      ySpeed: 0.72,
+      density: 1.45,
+      flakeScale: 1.2,
+      sway: 0.85,
+      fog: 0.32,
+      noise: 0.04,
+      seed: 17
+    });
+    expect(withSnow.waitTasks).toEqual([{ kind: "weather-transition", target: "snow", revision: withSnow.snapshot.revision }]);
+
+    const noSnow = reducePixiRuntimeCommand(
+      withSnow.snapshot,
+      runtimeCommand("snow", "effect", { power: 0, durationMs: 200, wait: true })
+    );
+    expect(noSnow.snapshot.weather).toHaveProperty("rain");
+    expect(noSnow.snapshot.weather).not.toHaveProperty("snow");
+    expect(noSnow.hints).toEqual([{ type: "weather-remove", kind: "snow", durationMs: 200, wait: true }]);
+    expect(noSnow.waitTasks).toEqual([{ kind: "weather-transition", target: "snow", revision: noSnow.snapshot.revision }]);
+  });
 });
 
 function runtimeCommand(

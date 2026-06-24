@@ -314,6 +314,49 @@ describe("contracts", () => {
     ).toThrow();
   });
 
+  it("declares shader snow controls and validates their Pixi weather snapshot fields", () => {
+    const snow = getNaniCommandDefinition("snow");
+    expect(snow?.params.map((param) => param.name)).toEqual(
+      expect.arrayContaining(["xSpeed", "ySpeed", "density", "flakeScale", "sway", "fog", "noise", "seed"])
+    );
+
+    const snapshot = PixiStageSnapshotSchema.parse({
+      version: 2,
+      weather: {
+        snow: {
+          kind: "snow",
+          power: 0.9,
+          xSpeed: -0.35,
+          ySpeed: 0.72,
+          density: 1.45,
+          flakeScale: 1.2,
+          sway: 0.85,
+          fog: 0.32,
+          noise: 0.04,
+          seed: 17,
+          transition: { durationMs: 250 }
+        }
+      }
+    });
+
+    expect(snapshot.weather.snow).toMatchObject({
+      kind: "snow",
+      density: 1.45,
+      flakeScale: 1.2,
+      sway: 0.85,
+      fog: 0.32,
+      noise: 0.04,
+      seed: 17,
+      transition: { durationMs: 250, lazy: false, wait: false }
+    });
+    expect(() =>
+      PixiStageSnapshotSchema.parse({
+        version: 2,
+        weather: { snow: { kind: "snow", density: -1, transition: { durationMs: 0 } } }
+      })
+    ).toThrow();
+  });
+
   it("validates navi and trial runtime states", () => {
     expect(
       NaviRuntimeStateSchema.parse({

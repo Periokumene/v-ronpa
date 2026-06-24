@@ -387,6 +387,24 @@ const particleParams = [
   param("wait", "boolean")
 ];
 
+const snowShaderParams = [
+  param("power", "decimal"),
+  param("time", "decimal"),
+  param("xSpeed", "decimal"),
+  param("ySpeed", "decimal"),
+  param("density", "decimal"),
+  param("flakeScale", "decimal"),
+  param("sway", "decimal"),
+  param("fog", "decimal"),
+  param("noise", "decimal"),
+  param("seed", "decimal"),
+  param("pos", "decimal list"),
+  param("position", "decimal list"),
+  param("rotation", "decimal list"),
+  param("scale", "decimal list"),
+  param("wait", "boolean")
+];
+
 const audioParams = [
   param("volume", "decimal"),
   param("loop", "boolean"),
@@ -593,7 +611,7 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
     param("lazy", "boolean"),
     param("wait", "boolean")
   ]),
-  official("snow", "effect", particleParams),
+  official("snow", "effect", snowShaderParams),
   official("spawn", "actor", [
     param("path", "string"),
     param("params", "string list"),
@@ -1000,6 +1018,12 @@ export const PixiWeatherSnapshotSchema = z.object({
   power: z.number().nonnegative().default(0),
   xSpeed: z.number().optional(),
   ySpeed: z.number().optional(),
+  density: z.number().nonnegative().optional(),
+  flakeScale: z.number().nonnegative().optional(),
+  sway: z.number().nonnegative().optional(),
+  fog: z.number().nonnegative().optional(),
+  noise: z.number().nonnegative().optional(),
+  seed: z.number().optional(),
   pos: PixiVector2Schema.optional(),
   position: PixiVector3Schema.optional(),
   rotation: PixiVector3Schema.optional(),

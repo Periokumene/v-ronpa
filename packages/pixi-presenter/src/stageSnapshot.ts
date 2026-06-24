@@ -434,6 +434,16 @@ function reduceWeather(snapshot: PixiStageSnapshot, command: RuntimeCommand, kin
         power,
         xSpeed: numberParam(command, "xSpeed"),
         ySpeed: numberParam(command, "ySpeed"),
+        ...(kind === "snow"
+          ? {
+              density: numberParam(command, "density"),
+              flakeScale: numberParam(command, "flakeScale"),
+              sway: numberParam(command, "sway"),
+              fog: numberParam(command, "fog"),
+              noise: numberParam(command, "noise"),
+              seed: numberParam(command, "seed")
+            }
+          : {}),
         pos: sceneVector2Param(command, "pos"),
         position: vector3Param(command, "position"),
         rotation: vector3Param(command, "rotation"),

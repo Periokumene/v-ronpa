@@ -63,9 +63,11 @@ composition or cleanup:
 - bokeh/glitch composition boundary when the existing vertical-slice fixture
   disables bokeh before glitch
 
-This task must not change `.nani` parsing, compiler normalization,
-`RuntimeCommand` shape, StoryEngine state, `runtimeWait`, media/UI command
-execution, or command catalog metadata.
+This task may change `@snow` command metadata and compiler normalization only
+for the CCR-backed Shadertoy snow shader parameters in
+`docs/ccr/snow-shader-command-params.md`. It must not change `.nani` parsing,
+`RuntimeCommand` top-level shape, StoryEngine state, `runtimeWait`, media/UI
+command execution, or unrelated command catalog metadata.
 
 ## Current Architecture Summary
 
@@ -77,7 +79,8 @@ execution, or command catalog metadata.
   `WeatherSystem`, `TransientEffectSystem`, `FilterSystem`, `TweenSystem`, and
   task interaction.
 - `packages/pixi-presenter/src/internal/fxAssets.ts` owns built-in effect
-  textures such as `rain-streak`, `snowflake-atlas`, and `glitch-scanline`.
+  textures such as `rain-streak` and `glitch-scanline`; snow is rendered by a
+  shader overlay after this task's CCR-backed migration.
 - Existing vertical-slice fixture already contains visual checkpoints for rain,
   snow, sun/blur, bokeh, glitch, rain+snow coexistence, and cleanup waits.
 - Pixi wait is already expressed as `StoryPresentationWait.expectedTasks` and
@@ -105,8 +108,10 @@ The target is visual and lifecycle polish inside the Pixi presenter:
 This task is designed to run in parallel with
 `docs/tasks/non-pixi-runtime-command-baseline.md`. To minimize conflicts:
 
-- Do not edit `packages/contracts/**`.
-- Do not edit `packages/nani-runtime-compiler/**`.
+- Do not edit `packages/contracts/**` except the CCR-backed `@snow` catalog and
+  `PixiWeatherSnapshot` fields for this task.
+- Do not edit `packages/nani-runtime-compiler/**` except weather normalization
+  for the CCR-backed `@snow` shader params.
 - Do not edit `packages/story-engine/**`.
 - Do not edit `packages/story-play/**`.
 - Do not edit `apps/game/src/vnRuntimeTransaction.ts`.
@@ -117,7 +122,8 @@ This task is designed to run in parallel with
   integration follow-up instead.
 - Do not add `runtimeWait`, media runtime, UI runtime, or non-Pixi command
   behavior here.
-- Do not change command catalog status, execution boundaries, or command params.
+- Do not change command catalog status or execution boundaries. Command param
+  changes are limited to the CCR-backed `@snow` shader params.
 
 ## Boundary Decisions
 
@@ -171,7 +177,14 @@ This task is designed to run in parallel with
 
 ## Public Contract Changes
 
-None expected.
+Expected only for `@snow`, backed by
+`docs/ccr/snow-shader-command-params.md`.
+
+Allowed public contract changes:
+
+- `@snow` catalog params: `xSpeed`, `ySpeed`, `density`, `flakeScale`, `sway`,
+  `fog`, `noise`, `seed`.
+- `PixiWeatherSnapshot` optional fields with the same names.
 
 Forbidden public contract changes:
 
@@ -179,9 +192,9 @@ Forbidden public contract changes:
 - `StoryRuntimeSnapshot`.
 - `StoryPresentationWait`.
 - `StoryPresentationWaitTask`.
-- `PixiStageSnapshot` schema.
-- `PixiWeatherSnapshot` schema.
-- `commandCatalog`.
+- `PixiStageSnapshot` top-level schema.
+- `PixiWeatherSnapshot` changes outside the `@snow` shader fields above.
+- `commandCatalog` changes outside the `@snow` params above.
 - `NaniCommandExecutionSchema`.
 - `.nani` parser IR.
 
@@ -202,6 +215,7 @@ Allowed files:
 - `packages/pixi-presenter/src/internal/presentationTasks.ts`
 - `packages/pixi-presenter/src/internal/presentationTasks.test.ts`
 - `packages/pixi-presenter/src/internal/fxAssets.ts`
+- `packages/pixi-presenter/src/internal/assets/fx/snowflake-atlas.png`
 - `packages/pixi-presenter/src/internal/effects.ts`
 - `packages/pixi-presenter/src/internal/effects.test.ts`
 - `packages/pixi-presenter/src/internal/presenterTrace.ts`
@@ -224,6 +238,7 @@ Allowed files only if package tests are insufficient for visual proof:
 
 - `apps/game/src/harness/fixtures/verticalSlice.ts`
 - `tests/smoke/vertical-slice.spec.ts`
+- `tests/smoke/vn-auto-skip.spec.ts`
 
 Allowed work:
 
@@ -250,6 +265,11 @@ Optional documentation updates:
 ## Allowed Paths
 
 - `docs/tasks/pixi-weather-glitch-effect-polish.md`
+- `docs/ccr/snow-shader-command-params.md`
+- `packages/contracts/src/index.ts`
+- `packages/contracts/src/index.test.ts`
+- `packages/nani-runtime-compiler/src/index.ts`
+- `packages/nani-runtime-compiler/src/index.test.ts`
 - `packages/pixi-presenter/src/stageSnapshot.ts`
 - `packages/pixi-presenter/src/index.ts`
 - `packages/pixi-presenter/src/index.test.ts`
@@ -258,18 +278,18 @@ Optional documentation updates:
 - `packages/pixi-presenter/src/internal/presentationTasks.ts`
 - `packages/pixi-presenter/src/internal/presentationTasks.test.ts`
 - `packages/pixi-presenter/src/internal/fxAssets.ts`
+- `packages/pixi-presenter/src/internal/assets/fx/snowflake-atlas.png`
 - `packages/pixi-presenter/src/internal/effects.ts`
 - `packages/pixi-presenter/src/internal/effects.test.ts`
 - `packages/pixi-presenter/src/internal/presenterTrace.ts`
 - `packages/pixi-presenter/src/internal/presenterTrace.test.ts`
 - `apps/game/src/harness/fixtures/verticalSlice.ts`
 - `tests/smoke/vertical-slice.spec.ts`
+- `tests/smoke/vn-auto-skip.spec.ts`
 
 ## Forbidden Paths
 
-- `packages/contracts/**`
 - `packages/nani-parser/**`
-- `packages/nani-runtime-compiler/**`
 - `packages/story-engine/**`
 - `packages/story-play/**`
 - `packages/media-save/**`

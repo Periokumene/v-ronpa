@@ -212,7 +212,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vn-dialog-choice-1")).toHaveText("分支2：完整 Pixi 命令视觉验收");
   await page.getByTestId("vn-dialog-choice-0").click();
   await expect(page.getByTestId("vertical-slice-route")).toHaveText("return");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 1 检查点");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT LOGIC 01");
   await advanceUntilOverlayClosed(page);
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
   await page.keyboard.press("Escape");
@@ -233,6 +233,25 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vertical-slice-evidence")).toContainText("evidence:keycard");
   await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 2 开始");
   await page.screenshot({ path: "test-results/vertical-slice-branch-b.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 01B-L1");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/vertical-slice-snow-light.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 01B-L2");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/vertical-slice-snow-medium.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 01B-L3");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/vertical-slice-snow-heavy.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 01B-L4");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/vertical-slice-snow-storm.png", fullPage: true });
+  await page.screenshot({ path: "test-results/vertical-slice-snow-shader.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 09");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/vertical-slice-rain-snow-coexist.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 11");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/vertical-slice-weather-cleanup.png", fullPage: true });
 
   expect(consoleErrors).toEqual([]);
 });
@@ -267,6 +286,16 @@ async function advanceUntilOverlayClosed(page: Page) {
   }
 
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
+}
+
+async function advanceUntilText(page: Page, text: string) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) return;
+    await page.getByTestId("vn-dialog-advance").click();
+    await page.waitForTimeout(120);
+  }
+
+  await expect(page.getByTestId("vn-dialog-text")).toContainText(text);
 }
 
 async function expectKeyNeverFocuses(page: Page, key: string, activeTestId: string) {

@@ -42,6 +42,45 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands[1]?.params).not.toHaveProperty("duration");
   });
 
+  it("normalizes shader snow params while leaving them snow-specific", () => {
+    const { scenario } = parseScenario({
+      sourceText: [
+        "@snow power:1 density:1.5 flakeScale:1.2 xSpeed:-0.3 ySpeed:0.8 sway:0.9 fog:0.25 noise:0.02 seed:42 time:0.2 wait!",
+        "@rain legacy power:1 density:1.5"
+      ].join("\n"),
+      scriptPath: "snow-shader.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.script.commands[0]).toEqual(
+      expect.objectContaining({
+        commandId: "snow",
+        params: {
+          kind: "snow",
+          power: 1,
+          xSpeed: -0.3,
+          ySpeed: 0.8,
+          density: 1.5,
+          flakeScale: 1.2,
+          sway: 0.9,
+          fog: 0.25,
+          noise: 0.02,
+          seed: 42,
+          durationMs: 200,
+          lazy: false,
+          wait: true
+        }
+      })
+    );
+    expect(result.script.commands[1]?.params).not.toHaveProperty("density");
+    expect(result.diagnostics).toContainEqual({
+      code: "invalid-command-param",
+      message: "@rain does not declare parameter density; commandCatalog is the authority.",
+      severity: "warning"
+    });
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+  });
+
   it("normalizes aliases, defaults, flags, and labels", () => {
     const { scenario } = parseScenario({
       sourceText: [

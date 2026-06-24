@@ -3,13 +3,14 @@ import {
   Assets,
   BlurFilter,
   Container,
+  Filter,
   Graphics,
+  GlProgram,
   Rectangle,
   Sprite,
   Text,
   Texture,
   TilingSprite,
-  type Filter,
   type Ticker
 } from "pixi.js";
 import { GlitchFilter, GodrayFilter, KawaseBlurFilter, RGBSplitFilter } from "pixi-filters";
@@ -36,9 +37,35 @@ interface WeatherRecord {
   snapshot: PixiWeatherSnapshot;
   container: Container;
   particles: WeatherParticle[];
+  snowShader?: SnowShaderRecord;
 }
 
 type WeatherParticle = Sprite | TilingSprite;
+
+interface SnowShaderRecord {
+  surface: Graphics;
+  filter: SnowShaderFilter;
+  uniforms: SnowShaderUniformValues;
+}
+
+interface SnowShaderFilter {
+  resources: { snowUniforms: { uniforms: SnowShaderUniformValues } };
+  destroy(destroyPrograms?: boolean): void;
+}
+
+interface SnowShaderUniformValues {
+  uTime: number;
+  uResolution: Float32Array;
+  uPower: number;
+  uDensity: number;
+  uFallSpeed: number;
+  uWind: number;
+  uFlakeScale: number;
+  uSway: number;
+  uFog: number;
+  uNoise: number;
+  uSeed: number;
+}
 
 interface TweenHandle {
   stop(): void;
@@ -269,12 +296,12 @@ export class ActorSystem {
   private drawBackground(container: Container, actor: PixiActorSnapshot): void {
     const width = this.options.width();
     const height = this.options.height();
-    const color = colorFromId(actor.appearance ?? "background");
+    const style = backgroundStyleFromId(actor.appearance ?? "background");
     const plate = new Graphics()
       .rect(0, 0, width, height)
-      .fill({ color, alpha: 0.78 })
+      .fill({ color: style.color, alpha: style.alpha })
       .rect(32, 32, width - 64, height - 64)
-      .stroke({ color: 0x83e4d3, width: 2, alpha: 0.28 });
+      .stroke({ color: 0x83e4d3, width: 2, alpha: style.strokeAlpha });
     const title = new Text({
       text: actor.appearance ?? actor.id,
       style: { fill: 0xeef8ff, fontSize: 18, fontFamily: "Inter, ui-sans-serif, system-ui", letterSpacing: 0 }
@@ -455,6 +482,12 @@ export class WeatherSystem {
     for (const record of this.records.values()) {
       const width = this.options.width();
       const height = this.options.height();
+      if (record.snowShader) {
+        this.updateSnowShaderUniforms(record);
+        this.resizeSnowShader(record, width, height);
+        record.snowShader.uniforms.uTime += Math.max(0, ticker.deltaMS) / 1000;
+        continue;
+      }
       const speedY = record.snapshot.ySpeed ?? (record.snapshot.kind === "snow" ? 0.45 : 6);
       const speedX = record.snapshot.xSpeed ?? (record.snapshot.kind === "rain" ? -1.6 : 0.25);
       for (const particle of record.particles) {
@@ -529,7 +562,11 @@ export class WeatherSystem {
   }
 
   private populate(record: WeatherRecord): void {
-    const count = record.snapshot.kind === "rain" ? 3 : record.snapshot.kind === "snow" ? 2 : 1;
+    if (record.snapshot.kind === "snow") {
+      this.populateSnowShader(record);
+      return;
+    }
+    const count = record.snapshot.kind === "rain" ? 3 : 1;
     const texture = createWeatherTexture(record.snapshot.kind);
     const width = this.options.width();
     const height = this.options.height();
@@ -546,6 +583,10 @@ export class WeatherSystem {
   }
 
   private applyParticleStyle(record: WeatherRecord): void {
+    if (record.snapshot.kind === "snow") {
+      this.updateSnowShaderUniforms(record);
+      return;
+    }
     const power = clamp01(record.snapshot.power);
     const externalScale = record.snapshot.scale?.[0] ?? 1;
     const activeCount =
@@ -566,18 +607,6 @@ export class WeatherSystem {
           particle.tileRotation = -0.08;
         } else {
           particle.scale.set((0.42 + (index % 5) * 0.045) * externalScale);
-        }
-      } else if (record.snapshot.kind === "snow") {
-        particle.alpha = 0.1 + power * (index === 0 ? 0.16 : 0.12);
-        if (particle instanceof TilingSprite) {
-          particle.width = this.options.width() + 420;
-          particle.height = this.options.height() + 420;
-          particle.x = -210;
-          particle.y = -210;
-          particle.tileScale.set((0.55 + index * 0.24) * externalScale);
-          particle.tileRotation = index % 2 === 0 ? 0.02 : -0.025;
-        } else {
-          particle.scale.set((0.19 + (index % 4) * 0.035) * externalScale);
         }
       } else {
         particle.alpha = 0.26 + power * 0.36;
@@ -623,9 +652,55 @@ export class WeatherSystem {
     const record = this.records.get(kind);
     if (!record) return;
     if (cancelTasks) this.tasks.cancelTarget(kind);
+    record.snowShader?.filter.destroy();
     record.container.removeFromParent();
     record.container.destroy({ children: true });
     this.records.delete(kind);
+  }
+
+  private populateSnowShader(record: WeatherRecord): void {
+    const width = this.options.width();
+    const height = this.options.height();
+    const surface = new Graphics()
+      .rect(0, 0, width, height)
+      .fill({ color: 0xffffff, alpha: 1 });
+    surface.label = "weather:snow:shader-surface";
+    const shader = createSnowShaderFilter(width, height);
+    surface.filters = [shader.filter as unknown as Filter];
+    surface.filterArea = new Rectangle(0, 0, width, height);
+    record.snowShader = { surface, filter: shader.filter, uniforms: shader.uniforms };
+    record.container.addChild(surface);
+    this.updateSnowShaderUniforms(record);
+  }
+
+  private resizeSnowShader(record: WeatherRecord, width: number, height: number): void {
+    const shader = record.snowShader;
+    if (!shader) return;
+    const resolution = shader.uniforms.uResolution;
+    if (resolution[0] === width && resolution[1] === height) return;
+    resolution[0] = width;
+    resolution[1] = height;
+    shader.surface
+      .clear()
+      .rect(0, 0, width, height)
+      .fill({ color: 0xffffff, alpha: 1 });
+    shader.surface.filterArea = new Rectangle(0, 0, width, height);
+  }
+
+  private updateSnowShaderUniforms(record: WeatherRecord): void {
+    const shader = record.snowShader;
+    if (!shader) return;
+    const snapshot = record.snapshot;
+    const uniforms = shader.uniforms;
+    uniforms.uPower = clamp01(snapshot.power);
+    uniforms.uDensity = snapshot.density ?? 1;
+    uniforms.uFallSpeed = snapshot.ySpeed ?? 0.45;
+    uniforms.uWind = snapshot.xSpeed ?? 0.25;
+    uniforms.uFlakeScale = snapshot.flakeScale ?? snapshot.scale?.[0] ?? 1;
+    uniforms.uSway = snapshot.sway ?? 1;
+    uniforms.uFog = snapshot.fog ?? 0.25;
+    uniforms.uNoise = snapshot.noise ?? 0.01;
+    uniforms.uSeed = snapshot.seed ?? 0;
   }
 }
 
@@ -980,6 +1055,11 @@ function colorFromId(id: string): number {
   return 0x243040 + (hash % 0x2f3f50);
 }
 
+function backgroundStyleFromId(id: string): { color: number; alpha: number; strokeAlpha: number } {
+  if (id === "bg:black" || id === "bg:solid-black") return { color: 0x000000, alpha: 1, strokeAlpha: 0.22 };
+  return { color: colorFromId(id), alpha: 0.78, strokeAlpha: 0.28 };
+}
+
 function nearestSlot(x: number): "left" | "center" | "right" {
   if (x < 0.38) return "left";
   if (x > 0.62) return "right";
@@ -1010,13 +1090,12 @@ function createWeatherContainer(kind: string): Container {
 
 function createWeatherTexture(kind: string): Texture {
   if (kind === "rain") return getBuiltInPixiFxTexture("rain-streak");
-  if (kind === "snow") return getBuiltInPixiFxTexture("snowflake-atlas");
   return getBuiltInPixiFxTexture("godray-mask");
 }
 
 function createWeatherParticle(kind: string, texture: Texture, width: number, height: number, index: number): WeatherParticle {
-  if (kind === "rain" || kind === "snow") {
-    const margin = kind === "rain" ? 520 : 420;
+  if (kind === "rain") {
+    const margin = 520;
     return new TilingSprite({
       texture,
       width: width + margin,
@@ -1030,6 +1109,161 @@ function createWeatherParticle(kind: string, texture: Texture, width: number, he
   return sprite;
 }
 
+function createSnowShaderFilter(width: number, height: number): { filter: SnowShaderFilter; uniforms: SnowShaderUniformValues } {
+  const initialUniforms: SnowShaderUniformValues = {
+    uTime: 0,
+    uResolution: new Float32Array([width, height]),
+    uPower: 1,
+    uDensity: 1,
+    uFallSpeed: 0.45,
+    uWind: 0.25,
+    uFlakeScale: 1,
+    uSway: 1,
+    uFog: 0.25,
+    uNoise: 0.01,
+    uSeed: 0
+  };
+  if (typeof document === "undefined") {
+    return {
+      filter: {
+        resources: { snowUniforms: { uniforms: initialUniforms } },
+        destroy: () => undefined
+      },
+      uniforms: initialUniforms
+    };
+  }
+
+  const filter = new Filter({
+    glProgram: GlProgram.from({
+      vertex: SNOW_SHADER_VERTEX,
+      fragment: SNOW_SHADER_FRAGMENT,
+      name: "v-ronpa-snow-shader"
+    }),
+    resources: {
+      snowUniforms: {
+        uTime: { value: initialUniforms.uTime, type: "f32" },
+        uResolution: { value: initialUniforms.uResolution, type: "vec2<f32>" },
+        uPower: { value: initialUniforms.uPower, type: "f32" },
+        uDensity: { value: initialUniforms.uDensity, type: "f32" },
+        uFallSpeed: { value: initialUniforms.uFallSpeed, type: "f32" },
+        uWind: { value: initialUniforms.uWind, type: "f32" },
+        uFlakeScale: { value: initialUniforms.uFlakeScale, type: "f32" },
+        uSway: { value: initialUniforms.uSway, type: "f32" },
+        uFog: { value: initialUniforms.uFog, type: "f32" },
+        uNoise: { value: initialUniforms.uNoise, type: "f32" },
+        uSeed: { value: initialUniforms.uSeed, type: "f32" }
+      }
+    }
+  });
+  return {
+    filter: filter as unknown as SnowShaderFilter,
+    uniforms: filter.resources.snowUniforms.uniforms as SnowShaderUniformValues
+  };
+}
+
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
+
+const SNOW_SHADER_VERTEX = `
+in vec2 aPosition;
+out vec2 vTextureCoord;
+
+uniform vec4 uInputSize;
+uniform vec4 uOutputFrame;
+uniform vec4 uOutputTexture;
+
+vec4 filterVertexPosition(void)
+{
+  vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
+  position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
+  position.y = position.y * (2.0 * uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
+  return vec4(position, 0.0, 1.0);
+}
+
+vec2 filterTextureCoord(void)
+{
+  return aPosition * (uOutputFrame.zw * uInputSize.zw);
+}
+
+void main(void)
+{
+  gl_Position = filterVertexPosition();
+  vTextureCoord = filterTextureCoord();
+}
+`;
+
+const SNOW_SHADER_FRAGMENT = `
+precision highp float;
+
+in vec2 vTextureCoord;
+out vec4 finalColor;
+
+uniform sampler2D uTexture;
+uniform float uTime;
+uniform vec2 uResolution;
+uniform float uPower;
+uniform float uDensity;
+uniform float uFallSpeed;
+uniform float uWind;
+uniform float uFlakeScale;
+uniform float uSway;
+uniform float uFog;
+uniform float uNoise;
+uniform float uSeed;
+
+float snowHash(vec2 value, vec2 basis, float offset)
+{
+  return fract(sin(dot(value, basis) + offset + uSeed * 19.19) * 43758.5453);
+}
+
+void main(void)
+{
+  vec2 fragCoord = vTextureCoord * uResolution;
+  float axis = max(1.0, uResolution.x);
+  float power = clamp(uPower, 0.0, 1.0);
+  float density = max(0.0, uDensity);
+  float flakeScale = max(0.05, uFlakeScale);
+  float fallSpeed = max(0.0, uFallSpeed);
+  float sway = max(0.0, uSway);
+  float snow = 0.0;
+  float random = snowHash(fragCoord, vec2(12.9898, 78.233), 0.0);
+
+  for (int k = 0; k < 6; k++) {
+    for (int i = 1; i <= 12; i++) {
+      float fk = float(k);
+      float fi = float(i);
+      float cellSize = (2.0 + fi * 3.0) / flakeScale;
+      float layerSpeed = fallSpeed * (0.54 + fi * 0.072) + (sin(uTime * 0.4 + fk + fi * 20.0) + 1.0) * 0.00012;
+      vec2 uv = fragCoord / axis + vec2(
+        0.01 * sin((uTime + fk * 6185.0) * 0.6 + fi) * (5.0 / fi) * sway + uWind * uTime * 0.015 / fi,
+        -layerSpeed * (uTime + fk * 1352.0) * (1.0 / fi)
+      );
+      vec2 uvStep = ceil(uv * cellSize - vec2(0.5)) / cellSize;
+      float x = snowHash(uvStep, vec2(12.9898 + fk * 12.0, 78.233 + fk * 315.156), fk * 12.0) - 0.5;
+      float y = snowHash(uvStep, vec2(62.2364 + fk * 23.0, 94.674 + fk * 95.0), fk * 12.0) - 0.5;
+      float randomMagnitude1 = sin(uTime * 2.5) * 0.7 / cellSize;
+      float randomMagnitude2 = cos(uTime * 2.5) * 0.7 / cellSize;
+      vec2 flakeCenter = uvStep + vec2(x * sin(y), y) * randomMagnitude1 + vec2(y, x) * randomMagnitude2;
+      float d = 5.0 * distance(flakeCenter, uv);
+      float omit = snowHash(uvStep, vec2(32.4691, 94.615), fk * 5.0);
+      float threshold = clamp(0.06 * density * mix(0.5, 1.05, power), 0.0, 0.28);
+      if (omit < threshold) {
+        float sharpness = 15.0 + x * 6.3;
+        float shaped = clamp(1.9 - d * sharpness * (cellSize / 1.4), 0.0, 1.0);
+        snow += (x + 1.0) * 0.4 * shaped;
+      }
+    }
+  }
+
+  float flurry = clamp(snow * (0.42 + density * 0.16) * (0.32 + power * 0.68), 0.0, 1.0);
+  float fogGradient = smoothstep(0.0, 1.0, 1.0 - vTextureCoord.y);
+  float fogAlpha = clamp(uFog, 0.0, 1.0) * power * (0.045 + fogGradient * 0.13);
+  float noiseAlpha = random * max(0.0, uNoise) * power * 0.25;
+  float alpha = clamp(flurry * 0.58 * power + fogAlpha + noiseAlpha, 0.0, 0.68);
+  vec3 fogColor = vec3(0.62, 0.82, 1.0);
+  vec3 snowColor = vec3(0.94, 0.98, 1.0);
+  vec3 color = mix(fogColor, snowColor, flurry);
+  finalColor = vec4(color * alpha, alpha);
+}
+`;

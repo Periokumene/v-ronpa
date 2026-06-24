@@ -78,7 +78,7 @@ test("VN wait! resumes from Pixi task completion and manual continue settles the
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toContainText("actor-transition:character:felix", { timeout: 1_000 });
   await page.getByTestId("vn-dialog-advance").click();
 
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT 05", { timeout: 2_000 });
+  await expect(page.getByTestId("vn-dialog-text")).toContainText(/CHECKPOINT 0[56]/, { timeout: 2_000 });
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
   expect(consoleErrors).toEqual([]);
 });

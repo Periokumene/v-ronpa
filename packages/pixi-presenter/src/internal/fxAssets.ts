@@ -5,7 +5,6 @@ export type PixiFxAssetId =
   | "blue-noise"
   | "bokeh-disc"
   | "rain-streak"
-  | "snowflake-atlas"
   | "godray-mask"
   | "glitch-scanline"
   | "chromatic-noise"
@@ -23,7 +22,6 @@ const assetUris: Record<PixiFxAssetId, string> = {
   "blue-noise": new URL("./assets/fx/blue-noise.png", import.meta.url).href,
   "bokeh-disc": new URL("./assets/fx/bokeh-disc.png", import.meta.url).href,
   "rain-streak": new URL("./assets/fx/rain-streak.png", import.meta.url).href,
-  "snowflake-atlas": new URL("./assets/fx/snowflake-atlas.png", import.meta.url).href,
   "godray-mask": new URL("./assets/fx/godray-mask.png", import.meta.url).href,
   "glitch-scanline": new URL("./assets/fx/glitch-scanline.png", import.meta.url).href,
   "chromatic-noise": new URL("./assets/fx/chromatic-noise.png", import.meta.url).href,
@@ -39,7 +37,6 @@ export const builtInPixiFxAssets: PixiFxAsset[] = [
   { id: "blue-noise", uri: assetUris["blue-noise"] },
   { id: "bokeh-disc", uri: assetUris["bokeh-disc"] },
   { id: "rain-streak", uri: assetUris["rain-streak"] },
-  { id: "snowflake-atlas", uri: assetUris["snowflake-atlas"] },
   { id: "godray-mask", uri: assetUris["godray-mask"] },
   { id: "glitch-scanline", uri: assetUris["glitch-scanline"] },
   { id: "chromatic-noise", uri: assetUris["chromatic-noise"] },
