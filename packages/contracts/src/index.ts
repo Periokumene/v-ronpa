@@ -262,6 +262,7 @@ const officialCommandStatuses: Partial<Record<string, NaniCommandStatus>> = {
   char: "implemented",
   choice: "implemented",
   glitch: "implemented",
+  glitchfilter: "implemented",
   goto: "implemented",
   hidechars: "implemented",
   print: "implemented",
@@ -282,6 +283,7 @@ const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
   flash: "pixi-presentation",
   focus: "pixi-presentation",
   glitch: "pixi-presentation",
+  glitchfilter: "pixi-presentation",
   hidechars: "pixi-presentation",
   rain: "pixi-presentation",
   shake: "pixi-presentation",
@@ -405,6 +407,31 @@ const snowShaderParams = [
   param("wait", "boolean")
 ];
 
+const glitchShaderParams = [
+  param("time", "decimal"),
+  param("power", "decimal"),
+  param("blockJump", "decimal"),
+  param("burstJump", "decimal"),
+  param("pixelScatter", "decimal"),
+  param("colorNoise", "decimal"),
+  param("speed", "decimal"),
+  param("seed", "decimal"),
+  param("wait", "boolean")
+];
+
+const glitchFilterShaderParams = [
+  param("time", "decimal"),
+  param("easing", "string"),
+  param("power", "decimal"),
+  param("blockJump", "decimal"),
+  param("burstJump", "decimal"),
+  param("pixelScatter", "decimal"),
+  param("colorNoise", "decimal"),
+  param("speed", "decimal"),
+  param("seed", "decimal"),
+  param("wait", "boolean")
+];
+
 const audioParams = [
   param("volume", "decimal"),
   param("loop", "boolean"),
@@ -494,7 +521,8 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
   official("enterDialogue", "text"),
   official("exitDialogue", "text", [param("destroy", "boolean")]),
   official("format", "text", [param("templates", "named string list"), param("printer", "string")]),
-  official("glitch", "effect", [param("time", "decimal"), param("power", "decimal"), param("wait", "boolean")]),
+  official("glitch", "effect", glitchShaderParams),
+  official("glitchFilter", "effect", glitchFilterShaderParams),
   official("gosub", "flow", [param("path", "string")]),
   official("goto", "flow", [
     param("path", "string"),
@@ -1045,6 +1073,12 @@ export const PixiScreenFiltersSnapshotSchema = z
     glitch: z
       .object({
         power: z.number().nonnegative().default(0),
+        blockJump: z.number().nonnegative().optional(),
+        burstJump: z.number().nonnegative().optional(),
+        pixelScatter: z.number().nonnegative().optional(),
+        colorNoise: z.number().nonnegative().optional(),
+        speed: z.number().nonnegative().optional(),
+        seed: z.number().optional(),
         transition: PixiActorTransitionSnapshotSchema
       })
       .optional()

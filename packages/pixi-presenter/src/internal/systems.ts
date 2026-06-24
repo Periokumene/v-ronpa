@@ -13,7 +13,7 @@ import {
   TilingSprite,
   type Ticker
 } from "pixi.js";
-import { GlitchFilter, GodrayFilter, KawaseBlurFilter, RGBSplitFilter } from "pixi-filters";
+import { GodrayFilter, KawaseBlurFilter } from "pixi-filters";
 import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "@v-ronpa/contracts";
 import type { PixiStageRenderHint } from "../stageSnapshot";
 import { getBuiltInPixiFxTexture } from "./fxAssets";
@@ -67,6 +67,43 @@ interface SnowShaderUniformValues {
   uSeed: number;
 }
 
+interface GlitchShaderRecord {
+  filter: GlitchShaderFilter;
+  uniforms: GlitchShaderUniformValues;
+}
+
+interface PersistentGlitchRecord extends GlitchShaderRecord {
+  handle: TweenHandle | undefined;
+}
+
+interface GlitchShaderFilter {
+  resources: { glitchUniforms: { uniforms: GlitchShaderUniformValues } };
+  destroy(destroyPrograms?: boolean): void;
+}
+
+interface GlitchShaderUniformValues {
+  uTime: number;
+  uProgress: number;
+  uResolution: Float32Array;
+  uPower: number;
+  uBlockJump: number;
+  uBurstJump: number;
+  uPixelScatter: number;
+  uColorNoise: number;
+  uSpeed: number;
+  uSeed: number;
+}
+
+interface GlitchShaderControls {
+  power?: number | undefined;
+  blockJump?: number | undefined;
+  burstJump?: number | undefined;
+  pixelScatter?: number | undefined;
+  colorNoise?: number | undefined;
+  speed?: number | undefined;
+  seed?: number | undefined;
+}
+
 interface TweenHandle {
   stop(): void;
 }
@@ -117,8 +154,58 @@ export class TweenSystem {
   }
 }
 
+export class RootFilterStack {
+  private screenFilters: Filter[] = [];
+  private transientFilters: Filter[] = [];
+
+  constructor(private readonly options: PixiPresenterSystemsOptions) {}
+
+  setScreenFilters(filters: Filter[]): void {
+    this.screenFilters = [...filters];
+    this.apply();
+  }
+
+  removeScreenFilter(filter: Filter): void {
+    this.screenFilters = this.screenFilters.filter((candidate) => candidate !== filter);
+    this.apply();
+  }
+
+  addTransientFilter(filter: Filter): void {
+    this.transientFilters.push(filter);
+    this.apply();
+  }
+
+  removeTransientFilter(filter: Filter): void {
+    this.transientFilters = this.transientFilters.filter((candidate) => candidate !== filter);
+    this.apply();
+  }
+
+  clear(): void {
+    this.screenFilters = [];
+    this.transientFilters = [];
+    this.apply();
+  }
+
+  private apply(): void {
+    const filters = [...this.screenFilters, ...this.transientFilters];
+    this.options.root.filters = filters.length > 0 ? filters : null;
+    if (filters.length > 0) {
+      this.options.root.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
+    } else {
+      (this.options.root as unknown as { filterArea: Rectangle | undefined }).filterArea = undefined;
+    }
+  }
+}
+
 export class FilterSystem {
-  constructor(private readonly options?: { width: () => number; height: () => number }) {}
+  private persistentGlitch: PersistentGlitchRecord | undefined;
+
+  constructor(
+    private readonly options: PixiPresenterSystemsOptions,
+    private readonly rootFilters: RootFilterStack,
+    private readonly tweens: TweenSystem,
+    private readonly tasks: PresentationTaskController
+  ) {}
 
   applyActorFilters(container: Container, actor: PixiActorSnapshot): void {
     const filters: Filter[] = [];
@@ -130,27 +217,133 @@ export class FilterSystem {
     container.filters = filters.length > 0 ? filters : null;
   }
 
-  applyScreenFilters(root: Container, snapshot: PixiStageSnapshot): void {
+  applyScreenFilters(snapshot: PixiStageSnapshot, animate: boolean, hints: PixiStageRenderHint[] = []): void {
     const filters: Filter[] = [];
     const bokehPower = snapshot.screenFilters.bokeh?.power ?? 0;
     if (bokehPower > 0) filters.push(new KawaseBlurFilter({ strength: Math.max(1, bokehPower * 8), quality: 4 }));
-    if (filters.length > 0 && this.options) {
-      root.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
-    }
-    root.filters = filters.length > 0 ? filters : null;
+    const glitch = this.reconcilePersistentGlitch(snapshot, animate, hints);
+    if (glitch) filters.push(glitch.filter as unknown as Filter);
+    this.rootFilters.setScreenFilters(filters);
   }
 
-  createTransientFilters(hint: PixiStageRenderHint): Filter[] {
-    if (hint.type === "glitch") {
-      const glitch = new GlitchFilter({ offset: Math.max(2, hint.power * 18), slices: Math.max(4, Math.round(hint.power * 8)) });
-      const split = new RGBSplitFilter({ red: [-hint.power * 4, 0], green: [0, 0], blue: [hint.power * 4, 0] });
-      return [glitch, split];
-    }
-    return [];
+  tick(ticker: Ticker): void {
+    if (!this.persistentGlitch) return;
+    this.persistentGlitch.uniforms.uTime += Math.max(0, ticker.deltaMS) / 1000;
+  }
+
+  clear(): void {
+    this.destroyPersistentGlitch();
+    this.rootFilters.setScreenFilters([]);
   }
 
   createSunFilter(power: number): Filter {
     return new GodrayFilter({ gain: Math.max(0.35, power), lacunarity: 2.6, parallel: true });
+  }
+
+  private reconcilePersistentGlitch(
+    snapshot: PixiStageSnapshot,
+    animate: boolean,
+    hints: PixiStageRenderHint[]
+  ): GlitchShaderRecord | undefined {
+    const glitch = snapshot.screenFilters.glitch;
+    const removal = hints.find(
+      (hint): hint is Extract<PixiStageRenderHint, { type: "screen-filter-remove" }> =>
+        hint.type === "screen-filter-remove" && hint.kind === "glitch"
+    );
+    if (!glitch || glitch.power <= 0) {
+      return this.removePersistentGlitch(snapshot.revision, animate, removal);
+    }
+
+    const width = this.options.width();
+    const height = this.options.height();
+    const isNew = !this.persistentGlitch;
+    if (!this.persistentGlitch) {
+      const shader = createGlitchShaderFilter(width, height);
+      this.persistentGlitch = { filter: shader.filter, uniforms: shader.uniforms, handle: undefined };
+    }
+
+    const record = this.persistentGlitch;
+    const transition = glitch.transition;
+    const targetPower = clamp01(glitch.power);
+    const shouldAnimate = animate && transition.durationMs > 0 && Math.abs(record.uniforms.uPower - targetPower) > 0.001;
+    record.handle?.stop();
+    applyGlitchUniforms(record.uniforms, glitch, {
+      power: shouldAnimate ? (isNew ? 0 : record.uniforms.uPower) : targetPower,
+      progress: 0
+    });
+
+    if (shouldAnimate) {
+      const task = this.tasks.start({
+        kind: "screen-filter-transition",
+        target: "glitch",
+        revision: snapshot.revision,
+        durationMs: transition.durationMs,
+        onCancel: () => {
+          record.handle?.stop();
+          record.uniforms.uPower = targetPower;
+        },
+        onSettle: () => {
+          record.handle?.stop();
+          record.uniforms.uPower = targetPower;
+        }
+      });
+      record.handle = this.tweens.tween(
+        record.uniforms as unknown as Record<string, number>,
+        { uPower: targetPower },
+        transition.durationMs,
+        transition.easing,
+        () => {
+          if (task.isCurrent()) task.complete();
+        }
+      );
+    } else {
+      record.handle = undefined;
+    }
+
+    return record;
+  }
+
+  private removePersistentGlitch(
+    revision: number,
+    animate: boolean,
+    removal: Extract<PixiStageRenderHint, { type: "screen-filter-remove" }> | undefined
+  ): GlitchShaderRecord | undefined {
+    const record = this.persistentGlitch;
+    if (!record) return undefined;
+    record.handle?.stop();
+    if (animate && removal && removal.durationMs > 0) {
+      const task = this.tasks.start({
+        kind: "screen-filter-transition",
+        target: "glitch",
+        revision,
+        durationMs: removal.durationMs,
+        onCancel: () => this.destroyPersistentGlitch(),
+        onSettle: () => this.destroyPersistentGlitch()
+      });
+      record.handle = this.tweens.tween(
+        record.uniforms as unknown as Record<string, number>,
+        { uPower: 0 },
+        removal.durationMs,
+        removal.easing,
+        () => {
+          if (!task.isCurrent()) return;
+          this.destroyPersistentGlitch();
+          task.complete();
+        }
+      );
+      return record;
+    }
+    this.destroyPersistentGlitch();
+    return undefined;
+  }
+
+  private destroyPersistentGlitch(): void {
+    const record = this.persistentGlitch;
+    if (!record) return;
+    record.handle?.stop();
+    this.rootFilters.removeScreenFilter(record.filter as unknown as Filter);
+    record.filter.destroy();
+    this.persistentGlitch = undefined;
   }
 }
 
@@ -828,12 +1021,12 @@ export class ScreenOverlaySystem {
 export class TransientEffectSystem {
   private readonly layer = new Container({ label: "transient-effects" });
   private readonly trialLayer = new Container({ label: "trial-overlay" });
-  private readonly rootEffects = new Set<Container>();
+  private readonly glitchShaders = new Set<GlitchShaderRecord>();
 
   constructor(
     private readonly options: PixiPresenterSystemsOptions,
     private readonly actors: ActorSystem,
-    private readonly filters: FilterSystem,
+    private readonly rootFilters: RootFilterStack,
     private readonly tweens: TweenSystem,
     private readonly tasks: PresentationTaskController
   ) {
@@ -854,11 +1047,7 @@ export class TransientEffectSystem {
   }
 
   clear(): void {
-    for (const group of this.rootEffects) {
-      group.removeFromParent();
-      group.destroy({ children: true });
-    }
-    this.rootEffects.clear();
+    for (const record of [...this.glitchShaders]) this.cleanupGlitchShader(record);
     this.layer.removeChildren().forEach((child) => child.destroy());
     this.clearTrialOverlays();
   }
@@ -947,83 +1136,48 @@ export class TransientEffectSystem {
   }
 
   private glitch(hint: Extract<PixiStageRenderHint, { type: "glitch" }>, revision: number): void {
-    const group = new Container({ label: "glitch-overlay" });
     const width = this.options.width();
     const height = this.options.height();
-    const power = clamp01(hint.power);
-    const staticNoise = new Sprite(getBuiltInPixiFxTexture("noise"));
-    staticNoise.width = width;
-    staticNoise.height = height;
-    staticNoise.alpha = Math.min(0.52, 0.24 + power * 0.24);
-    staticNoise.tint = 0x9fd8ff;
-    const scanline = new Sprite(getBuiltInPixiFxTexture("glitch-scanline"));
-    scanline.width = width;
-    scanline.height = height;
-    scanline.alpha = Math.min(1, 0.58 + power * 0.32);
-    const scanlineOffset = new Sprite(getBuiltInPixiFxTexture("glitch-scanline"));
-    scanlineOffset.x = -Math.round(width * 0.08);
-    scanlineOffset.y = Math.round(height * 0.06);
-    scanlineOffset.width = Math.round(width * 1.14);
-    scanlineOffset.height = height;
-    scanlineOffset.alpha = Math.min(0.9, 0.44 + power * 0.36);
-    scanlineOffset.tint = 0xff6aa8;
-    const noise = new Sprite(getBuiltInPixiFxTexture("chromatic-noise"));
-    noise.width = width;
-    noise.height = height;
-    noise.alpha = Math.min(0.9, 0.46 + power * 0.32);
-    const blueNoise = new Sprite(getBuiltInPixiFxTexture("blue-noise"));
-    blueNoise.width = width;
-    blueNoise.height = height;
-    blueNoise.alpha = Math.min(0.72, 0.3 + power * 0.34);
-    group.addChild(staticNoise, scanline, scanlineOffset, noise, blueNoise);
-    for (let index = 0; index < Math.max(3, Math.round(power * 5)); index += 1) {
-      const band = new Sprite(getBuiltInPixiFxTexture("glitch-scanline"));
-      band.x = index % 2 === 0 ? -Math.round(width * 0.08) : Math.round(width * 0.04);
-      band.y = Math.round(((index * 137) % Math.max(1, height - 56)) + 12);
-      band.width = Math.round(width * (1.04 + (index % 3) * 0.06));
-      band.height = 18 + (index % 3) * 14;
-      band.alpha = Math.min(0.95, 0.62 + power * 0.22);
-      band.tint = index % 3 === 0 ? 0xff4f8f : index % 3 === 1 ? 0x63e6be : 0x8fd3ff;
-      group.addChild(band);
-    }
-    scanline.filters = this.filters.createTransientFilters(hint);
-    scanline.filterArea = new Rectangle(0, 0, width, height);
-    group.zIndex = 32;
-    this.rootEffects.add(group);
-    this.options.root.addChild(group);
-    const holdMs = Math.min(650, Math.max(120, hint.durationMs * 0.55));
-    const cleanup = () => {
-      this.rootEffects.delete(group);
-      group.removeFromParent();
-      group.destroy({ children: true });
-    };
     let handle: TweenHandle | undefined;
+    let record: GlitchShaderRecord | undefined;
+    const cleanup = () => {
+      handle?.stop();
+      if (record) this.cleanupGlitchShader(record);
+    };
     const task = this.tasks.start({
       kind: "glitch",
       target: "screen",
       revision,
       durationMs: hint.durationMs,
-      onCancel: () => {
-        handle?.stop();
-        cleanup();
-      },
-      onSettle: () => {
-        handle?.stop();
-        cleanup();
-      }
+      onCancel: cleanup,
+      onSettle: cleanup
     });
+    const shader = createGlitchShaderFilter(width, height);
+    const uniforms = shader.uniforms;
+    applyGlitchUniforms(uniforms, hint, { progress: 0 });
+    record = {
+      filter: shader.filter,
+      uniforms
+    };
+    this.glitchShaders.add(record);
+    this.rootFilters.addTransientFilter(shader.filter as unknown as Filter);
     handle = this.tweens.tween(
-      group as unknown as Record<string, number>,
-      { alpha: 0 },
-      Math.max(80, hint.durationMs - holdMs),
+      uniforms as unknown as Record<string, number>,
+      { uTime: Math.max(0.001, hint.durationMs / 1000), uProgress: 1 },
+      Math.max(1, hint.durationMs),
       "linear",
       () => {
         if (!task.isCurrent()) return;
         cleanup();
         task.complete();
-      },
-      holdMs
+      }
     );
+  }
+
+  private cleanupGlitchShader(record: GlitchShaderRecord): void {
+    if (!this.glitchShaders.delete(record)) return;
+    this.rootFilters.removeTransientFilter(record.filter as unknown as Filter);
+    record.filter.destroy();
   }
 
   private trialKeyword(text: string): void {
@@ -1161,6 +1315,71 @@ function createSnowShaderFilter(width: number, height: number): { filter: SnowSh
   };
 }
 
+function createGlitchShaderFilter(width: number, height: number): { filter: GlitchShaderFilter; uniforms: GlitchShaderUniformValues } {
+  const initialUniforms: GlitchShaderUniformValues = {
+    uTime: 0,
+    uProgress: 0,
+    uResolution: new Float32Array([width, height]),
+    uPower: 1,
+    uBlockJump: 1,
+    uBurstJump: 1,
+    uPixelScatter: 1,
+    uColorNoise: 1,
+    uSpeed: 1,
+    uSeed: 0
+  };
+  if (typeof document === "undefined") {
+    return {
+      filter: {
+        resources: { glitchUniforms: { uniforms: initialUniforms } },
+        destroy: () => undefined
+      },
+      uniforms: initialUniforms
+    };
+  }
+
+  const filter = new Filter({
+    glProgram: GlProgram.from({
+      vertex: SNOW_SHADER_VERTEX,
+      fragment: GLITCH_SHADER_FRAGMENT,
+      name: "v-ronpa-morton-glitch-shader"
+    }),
+    resources: {
+      glitchUniforms: {
+        uTime: { value: initialUniforms.uTime, type: "f32" },
+        uProgress: { value: initialUniforms.uProgress, type: "f32" },
+        uResolution: { value: initialUniforms.uResolution, type: "vec2<f32>" },
+        uPower: { value: initialUniforms.uPower, type: "f32" },
+        uBlockJump: { value: initialUniforms.uBlockJump, type: "f32" },
+        uBurstJump: { value: initialUniforms.uBurstJump, type: "f32" },
+        uPixelScatter: { value: initialUniforms.uPixelScatter, type: "f32" },
+        uColorNoise: { value: initialUniforms.uColorNoise, type: "f32" },
+        uSpeed: { value: initialUniforms.uSpeed, type: "f32" },
+        uSeed: { value: initialUniforms.uSeed, type: "f32" }
+      }
+    }
+  });
+  return {
+    filter: filter as unknown as GlitchShaderFilter,
+    uniforms: filter.resources.glitchUniforms.uniforms as GlitchShaderUniformValues
+  };
+}
+
+function applyGlitchUniforms(
+  uniforms: GlitchShaderUniformValues,
+  controls: GlitchShaderControls,
+  options: { power?: number; progress?: number } = {}
+): void {
+  uniforms.uPower = clamp01(options.power ?? controls.power ?? 1);
+  uniforms.uBlockJump = Math.max(0, controls.blockJump ?? 1);
+  uniforms.uBurstJump = Math.max(0, controls.burstJump ?? 1);
+  uniforms.uPixelScatter = Math.max(0, controls.pixelScatter ?? 1);
+  uniforms.uColorNoise = Math.max(0, controls.colorNoise ?? 1);
+  uniforms.uSpeed = Math.max(0, controls.speed ?? 1);
+  uniforms.uSeed = controls.seed ?? 0;
+  if (options.progress !== undefined) uniforms.uProgress = options.progress;
+}
+
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
@@ -1265,5 +1484,143 @@ void main(void)
   vec3 snowColor = vec3(0.94, 0.98, 1.0);
   vec3 color = mix(fogColor, snowColor, flurry);
   finalColor = vec4(color * alpha, alpha);
+}
+`;
+
+const GLITCH_SHADER_FRAGMENT = `
+#version 300 es
+precision highp float;
+precision highp int;
+
+in vec2 vTextureCoord;
+out vec4 finalColor;
+
+uniform sampler2D uTexture;
+uniform float uTime;
+uniform float uProgress;
+uniform vec2 uResolution;
+uniform float uPower;
+uniform float uBlockJump;
+uniform float uBurstJump;
+uniform float uPixelScatter;
+uniform float uColorNoise;
+uniform float uSpeed;
+uniform float uSeed;
+
+/*
+  Technical selection note:
+  This shader intentionally keeps the Shadertoy Morton-code address-shuffle
+  algorithm instead of approximating it with simple horizontal bands. The uint
+  and uvec2 bit operations below require the WebGL2 / GLSL ES 3 path used by
+  Pixi's GlProgram filter pipeline. If a future platform lacks uint shader
+  support, debug failures here before replacing the algorithm with a fallback.
+*/
+uint SpreadBits(uint x)
+{
+  x &= 0x0000ffffu;
+  x = (x ^ (x << 8u)) & 0x00ff00ffu;
+  x = (x ^ (x << 4u)) & 0x0f0f0f0fu;
+  x = (x ^ (x << 2u)) & 0x33333333u;
+  x = (x ^ (x << 1u)) & 0x55555555u;
+  return x;
+}
+
+uint GatherBits(uint x)
+{
+  x &= 0x55555555u;
+  x = (x ^ (x >> 1u)) & 0x33333333u;
+  x = (x ^ (x >> 2u)) & 0x0f0f0f0fu;
+  x = (x ^ (x >> 4u)) & 0x00ff00ffu;
+  x = (x ^ (x >> 8u)) & 0x0000ffffu;
+  return x;
+}
+
+uvec2 MortonToVec2(uint morton)
+{
+  uvec2 res;
+  res.x = GatherBits(morton >> 0u);
+  res.y = GatherBits(morton >> 1u);
+  return res;
+}
+
+uint Vec2ToMorton(uvec2 vec)
+{
+  return SpreadBits(vec.x) | (SpreadBits(vec.y) << 1u);
+}
+
+float hash11(float u, float seed)
+{
+  return fract(sin(u + uSeed * 131.17) * 999999.9999 + seed * 1.61803398875 + uSeed * 0.03125);
+}
+
+vec3 hash31(float p)
+{
+  vec3 p3 = fract(vec3(p + uSeed * 4096.0) * vec3(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.xxy + p3.yzz) * p3.zyx);
+}
+
+float noise(float u, float size, float seed)
+{
+  float zoom = u * size;
+  float index = floor(zoom);
+  float progress = fract(zoom);
+  progress = smoothstep(0.0, 1.0, progress);
+  return mix(hash11(index, seed), hash11(index + 1.0, seed), progress);
+}
+
+float posterize(float u, float steps)
+{
+  return floor(u * steps + 0.5) / steps;
+}
+
+float threshold(float u, float edge)
+{
+  return u * step(edge, u);
+}
+
+void main(void)
+{
+  vec2 resolution = max(uResolution, vec2(1.0));
+  vec2 fragCoord = vTextureCoord * resolution;
+  float life = 1.0 - smoothstep(0.72, 1.0, clamp(uProgress, 0.0, 1.0));
+  float power = clamp(uPower, 0.0, 1.0) * life;
+  float time = max(0.0, uTime * max(0.0, uSpeed));
+  /*
+    Shadertoy's original iTime gates are intentionally slow; in a VN scene a
+    persistent low-power filter can look frozen for several seconds. These
+    shared beat offsets keep the Morton/hash structure but adapt its cadence for
+    both @glitch pulses and @glitchFilter, avoiding a filter-specific branch.
+  */
+  float rapidBeat = floor(time * 5.0);
+  float blockBeat = floor(time * 1.25);
+  float colorBeat = floor(time * 1.7);
+  float temporalPulse = mix(0.72, 1.18, hash11(rapidBeat, uSeed + 23.0));
+  vec2 pixel = clamp(floor(fragCoord), vec2(0.0), vec2(65535.0));
+  float i = float(Vec2ToMorton(uvec2(pixel)));
+
+  float n1 = noise(i + blockBeat * 17.0, 1e-3, floor(time * 0.1619) + blockBeat + uSeed);
+  n1 = posterize(n1, 4.0);
+  n1 = threshold(n1, mix(0.96, 0.68, clamp(power * uBlockJump * temporalPulse, 0.0, 1.0)));
+
+  float n2 = noise(i + rapidBeat * 31.0, 1e-5, floor(time * 3.12349) + rapidBeat + uSeed * 1.7);
+  n2 = posterize(n2, 20.0);
+  n2 = threshold(n2, mix(0.985, 0.88, clamp(power * uBurstJump * temporalPulse, 0.0, 1.0)));
+
+  float n3 = noise(i + rapidBeat * 7.0, 1e3, floor(time * 0.12349) + rapidBeat + uSeed * 2.3);
+  n3 = threshold(n3, mix(0.965, 0.88, clamp(power * uPixelScatter * temporalPulse, 0.0, 1.0)));
+
+  float n4 = noise(i + colorBeat * 11.0, 0.01, colorBeat + uSeed * 3.1);
+
+  i += n1 * 40.0 * max(0.0, uBlockJump) * power;
+  i += n2 * 1000.0 * max(0.0, uBurstJump) * power;
+  i += n3 * 100.0 * max(0.0, uPixelScatter) * power;
+
+  vec2 uv = clamp(vec2(MortonToVec2(uint(max(0.0, i)))) / resolution, vec2(0.0), vec2(1.0));
+  vec4 source = texture(uTexture, uv);
+  float colorEdge = hash11(floor(time * 2.0), 1.0) * 0.1 + mix(0.97, 0.84, clamp(power * uColorNoise * temporalPulse, 0.0, 1.0));
+  float colorMix = step(colorEdge, n4) * clamp(power * uColorNoise, 0.0, 1.0);
+  vec3 randomColor = hash31(i) * source.a;
+  finalColor = vec4(mix(source.rgb, randomColor, colorMix), source.a);
 }
 `;

@@ -261,6 +261,8 @@ function normalizeCommandParams(command: CommandShape, definition: NaniCommandDe
       return normalizeBokehCommand(command);
     case "glitch":
       return normalizeGlitchCommand(command);
+    case "glitchfilter":
+      return normalizeGlitchFilterCommand(command);
     case "rain":
     case "snow":
     case "sun":
@@ -522,9 +524,31 @@ function normalizeGlitchCommand(command: CommandShape): NormalizedCommandParams 
   return {
     params: compactParams({
       power: runtimeParam(command, "power") ?? 1,
+      blockJump: runtimeParam(command, "blockJump"),
+      burstJump: runtimeParam(command, "burstJump"),
+      pixelScatter: runtimeParam(command, "pixelScatter"),
+      colorNoise: runtimeParam(command, "colorNoise"),
+      speed: runtimeParam(command, "speed"),
+      seed: runtimeParam(command, "seed"),
       ...normalizeTimingParams(command)
     }),
-    consumesParams: ["time", "power", "wait"]
+    consumesParams: ["time", "power", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"]
+  };
+}
+
+function normalizeGlitchFilterCommand(command: CommandShape): NormalizedCommandParams {
+  return {
+    params: compactParams({
+      power: runtimeParam(command, "power") ?? 0,
+      blockJump: runtimeParam(command, "blockJump"),
+      burstJump: runtimeParam(command, "burstJump"),
+      pixelScatter: runtimeParam(command, "pixelScatter"),
+      colorNoise: runtimeParam(command, "colorNoise"),
+      speed: runtimeParam(command, "speed"),
+      seed: runtimeParam(command, "seed"),
+      ...normalizeTimingParams(command)
+    }),
+    consumesParams: ["time", "easing", "power", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"]
   };
 }
 

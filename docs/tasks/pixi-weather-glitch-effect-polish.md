@@ -40,7 +40,7 @@ worktrees do not share the same dev server. Do not commit `.env.worktree`,
 你在 V-Ronpa 独立 worktree 中执行 docs/tasks/pixi-weather-glitch-effect-polish.md。
 请先阅读 AGENTS.md、docs/architecture/system-guide.md、docs/architecture/presentation-pipeline.md、docs/architecture/vn-runtime-dispatcher.md、docs/architecture/harness-gates.md、docs/ccr/pixi-presentation-task-lifecycle.md、docs/ccr/pixi-wait-parser-compiler-control-flow.md、以及本 task card。
 先运行 pnpm setup:worktree-env；Vite/Playwright 会读取 .env.worktree 隔离端口，不要提交 .env.worktree、.local-state、test-results 或 playwright-report。
-本线目标是打磨 Pixi rain / snow / glitch 等已接入表现效果。不要修改 contracts、nani-runtime-compiler、story-engine、story-play、runtimeWait、media/ui runtime 或非 Pixi taskcard 涉及的公共契约。
+本线目标是打磨 Pixi rain / snow / glitch 等已接入表现效果。不要修改 story-engine 运行逻辑、story-play、runtimeWait、media/ui runtime 或非 Pixi taskcard 涉及的公共契约；CCR-backed command catalog 扩围可同步 contracts、nani-runtime-compiler 与下游 catalog pin test。
 本线会与 docs/tasks/non-pixi-runtime-command-baseline.md 并行推进；Pixi 视觉、Pixi task、vertical-slice 视觉 smoke 由本线负责，非 Pixi runtime/media/UI 接入由另一线负责。
 实现后运行 Required Gates，最终运行 BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/pixi-weather-glitch-effect-polish.md。
 输出 changed files、测试结果、截图路径、残余风险。
@@ -63,11 +63,14 @@ composition or cleanup:
 - bokeh/glitch composition boundary when the existing vertical-slice fixture
   disables bokeh before glitch
 
-This task may change `@snow` command metadata and compiler normalization only
-for the CCR-backed Shadertoy snow shader parameters in
-`docs/ccr/snow-shader-command-params.md`. It must not change `.nani` parsing,
-`RuntimeCommand` top-level shape, StoryEngine state, `runtimeWait`, media/UI
-command execution, or unrelated command catalog metadata.
+This task may change `@snow`, `@glitch`, and `@glitchFilter` command metadata
+and compiler normalization only for the CCR-backed Shadertoy shader parameters
+and persistent glitch filter command in
+`docs/ccr/snow-shader-command-params.md` and
+`docs/ccr/glitch-shader-command-params.md` and
+`docs/ccr/glitch-filter-persistent-command.md`. It must not change `.nani`
+parsing, `RuntimeCommand` top-level shape, StoryEngine state, `runtimeWait`,
+media/UI command execution, or unrelated command catalog metadata.
 
 ## Current Architecture Summary
 
@@ -108,11 +111,13 @@ The target is visual and lifecycle polish inside the Pixi presenter:
 This task is designed to run in parallel with
 `docs/tasks/non-pixi-runtime-command-baseline.md`. To minimize conflicts:
 
-- Do not edit `packages/contracts/**` except the CCR-backed `@snow` catalog and
-  `PixiWeatherSnapshot` fields for this task.
-- Do not edit `packages/nani-runtime-compiler/**` except weather normalization
-  for the CCR-backed `@snow` shader params.
-- Do not edit `packages/story-engine/**`.
+- Do not edit `packages/contracts/**` except the CCR-backed `@snow`,
+  `@glitch`, and `@glitchFilter` catalog/snapshot fields for this task.
+- Do not edit `packages/nani-runtime-compiler/**` except normalization for the
+  CCR-backed `@snow`, `@glitch`, and `@glitchFilter` shader params.
+- Do not edit `packages/story-engine/**` except the catalog pin expectation in
+  `packages/story-engine/src/index.test.ts` when a CCR-backed implemented
+  command is added.
 - Do not edit `packages/story-play/**`.
 - Do not edit `apps/game/src/vnRuntimeTransaction.ts`.
 - Do not edit `apps/game/src/vnOutputRoutes.ts`.
@@ -122,8 +127,8 @@ This task is designed to run in parallel with
   integration follow-up instead.
 - Do not add `runtimeWait`, media runtime, UI runtime, or non-Pixi command
   behavior here.
-- Do not change command catalog status or execution boundaries. Command param
-  changes are limited to the CCR-backed `@snow` shader params.
+- Do not change command catalog status or execution boundaries outside the
+  CCR-backed `@snow`, `@glitch`, and `@glitchFilter` work.
 
 ## Boundary Decisions
 
@@ -169,22 +174,30 @@ This task is designed to run in parallel with
 | Rendering stack | Keep Pixi presenter and current Pixi/filter libraries. |
 | Effect assets | Reuse built-in textures in `fxAssets.ts`; add generated/static assets only if committed under existing Pixi asset path and justified by visual tests. |
 | Weather particles | Improve `WeatherSystem` particle count, scale, alpha, depth layers, tiling, speed, and wrapping within existing snapshot params. |
-| Glitch | Improve `TransientEffectSystem.glitch` overlay composition, scanlines, bands, displacement/filter strength, alpha, duration, and cleanup. |
+| Glitch | Replace `TransientEffectSystem.glitch` overlay sprites with the CCR-backed Shadertoy Morton shader filter, including duration and cleanup. Add `@glitchFilter` as the persistent screen-filter counterpart. |
 | Wait tasks | Keep `StoryPresentationWaitTask` shape and existing task kinds. |
-| Contracts | No public schema changes. |
+| Contracts | Only CCR-backed `@snow`, `@glitch`, and `@glitchFilter` shader/filter params. |
 | Dependencies | No new dependencies. |
 | App runtime | No runtimeWait/media/UI work. |
 
 ## Public Contract Changes
 
-Expected only for `@snow`, backed by
-`docs/ccr/snow-shader-command-params.md`.
+Expected only for `@snow`, `@glitch`, and `@glitchFilter`, backed by
+`docs/ccr/snow-shader-command-params.md` and
+`docs/ccr/glitch-shader-command-params.md` and
+`docs/ccr/glitch-filter-persistent-command.md`.
 
 Allowed public contract changes:
 
 - `@snow` catalog params: `xSpeed`, `ySpeed`, `density`, `flakeScale`, `sway`,
   `fog`, `noise`, `seed`.
 - `PixiWeatherSnapshot` optional fields with the same names.
+- `@glitch` catalog params: `blockJump`, `burstJump`, `pixelScatter`,
+  `colorNoise`, `speed`, `seed`.
+- `@glitchFilter` catalog params: `power`, `time`, `easing`, `wait`,
+  `blockJump`, `burstJump`, `pixelScatter`, `colorNoise`, `speed`, `seed`.
+- `PixiStageSnapshot.screenFilters.glitch` persistent filter params with the
+  same shader control names plus transition metadata.
 
 Forbidden public contract changes:
 
@@ -194,7 +207,8 @@ Forbidden public contract changes:
 - `StoryPresentationWaitTask`.
 - `PixiStageSnapshot` top-level schema.
 - `PixiWeatherSnapshot` changes outside the `@snow` shader fields above.
-- `commandCatalog` changes outside the `@snow` params above.
+- `commandCatalog` changes outside the `@snow`, `@glitch`, and
+  `@glitchFilter` params above.
 - `NaniCommandExecutionSchema`.
 - `.nani` parser IR.
 
@@ -266,10 +280,13 @@ Optional documentation updates:
 
 - `docs/tasks/pixi-weather-glitch-effect-polish.md`
 - `docs/ccr/snow-shader-command-params.md`
+- `docs/ccr/glitch-shader-command-params.md`
+- `docs/ccr/glitch-filter-persistent-command.md`
 - `packages/contracts/src/index.ts`
 - `packages/contracts/src/index.test.ts`
 - `packages/nani-runtime-compiler/src/index.ts`
 - `packages/nani-runtime-compiler/src/index.test.ts`
+- `packages/story-engine/src/index.test.ts`
 - `packages/pixi-presenter/src/stageSnapshot.ts`
 - `packages/pixi-presenter/src/index.ts`
 - `packages/pixi-presenter/src/index.test.ts`
@@ -290,7 +307,7 @@ Optional documentation updates:
 ## Forbidden Paths
 
 - `packages/nani-parser/**`
-- `packages/story-engine/**`
+- `packages/story-engine/src/index.ts`
 - `packages/story-play/**`
 - `packages/media-save/**`
 - `packages/ui-kit/**`
@@ -333,10 +350,11 @@ Optional documentation updates:
 - Ensure rain/snow/sun records are keyed and reconciled independently.
 - Add tests for coexistence and independent removal.
 
-### Phase 3: Glitch polish
+### Phase 3: Glitch shader migration
 
-- Tune `TransientEffectSystem.glitch` overlay composition.
-- Strengthen high-power scanline/band/color separation.
+- Replace `TransientEffectSystem.glitch` overlay sprites with the CCR-backed
+  Shadertoy Morton/hash shader filter.
+- Strengthen high-power address shuffle and random color replacement.
 - Ensure overlay cleanup and task completion are deterministic.
 
 ### Phase 4: Wait lifecycle regression
@@ -379,9 +397,12 @@ Required regression cases:
 - Boundary path: `@snow power:0` removes snow without removing rain.
 - Boundary path: inactive weather removal creates no wait task.
 - Boundary path: high-power glitch emits and completes a glitch task.
-- Cleanup path: glitch overlay cleanup destroys display objects or removes
-  them from the transient layer.
-- No-contract path: no public schema or command catalog changes are required.
+- Persistent path: `@glitchFilter` writes saveable screen filter state and
+  one-shot `@glitch` remains transient.
+- Cleanup path: one-shot and persistent glitch cleanup remove only their own
+  root filters and preserve unrelated bokeh/weather filters.
+- Contract path: public schema/catalog/compiler changes are limited to the
+  CCR-backed `@snow`, `@glitch`, and `@glitchFilter` shader params.
 
 Test placement:
 
@@ -404,16 +425,18 @@ stop and create a follow-up task. Do not add dependencies in this task.
 
 ## CCR Triggers
 
-No CCR is expected.
+CCR is expected only for the Shadertoy snow/glitch shader command params and
+the persistent `@glitchFilter` screen-filter command named above.
 
 Create a CCR instead of widening this task if implementation needs:
 
-- public contract changes,
+- public contract changes outside the CCR-backed shader/filter params,
 - `RuntimeCommand` shape changes,
-- new weather/glitch command params,
+- new weather/glitch command params outside the CCR-backed shader/filter params,
 - new `StoryPresentationWaitTask` kind,
 - `PixiStageSnapshot` schema changes,
-- StoryEngine or compiler changes,
+- StoryEngine runtime changes or compiler changes outside the CCR-backed
+  normalization paths,
 - app runtime transaction changes.
 
 ## Required Gates
@@ -447,8 +470,8 @@ The implementation is programmatically acceptable when:
 
 - Pixi presenter tests cover rain, snow, coexistence, removal, glitch, and wait
   tasks.
-- No public contract, compiler, StoryEngine, story-play, media, or UI runtime
-  files are changed.
+- Public contract/compiler changes are limited to the CCR-backed `@snow`,
+  `@glitch`, and `@glitchFilter` shader/filter params.
 - No dependency files are changed.
 - Typecheck passes.
 - Boundary validation passes.
@@ -488,8 +511,8 @@ The reviewer should inspect that:
 Reverting this branch should only revert Pixi presenter visual/system changes
 and optional visual smoke updates.
 
-No save migration, contract migration, command catalog migration, or media/UI
-cleanup should be required.
+No save migration, runtime command shape migration, or media/UI cleanup should
+be required.
 
 ## Done When
 

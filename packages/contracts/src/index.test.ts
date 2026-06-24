@@ -357,6 +357,83 @@ describe("contracts", () => {
     ).toThrow();
   });
 
+  it("declares shader glitch controls without changing RuntimeCommand shape", () => {
+    const glitch = getNaniCommandDefinition("glitch");
+    expect(glitch?.params.map((param) => param.name)).toEqual(
+      expect.arrayContaining(["power", "time", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"])
+    );
+    const glitchFilter = getNaniCommandDefinition("glitchFilter");
+    expect(glitchFilter?.params.map((param) => param.name)).toEqual(
+      expect.arrayContaining(["power", "time", "easing", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"])
+    );
+
+    const snapshot = PixiStageSnapshotSchema.parse({
+      version: 2,
+      screenFilters: {
+        glitch: {
+          power: 0.4,
+          blockJump: 0.5,
+          burstJump: 0.25,
+          pixelScatter: 0.75,
+          colorNoise: 0.35,
+          speed: 0.8,
+          seed: 12,
+          transition: { durationMs: 300, easing: "linear" }
+        }
+      }
+    });
+    expect(snapshot.screenFilters.glitch).toMatchObject({
+      power: 0.4,
+      blockJump: 0.5,
+      burstJump: 0.25,
+      pixelScatter: 0.75,
+      colorNoise: 0.35,
+      speed: 0.8,
+      seed: 12,
+      transition: { durationMs: 300, easing: "linear", lazy: false, wait: false }
+    });
+
+    const command = RuntimeCommandSchema.parse({
+      commandId: "glitchfilter",
+      canonicalName: "glitchFilter",
+      category: "effect",
+      source: "v-ronpa",
+      status: "implemented",
+      params: {
+        power: 0.9,
+        blockJump: 1.2,
+        burstJump: 0.75,
+        pixelScatter: 1.5,
+        colorNoise: 0.8,
+        speed: 1.1,
+        seed: 31,
+        durationMs: 300,
+        wait: true
+      },
+      loc: { scriptPath: "glitch.nani", line: 1, column: 1, raw: "@glitchFilter" }
+    });
+
+    expect(command).toEqual({
+      commandId: "glitchfilter",
+      canonicalName: "glitchFilter",
+      category: "effect",
+      source: "v-ronpa",
+      status: "implemented",
+      params: {
+        power: 0.9,
+        blockJump: 1.2,
+        burstJump: 0.75,
+        pixelScatter: 1.5,
+        colorNoise: 0.8,
+        speed: 1.1,
+        seed: 31,
+        durationMs: 300,
+        wait: true
+      },
+      loc: { scriptPath: "glitch.nani", line: 1, column: 1, raw: "@glitchFilter" }
+    });
+  });
+
   it("validates navi and trial runtime states", () => {
     expect(
       NaviRuntimeStateSchema.parse({
@@ -578,8 +655,8 @@ describe("contracts", () => {
   it("pins the Naninovel command catalog as the command declaration source", () => {
     const officialCommands = naniCommandCatalog.filter((command) => command.source === "naninovel");
 
-    expect(officialCommands).toHaveLength(77);
-    expect(naniCommandCatalog).toHaveLength(83);
+    expect(officialCommands).toHaveLength(78);
+    expect(naniCommandCatalog).toHaveLength(84);
     expect(() => NaniCommandDefinitionSchema.array().parse(naniCommandCatalog)).not.toThrow();
   });
 
