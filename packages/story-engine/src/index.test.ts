@@ -105,14 +105,25 @@ describe("story engine", () => {
         "instructionPointer": 6,
         "pendingChoices": [
           {
+            "enabled": true,
             "goto": "#Object",
             "text": "Object with the keycard",
           },
           {
+            "enabled": true,
             "goto": "#End",
             "text": "Stay silent",
           },
         ],
+        "text": {
+          "current": {
+            "speaker": "Felix",
+            "text": "The door was locked.",
+          },
+          "formats": {},
+          "printerId": "default",
+          "visible": true,
+        },
         "variables": {},
       }
     `);
@@ -169,8 +180,8 @@ describe("story engine", () => {
 
     expect(result.diagnostics).toEqual([]);
     expect(state.pendingChoices).toEqual([
-      { text: "Return to the hallway", goto: "#Return" },
-      { text: "Follow the witness into class", goto: "#Classroom" }
+      { text: "Return to the hallway", goto: "#Return", enabled: true },
+      { text: "Follow the witness into class", goto: "#Classroom", enabled: true }
     ]);
     expect(result.emittedRuntimeCommands).toEqual([]);
   });
@@ -211,22 +222,38 @@ describe("story engine", () => {
     const implementedRuntimeCommands = commandCatalog.filter((command) => command.status === "implemented");
 
     expect(implementedRuntimeCommands.map((command) => command.id)).toEqual([
+      "append",
       "arrange",
       "back",
+      "bgm",
       "blur",
       "bokeh",
       "char",
       "choice",
+      "clearbacklog",
+      "clearchoice",
+      "format",
       "glitch",
       "goto",
       "hidechars",
+      "hideui",
+      "input",
+      "movie",
       "print",
       "rain",
+      "resettext",
       "set",
+      "sfx",
+      "sfxfast",
       "shake",
+      "showprinter",
+      "showui",
       "slide",
       "snow",
+      "stopbgm",
+      "stopsfx",
       "sun",
+      "toast",
       "end",
       "gameplay",
       "flash",
@@ -330,8 +357,187 @@ describe("story engine", () => {
     const result = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
 
     expect(result.diagnostics).toEqual([]);
-    expect(result.state.pendingChoices).toEqual([{ text: "Open the door", goto: "#Open" }]);
+    expect(result.state.pendingChoices).toEqual([{ text: "Open the door", goto: "#Open", enabled: true }]);
     expect(result.emittedRuntimeCommands).toEqual([]);
+  });
+
+  it("keeps current text separate from backlog for append, resetText, clearBacklog, format, and showPrinter", () => {
+    const runtimeScript = runtimeScriptFixture("text-state.nani", [
+      runtimeCommand("append", "text", { text: "Draft" }),
+      runtimeCommand("format", "text", { templates: ["alert.red", "soft:blue"] }),
+      runtimeCommand("showprinter", "text", { printerId: "say" }),
+      runtimeCommand("resettext", "text", {}),
+      runtimeCommand("append", "text", { text: "Fresh" }),
+      runtimeCommand("print", "text", { speaker: "Felix", text: "Logged.", autoNext: false }),
+      runtimeCommand("clearbacklog", "text", {}),
+      runtimeCommand("print", "text", { speaker: "Mira", text: "After clear.", autoNext: false })
+    ]);
+
+    let state = createInitialStoryState(runtimeScript);
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(selectCurrentStoryLine(state)).toEqual({ text: "Draft" });
+    expect(state.backlog).toEqual([]);
+
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(state.text?.formats).toEqual({ alert: "red", soft: "blue" });
+
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(state.text?.printerId).toBe("say");
+
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(selectCurrentStoryLine(state)).toBeUndefined();
+
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(selectCurrentStoryLine(state)).toEqual({ text: "Fresh" });
+    expect(state.backlog).toEqual([]);
+
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(state.backlog).toEqual([{ speaker: "Felix", text: "Logged." }]);
+
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(state.backlog).toEqual([]);
+    expect(selectCurrentStoryLine(state)).toEqual({ speaker: "Felix", text: "Logged." });
+
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(state.backlog).toEqual([{ speaker: "Mira", text: "After clear." }]);
+  });
+
+  it("blocks on wait runtimeWait until a matching completion event arrives", () => {
+    const runtimeScript = runtimeScriptFixture("wait.nani", [
+      runtimeCommand("wait", "text", { waitMode: "i5" }),
+      runtimeCommand("print", "text", { speaker: "Felix", text: "Resumed.", autoNext: false })
+    ]);
+    const first = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+
+    expect(first.stopReason).toBe("runtime-wait");
+    expect(first.state.runtimeWait).toEqual({
+      kind: "pause",
+      commandId: "wait",
+      commandIndex: 0,
+      mode: "timer-or-confirm",
+      durationMs: 5000
+    });
+    expect(advanceToNextStop(first.state, runtimeScript)).toMatchObject({
+      state: first.state,
+      stopReason: "runtime-wait",
+      diagnostics: [{ code: "runtime-wait", message: "Story is waiting for a runtime command to complete; advance did not change state." }]
+    });
+
+    const wrongCompletion = storyReducer(first.state, { type: "RUNTIME_WAIT_COMPLETE", script: runtimeScript, kind: "movie" });
+    expect(wrongCompletion.state).toBe(first.state);
+    expect(wrongCompletion.diagnostics).toEqual([
+      {
+        code: "invalid-runtime-wait-completion",
+        message: "Runtime wait completion movie does not match the active wait."
+      }
+    ]);
+
+    const completed = reduceWithoutDiagnostics(first.state, { type: "RUNTIME_WAIT_COMPLETE", script: runtimeScript, kind: "pause" });
+    const resumed = advanceToNextStop(completed.state, runtimeScript);
+    expect(resumed.stopReason).toBe("text");
+    expect(selectCurrentStoryLine(resumed.state)).toEqual({ speaker: "Felix", text: "Resumed." });
+  });
+
+  it("validates input submissions as the only input completion path", () => {
+    const runtimeScript = runtimeScriptFixture("input.nani", [
+      runtimeCommand("input", "text", { variableName: "score", valueType: "number", summary: "Score" }),
+      runtimeCommand("print", "text", { speaker: "Felix", text: "Captured.", autoNext: false })
+    ]);
+    const first = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+
+    expect(first.stopReason).toBe("runtime-wait");
+    expect(first.state.runtimeWait).toMatchObject({
+      kind: "input",
+      commandId: "input",
+      commandIndex: 0,
+      variableName: "score",
+      valueType: "number",
+      summary: "Score"
+    });
+
+    const invalid = storyReducer(first.state, { type: "SUBMIT_INPUT", script: runtimeScript, value: "NaN" });
+    expect(invalid.state).toBe(first.state);
+    expect(invalid.diagnostics).toEqual([
+      { code: "input-validation", message: "Input value NaN is not a valid number.", severity: "warning" }
+    ]);
+
+    const completed = reduceWithoutDiagnostics(first.state, { type: "SUBMIT_INPUT", script: runtimeScript, value: "42" });
+    expect(completed.state.variables.score).toBe(42);
+    expect(completed.state.runtimeWait).toBeUndefined();
+    expect(storyReducer(completed.state, { type: "RUNTIME_WAIT_COMPLETE", script: runtimeScript, kind: "pause" }).diagnostics).toEqual([
+      {
+        code: "invalid-runtime-wait-completion",
+        message: "Runtime wait completion pause does not match the active wait."
+      }
+    ]);
+  });
+
+  it("emits media/UI commands while movie block:true creates a runtimeWait", () => {
+    const runtimeScript = runtimeScriptFixture("media-ui.nani", [
+      runtimeCommand("bgm", "media", { bgmPath: "bgm:main", group: "music" }),
+      runtimeCommand("sfx", "media", { sfxPath: "sfx:loop", group: "rain", loop: true }),
+      runtimeCommand("hideui", "ui", { target: "dialog", visible: false }),
+      runtimeCommand("hideui", "ui", { target: "commandBar" }),
+      runtimeCommand("toast", "ui", { text: "Ready" }),
+      runtimeCommand("movie", "media", { moviePath: "movie:intro", block: false }),
+      runtimeCommand("movie", "media", { moviePath: "movie:blocked", block: true }),
+      runtimeCommand("print", "text", { speaker: "Felix", text: "After movie.", autoNext: false })
+    ]);
+
+    const result = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+
+    expect(result.stopReason).toBe("runtime-wait");
+    expect(result.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["bgm", "sfx", "hideui", "hideui", "toast", "movie", "movie"]);
+    expect(result.state.runtimeWait).toEqual({
+      kind: "movie",
+      commandId: "movie",
+      commandIndex: 6,
+      moviePath: "movie:blocked",
+      allowSkip: true
+    });
+
+    const completed = reduceWithoutDiagnostics(result.state, { type: "RUNTIME_WAIT_COMPLETE", script: runtimeScript, kind: "movie" });
+    const resumed = advanceToNextStop(completed.state, runtimeScript);
+    expect(resumed.stopReason).toBe("text");
+    expect(selectCurrentStoryLine(resumed.state)).toEqual({ speaker: "Felix", text: "After movie." });
+  });
+
+  it("supports choice ids, disabled choices, clearChoice, and choice set expressions", () => {
+    const runtimeScript = runtimeScriptFixture("choices.nani", [
+      runtimeCommand("choice", "choice", { id: "a", text: "A", goto: "#A", setExpression: "route:a" }),
+      runtimeCommand("choice", "choice", { id: "b", text: "B", goto: "#B", enabled: false }),
+      runtimeCommand("clearchoice", "choice", { id: "missing" }),
+      runtimeCommand("clearchoice", "choice", { id: "b" }),
+      runtimeCommand("print", "text", { text: "Skipped.", autoNext: false }),
+      runtimeCommand("print", "text", { text: "A path.", autoNext: false }),
+      runtimeCommand("print", "text", { text: "B path.", autoNext: false })
+    ], { Start: 0, A: 5, B: 6 });
+
+    let state = createInitialStoryState(runtimeScript);
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+
+    expect(state.pendingChoices).toEqual([
+      { id: "a", text: "A", goto: "#A", enabled: true, setExpression: "route:a" },
+      { id: "b", text: "B", goto: "#B", enabled: false }
+    ]);
+    expect(chooseStoryOption(state, runtimeScript, 1).diagnostics).toEqual([
+      { code: "invalid-choice", message: "Choice index 1 is disabled." }
+    ]);
+
+    const missingClear = storyReducer(state, { type: "STEP", script: runtimeScript });
+    expect(missingClear.diagnostics).toEqual([
+      { code: "invalid-choice", message: "Choice id missing is not available." }
+    ]);
+    state = missingClear.state;
+
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(state.pendingChoices).toEqual([{ id: "a", text: "A", goto: "#A", enabled: true, setExpression: "route:a" }]);
+
+    const chosen = chooseStoryOption(state, runtimeScript, 0);
+    expect(chosen.diagnostics).toEqual([]);
+    expect(chosen.state.variables.route).toBe("a");
+    expect(chosen.state.instructionPointer).toBe(runtimeScript.labels.A);
   });
 
   it("returns an expression diagnostic without emitting commands on unresolved variables", () => {
@@ -453,6 +659,43 @@ describe("story engine", () => {
     expect(result.diagnostics).toEqual([
       { code: "max-steps", message: "Advance stopped after reaching the max step limit of 3." }
     ]);
+  });
+
+  it("diagnoses unsupported or missing goto targets instead of silently dropping them", () => {
+    const runtimeScript = runtimeScriptFixture(
+      "goto-boundary.nani",
+      [
+        runtimeCommand("goto", "flow", { label: "other.nani#Start" }, { source: "naninovel" }),
+        runtimeCommand("goto", "flow", { label: "#Missing" }, { source: "naninovel" }),
+        runtimeCommand("print", "text", { speaker: "Mira", text: "After invalid goto.", autoNext: false })
+      ],
+      { Start: 0 }
+    );
+    let state = createInitialStoryState(runtimeScript);
+
+    const crossScript = storyReducer(state, { type: "STEP", script: runtimeScript });
+    expect(crossScript.state.instructionPointer).toBe(1);
+    expect(crossScript.diagnostics).toEqual([
+      {
+        code: "unsupported-command-param",
+        message: "@goto target other.nani#Start is outside this task's local-label boundary; cross-script goto is not implemented.",
+        severity: "warning"
+      }
+    ]);
+
+    state = crossScript.state;
+    const missing = storyReducer(state, { type: "STEP", script: runtimeScript });
+    expect(missing.state.instructionPointer).toBe(2);
+    expect(missing.diagnostics).toEqual([
+      {
+        code: "invalid-goto",
+        message: "@goto target #Missing does not exist in goto-boundary.nani.",
+        severity: "warning"
+      }
+    ]);
+
+    const resumed = reduceWithoutDiagnostics(missing.state, { type: "STEP", script: runtimeScript });
+    expect(selectCurrentStoryLine(resumed.state)).toEqual({ speaker: "Mira", text: "After invalid goto." });
   });
 
   it("keeps the public story runtime snapshot serializable", () => {

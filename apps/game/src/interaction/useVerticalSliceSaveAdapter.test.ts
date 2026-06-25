@@ -5,7 +5,7 @@ import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ronpa/pixi-presenter";
 import { createInitialStoryState } from "@v-ronpa/story-engine";
-import { createVerticalSliceSaveData, verticalSliceSaveSlotIds } from "./useVerticalSliceSaveAdapter";
+import { canSaveVerticalSliceRuntime, createVerticalSliceSaveData, verticalSliceSaveSlotIds } from "./useVerticalSliceSaveAdapter";
 
 describe("vertical slice save adapter", () => {
   it("collects public runtime state into versioned SaveData without UI state", () => {
@@ -84,6 +84,26 @@ describe("vertical slice save adapter", () => {
     });
     expect(save).not.toHaveProperty("storyPlay");
     expect(save).not.toHaveProperty("playback");
+  });
+
+  it("does not persist runtimeWait and reports save availability as false while waiting", () => {
+    const runtimeScript = compileScenario("@wait i", "runtime-wait-save-test.nani");
+    const gameplay = createGameplayState();
+    const story = {
+      ...createInitialStoryState(runtimeScript),
+      runtimeWait: { kind: "pause" as const, commandId: "wait" as const, commandIndex: 0, mode: "confirm" as const }
+    };
+
+    const save = createVerticalSliceSaveData({
+      savedAt: "2026-06-20T00:00:00.000Z",
+      navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
+      story,
+      pixiStage: createInitialPixiStageSnapshot(),
+      gameplay
+    });
+
+    expect(save.story.runtimeWait).toBeUndefined();
+    expect(canSaveVerticalSliceRuntime({ storyRuntime: { active: true, state: story } })).toBe(false);
   });
 
   it("keeps the vertical-slice slot id policy in the app adapter layer", () => {

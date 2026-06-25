@@ -208,12 +208,16 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
 
   await expect(page.getByTestId("vn-dialog-choices")).toBeVisible();
   await expect(page.getByTestId("vn-dialog-state")).toHaveText("等待选择");
-  await expect(page.getByTestId("vn-dialog-choice-0")).toHaveText("分支1：快速结束剧情逻辑测试");
+  await expect(page.getByTestId("vn-dialog-choice-0")).toHaveText("分支1：主交互流程验证入口");
   await expect(page.getByTestId("vn-dialog-choice-1")).toHaveText("分支2：完整 Pixi 命令视觉验收");
   await page.getByTestId("vn-dialog-choice-0").click();
   await expect(page.getByTestId("vertical-slice-route")).toHaveText("return");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 1 检查点");
-  await advanceUntilOverlayClosed(page);
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
+  await expect(page.getByTestId("vn-command-bar")).toBeHidden();
+  await expect(page.getByTestId("vertical-slice-debug-sidebar")).toBeVisible();
+  await expect(page.getByTestId("vertical-slice-debug-panel-runtime")).toBeVisible();
+  await expect(page.getByTestId("playfield").getByTestId("harness-status")).toBeVisible();
+  await advanceMainInteractionShowcase(page);
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("pause-menu-overlay")).toBeVisible();
@@ -267,6 +271,30 @@ async function advanceUntilOverlayClosed(page: Page) {
   }
 
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
+}
+
+async function advanceMainInteractionShowcase(page: Page) {
+  await page.getByTestId("vertical-slice-advance").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 01B");
+  await expect(page.getByTestId("vn-command-bar")).toBeVisible();
+  await page.getByTestId("vn-dialog-advance").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("附加文本验证");
+  await page.getByTestId("vn-dialog-advance").click();
+  await expect(page.getByTestId("runtime-input-prompt")).toBeVisible();
+  await page.getByTestId("runtime-input-field").fill("Smoke");
+  await page.getByTestId("runtime-input-submit").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 02");
+  await page.getByTestId("vn-dialog-advance").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 03");
+  await page.getByTestId("vn-dialog-advance").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 04");
+  await page.getByTestId("vn-dialog-advance").click();
+  await expect(page.getByTestId("runtime-movie-overlay")).toBeVisible();
+  await page.getByTestId("runtime-movie-skip").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 05");
+  await page.getByTestId("vn-dialog-advance").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 06");
+  await advanceUntilOverlayClosed(page);
 }
 
 async function expectKeyNeverFocuses(page: Page, key: string, activeTestId: string) {

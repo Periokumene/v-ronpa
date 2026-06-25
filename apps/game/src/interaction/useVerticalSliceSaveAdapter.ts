@@ -29,12 +29,15 @@ export function createVerticalSliceSaveData({
   story,
   trial
 }: VerticalSliceSaveDataInput): SaveData {
+  const storySnapshot = storyRuntimeSnapshot(story);
+  const { runtimeWait: _runtimeWait, ...saveableStory } = storySnapshot;
+  void _runtimeWait;
   const data: SaveData = {
     version: 2,
     savedAt,
     mode,
     navi,
-    story: storyRuntimeSnapshot(story),
+    story: saveableStory,
     pixiStage,
     inventory: gameplay.inventory,
     evidence: gameplay.evidence,
@@ -42,6 +45,10 @@ export function createVerticalSliceSaveData({
   };
   if (trial) data.trial = trial;
   return data;
+}
+
+export function canSaveVerticalSliceRuntime(runtime: Pick<VerticalSliceRuntimeAdapter, "storyRuntime">): boolean {
+  return !runtime.storyRuntime.state.runtimeWait;
 }
 
 export function useVerticalSliceSaveAdapter(runtime: VerticalSliceRuntimeAdapter, port?: SavePort) {
@@ -81,6 +88,7 @@ export function useVerticalSliceSaveAdapter(runtime: VerticalSliceRuntimeAdapter
 
   const saveSlot = useCallback(
     async (slotId: string) => {
+      if (!canSaveVerticalSliceRuntime(runtime)) return;
       const data = collectSaveData();
       const summary = createSaveSlotSummary(slotId, labelForSlot(slotId), data);
       await savePort.save({ id: slotId, label: summary.label, summary, data });

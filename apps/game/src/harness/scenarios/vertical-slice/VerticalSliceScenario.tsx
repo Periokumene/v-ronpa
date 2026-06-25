@@ -42,7 +42,7 @@ export function VerticalSliceScenario() {
   return (
     <main className="app-shell app-shell-harness">
       <section className="playfield" data-testid="playfield">
-        <GameInteractionShell flow={flow} overlayPages={overlayPages} runtime={runtime}>
+        <GameInteractionShell dialogDisplay={dialogDisplay} flow={flow} formatStorySpeaker={displayStorySpeaker} overlayPages={overlayPages} runtime={runtime}>
           <div className="scene-stack" data-testid="vertical-slice-shell">
             {flow.mode === "trial" && runtime.trialRuntime.state ? (
               <TrialRoundTableStage
@@ -61,13 +61,7 @@ export function VerticalSliceScenario() {
               pixiHints={runtime.pixiStageRuntime.hints}
               pixiPresentationTasks={runtime.pixiStageRuntime.presentationTasks}
               pixiStage={runtime.pixiStageRuntime.snapshot}
-              story={runtime.storyRuntime.state}
               storySession={runtime.storySession}
-              dialogDisplay={dialogDisplay}
-              formatSpeaker={displayStorySpeaker}
-              onAdvance={runtime.advanceStory}
-              onChoice={runtime.chooseStory}
-              onCancel={() => runtime.closeStoryOverlay()}
               onPixiTasksChanged={runtime.updatePixiPresentationTasks}
             />
           </div>

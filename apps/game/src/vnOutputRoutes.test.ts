@@ -33,16 +33,29 @@ describe("VN output routes", () => {
     expect(selectRuntimeCommandsForTarget(commands, "debug")).toEqual([commands[0]]);
   });
 
-  it("routes uncased commands through category fallback", () => {
+  it("routes promoted media/UI commands by contract execution authority", () => {
     const commands: RuntimeCommand[] = [
-      runtimeCommand("bgm", "media", { bgmPath: "bgm:investigation" }, "naninovel", "stubbed"),
-      runtimeCommand("toast", "ui", { text: "Debug" }, "naninovel", "stubbed"),
-      runtimeCommand("lock", "state", { id: "door" }, "naninovel", "stubbed")
+      runtimeCommand("bgm", "media", { bgmPath: "bgm:investigation" }, "naninovel", "implemented"),
+      runtimeCommand("toast", "ui", { text: "Debug" }, "naninovel", "implemented"),
+      runtimeCommand("customState", "state", { id: "door" }, "v-ronpa", "implemented")
     ];
 
     expect(selectRuntimeCommandsForTarget(commands, "media")).toEqual([commands[0]]);
     expect(selectRuntimeCommandsForTarget(commands, "ui")).toEqual([commands[1]]);
     expect(selectRuntimeCommandsForTarget(commands, "app")).toEqual([commands[2]]);
+  });
+
+  it("does not route known unpromoted media or story-control commands through category fallback", () => {
+    const commands: RuntimeCommand[] = [
+      runtimeCommand("stopvoice", "media", {}, "naninovel", "stubbed"),
+      runtimeCommand("wait", "flow", { waitMode: "i" }, "naninovel", "implemented"),
+      runtimeCommand("unknownMedia", "media", { path: "raw" }, "v-ronpa", "implemented")
+    ];
+
+    expect(routeRuntimeCommand(commands[0]!)).toEqual(["debug"]);
+    expect(routeRuntimeCommand(commands[1]!)).toEqual(["app"]);
+    expect(routeRuntimeCommand(commands[2]!)).toEqual(["media"]);
+    expect(selectRuntimeCommandsForTarget(commands, "media")).toEqual([commands[2]]);
   });
 
   it("requires explicit command or category routes for every runtime command", () => {

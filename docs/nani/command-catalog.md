@@ -79,33 +79,38 @@ release mechanism.
   params with defaults.
 - `children` means the catalog marks the command as child-block capable. This
   baseline does not parse nested command blocks yet.
+- `showUI` / `hideUI` are implemented as a V-Ronpa runtime UI subset. Supported
+  targets are `dialog`, `commandBar`, and `toastLayer`; no-target commands apply
+  to those three targets only. `hud`, debug/harness UI, shell overlays,
+  lifecycle-owned `inputPrompt` / `movieOverlay`, and multi-target `uINames`
+  parity are outside the current implementation.
 
 ## Official Naninovel Commands
 
 | Command | Runtime id | Category | Params | Children | Status |
 |---|---|---|---|---|---|
 | `addChoice` | `addchoice` | choice | `choiceSummary:string`, `id:string`, `lock:string`, `button:string`, `pos:decimal list`, `handler:string`, `goto:string`, `gosub:string`, `set:string`, `show:boolean`, `time:decimal` | no | stubbed |
-| `append` | `append` | text | `text:string`, `printer:string`, `author:string` | no | stubbed |
+| `append` | `append` | text | `text:string`, `printer:string`, `author:string` | no | implemented |
 | `arrange` | `arrange` | actor | `characterPositions:named decimal list`, `look:boolean`, `time:decimal`, `wait:boolean` | no | implemented |
 | `async` | `async` | flow | `trackId:string`, `loop:boolean` | yes | stubbed |
 | `await` | `await` | flow | `trackId:string`, `complete:boolean` | no | stubbed |
 | `back` | `back` | scene | `appearanceAndTransition:named string`, `pos:decimal list`, actor transform params | no | implemented |
-| `bgm` | `bgm` | media | `bgmPath:string`, `intro:string`, audio params | no | stubbed |
+| `bgm` | `bgm` | media | `bgmPath:string`, `intro:string`, audio params | no | implemented |
 | `blur` | `blur` | effect | `actorId:string`, `power:decimal`, `time:decimal`, `wait:boolean` | no | implemented |
 | `bokeh` | `bokeh` | effect | `focus:string`, `dist:decimal`, `power:decimal`, `time:decimal`, `wait:boolean` | no | implemented |
 | `camera` | `camera` | scene | `offset:decimal list`, `roll:decimal`, `rotation:decimal list`, `zoom:decimal`, `ortho:boolean`, `toggle:string list`, `set:named boolean list`, `easing:string`, `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
 | `char` | `char` | actor | `idAndAppearance:named string`, `look:string`, `avatar:string`, `pos:decimal list`, actor transform params | no | implemented |
 | `choice` | `choice` | choice | same as `addChoice` | no | implemented |
 | `choiceHandler` | `choicehandler` | choice | `handlerId:string`, `default:boolean`, actor transform params | no | stubbed |
-| `clearBacklog` | `clearbacklog` | text | none | no | stubbed |
-| `clearChoice` | `clearchoice` | choice | `handlerId:string`, `id:string`, `hide:boolean` | no | stubbed |
+| `clearBacklog` | `clearbacklog` | text | none | no | implemented |
+| `clearChoice` | `clearchoice` | choice | `handlerId:string`, `id:string`, `hide:boolean` | no | implemented |
 | `despawn` | `despawn` | actor | `path:string`, `params:string list`, `wait:boolean` | no | stubbed |
 | `despawnAll` | `despawnall` | actor | `wait:boolean` | no | stubbed |
 | `else` | `else` | flow | none | yes | stubbed |
 | `endIf` | `endif` | flow | none | no | stubbed |
 | `enterDialogue` | `enterdialogue` | text | none | no | stubbed |
 | `exitDialogue` | `exitdialogue` | text | `destroy:boolean` | no | stubbed |
-| `format` | `format` | text | `templates:named string list`, `printer:string` | no | stubbed |
+| `format` | `format` | text | `templates:named string list`, `printer:string` | no | implemented |
 | `glitch` | `glitch` | effect | `time:decimal`, `power:decimal`, `wait:boolean` | no | implemented |
 | `gosub` | `gosub` | flow | `path:string` | no | stubbed |
 | `goto` | `goto` | flow | `path:string`, `reset:string list`, `hold:boolean`, `release:boolean` | no | implemented |
@@ -114,14 +119,14 @@ release mechanism.
 | `hideAll` | `hideall` | actor | `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
 | `hideChars` | `hidechars` | actor | `time:decimal`, `lazy:boolean`, `wait:boolean` | no | implemented |
 | `hidePrinter` | `hideprinter` | text | `printerId:string`, `time:decimal`, `wait:boolean` | no | stubbed |
-| `hideUI` | `hideui` | ui | `uINames:string list`, `allowToggle:boolean`, `time:decimal`, `wait:boolean` | no | stubbed |
+| `hideUI` | `hideui` | ui | `uINames:string list`, `allowToggle:boolean`, `time:decimal`, `wait:boolean`, `target:string` (V-Ronpa) | no | implemented |
 | `if` | `if` | flow | `expression:string` | yes | stubbed |
-| `input` | `input` | ui | `variableName:string`, `type:string`, `summary:string`, `value:string`, `nostop:boolean` | no | stubbed |
+| `input` | `input` | ui | `variableName:string`, `type:string`, `summary:string`, `value:string`, `nostop:boolean` | no | implemented |
 | `lipSync` | `lipsync` | actor | `charIdAndAllow:named boolean` | no | stubbed |
 | `loadScene` | `loadscene` | scene | `sceneName:string`, `additive:boolean` | no | stubbed |
 | `lock` | `lock` | state | `id:string` | no | stubbed |
 | `look` | `look` | actor | `enable:boolean`, `zone:decimal list`, `speed:decimal list`, `gravity:boolean` | no | stubbed |
-| `movie` | `movie` | media | `moviePath:string`, `time:decimal`, `block:boolean` | no | stubbed |
+| `movie` | `movie` | media | `moviePath:string`, `time:decimal`, `block:boolean` | no | implemented |
 | `openURL` | `openurl` | ui | `uRL:string`, `target:string` | no | stubbed |
 | `print` | `print` | text | `text:string`, `printer:string`, `author:string`, `as:string`, `speed:decimal`, `reset:boolean`, `default:boolean`, `waitInput:boolean`, `append:boolean`, `fadeTime:decimal`, `wait:boolean` | no | implemented |
 | `printer` | `printer` | text | `idAndAppearance:named string`, `default:boolean`, `hideOther:boolean`, `anchor:boolean`, `pos:decimal list`, actor transform params | no | stubbed |
@@ -131,35 +136,35 @@ release mechanism.
 | `random` | `random` | flow | `weight:decimal list` | yes | stubbed |
 | `remove` | `remove` | actor | `actorIds:string list` | no | stubbed |
 | `resetState` | `resetstate` | state | `exclude:string list`, `only:string list` | no | stubbed |
-| `resetText` | `resettext` | text | `printerId:string` | no | stubbed |
+| `resetText` | `resettext` | text | `printerId:string` | no | implemented |
 | `return` | `return` | flow | `reset:string list` | no | stubbed |
 | `save` | `save` | ui | `at:string` | no | stubbed |
 | `set` | `set` | state | `expression:string` | no | implemented |
-| `sfx` | `sfx` | media | `sfxPath:string`, audio params | no | stubbed |
-| `sfxFast` | `sfxfast` | media | `sfxPath:string`, `volume:decimal`, `restart:boolean`, `additive:boolean`, `group:string`, `wait:boolean` | no | stubbed |
+| `sfx` | `sfx` | media | `sfxPath:string`, audio params | no | implemented |
+| `sfxFast` | `sfxfast` | media | `sfxPath:string`, `volume:decimal`, `restart:boolean`, `additive:boolean`, `group:string`, `wait:boolean` | no | implemented |
 | `shake` | `shake` | effect | `actorId:string`, `count:integer`, `loop:boolean`, `time:decimal`, `deltaTime:decimal`, `power:decimal`, `deltaPower:decimal`, `hor:boolean`, `ver:boolean`, `wait:boolean` | no | implemented |
 | `show` | `show` | actor | `actorIds:string list`, `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
-| `showPrinter` | `showprinter` | text | `printerId:string`, `time:decimal`, `wait:boolean` | no | stubbed |
-| `showUI` | `showui` | ui | `uINames:string list`, `time:decimal`, `wait:boolean` | no | stubbed |
+| `showPrinter` | `showprinter` | text | `printerId:string`, `time:decimal`, `wait:boolean` | no | implemented |
+| `showUI` | `showui` | ui | `uINames:string list`, `time:decimal`, `wait:boolean`, `target:string` (V-Ronpa), `visible:boolean` (V-Ronpa) | no | implemented |
 | `skip` | `skip` | ui | `enable:boolean` | no | stubbed |
 | `slide` | `slide` | actor | `idAndAppearance:named string`, `from:decimal list`, `to:decimal list`, `visible:boolean`, `easing:string`, `time:decimal`, `lazy:boolean`, `wait:boolean` | no | implemented |
 | `snow` | `snow` | effect | particle params | no | implemented |
 | `spawn` | `spawn` | actor | `path:string`, `params:string list`, `pos:decimal list`, `position:decimal list`, `rotation:decimal list`, `scale:decimal list`, `wait:boolean` | no | stubbed |
 | `stop` | `stop` | flow | `trackId:string` | no | stubbed |
-| `stopBgm` | `stopbgm` | media | `bgmPath:string`, `fade:decimal`, `wait:boolean` | no | stubbed |
-| `stopSfx` | `stopsfx` | media | `sfxPath:string`, `fade:decimal`, `wait:boolean` | no | stubbed |
+| `stopBgm` | `stopbgm` | media | `bgmPath:string`, `fade:decimal`, `wait:boolean`, `group:string` (V-Ronpa) | no | implemented |
+| `stopSfx` | `stopsfx` | media | `sfxPath:string`, `fade:decimal`, `wait:boolean`, `group:string` (V-Ronpa) | no | implemented |
 | `stopVoice` | `stopvoice` | media | none | no | stubbed |
 | `sun` | `sun` | effect | particle params | no | implemented |
 | `sync` | `sync` | flow | `trackId:string` | no | stubbed |
 | `timeline` | `timeline` | media | `name:string`, `stop:boolean`, `pause:boolean`, `resume:boolean`, `wait:boolean` | no | stubbed |
 | `title` | `title` | ui | none | no | stubbed |
-| `toast` | `toast` | ui | `text:string`, `appearance:string`, `time:decimal` | no | stubbed |
+| `toast` | `toast` | ui | `text:string`, `appearance:string`, `time:decimal` | no | implemented |
 | `trans` | `trans` | scene | `transition:string`, `params:decimal list`, `dissolve:string`, `easing:string`, `time:decimal` | no | stubbed |
 | `unless` | `unless` | flow | `expression:string` | yes | stubbed |
 | `unloadScene` | `unloadscene` | scene | `sceneName:string` | no | stubbed |
 | `unlock` | `unlock` | state | `id:string` | no | stubbed |
 | `voice` | `voice` | media | `voicePath:string`, `volume:decimal`, `group:string`, `authorId:string` | no | stubbed |
-| `wait` | `wait` | flow | `waitMode:string` | no | stubbed |
+| `wait` | `wait` | flow | `waitMode:string` | no | implemented |
 | `while` | `while` | flow | `expression:string` | yes | stubbed |
 
 Shared shorthand:

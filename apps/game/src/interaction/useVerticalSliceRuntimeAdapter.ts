@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  AssetRef,
   GameInteractionContext,
   GameUiAction,
   NaviInteractionSensorReport,
   NaviRuntimeState,
   PlayerPose,
   PixiStageSnapshot,
+  RuntimeAsset,
   RuntimeCommand,
   SaveData,
   GameplayEvent,
@@ -54,6 +56,7 @@ import {
 import {
   verticalSliceEvidence,
   verticalSliceMaps,
+  verticalSliceRuntimeAssets,
   verticalSliceScript,
   verticalSliceTrial
 } from "../harness/fixtures/verticalSlice";
@@ -73,6 +76,22 @@ import {
   type VnRuntimePresentationTransaction
 } from "../vnRuntimeTransaction";
 import type { VnOutputRouteTable, VnRuntimeProfile } from "../vnOutputRoutes";
+import { createHowlerAudioPort, createHtmlVideoPort, type AudioHandle, type AudioPort, type VideoPort } from "@v-ronpa/media-save";
+import {
+  createInitialMediaRuntimeState,
+  type MediaRuntimeDiagnostic,
+  type MediaRuntimeEffect,
+  type MediaRuntimeState
+} from "../mediaRuntime";
+import {
+  clearMovieOverlay,
+  createInitialUiRuntimeState,
+  deriveUiRuntimeLifecycleState,
+  dismissToast,
+  startMovieOverlay,
+  type UiRuntimeDiagnostic,
+  type UiRuntimeState
+} from "../uiRuntime";
 
 export type PosePresetId = "spawn" | "notebook" | "keycard" | "door" | "hall-door" | "witness" | "trial-stand" | "empty";
 
@@ -96,6 +115,14 @@ export interface PixiStageRuntime {
   presentationTasks: PixiPresentationTaskSnapshot[];
 }
 
+export interface MediaRuntime {
+  state: MediaRuntimeState;
+}
+
+export interface UiRuntime {
+  state: UiRuntimeState;
+}
+
 export interface TrialRuntime {
   definition: TrialDefinition;
   active: boolean;
@@ -103,7 +130,7 @@ export interface TrialRuntime {
   lastOutcome: string;
 }
 
-export type VerticalSliceDiagnosticSource = "parser" | "compiler" | "story" | "transaction" | "trial";
+export type VerticalSliceDiagnosticSource = "parser" | "compiler" | "story" | "transaction" | "media" | "ui" | "trial";
 
 export interface VerticalSliceRuntimeDiagnostic {
   source: VerticalSliceDiagnosticSource;
@@ -115,6 +142,7 @@ export interface VerticalSliceRuntimeDiagnostic {
 }
 
 export interface VerticalSliceRuntimeRestorePlan {
+  diagnostics: VerticalSliceRuntimeDiagnostic[];
   gameplay: GameplayState;
   navi?: NaviRuntimeState;
   playerPose?: PlayerPose;
@@ -124,9 +152,40 @@ export interface VerticalSliceRuntimeRestorePlan {
   pixiStageRuntime: PixiStageRuntime;
 }
 
+export type AdapterMediaKind = "bgm" | "sfx" | "voice" | "video";
+
+export interface MediaSourceResolverInput {
+  sourceRef: string;
+  kind: AdapterMediaKind;
+  runtimeAssets?: RuntimeAsset[];
+  manifestAssets?: AssetRef[];
+  scriptAssets?: AssetRef[];
+}
+
+export interface MediaSourceResolverResult {
+  uri?: string;
+  diagnostic?: VerticalSliceRuntimeDiagnostic;
+}
+
+export interface MediaHandleStore {
+  bgm: Record<string, AudioHandle>;
+  sfx: Record<string, AudioHandle>;
+  oneShotSequence: number;
+}
+
+export interface ApplyMediaRuntimeEffectsInput {
+  effects: MediaRuntimeEffect[];
+  handles: MediaHandleStore;
+  resolver: (input: Pick<MediaSourceResolverInput, "sourceRef" | "kind">) => MediaSourceResolverResult;
+  audioPort?: AudioPort;
+  videoPort?: VideoPort;
+}
+
 export interface VerticalSliceRuntimeAdapterOptions {
   profile?: VnRuntimeProfile;
   routeTable?: VnOutputRouteTable;
+  audioPort?: AudioPort;
+  videoPort?: VideoPort;
   storyPlayTiming?: StoryPlayTimingPolicy;
   onEnterTrial?: () => void;
   onEnterNavi?: () => void;
@@ -135,6 +194,8 @@ export interface VerticalSliceRuntimeAdapterOptions {
 export interface VerticalSlicePresentationTransactionInput {
   runtimeCommands: RuntimeCommand[];
   previousPixiStage: PixiStageSnapshot;
+  previousMediaState?: MediaRuntimeState;
+  previousUiState?: UiRuntimeState;
   options?: VerticalSliceRuntimeAdapterOptions;
 }
 
@@ -151,6 +212,40 @@ export const verticalSlicePosePresets: PosePreset[] = [
 
 const initialMap = verticalSliceMaps[0] ?? createFallbackMap();
 const MAX_RUNTIME_DIAGNOSTICS = 50;
+const DEFAULT_TOAST_DURATION_MS = 2500;
+
+export interface SyncRuntimeToastDismissalTimersInput {
+  state: UiRuntimeState;
+  timeouts: Record<string, number>;
+  setTimeoutFn: (callback: () => void, durationMs: number) => number;
+  clearTimeoutFn: (timeoutId: number) => void;
+  dismissToastId: (toastId: string) => void;
+  defaultDurationMs?: number;
+}
+
+export function syncRuntimeToastDismissalTimers({
+  state,
+  timeouts,
+  setTimeoutFn,
+  clearTimeoutFn,
+  dismissToastId,
+  defaultDurationMs = DEFAULT_TOAST_DURATION_MS
+}: SyncRuntimeToastDismissalTimersInput) {
+  const activeToastIds = new Set(state.toasts.map((toast) => toast.id));
+  for (const [toastId, timeout] of Object.entries(timeouts)) {
+    if (!activeToastIds.has(toastId)) {
+      clearTimeoutFn(timeout);
+      delete timeouts[toastId];
+    }
+  }
+  for (const toast of state.toasts) {
+    if (timeouts[toast.id]) continue;
+    timeouts[toast.id] = setTimeoutFn(() => {
+      delete timeouts[toast.id];
+      dismissToastId(toast.id);
+    }, toast.durationMs ?? defaultDurationMs);
+  }
+}
 
 export function useVerticalSliceRuntimeAdapter(
   flowMode: GameInteractionContext["mode"],
@@ -168,6 +263,8 @@ export function useVerticalSliceRuntimeAdapter(
   );
   const runtimeProfile = options.profile ?? "vn2d";
   const runtimeRouteTable = options.routeTable;
+  const audioPort = useMemo(() => options.audioPort ?? createHowlerAudioPort(), [options.audioPort]);
+  const videoPort = useMemo(() => options.videoPort ?? createHtmlVideoPort(), [options.videoPort]);
   const storyPlayTiming = options.storyPlayTiming;
   const onEnterTrial = options.onEnterTrial;
   const onEnterNavi = options.onEnterNavi;
@@ -183,6 +280,8 @@ export function useVerticalSliceRuntimeAdapter(
   const [storyPlay, setStoryPlay] = useState<StoryPlayState>(() => createInitialStoryPlayState());
   const [trialRuntime, setTrialRuntime] = useState<TrialRuntime>(() => createInitialVerticalSliceTrialRuntime());
   const [pixiStageRuntime, setPixiStageRuntime] = useState<PixiStageRuntime>(() => createInitialPixiStageRuntime());
+  const [mediaRuntime, setMediaRuntime] = useState<MediaRuntime>(() => ({ state: createInitialMediaRuntimeState() }));
+  const [uiRuntime, setUiRuntime] = useState<UiRuntime>(() => ({ state: createInitialUiRuntimeState() }));
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<VerticalSliceRuntimeDiagnostic[]>(() => initialRuntimeDiagnostics);
   const [lastRuntimeCommandCount, setLastRuntimeCommandCount] = useState(0);
   const [lastOutcome, setLastOutcome] = useState("spawn");
@@ -191,6 +290,11 @@ export function useVerticalSliceRuntimeAdapter(
   const storyRuntimeRef = useRef<StoryRuntime>({ state: createInitialStoryState(compiled.script), active: false });
   const storyPlayRef = useRef<StoryPlayState>(createInitialStoryPlayState());
   const pixiStageRuntimeRef = useRef<PixiStageRuntime>(createInitialPixiStageRuntime());
+  const mediaRuntimeRef = useRef<MediaRuntime>({ state: createInitialMediaRuntimeState() });
+  const uiRuntimeRef = useRef<UiRuntime>({ state: createInitialUiRuntimeState() });
+  const mediaHandlesRef = useRef<MediaHandleStore>({ bgm: {}, sfx: {}, oneShotSequence: 0 });
+  const pendingMoviePlaybackRef = useRef<{ sourceRef: string; uri: string } | undefined>(undefined);
+  const toastTimeoutsRef = useRef<Record<string, number>>({});
   const observedWaitTasksRef = useRef<{ waitKey: string; observed: Set<string> } | undefined>(undefined);
   const completingWaitKeyRef = useRef<string | undefined>(undefined);
   const activeMap = getActiveMap(navi);
@@ -235,6 +339,14 @@ export function useVerticalSliceRuntimeAdapter(
   }, [pixiStageRuntime]);
 
   useEffect(() => {
+    mediaRuntimeRef.current = mediaRuntime;
+  }, [mediaRuntime]);
+
+  useEffect(() => {
+    uiRuntimeRef.current = uiRuntime;
+  }, [uiRuntime]);
+
+  useEffect(() => {
     const key = storyRuntime.state.presentationWait ? presentationWaitKey(storyRuntime.state.presentationWait) : undefined;
     if (key !== completingWaitKeyRef.current) completingWaitKeyRef.current = undefined;
   }, [storyRuntime.state.presentationWait]);
@@ -256,6 +368,43 @@ export function useVerticalSliceRuntimeAdapter(
     pixiStageRuntimeRef.current = resolved;
     setPixiStageRuntime(resolved);
   }
+
+  function setMediaRuntimeNow(next: MediaRuntime | ((current: MediaRuntime) => MediaRuntime)) {
+    const resolved = typeof next === "function" ? next(mediaRuntimeRef.current) : next;
+    mediaRuntimeRef.current = resolved;
+    setMediaRuntime(resolved);
+  }
+
+  function setUiRuntimeNow(next: UiRuntime | ((current: UiRuntime) => UiRuntime)) {
+    const resolved = typeof next === "function" ? next(uiRuntimeRef.current) : next;
+    uiRuntimeRef.current = resolved;
+    setUiRuntime(resolved);
+  }
+
+  const appendRuntimeDiagnostics = useCallback((diagnostics: VerticalSliceRuntimeDiagnostic[]) => {
+    if (diagnostics.length === 0) return;
+    setRuntimeDiagnostics((current) => limitRuntimeDiagnostics([...current, ...diagnostics]));
+  }, []);
+
+  const attachMovieElement = useCallback(
+    (element: HTMLVideoElement | null) => {
+      if (!element) {
+        videoPort.stop();
+        return;
+      }
+      videoPort.attach(element);
+      const playback = pendingMoviePlaybackRef.current;
+      if (!playback) return;
+      void videoPort.play(playback.uri).catch((error) => {
+        appendRuntimeDiagnostics([mediaPortError(error instanceof Error ? error.message : String(error))]);
+      });
+    },
+    [appendRuntimeDiagnostics, videoPort]
+  );
+
+  const dismissRuntimeToast = useCallback((toastId: string) => {
+    setUiRuntimeNow((current) => ({ state: dismissToast(current.state, toastId) }));
+  }, []);
 
   useEffect(() => {
     if (!storyRuntime.active) return;
@@ -292,6 +441,31 @@ export function useVerticalSliceRuntimeAdapter(
     return () => window.clearTimeout(timeout);
   }, [storyRuntime.active, storyRuntime.state.presentationWait]);
 
+  useEffect(() => {
+    const wait = storyRuntime.state.runtimeWait;
+    if (!storyRuntime.active || wait?.kind !== "pause") return;
+    if (wait.mode === "confirm" || wait.durationMs === undefined) return;
+    const timeout = window.setTimeout(() => completeRuntimeWaitAndAdvance("system", "pause"), wait.durationMs);
+    return () => window.clearTimeout(timeout);
+  }, [storyRuntime.active, storyRuntime.state.runtimeWait]);
+
+  useEffect(() => {
+    syncRuntimeToastDismissalTimers({
+      state: uiRuntime.state,
+      timeouts: toastTimeoutsRef.current,
+      setTimeoutFn: window.setTimeout.bind(window),
+      clearTimeoutFn: window.clearTimeout.bind(window),
+      dismissToastId: (toastId) => setUiRuntimeNow((current) => ({ state: dismissToast(current.state, toastId) }))
+    });
+  }, [uiRuntime.state.toasts]);
+
+  useEffect(() => {
+    return () => {
+      for (const timeout of Object.values(toastTimeoutsRef.current)) window.clearTimeout(timeout);
+      toastTimeoutsRef.current = {};
+    };
+  }, []);
+
   function resetSlice() {
     cancelStoryPlayHostSchedule();
     observedWaitTasksRef.current = undefined;
@@ -305,6 +479,9 @@ export function useVerticalSliceRuntimeAdapter(
     setStoryRuntimeNow({ state: createInitialStoryState(compiled.script), active: false });
     setStoryPlayNow(createInitialStoryPlayState());
     setTrialRuntime(createInitialVerticalSliceTrialRuntime());
+    stopAllMediaHandles();
+    setMediaRuntimeNow({ state: createInitialMediaRuntimeState() });
+    setUiRuntimeNow({ state: createInitialUiRuntimeState() });
     setRuntimeDiagnostics(initialRuntimeDiagnostics);
     setPixiStageRuntimeNow((current) => ({
       ...createInitialPixiStageRuntime(),
@@ -404,6 +581,24 @@ export function useVerticalSliceRuntimeAdapter(
       completePresentationWaitAndAdvance(source, { settlePixi: true });
       return;
     }
+    if (storyRuntime.state.runtimeWait) {
+      if (storyRuntime.state.runtimeWait.kind === "pause") {
+        if (!canCompletePauseRuntimeWaitFromSource(storyRuntime.state.runtimeWait, source)) {
+          setLastAction(source === "manual" ? "story:advance" : `story:${source}`);
+          setLastOutcome("timer-wait");
+          return;
+        }
+        completeRuntimeWaitAndAdvance(source, "pause");
+        return;
+      }
+      if (storyRuntime.state.runtimeWait.kind === "movie") {
+        completeRuntimeWaitAndAdvance(source, "movie");
+        return;
+      }
+      setLastAction(source === "manual" ? "story:advance" : `story:${source}`);
+      setLastOutcome("input-wait");
+      return;
+    }
     const step = advanceStoryPlay(storyPlay, {
       state: storyRuntime.state,
       script: compiled.script,
@@ -467,6 +662,39 @@ export function useVerticalSliceRuntimeAdapter(
   function stopStoryAutomation(reason: StoryPlayStopReason) {
     cancelStoryPlayHostSchedule();
     setStoryPlayNow((current) => stopStoryPlayAutomation(current, reason));
+  }
+
+  function submitStoryInput(value: string | number | boolean) {
+    cancelStoryPlayHostSchedule();
+    const currentStory = storyRuntimeRef.current;
+    if (!currentStory.active || currentStory.state.runtimeWait?.kind !== "input") return;
+    const submitted = storyReducer(currentStory.state, { type: "SUBMIT_INPUT", script: compiled.script, value });
+    appendRuntimeDiagnostics(collectVerticalSliceRuntimeDiagnostics({ storyDiagnostics: submitted.diagnostics }));
+    if (submitted.diagnostics.length > 0) return;
+    const step = advanceStoryPlay(storyPlayRef.current, {
+      state: submitted.state,
+      script: compiled.script,
+      source: "manual"
+    });
+    setStoryPlayNow(step.play);
+    commitStoryTransaction({
+      storyStep: step.story,
+      previousPixiStage: pixiStageRuntimeRef.current.snapshot,
+      active: !step.story.state.ended,
+      pacing: step.intent.pacing
+    });
+    setLastAction("input:submit");
+    setLastOutcome(step.story.state.ended ? "story:end" : "input-submitted");
+  }
+
+  function completeMoviePlayback() {
+    if (storyRuntimeRef.current.state.runtimeWait?.kind === "movie") {
+      completeRuntimeWaitAndAdvance("system", "movie");
+      return;
+    }
+    pendingMoviePlaybackRef.current = undefined;
+    videoPort.stop();
+    setUiRuntimeNow((current) => ({ state: clearMovieOverlay(current.state) }));
   }
 
   function startTrial(outcome: Extract<ExplorationOutcome, { type: "start-trial" }>) {
@@ -547,6 +775,9 @@ export function useVerticalSliceRuntimeAdapter(
     setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
     setStoryRuntimeNow((current) => ({ ...current, active: false }));
     setStoryPlayNow(createInitialStoryPlayState());
+    stopAllMediaHandles();
+    setMediaRuntimeNow({ state: createInitialMediaRuntimeState() });
+    setUiRuntimeNow({ state: createInitialUiRuntimeState() });
     setLastRuntimeCommandCount(0);
     setLastAction(action);
     setLastOutcome("overlay-closed");
@@ -563,7 +794,10 @@ export function useVerticalSliceRuntimeAdapter(
     setStoryRuntimeNow(plan.storyRuntime);
     setStoryPlayNow(plan.storyPlay);
     setTrialRuntime(plan.trialRuntime);
-    setRuntimeDiagnostics(initialRuntimeDiagnostics);
+    stopAllMediaHandles();
+    setMediaRuntimeNow({ state: createInitialMediaRuntimeState() });
+    setUiRuntimeNow({ state: deriveUiRuntimeLifecycleState(createInitialUiRuntimeState(), plan.storyRuntime.state) });
+    setRuntimeDiagnostics(limitRuntimeDiagnostics([...initialRuntimeDiagnostics, ...plan.diagnostics]));
     setPixiStageRuntimeNow((current) => ({
       ...plan.pixiStageRuntime,
       hintSequence: current.hintSequence + 1
@@ -590,17 +824,13 @@ export function useVerticalSliceRuntimeAdapter(
     const transaction = createVerticalSlicePresentationTransaction({
       runtimeCommands: storyStep.emittedRuntimeCommands,
       previousPixiStage,
+      previousMediaState: mediaRuntimeRef.current.state,
+      previousUiState: uiRuntimeRef.current.state,
       options: {
         profile: runtimeProfile,
         ...(runtimeRouteTable ? { routeTable: runtimeRouteTable } : {})
       }
     });
-    appendRuntimeDiagnostics(
-      collectVerticalSliceRuntimeDiagnostics({
-        storyDiagnostics: storyStep.diagnostics,
-        transactionDiagnostics: transaction.diagnostics
-      })
-    );
     setLastRuntimeCommandCount(storyStep.emittedRuntimeCommands.length);
     if (transaction.gameplayEvents.length > 0) {
       setGameplay((currentGameplay) => applyGameplayEvents(currentGameplay, transaction.gameplayEvents));
@@ -616,6 +846,53 @@ export function useVerticalSliceRuntimeAdapter(
           }
         }
       : storyStep.state;
+    let sawMovieEffect = false;
+    let pendingMoviePlayback: { sourceRef: string; uri: string } | undefined;
+    const movieDiagnostics: VerticalSliceRuntimeDiagnostic[] = [];
+    const nextUiStateFromCommands = transaction.mediaEffects.reduce((current, effect) => {
+      if (effect.type !== "play-movie") return current;
+      sawMovieEffect = true;
+      const resolved = resolveMediaSource({
+        kind: "video",
+        sourceRef: effect.sourceRef,
+        runtimeAssets: verticalSliceRuntimeAssets,
+        scriptAssets: compiled.script.assets
+      });
+      if (resolved.diagnostic) movieDiagnostics.push(resolved.diagnostic);
+      if (resolved.uri) pendingMoviePlayback = { sourceRef: effect.sourceRef, uri: resolved.uri };
+      return startMovieOverlay(current, {
+        sourceRef: effect.sourceRef,
+        ...(resolved.uri ? { uri: resolved.uri } : {}),
+        blocking: effect.block
+      });
+    }, transaction.uiState);
+    if (sawMovieEffect) pendingMoviePlaybackRef.current = pendingMoviePlayback;
+    appendRuntimeDiagnostics(
+      collectVerticalSliceRuntimeDiagnostics({
+        storyDiagnostics: storyStep.diagnostics,
+        transactionDiagnostics: transaction.diagnostics,
+        mediaDiagnostics: transaction.mediaDiagnostics,
+        uiDiagnostics: transaction.uiDiagnostics
+      }).concat(movieDiagnostics)
+    );
+    setMediaRuntimeNow({ state: transaction.mediaState });
+    setUiRuntimeNow({ state: deriveUiRuntimeLifecycleState(nextUiStateFromCommands, nextStoryState) });
+    const audioMediaEffects = transaction.mediaEffects.filter((effect) => effect.type !== "play-movie");
+    if (audioMediaEffects.length > 0) {
+      const mediaEffectInput: ApplyMediaRuntimeEffectsInput = {
+        audioPort,
+        effects: audioMediaEffects,
+        handles: mediaHandlesRef.current,
+        resolver: ({ kind, sourceRef }) =>
+          resolveMediaSource({
+            kind,
+            sourceRef,
+            runtimeAssets: verticalSliceRuntimeAssets,
+            scriptAssets: compiled.script.assets
+          })
+      };
+      void applyMediaRuntimeEffects(mediaEffectInput).then(appendRuntimeDiagnostics);
+    }
     if (
       forcePixiCommit ||
       transaction.pixiStage !== previousPixiStage ||
@@ -705,6 +982,39 @@ export function useVerticalSliceRuntimeAdapter(
     }
   }
 
+  function completeRuntimeWaitAndAdvance(source: StoryPlayAdvanceSource, kind: "pause" | "movie") {
+    const currentStory = storyRuntimeRef.current;
+    const wait = currentStory.state.runtimeWait;
+    if (!currentStory.active || !wait || wait.kind !== kind) return;
+    if (kind === "pause" && wait.kind === "pause" && !canCompletePauseRuntimeWaitFromSource(wait, source)) return;
+    if (kind === "movie") {
+      pendingMoviePlaybackRef.current = undefined;
+      videoPort.stop();
+      setUiRuntimeNow((current) => ({ state: clearMovieOverlay(current.state) }));
+    }
+    const completed = storyReducer(currentStory.state, { type: "RUNTIME_WAIT_COMPLETE", script: compiled.script, kind });
+    appendRuntimeDiagnostics(collectVerticalSliceRuntimeDiagnostics({ storyDiagnostics: completed.diagnostics }));
+    if (completed.diagnostics.length > 0) return;
+    const step = advanceStoryPlay(storyPlayRef.current, {
+      state: completed.state,
+      script: compiled.script,
+      source
+    });
+    setStoryPlayNow(step.play);
+    commitStoryTransaction({
+      storyStep: step.story,
+      previousPixiStage: pixiStageRuntimeRef.current.snapshot,
+      active: !step.story.state.ended,
+      pacing: step.intent.pacing
+    });
+    if (step.story.state.ended) {
+      closeStoryOverlay("story:end");
+    } else {
+      setLastAction(source === "manual" ? "story:advance" : `story:${source}`);
+      setLastOutcome(step.story.state.runtimeWait ? "runtime-wait" : step.story.state.pendingChoices.length > 0 ? "choices" : "line");
+    }
+  }
+
   const interactionContext: GameInteractionContext = useMemo(
     () => createVerticalSliceInteractionContext({ flowMode, navi, storyRuntime, trialRuntime }),
     [
@@ -714,6 +1024,8 @@ export function useVerticalSliceRuntimeAdapter(
       storyRuntime.active,
       storyRuntime.state.ended,
       storyRuntime.state.pendingChoices.length,
+      storyRuntime.state.presentationWait,
+      storyRuntime.state.runtimeWait,
       trialRuntime.active,
       trialRuntime.state?.currentSegmentId,
       trialRuntime.state?.inputLock,
@@ -734,6 +1046,7 @@ export function useVerticalSliceRuntimeAdapter(
     lastAction,
     lastOutcome,
     lastRuntimeCommandCount,
+    mediaRuntime,
     moveToPreset,
     navi,
     parsed,
@@ -752,17 +1065,25 @@ export function useVerticalSliceRuntimeAdapter(
     trialRuntime,
     toggleStoryAuto,
     toggleStorySkip,
+    uiRuntime,
     updatePixiPresentationTasks,
+    submitStoryInput,
+    completeMoviePlayback,
+    attachMovieElement,
+    dismissRuntimeToast,
     exitTrial
   };
 
-  function appendRuntimeDiagnostics(diagnostics: VerticalSliceRuntimeDiagnostic[]) {
-    if (diagnostics.length === 0) return;
-    setRuntimeDiagnostics((current) => limitRuntimeDiagnostics([...current, ...diagnostics]));
-  }
-
   function cancelStoryPlayHostSchedule() {
     storyPlayHostRef.current = { active: storyRuntimeRef.current.active, schedule: { type: "idle" } };
+  }
+
+  function stopAllMediaHandles() {
+    for (const handle of Object.values(mediaHandlesRef.current.bgm)) handle.stop();
+    for (const handle of Object.values(mediaHandlesRef.current.sfx)) handle.stop();
+    mediaHandlesRef.current = { bgm: {}, sfx: {}, oneShotSequence: mediaHandlesRef.current.oneShotSequence };
+    pendingMoviePlaybackRef.current = undefined;
+    videoPort.stop();
   }
 }
 
@@ -779,15 +1100,21 @@ export function createInitialVerticalSliceDiagnostics(
 }
 
 export function collectVerticalSliceRuntimeDiagnostics({
+  mediaDiagnostics = [],
   storyDiagnostics = [],
-  transactionDiagnostics = []
+  transactionDiagnostics = [],
+  uiDiagnostics = []
 }: {
+  mediaDiagnostics?: MediaRuntimeDiagnostic[];
   storyDiagnostics?: StoryStepperDiagnostic[];
   transactionDiagnostics?: VnRuntimeTransactionDiagnostic[];
+  uiDiagnostics?: UiRuntimeDiagnostic[];
 }): VerticalSliceRuntimeDiagnostic[] {
   return [
     ...storyDiagnostics.map(toVerticalSliceStoryDiagnostic),
-    ...transactionDiagnostics.map(toVerticalSliceTransactionDiagnostic)
+    ...transactionDiagnostics.map(toVerticalSliceTransactionDiagnostic),
+    ...mediaDiagnostics.map(toVerticalSliceMediaDiagnostic),
+    ...uiDiagnostics.map(toVerticalSliceUiDiagnostic)
   ];
 }
 
@@ -824,26 +1151,55 @@ export function createVerticalSliceInteractionContext({
     hasActiveStory: storyRuntime.active,
     storyHasChoices: storyRuntime.state.pendingChoices.length > 0,
     storyEnded: storyRuntime.state.ended,
-    isAtStableStop: flowMode === "navi" && (navi.substate === "walk" || navi.substate === "vn2d-overlay")
+    isAtStableStop:
+      flowMode === "navi" &&
+      !storyRuntime.state.presentationWait &&
+      !storyRuntime.state.runtimeWait &&
+      (navi.substate === "walk" || navi.substate === "vn2d-overlay")
   };
 }
 
 export function canToggleStoryAutomation(storyRuntime: StoryRuntime): boolean {
-  return storyRuntime.active && !storyRuntime.state.ended && storyRuntime.state.pendingChoices.length === 0 && !storyRuntime.state.presentationWait;
+  return (
+    storyRuntime.active &&
+    !storyRuntime.state.ended &&
+    storyRuntime.state.pendingChoices.length === 0 &&
+    !storyRuntime.state.presentationWait &&
+    !storyRuntime.state.runtimeWait
+  );
+}
+
+export function canCompletePauseRuntimeWaitFromSource(
+  wait: Extract<NonNullable<StoryRuntimeState["runtimeWait"]>, { kind: "pause" }>,
+  source: StoryPlayAdvanceSource
+): boolean {
+  if (source === "system") return true;
+  return source === "manual" && wait.mode !== "timer";
 }
 
 export function createVerticalSliceRuntimeRestorePlan(
   save: Pick<SaveData, "mode" | "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters" | "trial">,
   script: { scriptPath: string }
 ): VerticalSliceRuntimeRestorePlan {
+  const { runtimeWait: restoredRuntimeWait, ...saveableStory } = save.story;
   const storyRuntime = {
     active: save.navi?.substate === "vn2d-overlay" && !save.story.ended,
     state: {
       ...createInitialStoryState(script),
-      ...save.story
+      ...saveableStory
     }
   };
   return {
+    diagnostics: restoredRuntimeWait
+      ? [
+          {
+            source: "story",
+            code: "runtime-wait-cleared-on-load",
+            severity: "warning",
+            message: "Saved runtimeWait was cleared during restore because runtime waits are transient app state."
+          }
+        ]
+      : [],
     gameplay: { inventory: save.inventory, evidence: save.evidence, characters: save.characters },
     ...(save.navi ? { navi: save.navi } : {}),
     ...(save.navi?.playerPose ? { playerPose: save.navi.playerPose } : {}),
@@ -905,21 +1261,151 @@ function pixiPresentationTaskKey(task: PixiPresentationTaskSnapshot): string {
 
 export function createVerticalSlicePresentationTransaction({
   runtimeCommands,
+  previousMediaState,
   previousPixiStage,
+  previousUiState,
   options = {}
 }: VerticalSlicePresentationTransactionInput): VnRuntimePresentationTransaction {
   return createVnRuntimePresentationTransaction({
     runtimeCommands,
+    ...(previousMediaState ? { previousMediaState } : {}),
     previousPixiStage,
+    ...(previousUiState ? { previousUiState } : {}),
     profile: options.profile ?? "vn2d",
     ...(options.routeTable ? { routeTable: options.routeTable } : {})
   });
+}
+
+export function resolveMediaSource({
+  kind,
+  manifestAssets = [],
+  runtimeAssets = [],
+  scriptAssets = [],
+  sourceRef
+}: MediaSourceResolverInput): MediaSourceResolverResult {
+  const runtimeAsset = runtimeAssets.find(
+    (asset) => asset.kind === kind && (asset.id === sourceRef || asset.sourceUri === sourceRef)
+  );
+  if (runtimeAsset) return { uri: runtimeAsset.optimizedUri };
+
+  const manifestAsset = manifestAssets.find((asset) => asset.kind === kind && asset.id === sourceRef);
+  if (manifestAsset) return { uri: manifestAsset.uri };
+
+  const scriptAsset = scriptAssets.find((asset) => asset.kind === kind && asset.id === sourceRef);
+  if (scriptAsset) return { uri: scriptAsset.uri };
+
+  if (isRawMediaUri(sourceRef)) return { uri: sourceRef };
+
+  return {
+    diagnostic: {
+      source: "media",
+      code: "media-source-unresolved",
+      severity: "warning",
+      message: `Media source ${sourceRef} (${kind}) could not be resolved.`
+    }
+  };
+}
+
+export async function applyMediaRuntimeEffects({
+  audioPort,
+  effects,
+  handles,
+  resolver,
+  videoPort
+}: ApplyMediaRuntimeEffectsInput): Promise<VerticalSliceRuntimeDiagnostic[]> {
+  const diagnostics: VerticalSliceRuntimeDiagnostic[] = [];
+  for (const effect of effects) {
+    try {
+      if (effect.type === "play-bgm") {
+        const resolved = resolver({ sourceRef: effect.sourceRef, kind: "bgm" });
+        if (!resolved.uri) {
+          if (resolved.diagnostic) diagnostics.push(resolved.diagnostic);
+          continue;
+        }
+        if (!audioPort) {
+          diagnostics.push(mediaPortError("AudioPort is not available for BGM playback."));
+          continue;
+        }
+        handles.bgm[effect.key]?.stop();
+        handles.bgm[effect.key] = audioPort.playBgm(effect.key, resolved.uri, {
+          loop: true,
+          ...(effect.volume !== undefined ? { volume: effect.volume } : {})
+        });
+        continue;
+      }
+
+      if (effect.type === "stop-bgm") {
+        const handle = handles.bgm[effect.key];
+        if (!handle) {
+          diagnostics.push(mediaHandleMissing(`BGM handle ${effect.key} is not active.`));
+          continue;
+        }
+        if (effect.fadeMs !== undefined) handle.fadeOutAndStop(effect.fadeMs);
+        else handle.stop();
+        delete handles.bgm[effect.key];
+        continue;
+      }
+
+      if (effect.type === "play-sfx") {
+        const resolved = resolver({ sourceRef: effect.sourceRef, kind: "sfx" });
+        if (!resolved.uri) {
+          if (resolved.diagnostic) diagnostics.push(resolved.diagnostic);
+          continue;
+        }
+        if (!audioPort) {
+          diagnostics.push(mediaPortError("AudioPort is not available for SFX playback."));
+          continue;
+        }
+        const key = effect.key ?? `sfx:one-shot:${++handles.oneShotSequence}`;
+        const handle = audioPort.playSfx(key, resolved.uri, {
+          loop: effect.loop,
+          ...(effect.volume !== undefined ? { volume: effect.volume } : {})
+        });
+        if (effect.loop) handles.sfx[key] = handle;
+        continue;
+      }
+
+      if (effect.type === "stop-sfx") {
+        const handle = handles.sfx[effect.key];
+        if (!handle) {
+          diagnostics.push(mediaHandleMissing(`Looping SFX handle ${effect.key} is not active.`));
+          continue;
+        }
+        if (effect.fadeMs !== undefined) handle.fadeOutAndStop(effect.fadeMs);
+        else handle.stop();
+        delete handles.sfx[effect.key];
+        continue;
+      }
+
+      const resolved = resolver({ sourceRef: effect.sourceRef, kind: "video" });
+      if (!resolved.uri) {
+        if (resolved.diagnostic) diagnostics.push(resolved.diagnostic);
+        continue;
+      }
+      if (videoPort) await videoPort.play(resolved.uri);
+    } catch (error) {
+      diagnostics.push(mediaPortError(error instanceof Error ? error.message : String(error)));
+    }
+  }
+  return diagnostics;
 }
 
 function applyGameplayEvents(gameplay: GameplayState, events: GameplayEvent[]): GameplayState {
   return events.reduce((current, event) => {
     return applyGameplayEvent(current, event).state;
   }, gameplay);
+}
+
+function isRawMediaUri(sourceRef: string): boolean {
+  return /^(\/|\.\/|\.\.\/|https?:\/\/|data:|blob:)/u.test(sourceRef);
+}
+
+function mediaHandleMissing(message: string): VerticalSliceRuntimeDiagnostic {
+  return { source: "media", code: "media-handle-missing", severity: "info", message };
+}
+
+function mediaPortError(message: string): VerticalSliceRuntimeDiagnostic {
+  return { source: "media", code: "media-port-error", severity: "warning", message };
 }
 
 function createSensorReportFromRequest(request: FirstPersonInteractRequest | undefined): NaviInteractionSensorReport | undefined {
@@ -1001,6 +1487,26 @@ function toVerticalSliceTransactionDiagnostic(
     source: "transaction",
     code: diagnostic.code,
     severity: "error",
+    message: diagnostic.message,
+    commandId: diagnostic.commandId
+  };
+}
+
+function toVerticalSliceMediaDiagnostic(diagnostic: MediaRuntimeDiagnostic): VerticalSliceRuntimeDiagnostic {
+  return {
+    source: "media",
+    code: diagnostic.code,
+    severity: diagnostic.severity,
+    message: diagnostic.message,
+    commandId: diagnostic.commandId
+  };
+}
+
+function toVerticalSliceUiDiagnostic(diagnostic: UiRuntimeDiagnostic): VerticalSliceRuntimeDiagnostic {
+  return {
+    source: "ui",
+    code: diagnostic.code,
+    severity: diagnostic.severity,
     message: diagnostic.message,
     commandId: diagnostic.commandId
   };

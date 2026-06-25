@@ -10,10 +10,25 @@ import {
   type VnOutputRouteTable,
   type VnRuntimeProfile
 } from "./vnOutputRoutes";
+import {
+  createInitialMediaRuntimeState,
+  reduceMediaRuntimeCommands,
+  type MediaRuntimeDiagnostic,
+  type MediaRuntimeEffect,
+  type MediaRuntimeState
+} from "./mediaRuntime";
+import {
+  createInitialUiRuntimeState,
+  reduceUiRuntimeCommands,
+  type UiRuntimeDiagnostic,
+  type UiRuntimeState
+} from "./uiRuntime";
 
 export interface VnRuntimePresentationTransactionInput {
   runtimeCommands: RuntimeCommand[];
   previousPixiStage: PixiStageSnapshot;
+  previousMediaState?: MediaRuntimeState;
+  previousUiState?: UiRuntimeState;
   profile?: VnRuntimeProfile;
   routeTable?: VnOutputRouteTable;
 }
@@ -23,6 +38,11 @@ export interface VnRuntimePresentationTransaction {
   pixiHints: PixiStageRenderHint[];
   pixiWaitTasks: StoryPresentationWaitTask[];
   gameplayEvents: GameplayEvent[];
+  mediaState: MediaRuntimeState;
+  mediaEffects: MediaRuntimeEffect[];
+  mediaDiagnostics: MediaRuntimeDiagnostic[];
+  uiState: UiRuntimeState;
+  uiDiagnostics: UiRuntimeDiagnostic[];
   diagnostics: VnRuntimeTransactionDiagnostic[];
 }
 
@@ -34,7 +54,9 @@ export interface VnRuntimeTransactionDiagnostic {
 
 export function createVnRuntimePresentationTransaction({
   runtimeCommands,
+  previousMediaState = createInitialMediaRuntimeState(),
   previousPixiStage,
+  previousUiState = createInitialUiRuntimeState(),
   profile = "vn2d",
   routeTable = defaultVnOutputRouteTable
 }: VnRuntimePresentationTransactionInput): VnRuntimePresentationTransaction {
@@ -63,12 +85,25 @@ export function createVnRuntimePresentationTransaction({
   const gameplayEvents = selectRuntimeCommandsForTarget(runtimeCommands, "gameplay", routeTable, routeContext)
     .map(runtimeCommandToGameplayEvent)
     .filter((event): event is GameplayEvent => event !== undefined);
+  const mediaReduction = reduceMediaRuntimeCommands(
+    previousMediaState,
+    selectRuntimeCommandsForTarget(runtimeCommands, "media", routeTable, routeContext).filter((command) => !hasUnresolvedExpression(command))
+  );
+  const uiReduction = reduceUiRuntimeCommands(
+    previousUiState,
+    selectRuntimeCommandsForTarget(runtimeCommands, "ui", routeTable, routeContext).filter((command) => !hasUnresolvedExpression(command))
+  );
 
   return {
     pixiStage: pixiReduction.snapshot,
     pixiHints: pixiReduction.hints,
     pixiWaitTasks: pixiReduction.waitTasks,
     gameplayEvents,
+    mediaState: mediaReduction.state,
+    mediaEffects: mediaReduction.effects,
+    mediaDiagnostics: mediaReduction.diagnostics,
+    uiState: uiReduction.state,
+    uiDiagnostics: uiReduction.diagnostics,
     diagnostics: [...diagnostics, ...pixiReduction.diagnostics]
   };
 }

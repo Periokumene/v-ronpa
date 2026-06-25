@@ -14,13 +14,18 @@ export type ChoiceRuntimeOption = StoryChoiceOption;
 
 export type StoryRuntimeState = StoryRuntimeSnapshot;
 
-export type StoryStopReason = "text" | "choices" | "ended" | "presentation-wait" | "max-steps";
+export type StoryStopReason = "text" | "choices" | "ended" | "presentation-wait" | "runtime-wait" | "max-steps";
 
 export type StoryStepperDiagnosticCode =
   | "invalid-choice"
   | "story-ended-noop"
   | "pending-choices"
   | "presentation-wait"
+  | "runtime-wait"
+  | "invalid-runtime-wait-completion"
+  | "input-validation"
+  | "invalid-goto"
+  | "unsupported-command-param"
   | "max-steps"
   | "command-not-implemented"
   | "expression-unresolved";
@@ -50,6 +55,8 @@ export interface CurrentStoryLine {
 export type StoryEvent =
   | { type: "STEP"; script: RuntimeScript }
   | { type: "PRESENTATION_COMPLETE"; script: RuntimeScript }
+  | { type: "RUNTIME_WAIT_COMPLETE"; script: RuntimeScript; kind: "pause" | "movie" }
+  | { type: "SUBMIT_INPUT"; script: RuntimeScript; value: string | number | boolean }
   | { type: "CHOOSE"; script: RuntimeScript; index: number }
   | { type: "JUMP"; script: RuntimeScript; label: string }
   | { type: "PATCH_VARIABLE"; key: string; value: string | number | boolean };
@@ -71,7 +78,20 @@ interface RuntimeCommandResolution {
 }
 
 const DEFAULT_ADVANCE_MAX_STEPS = 100;
-const CONTROL_COMMAND_IDS = new Set(["choice", "end", "goto", "set"]);
+const CONTROL_COMMAND_IDS = new Set([
+  "append",
+  "choice",
+  "clearbacklog",
+  "clearchoice",
+  "end",
+  "format",
+  "goto",
+  "input",
+  "resettext",
+  "set",
+  "showprinter",
+  "wait"
+]);
 
 export function createInitialStoryState(script: Pick<RuntimeScript, "scriptPath">): StoryRuntimeState {
   return {
@@ -92,6 +112,8 @@ export function storyRuntimeSnapshot(state: StoryRuntimeState): StoryRuntimeSnap
     backlog: [...state.backlog],
     pendingChoices: [...state.pendingChoices],
     ...(state.presentationWait ? { presentationWait: state.presentationWait } : {}),
+    ...(state.runtimeWait ? { runtimeWait: state.runtimeWait } : {}),
+    ...(state.text ? { text: cloneTextState(state.text) } : {}),
     ended: state.ended
   };
 }
@@ -118,6 +140,17 @@ export function advanceToNextStop(
         createDiagnostic("presentation-wait", "Story is waiting for a presentation command to complete; advance did not change state.")
       ],
       stopReason: "presentation-wait"
+    };
+  }
+
+  if (state.runtimeWait) {
+    return {
+      state,
+      emittedRuntimeCommands: [],
+      diagnostics: [
+        createDiagnostic("runtime-wait", "Story is waiting for a runtime command to complete; advance did not change state.")
+      ],
+      stopReason: "runtime-wait"
     };
   }
 
@@ -156,13 +189,17 @@ export function advanceToNextStop(
       return { state: nextState, diagnostics, emittedRuntimeCommands, stopReason: "presentation-wait" };
     }
 
+    if (nextState.runtimeWait) {
+      return { state: nextState, diagnostics, emittedRuntimeCommands, stopReason: "runtime-wait" };
+    }
+
     if (command.commandId === "print" || nextState.ended) {
       return { state: nextState, diagnostics, emittedRuntimeCommands, stopReason: nextState.ended ? "ended" : "text" };
     }
 
     if (nextState.pendingChoices.length > 0) {
       const nextCommand = script.commands[nextState.instructionPointer];
-      if (nextCommand?.category === "choice") continue;
+      if (nextCommand?.category === "choice" || nextCommand?.commandId === "clearchoice") continue;
       return { state: nextState, diagnostics, emittedRuntimeCommands, stopReason: "choices" };
     }
   }
@@ -190,6 +227,17 @@ export function chooseStoryOption(state: StoryRuntimeState, script: RuntimeScrip
     };
   }
 
+  if (state.runtimeWait) {
+    return {
+      state,
+      emittedRuntimeCommands: [],
+      diagnostics: [
+        createDiagnostic("runtime-wait", "Story is waiting for a runtime command to complete; choice did not change state.")
+      ],
+      stopReason: "runtime-wait"
+    };
+  }
+
   const choice = Number.isInteger(index) ? state.pendingChoices[index] : undefined;
   if (!choice) {
     return {
@@ -198,17 +246,25 @@ export function chooseStoryOption(state: StoryRuntimeState, script: RuntimeScrip
       diagnostics: [createDiagnostic("invalid-choice", `Choice index ${index} is not available.`)]
     };
   }
+  if (choice.enabled === false) {
+    return {
+      state,
+      emittedRuntimeCommands: [],
+      diagnostics: [createDiagnostic("invalid-choice", `Choice index ${index} is disabled.`)]
+    };
+  }
 
   const cleared = { ...state, pendingChoices: [] };
+  const withChoiceSet = choice.setExpression ? applySetExpression(cleared, choice.setExpression) : cleared;
   return {
-    state: choice.goto ? jumpToLabel(cleared, script, choice.goto) : cleared,
+    state: choice.goto ? jumpToLabel(withChoiceSet, script, choice.goto) : withChoiceSet,
     diagnostics: [],
     emittedRuntimeCommands: []
   };
 }
 
 export function selectCurrentStoryLine(state: StoryRuntimeState): CurrentStoryLine | undefined {
-  const latest = state.backlog.at(-1);
+  const latest = state.text?.current ?? state.backlog.at(-1);
   if (!latest) return undefined;
   return latest.speaker ? { speaker: latest.speaker, text: latest.text } : { text: latest.text };
 }
@@ -217,6 +273,55 @@ export function storyReducer(state: StoryRuntimeState, event: StoryEvent): Story
   if (event.type === "PRESENTATION_COMPLETE") {
     return {
       state: state.presentationWait ? { ...state, presentationWait: undefined } : state,
+      diagnostics: [],
+      emittedRuntimeCommands: []
+    };
+  }
+
+  if (event.type === "RUNTIME_WAIT_COMPLETE") {
+    if (!state.runtimeWait || state.runtimeWait.kind !== event.kind) {
+      return {
+        state,
+        diagnostics: [
+          createDiagnostic(
+            "invalid-runtime-wait-completion",
+            `Runtime wait completion ${event.kind} does not match the active wait.`
+          )
+        ],
+        emittedRuntimeCommands: []
+      };
+    }
+    return {
+      state: { ...state, runtimeWait: undefined },
+      diagnostics: [],
+      emittedRuntimeCommands: []
+    };
+  }
+
+  if (event.type === "SUBMIT_INPUT") {
+    if (!state.runtimeWait || state.runtimeWait.kind !== "input") {
+      return {
+        state,
+        diagnostics: [
+          createDiagnostic("invalid-runtime-wait-completion", "Input submission does not match an active input wait.")
+        ],
+        emittedRuntimeCommands: []
+      };
+    }
+    const coerced = coerceInputValue(event.value, state.runtimeWait.valueType);
+    if (coerced.diagnostic) {
+      return {
+        state,
+        diagnostics: [coerced.diagnostic],
+        emittedRuntimeCommands: []
+      };
+    }
+    return {
+      state: {
+        ...state,
+        runtimeWait: undefined,
+        variables: { ...state.variables, [state.runtimeWait.variableName]: coerced.value ?? "" }
+      },
       diagnostics: [],
       emittedRuntimeCommands: []
     };
@@ -261,7 +366,19 @@ export function storyReducer(state: StoryRuntimeState, event: StoryEvent): Story
     };
   }
 
-  if (state.pendingChoices.length > 0) {
+  if (state.runtimeWait) {
+    return {
+      state,
+      emittedRuntimeCommands: [],
+      diagnostics: [
+        createDiagnostic("runtime-wait", "Story is waiting for a runtime command to complete; advance did not change state.")
+      ],
+      stopReason: "runtime-wait"
+    };
+  }
+
+  const command = event.script.commands[state.instructionPointer];
+  if (state.pendingChoices.length > 0 && command?.category !== "choice" && command?.commandId !== "clearchoice") {
     return {
       state,
       emittedRuntimeCommands: [],
@@ -270,7 +387,6 @@ export function storyReducer(state: StoryRuntimeState, event: StoryEvent): Story
     };
   }
 
-  const command = event.script.commands[state.instructionPointer];
   if (!command) return { state: { ...state, ended: true }, diagnostics: [], emittedRuntimeCommands: [] };
 
   return executeCommandAtPointer(state, event.script, command);
@@ -324,14 +440,32 @@ function executeCommand(
   switch (command.commandId) {
     case "print":
       return { state: executePrint(advancedState, resolved.command), diagnostics: [], emittedRuntimeCommands: [resolved.command] };
+    case "append":
+      return { state: executeAppend(advancedState, resolved.command), diagnostics: [], emittedRuntimeCommands: [] };
+    case "resettext":
+      return { state: executeResetText(advancedState), diagnostics: [], emittedRuntimeCommands: [] };
+    case "clearbacklog":
+      return { state: { ...advancedState, backlog: [] }, diagnostics: [], emittedRuntimeCommands: [] };
+    case "format":
+      return { state: executeFormat(advancedState, resolved.command), diagnostics: [], emittedRuntimeCommands: [] };
+    case "showprinter":
+      return { state: executeShowPrinter(advancedState, resolved.command), diagnostics: [], emittedRuntimeCommands: [] };
+    case "wait":
+      return executeWait(advancedState, state.instructionPointer, resolved.command);
+    case "input":
+      return executeInput(advancedState, state.instructionPointer, resolved.command);
     case "choice":
       return { state: executeChoice(advancedState, resolved.command), diagnostics: [], emittedRuntimeCommands: [] };
+    case "clearchoice":
+      return executeClearChoice(advancedState, resolved.command);
     case "goto":
-      return { state: jumpToLabel(advancedState, script, stringParam(resolved.command, "label") ?? ""), diagnostics: [], emittedRuntimeCommands: [] };
+      return executeGoto(advancedState, script, resolved.command);
     case "set":
       return { state: executeSet(advancedState, resolved.command), diagnostics: [], emittedRuntimeCommands: [] };
     case "end":
       return { state: { ...advancedState, ended: true }, diagnostics: [], emittedRuntimeCommands: [] };
+    case "movie":
+      return executeMovie(advancedState, state.instructionPointer, resolved.command);
     default:
       if (!CONTROL_COMMAND_IDS.has(command.commandId) && shouldWaitForPresentation(resolved.command)) {
         return {
@@ -427,19 +561,159 @@ function resolveRuntimeValue(
 function executePrint(state: StoryRuntimeState, command: RuntimeCommand): StoryRuntimeState {
   const text = stringParam(command, "text") ?? "";
   const speaker = stringParam(command, "speaker");
+  const printerId = stringParam(command, "printerId") ?? state.text?.printerId ?? "default";
   const backlogEntry: BacklogEntry = speaker ? { speaker, text } : { text };
 
   return {
     ...state,
+    text: {
+      printerId,
+      visible: true,
+      current: speaker ? { speaker, text } : { text },
+      formats: { ...(state.text?.formats ?? {}) }
+    },
     backlog: [...state.backlog, backlogEntry]
+  };
+}
+
+function executeAppend(state: StoryRuntimeState, command: RuntimeCommand): StoryRuntimeState {
+  const text = stringParam(command, "text") ?? "";
+  const current = state.text?.current;
+  const speaker = current?.speaker ?? stringParam(command, "speaker");
+  return {
+    ...state,
+    text: {
+      printerId: stringParam(command, "printerId") ?? state.text?.printerId ?? "default",
+      visible: state.text?.visible ?? true,
+      current: speaker ? { speaker, text: `${current?.text ?? ""}${text}` } : { text: `${current?.text ?? ""}${text}` },
+      formats: { ...(state.text?.formats ?? {}) }
+    }
+  };
+}
+
+function executeResetText(state: StoryRuntimeState): StoryRuntimeState {
+  return {
+    ...state,
+    text: {
+      printerId: state.text?.printerId ?? "default",
+      visible: state.text?.visible ?? true,
+      formats: { ...(state.text?.formats ?? {}) }
+    }
+  };
+}
+
+function executeFormat(state: StoryRuntimeState, command: RuntimeCommand): StoryRuntimeState {
+  const formats = { ...(state.text?.formats ?? {}) };
+  const templates = command.params.templates;
+  for (const [key, value] of formatTemplatesFromValue(templates)) formats[key] = value;
+  return {
+    ...state,
+    text: {
+      printerId: stringParam(command, "printerId") ?? state.text?.printerId ?? "default",
+      visible: state.text?.visible ?? true,
+      ...(state.text?.current ? { current: { ...state.text.current } } : {}),
+      formats
+    }
+  };
+}
+
+function executeShowPrinter(state: StoryRuntimeState, command: RuntimeCommand): StoryRuntimeState {
+  return {
+    ...state,
+    text: {
+      printerId: stringParam(command, "printerId") ?? state.text?.printerId ?? "default",
+      visible: true,
+      ...(state.text?.current ? { current: { ...state.text.current } } : {}),
+      formats: { ...(state.text?.formats ?? {}) }
+    }
+  };
+}
+
+function executeWait(state: StoryRuntimeState, commandIndex: number, command: RuntimeCommand): RuntimeCommandExecutionResult {
+  const waitMode = parseWaitMode(stringParam(command, "waitMode") ?? "i");
+  if (waitMode.diagnostic) {
+    return { state, diagnostics: [waitMode.diagnostic], emittedRuntimeCommands: [] };
+  }
+  return {
+    state: {
+      ...state,
+      runtimeWait: {
+        kind: "pause",
+        commandId: "wait",
+        commandIndex,
+        mode: waitMode.mode,
+        ...(waitMode.durationMs !== undefined ? { durationMs: waitMode.durationMs } : {})
+      }
+    },
+    diagnostics: [],
+    emittedRuntimeCommands: []
+  };
+}
+
+function executeInput(state: StoryRuntimeState, commandIndex: number, command: RuntimeCommand): RuntimeCommandExecutionResult {
+  const variableName = stringParam(command, "variableName");
+  const valueType = stringParam(command, "valueType") ?? "string";
+  if (!variableName) {
+    return {
+      state,
+      diagnostics: [createDiagnostic("unsupported-command-param", "@input requires a variable name.", "warning")],
+      emittedRuntimeCommands: []
+    };
+  }
+  if (valueType !== "string" && valueType !== "number" && valueType !== "boolean") {
+    return {
+      state,
+      diagnostics: [createDiagnostic("unsupported-command-param", `@input type ${valueType} is unsupported.`, "warning")],
+      emittedRuntimeCommands: []
+    };
+  }
+  const defaultValue = scalarParam(command, "defaultValue");
+  return {
+    state: {
+      ...state,
+      runtimeWait: {
+        kind: "input",
+        commandId: "input",
+        commandIndex,
+        variableName,
+        valueType,
+        ...(stringParam(command, "summary") ? { summary: stringParam(command, "summary") } : {}),
+        ...(defaultValue !== undefined ? { defaultValue } : {})
+      }
+    },
+    diagnostics: [],
+    emittedRuntimeCommands: []
   };
 }
 
 function executeChoice(state: StoryRuntimeState, command: RuntimeCommand): StoryRuntimeState {
   const text = stringParam(command, "text") ?? "Choice";
   const goto = stringParam(command, "goto");
-  const choice = goto ? { text, goto } : { text };
+  const id = stringParam(command, "id");
+  const enabled = booleanParam(command, "enabled") ?? true;
+  const setExpression = stringParam(command, "setExpression");
+  const choice: StoryChoiceOption = {
+    text,
+    enabled,
+    ...(goto ? { goto } : {}),
+    ...(id ? { id } : {}),
+    ...(setExpression ? { setExpression } : {})
+  };
   return { ...state, pendingChoices: [...state.pendingChoices, choice] };
+}
+
+function executeClearChoice(state: StoryRuntimeState, command: RuntimeCommand): RuntimeCommandExecutionResult {
+  const id = stringParam(command, "id");
+  if (!id) return { state: { ...state, pendingChoices: [] }, diagnostics: [], emittedRuntimeCommands: [] };
+  const nextChoices = state.pendingChoices.filter((choice) => choice.id !== id);
+  if (nextChoices.length === state.pendingChoices.length) {
+    return {
+      state,
+      diagnostics: [createDiagnostic("invalid-choice", `Choice id ${id} is not available.`)],
+      emittedRuntimeCommands: []
+    };
+  }
+  return { state: { ...state, pendingChoices: nextChoices }, diagnostics: [], emittedRuntimeCommands: [] };
 }
 
 function executeSet(state: StoryRuntimeState, command: RuntimeCommand): StoryRuntimeState {
@@ -448,10 +722,73 @@ function executeSet(state: StoryRuntimeState, command: RuntimeCommand): StoryRun
   return { ...state, variables: { ...state.variables, [key]: value ?? true } };
 }
 
+function executeGoto(state: StoryRuntimeState, script: RuntimeScript, command: RuntimeCommand): RuntimeCommandExecutionResult {
+  const label = stringParam(command, "label")?.trim() ?? "";
+  if (!label) {
+    return {
+      state,
+      diagnostics: [createDiagnostic("invalid-goto", "@goto requires a local label target.", "warning")],
+      emittedRuntimeCommands: []
+    };
+  }
+  if (isUnsupportedGotoTarget(label)) {
+    return {
+      state,
+      diagnostics: [
+        createDiagnostic(
+          "unsupported-command-param",
+          `@goto target ${label} is outside this task's local-label boundary; cross-script goto is not implemented.`,
+          "warning"
+        )
+      ],
+      emittedRuntimeCommands: []
+    };
+  }
+  const normalized = normalizeLocalLabel(label);
+  if (script.labels[normalized] === undefined) {
+    return {
+      state,
+      diagnostics: [createDiagnostic("invalid-goto", `@goto target #${normalized} does not exist in ${script.scriptPath}.`, "warning")],
+      emittedRuntimeCommands: []
+    };
+  }
+  return { state: jumpToLabel(state, script, label), diagnostics: [], emittedRuntimeCommands: [] };
+}
+
+function executeMovie(state: StoryRuntimeState, commandIndex: number, command: RuntimeCommand): RuntimeCommandExecutionResult {
+  if (booleanParam(command, "block") !== true) {
+    return { state, diagnostics: [], emittedRuntimeCommands: [command] };
+  }
+  const moviePath = stringParam(command, "moviePath") ?? "";
+  return {
+    state: {
+      ...state,
+      runtimeWait: {
+        kind: "movie",
+        commandId: "movie",
+        commandIndex,
+        moviePath,
+        allowSkip: true
+      }
+    },
+    diagnostics: [],
+    emittedRuntimeCommands: [command]
+  };
+}
+
 function jumpToLabel(state: StoryRuntimeState, script: RuntimeScript, label: string): StoryRuntimeState {
-  const normalized = label.startsWith("#") ? label.slice(1) : label;
+  const normalized = normalizeLocalLabel(label);
   const pointer = script.labels[normalized];
   return pointer === undefined ? state : { ...state, instructionPointer: pointer };
+}
+
+function normalizeLocalLabel(label: string): string {
+  return label.startsWith("#") ? label.slice(1) : label;
+}
+
+function isUnsupportedGotoTarget(label: string): boolean {
+  if (label.startsWith("#")) return false;
+  return label.includes("#") || label.includes("/") || label.includes("\\") || label.includes(".") || label.includes(":");
 }
 
 function stringParam(command: RuntimeCommand, key: string): string | undefined {
@@ -464,6 +801,11 @@ function numberParam(command: RuntimeCommand, key: string, fallback: number): nu
   return typeof value === "number" ? value : fallback;
 }
 
+function booleanParam(command: RuntimeCommand, key: string): boolean | undefined {
+  const value = scalarParam(command, key);
+  return typeof value === "boolean" ? value : undefined;
+}
+
 function scalarParam(command: RuntimeCommand, key: string): string | number | boolean | undefined {
   const value = command.params[key];
   if (value === undefined) return undefined;
@@ -473,6 +815,81 @@ function scalarParam(command: RuntimeCommand, key: string): string | number | bo
     return items.some((item) => item === undefined) ? undefined : items.map(String).join(",");
   }
   return undefined;
+}
+
+function cloneTextState(text: NonNullable<StoryRuntimeState["text"]>): NonNullable<StoryRuntimeState["text"]> {
+  return {
+    printerId: text.printerId,
+    visible: text.visible,
+    ...(text.current ? { current: { ...text.current } } : {}),
+    formats: { ...text.formats }
+  };
+}
+
+function parseWaitMode(value: string): { mode: "timer" | "confirm" | "timer-or-confirm"; durationMs?: number; diagnostic?: StoryStepperDiagnostic } {
+  const trimmed = value.trim();
+  if (trimmed === "i") return { mode: "confirm" };
+  if (/^i\d+(\.\d+)?$/u.test(trimmed)) {
+    return { mode: "timer-or-confirm", durationMs: secondsToMs(Number(trimmed.slice(1))) };
+  }
+  if (/^\d+(\.\d+)?$/u.test(trimmed)) return { mode: "timer", durationMs: secondsToMs(Number(trimmed)) };
+  return {
+    mode: "confirm",
+    diagnostic: createDiagnostic("unsupported-command-param", `@wait mode ${value} is unsupported.`, "warning")
+  };
+}
+
+function secondsToMs(seconds: number): number {
+  return Math.max(0, Math.round(seconds * 1000));
+}
+
+function coerceInputValue(
+  value: string | number | boolean,
+  valueType: "string" | "number" | "boolean"
+): { value?: string | number | boolean; diagnostic?: StoryStepperDiagnostic } {
+  if (valueType === "string") return { value: String(value) };
+  if (valueType === "number") {
+    if (typeof value === "number" && Number.isFinite(value)) return { value };
+    if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) return { value: Number(value) };
+    return { diagnostic: createDiagnostic("input-validation", `Input value ${String(value)} is not a valid number.`, "warning") };
+  }
+  if (typeof value === "boolean") return { value };
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return { value: true };
+    if (normalized === "false") return { value: false };
+  }
+  return { diagnostic: createDiagnostic("input-validation", `Input value ${String(value)} is not a valid boolean.`, "warning") };
+}
+
+function formatTemplatesFromValue(value: RuntimeValue | undefined): Array<[string, string]> {
+  if (value === undefined) return [];
+  if (Array.isArray(value)) return value.flatMap(formatTemplatesFromValue);
+  if (typeof value !== "string") return [];
+  const colon = value.indexOf(":");
+  const dot = value.indexOf(".");
+  const splitAt = colon >= 0 ? colon : dot;
+  if (splitAt < 0) return [[value, value]];
+  return [[value.slice(0, splitAt), value.slice(splitAt + 1)]];
+}
+
+function applySetExpression(state: StoryRuntimeState, expression: string): StoryRuntimeState {
+  const match = expression.match(/^\s*([a-zA-Z0-9:_./-]+)\s*(?::|=)\s*(.+?)\s*$/u);
+  if (!match) return state;
+  const [, key, rawValue] = match;
+  if (!key || rawValue === undefined) return state;
+  return { ...state, variables: { ...state.variables, [key]: parseSetExpressionValue(rawValue) } };
+}
+
+function parseSetExpressionValue(raw: string): StoryScalar {
+  const trimmed = raw.trim();
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
+  }
+  if (trimmed === "true") return true;
+  if (trimmed === "false") return false;
+  if (trimmed !== "" && Number.isFinite(Number(trimmed))) return Number(trimmed);
+  return trimmed;
 }
 
 function runtimeValueScalar(value: RuntimeValue): string | number | boolean | undefined {

@@ -1,4 +1,4 @@
-import type { EvidenceDef, ItemDef, TrialDefinition, WorldMapDef } from "@v-ronpa/contracts";
+import type { EvidenceDef, ItemDef, RuntimeAsset, TrialDefinition, WorldMapDef } from "@v-ronpa/contracts";
 
 export const verticalSliceItem: ItemDef = {
   id: "tool:notebook",
@@ -21,6 +21,89 @@ export const verticalSliceEvidence: EvidenceDef = {
   },
   tags: ["harness", "vertical-slice"]
 };
+
+export const verticalSliceRuntimeAssets: RuntimeAsset[] = [
+  {
+    id: "bgm:validation-main",
+    kind: "bgm",
+    optimizedUri: "/harness/media/bgm/bgm-validation-main.ogg",
+    format: "ogg",
+    compression: [],
+    lods: [],
+    collisionProxyIds: [],
+    tags: ["harness", "non-pixi-command-baseline"]
+  },
+  {
+    id: "bgm:validation-alt",
+    kind: "bgm",
+    optimizedUri: "/harness/media/bgm/bgm-validation-alt.ogg",
+    format: "ogg",
+    compression: [],
+    lods: [],
+    collisionProxyIds: [],
+    tags: ["harness", "non-pixi-command-baseline"]
+  },
+  {
+    id: "bgm:validation-layer",
+    kind: "bgm",
+    optimizedUri: "/harness/media/bgm/bgm-validation-layer.ogg",
+    format: "ogg",
+    compression: [],
+    lods: [],
+    collisionProxyIds: [],
+    tags: ["harness", "non-pixi-command-baseline"]
+  },
+  {
+    id: "bgm:validation-extra",
+    kind: "bgm",
+    optimizedUri: "/harness/media/bgm/bgm-validation-extra.ogg",
+    format: "ogg",
+    compression: [],
+    lods: [],
+    collisionProxyIds: [],
+    tags: ["harness", "non-pixi-command-baseline"]
+  },
+  {
+    id: "sfx:rain-inside-car-loop",
+    kind: "sfx",
+    optimizedUri: "/harness/media/sfx/rain-inside-car-loop.ogg",
+    format: "ogg",
+    compression: [],
+    lods: [],
+    collisionProxyIds: [],
+    tags: ["harness", "non-pixi-command-baseline"]
+  },
+  {
+    id: "sfx:knock-door",
+    kind: "sfx",
+    optimizedUri: "/harness/media/sfx/knock-door.ogg",
+    format: "ogg",
+    compression: [],
+    lods: [],
+    collisionProxyIds: [],
+    tags: ["harness", "non-pixi-command-baseline"]
+  },
+  {
+    id: "sfx:shock-fadeout",
+    kind: "sfx",
+    optimizedUri: "/harness/media/sfx/shock-fadeout.ogg",
+    format: "ogg",
+    compression: [],
+    lods: [],
+    collisionProxyIds: [],
+    tags: ["harness", "non-pixi-command-baseline"]
+  },
+  {
+    id: "video:validation-intro",
+    kind: "video",
+    optimizedUri: "/harness/media/video/movie-validation-intro.mp4",
+    format: "mp4",
+    compression: [],
+    lods: [],
+    collisionProxyIds: [],
+    tags: ["harness", "non-pixi-command-baseline"]
+  }
+];
 
 export const verticalSliceTrial: TrialDefinition = {
   id: "trial:door-lock",
@@ -160,13 +243,51 @@ export const verticalSliceScript = `#Start
 @back bg:harness effect:fade time:0.15
 @char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
 Narrator: CHECKPOINT 00 - baseline。视觉小说联调剧本：这是测试入口，不是剧情样例。请先确认背景和 Felix 中央立绘可见。[>]
-Narrator: 请选择测试路径。分支 1 快速结束，只验证 StoryEngine 的 choice、goto、set、end；分支 2 是完整 Pixi 命令视觉验收。
-@choice "分支1：快速结束剧情逻辑测试" goto:#LogicFastExit
+Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command showcase；分支 2 保持完整 Pixi 命令视觉验收。
+@choice "临时选项：应被 clearChoice 清除" id:temp-clear goto:#TemporaryChoiceShouldNotAppear
+@clearChoice temp-clear
+@choice "分支1：主交互流程验证入口" goto:#MainInteractionFlow
 @choice "分支2：完整 Pixi 命令视觉验收" goto:#PixiCommandShowcase
 
-#LogicFastExit
+#MainInteractionFlow
 @set route:"return"
-Narrator: CHECKPOINT LOGIC 01 - fast exit。route 应切换为 return，选择跳转成功；下一步直接结束覆盖层，不进入 Pixi showcase。
+@clearBacklog
+@showPrinter default
+@format checkpoint:"accent"
+@hideUI dialog
+@hideUI commandBar
+@toast "CHECKPOINT MAIN 01A - hideUI。VN dialog 与 command bar 应隐藏；右上 toast 应出现；调试侧栏应保持可见。"
+@print "CHECKPOINT MAIN 01A - hideUI + explicit print。VN dialog 与 command bar 应隐藏；调试侧栏不属于 showUI/hideUI 控制面。" author:Narrator
+@showUI dialog
+@showUI commandBar visible:true
+@print "CHECKPOINT MAIN 01B - showUI。VN dialog 与 command bar 应恢复；下一步验证 append + wait + input。" author:Narrator
+@append " 附加文本验证：append 应更新当前行，但不新增 backlog。"
+@wait i
+@input playerName type:string summary:"输入任意代号后继续" value:Felix
+Narrator: CHECKPOINT MAIN 02 - input。输入已提交；右侧 Runtime variables 应包含 playerName。
+@bgm bgm:validation-main group:music volume:0.45 fade:0.2
+@sfx sfx:rain-inside-car-loop group:rain loop:true volume:0.35
+@sfx sfx:knock-door volume:0.9
+Narrator: CHECKPOINT MAIN 03 - audio layer。应听到 music 组 BGM、rain 组 loop SFX，并播放一次敲门 SFX。
+@bgm bgm:validation-alt group:music volume:0.45 fade:0.5
+@bgm bgm:validation-layer group:ambient volume:0.25 fade:0.1
+@sfxFast sfx:shock-fadeout volume:0.75
+Narrator: CHECKPOINT MAIN 04 - grouped BGM。music 组 BGM 应被替换，ambient 组同时存在；sfxFast 播放一次。
+@movie video:validation-intro block:true
+Narrator: CHECKPOINT MAIN 05 - movie complete。阻塞 movie 已结束或跳过；脚本恢复推进。
+@stopSfx group:rain fade:0.2
+@stopBgm group:music fade:0.5
+@stopBgm group:ambient fade:0.2
+@resetText
+@print "CHECKPOINT MAIN 06 - explicit print cleanup。loop SFX 和两个 BGM group 已停止；下一步将通过 @goto 跳到完成标签。" author:Narrator
+@goto #MainInteractionComplete
+Narrator: CHECKPOINT MAIN unreachable。若看到这句，说明 @goto 未按本地 label 生效。
+
+#TemporaryChoiceShouldNotAppear
+Narrator: CHECKPOINT MAIN unreachable temp choice。若看到这句，说明 @clearChoice 未清除临时选项。
+
+#MainInteractionComplete
+Narrator: CHECKPOINT MAIN 07 - goto complete。显式 @goto 已跳到完成标签；完整 non-Pixi showcase 完成。
 @end
 
 #PixiCommandShowcase
