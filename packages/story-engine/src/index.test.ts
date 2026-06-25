@@ -234,6 +234,7 @@ describe("story engine", () => {
       "clearchoice",
       "format",
       "glitch",
+      "glitchfilter",
       "goto",
       "hidechars",
       "hideui",

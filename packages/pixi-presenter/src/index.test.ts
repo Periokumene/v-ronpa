@@ -340,6 +340,73 @@ describe("pixi presenter port", () => {
     );
     expect(flash.waitTasks).toEqual([{ kind: "flash", target: "screen", revision: withActor.snapshot.revision }]);
 
+    const glitch = reducePixiRuntimeCommand(
+      withActor.snapshot,
+      runtimeCommand("glitch", "effect", {
+        power: 0.8,
+        durationMs: 240,
+        blockJump: 1.2,
+        burstJump: 0.7,
+        pixelScatter: 1.4,
+        colorNoise: 0.6,
+        speed: 1.25,
+        seed: 21,
+        wait: true
+      })
+    );
+    expect(glitch.hints).toEqual([
+      {
+        type: "glitch",
+        power: 0.8,
+        durationMs: 240,
+        blockJump: 1.2,
+        burstJump: 0.7,
+        pixelScatter: 1.4,
+        colorNoise: 0.6,
+        speed: 1.25,
+        seed: 21,
+        wait: true
+      }
+    ]);
+    expect(glitch.snapshot).toBe(withActor.snapshot);
+    expect(glitch.waitTasks).toEqual([{ kind: "glitch", target: "screen", revision: withActor.snapshot.revision }]);
+
+    const glitchFilter = reducePixiRuntimeCommand(
+      withActor.snapshot,
+      runtimeCommand("glitchfilter", "effect", {
+        power: 0.45,
+        durationMs: 300,
+        easing: "linear",
+        blockJump: 0.5,
+        burstJump: 0.25,
+        pixelScatter: 0.75,
+        colorNoise: 0.35,
+        speed: 0.8,
+        seed: 12,
+        wait: true
+      })
+    );
+    expect(glitchFilter.snapshot.screenFilters.glitch).toMatchObject({
+      power: 0.45,
+      blockJump: 0.5,
+      burstJump: 0.25,
+      pixelScatter: 0.75,
+      colorNoise: 0.35,
+      speed: 0.8,
+      seed: 12,
+      transition: { durationMs: 300, easing: "linear", lazy: false, wait: true }
+    });
+    expect(glitchFilter.hints).toEqual([]);
+    expect(glitchFilter.waitTasks).toEqual([{ kind: "screen-filter-transition", target: "glitch", revision: glitchFilter.snapshot.revision }]);
+
+    const glitchFilterOff = reducePixiRuntimeCommand(
+      glitchFilter.snapshot,
+      runtimeCommand("glitchfilter", "effect", { power: 0, durationMs: 200, easing: "linear", wait: true })
+    );
+    expect(glitchFilterOff.snapshot.screenFilters).not.toHaveProperty("glitch");
+    expect(glitchFilterOff.hints).toEqual([{ type: "screen-filter-remove", kind: "glitch", durationMs: 200, easing: "linear", wait: true }]);
+    expect(glitchFilterOff.waitTasks).toEqual([{ kind: "screen-filter-transition", target: "glitch", revision: glitchFilterOff.snapshot.revision }]);
+
     const rain = reducePixiRuntimeCommand(
       withActor.snapshot,
       runtimeCommand("rain", "effect", { power: 0.6, durationMs: 300, wait: true })
@@ -393,17 +460,65 @@ describe("pixi presenter port", () => {
     ).snapshot;
     stage = reducePixiRuntimeCommand(stage, runtimeCommand("blur", "effect", { target: "MainBackground", power: 0.4 })).snapshot;
     stage = reducePixiRuntimeCommand(stage, runtimeCommand("bokeh", "effect", { focus: "MainBackground", power: 0.5 })).snapshot;
+    stage = reducePixiRuntimeCommand(stage, runtimeCommand("glitchfilter", "effect", { power: 0.35 })).snapshot;
     stage = reducePixiRuntimeCommand(stage, runtimeCommand("rain", "effect", { power: 0.6 })).snapshot;
 
     const noBlur = reducePixiRuntimeCommand(stage, runtimeCommand("blur", "effect", { target: "MainBackground", power: 0 })).snapshot;
     const noBokeh = reducePixiRuntimeCommand(noBlur, runtimeCommand("bokeh", "effect", { power: 0 })).snapshot;
-    const noRain = reducePixiRuntimeCommand(noBokeh, runtimeCommand("rain", "effect", { power: 0 })).snapshot;
+    const noGlitch = reducePixiRuntimeCommand(noBokeh, runtimeCommand("glitchfilter", "effect", { power: 0 })).snapshot;
+    const noRain = reducePixiRuntimeCommand(noGlitch, runtimeCommand("rain", "effect", { power: 0 })).snapshot;
 
     const mainBackground = noRain.backgroundsById.MainBackground;
     expect(mainBackground).toBeDefined();
     expect(mainBackground?.filters).not.toHaveProperty("blur");
     expect(noRain.screenFilters).not.toHaveProperty("bokeh");
+    expect(noRain.screenFilters).not.toHaveProperty("glitch");
     expect(noRain.weather).not.toHaveProperty("rain");
+  });
+
+  it("preserves shader snow controls and removes weather kinds independently", () => {
+    let stage = createInitialPixiStageSnapshot();
+    stage = reducePixiRuntimeCommand(stage, runtimeCommand("rain", "effect", { power: 0.7, durationMs: 120 })).snapshot;
+    const withSnow = reducePixiRuntimeCommand(
+      stage,
+      runtimeCommand("snow", "effect", {
+        power: 0.9,
+        xSpeed: -0.35,
+        ySpeed: 0.72,
+        density: 1.45,
+        flakeScale: 1.2,
+        sway: 0.85,
+        fog: 0.32,
+        noise: 0.04,
+        seed: 17,
+        durationMs: 300,
+        wait: true
+      })
+    );
+
+    expect(withSnow.snapshot.weather.rain).toMatchObject({ kind: "rain", power: 0.7 });
+    expect(withSnow.snapshot.weather.snow).toMatchObject({
+      kind: "snow",
+      power: 0.9,
+      xSpeed: -0.35,
+      ySpeed: 0.72,
+      density: 1.45,
+      flakeScale: 1.2,
+      sway: 0.85,
+      fog: 0.32,
+      noise: 0.04,
+      seed: 17
+    });
+    expect(withSnow.waitTasks).toEqual([{ kind: "weather-transition", target: "snow", revision: withSnow.snapshot.revision }]);
+
+    const noSnow = reducePixiRuntimeCommand(
+      withSnow.snapshot,
+      runtimeCommand("snow", "effect", { power: 0, durationMs: 200, wait: true })
+    );
+    expect(noSnow.snapshot.weather).toHaveProperty("rain");
+    expect(noSnow.snapshot.weather).not.toHaveProperty("snow");
+    expect(noSnow.hints).toEqual([{ type: "weather-remove", kind: "snow", durationMs: 200, wait: true }]);
+    expect(noSnow.waitTasks).toEqual([{ kind: "weather-transition", target: "snow", revision: noSnow.snapshot.revision }]);
   });
 });
 

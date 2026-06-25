@@ -3,6 +3,7 @@ import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import {
   ActorSystem,
   FilterSystem,
+  RootFilterStack,
   ScreenOverlaySystem,
   TransientEffectSystem,
   TweenSystem,
@@ -69,11 +70,13 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     width: () => app.renderer.width || options.host.clientWidth || options.width || 960,
     height: () => app.renderer.height || options.host.clientHeight || options.height || 540
   };
-  const filters = new FilterSystem(size);
+  const rootFilters = new RootFilterStack({ root: stageRoot, width: size.width, height: size.height });
+  const filters = new FilterSystem({ root: stageRoot, width: size.width, height: size.height }, rootFilters, tweens, tasks);
 
   const tick = (ticker: Ticker) => {
     tweens.tick(ticker);
     tasks.tick(ticker.deltaMS);
+    filters.tick(ticker);
     weather?.tick(ticker);
   };
 
@@ -104,7 +107,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     actors = new ActorSystem(systemOptions, filters, tweens, tasks);
     weather = new WeatherSystem(systemOptions, filters, tweens, tasks);
     screenOverlays = new ScreenOverlaySystem(systemOptions, tweens, tasks);
-    effects = new TransientEffectSystem(systemOptions, actors, filters, tweens, tasks);
+    effects = new TransientEffectSystem(systemOptions, actors, rootFilters, tweens, tasks);
     app.ticker.add(tick);
     mounted = true;
     if (pendingReconcile) {
@@ -132,7 +135,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     actors?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision);
     weather?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision, reconcileOptions.hints ?? []);
     screenOverlays?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision);
-    filters.applyScreenFilters(stageRoot, snapshot);
+    filters.applyScreenFilters(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision, reconcileOptions.hints ?? []);
     effects?.clearTrialOverlays();
     if (animate) effects?.run(reconcileOptions.hints ?? [], snapshot.revision);
     lastRenderedSnapshot = snapshot;
@@ -142,6 +145,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     pendingReconcile = undefined;
     tasks.cancelAll();
     tweens.clear();
+    filters.clear();
     actors?.clear();
     weather?.clear();
     screenOverlays?.clear();

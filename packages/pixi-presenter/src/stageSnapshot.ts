@@ -10,6 +10,7 @@ import type {
 
 export type PixiStageRenderHint =
   | { type: "flash"; color: string; durationMs: number; wait?: boolean }
+  | { type: "screen-filter-remove"; kind: "glitch"; durationMs: number; easing?: string; wait?: boolean }
   | { type: "weather-remove"; kind: PixiWeatherKind; durationMs: number; easing?: string; wait?: boolean }
   | {
       type: "shake";
@@ -24,7 +25,18 @@ export type PixiStageRenderHint =
       ver?: boolean;
       wait?: boolean;
     }
-  | { type: "glitch"; power: number; durationMs: number; wait?: boolean }
+  | {
+      type: "glitch";
+      power: number;
+      durationMs: number;
+      blockJump?: number;
+      burstJump?: number;
+      pixelScatter?: number;
+      colorNoise?: number;
+      speed?: number;
+      seed?: number;
+      wait?: boolean;
+    }
   | {
       type: "trial-keyword";
       keywordId: string;
@@ -166,19 +178,34 @@ export function reducePixiRuntimeCommand(
         };
       }
     case "glitch":
-      return {
-        snapshot,
-        hints: [
-          {
-            type: "glitch",
-            power: numberParam(command, "power", 1),
-            durationMs: durationMsParam(command, 1000),
-            wait: booleanParam(command, "wait", false)
-          }
-        ],
-        waitTasks: waitTask(command, "glitch", "screen", snapshot.revision),
-        diagnostics: []
-      };
+      {
+        const blockJump = numberParam(command, "blockJump");
+        const burstJump = numberParam(command, "burstJump");
+        const pixelScatter = numberParam(command, "pixelScatter");
+        const colorNoise = numberParam(command, "colorNoise");
+        const speed = numberParam(command, "speed");
+        const seed = numberParam(command, "seed");
+        const hint: Extract<PixiStageRenderHint, { type: "glitch" }> = {
+          type: "glitch",
+          power: numberParam(command, "power", 1),
+          durationMs: durationMsParam(command, 1000),
+          wait: booleanParam(command, "wait", false)
+        };
+        if (blockJump !== undefined) hint.blockJump = blockJump;
+        if (burstJump !== undefined) hint.burstJump = burstJump;
+        if (pixelScatter !== undefined) hint.pixelScatter = pixelScatter;
+        if (colorNoise !== undefined) hint.colorNoise = colorNoise;
+        if (speed !== undefined) hint.speed = speed;
+        if (seed !== undefined) hint.seed = seed;
+        return {
+          snapshot,
+          hints: [hint],
+          waitTasks: waitTask(command, "glitch", "screen", snapshot.revision),
+          diagnostics: []
+        };
+      }
+    case "glitchfilter":
+      return reduceGlitchFilter(snapshot, command);
     case "trialkeyword":
       return reduceTrialKeyword(snapshot, command);
     default:
@@ -400,6 +427,57 @@ function reduceBokeh(snapshot: PixiStageSnapshot, command: RuntimeCommand): Pixi
   }), "screen-filter-transition", ["bokeh"]);
 }
 
+function reduceGlitchFilter(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
+  const power = numberParam(command, "power", 0);
+  if (power <= 0) {
+    const hadGlitch = Boolean(snapshot.screenFilters.glitch);
+    const { glitch: _glitch, ...screenFilters } = snapshot.screenFilters;
+    const reduction = changedSnapshot({ ...snapshot, screenFilters });
+    const durationMs = durationMsParam(command, 0);
+    if (!hadGlitch) return reduction;
+    const easing = stringParam(command, "easing");
+    return {
+      ...withWaitTasks(command, reduction, "screen-filter-transition", ["glitch"]),
+      hints: durationMs > 0
+        ? [
+            {
+              type: "screen-filter-remove",
+              kind: "glitch",
+              durationMs,
+              ...(easing ? { easing } : {}),
+              wait: booleanParam(command, "wait", false)
+            }
+          ]
+        : []
+    };
+  }
+
+  const blockJump = numberParam(command, "blockJump");
+  const burstJump = numberParam(command, "burstJump");
+  const pixelScatter = numberParam(command, "pixelScatter");
+  const colorNoise = numberParam(command, "colorNoise");
+  const speed = numberParam(command, "speed");
+  const seed = numberParam(command, "seed");
+  const glitch: NonNullable<PixiStageSnapshot["screenFilters"]["glitch"]> = {
+    power,
+    transition: timingTransition(command)
+  };
+  if (blockJump !== undefined) glitch.blockJump = blockJump;
+  if (burstJump !== undefined) glitch.burstJump = burstJump;
+  if (pixelScatter !== undefined) glitch.pixelScatter = pixelScatter;
+  if (colorNoise !== undefined) glitch.colorNoise = colorNoise;
+  if (speed !== undefined) glitch.speed = speed;
+  if (seed !== undefined) glitch.seed = seed;
+
+  return withWaitTasks(command, changedSnapshot({
+    ...snapshot,
+    screenFilters: {
+      ...snapshot.screenFilters,
+      glitch
+    }
+  }), "screen-filter-transition", ["glitch"]);
+}
+
 function reduceWeather(snapshot: PixiStageSnapshot, command: RuntimeCommand, kind: PixiWeatherKind): PixiRuntimeCommandReduction {
   const power = numberParam(command, "power", 1);
   if (power <= 0) {
@@ -434,6 +512,16 @@ function reduceWeather(snapshot: PixiStageSnapshot, command: RuntimeCommand, kin
         power,
         xSpeed: numberParam(command, "xSpeed"),
         ySpeed: numberParam(command, "ySpeed"),
+        ...(kind === "snow"
+          ? {
+              density: numberParam(command, "density"),
+              flakeScale: numberParam(command, "flakeScale"),
+              sway: numberParam(command, "sway"),
+              fog: numberParam(command, "fog"),
+              noise: numberParam(command, "noise"),
+              seed: numberParam(command, "seed")
+            }
+          : {}),
         pos: sceneVector2Param(command, "pos"),
         position: vector3Param(command, "position"),
         rotation: vector3Param(command, "rotation"),

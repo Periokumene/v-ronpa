@@ -269,6 +269,7 @@ const officialCommandStatuses: Partial<Record<string, NaniCommandStatus>> = {
   format: "implemented",
   input: "implemented",
   glitch: "implemented",
+  glitchfilter: "implemented",
   goto: "implemented",
   hidechars: "implemented",
   hideui: "implemented",
@@ -300,6 +301,7 @@ const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
   flash: "pixi-presentation",
   focus: "pixi-presentation",
   glitch: "pixi-presentation",
+  glitchfilter: "pixi-presentation",
   hidechars: "pixi-presentation",
   rain: "pixi-presentation",
   shake: "pixi-presentation",
@@ -422,6 +424,49 @@ const particleParams = [
   param("wait", "boolean")
 ];
 
+const snowShaderParams = [
+  param("power", "decimal"),
+  param("time", "decimal"),
+  param("xSpeed", "decimal"),
+  param("ySpeed", "decimal"),
+  param("density", "decimal"),
+  param("flakeScale", "decimal"),
+  param("sway", "decimal"),
+  param("fog", "decimal"),
+  param("noise", "decimal"),
+  param("seed", "decimal"),
+  param("pos", "decimal list"),
+  param("position", "decimal list"),
+  param("rotation", "decimal list"),
+  param("scale", "decimal list"),
+  param("wait", "boolean")
+];
+
+const glitchShaderParams = [
+  param("time", "decimal"),
+  param("power", "decimal"),
+  param("blockJump", "decimal"),
+  param("burstJump", "decimal"),
+  param("pixelScatter", "decimal"),
+  param("colorNoise", "decimal"),
+  param("speed", "decimal"),
+  param("seed", "decimal"),
+  param("wait", "boolean")
+];
+
+const glitchFilterShaderParams = [
+  param("time", "decimal"),
+  param("easing", "string"),
+  param("power", "decimal"),
+  param("blockJump", "decimal"),
+  param("burstJump", "decimal"),
+  param("pixelScatter", "decimal"),
+  param("colorNoise", "decimal"),
+  param("speed", "decimal"),
+  param("seed", "decimal"),
+  param("wait", "boolean")
+];
+
 const audioParams = [
   param("volume", "decimal"),
   param("loop", "boolean"),
@@ -512,7 +557,8 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
   official("enterDialogue", "text"),
   official("exitDialogue", "text", [param("destroy", "boolean")]),
   official("format", "text", [param("templates", "named string list"), param("printer", "string")]),
-  official("glitch", "effect", [param("time", "decimal"), param("power", "decimal"), param("wait", "boolean")]),
+  official("glitch", "effect", glitchShaderParams),
+  official("glitchFilter", "effect", glitchFilterShaderParams),
   official("gosub", "flow", [param("path", "string")]),
   official("goto", "flow", [
     param("path", "string"),
@@ -636,7 +682,7 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
     param("lazy", "boolean"),
     param("wait", "boolean")
   ]),
-  official("snow", "effect", particleParams),
+  official("snow", "effect", snowShaderParams),
   official("spawn", "actor", [
     param("path", "string"),
     param("params", "string list"),
@@ -1053,6 +1099,12 @@ export const PixiWeatherSnapshotSchema = z.object({
   power: z.number().nonnegative().default(0),
   xSpeed: z.number().optional(),
   ySpeed: z.number().optional(),
+  density: z.number().nonnegative().optional(),
+  flakeScale: z.number().nonnegative().optional(),
+  sway: z.number().nonnegative().optional(),
+  fog: z.number().nonnegative().optional(),
+  noise: z.number().nonnegative().optional(),
+  seed: z.number().optional(),
   pos: PixiVector2Schema.optional(),
   position: PixiVector3Schema.optional(),
   rotation: PixiVector3Schema.optional(),
@@ -1074,6 +1126,12 @@ export const PixiScreenFiltersSnapshotSchema = z
     glitch: z
       .object({
         power: z.number().nonnegative().default(0),
+        blockJump: z.number().nonnegative().optional(),
+        burstJump: z.number().nonnegative().optional(),
+        pixelScatter: z.number().nonnegative().optional(),
+        colorNoise: z.number().nonnegative().optional(),
+        speed: z.number().nonnegative().optional(),
+        seed: z.number().optional(),
         transition: PixiActorTransitionSnapshotSchema
       })
       .optional()

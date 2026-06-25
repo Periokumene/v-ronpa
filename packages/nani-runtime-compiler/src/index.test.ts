@@ -42,6 +42,117 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands[1]?.params).not.toHaveProperty("duration");
   });
 
+  it("normalizes shader snow params while leaving them snow-specific", () => {
+    const { scenario } = parseScenario({
+      sourceText: [
+        "@snow power:1 density:1.5 flakeScale:1.2 xSpeed:-0.3 ySpeed:0.8 sway:0.9 fog:0.25 noise:0.02 seed:42 time:0.2 wait!",
+        "@rain legacy power:1 density:1.5"
+      ].join("\n"),
+      scriptPath: "snow-shader.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.script.commands[0]).toEqual(
+      expect.objectContaining({
+        commandId: "snow",
+        params: {
+          kind: "snow",
+          power: 1,
+          xSpeed: -0.3,
+          ySpeed: 0.8,
+          density: 1.5,
+          flakeScale: 1.2,
+          sway: 0.9,
+          fog: 0.25,
+          noise: 0.02,
+          seed: 42,
+          durationMs: 200,
+          lazy: false,
+          wait: true
+        }
+      })
+    );
+    expect(result.script.commands[1]?.params).not.toHaveProperty("density");
+    expect(result.diagnostics).toContainEqual({
+      code: "invalid-command-param",
+      message: "@rain does not declare parameter density; commandCatalog is the authority.",
+      severity: "warning"
+    });
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+  });
+
+  it("normalizes shader glitch params while preserving unknown-param diagnostics", () => {
+    const { scenario } = parseScenario({
+      sourceText: [
+        "@glitch power:1 blockJump:1.2 burstJump:0.8 pixelScatter:1.6 colorNoise:0.75 speed:1.4 seed:99 time:0.5 wait!",
+        "@glitch legacy power:0.5 ghost:2"
+      ].join("\n"),
+      scriptPath: "glitch-shader.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.script.commands[0]).toEqual(
+      expect.objectContaining({
+        commandId: "glitch",
+        params: {
+          power: 1,
+          blockJump: 1.2,
+          burstJump: 0.8,
+          pixelScatter: 1.6,
+          colorNoise: 0.75,
+          speed: 1.4,
+          seed: 99,
+          durationMs: 500,
+          lazy: false,
+          wait: true
+        }
+      })
+    );
+    expect(result.script.commands[1]?.params).not.toHaveProperty("ghost");
+    expect(result.diagnostics).toContainEqual({
+      code: "invalid-command-param",
+      message: "@glitch does not declare parameter ghost; commandCatalog is the authority.",
+      severity: "warning"
+    });
+  });
+
+  it("normalizes persistent glitchFilter params while preserving unknown-param diagnostics", () => {
+    const { scenario } = parseScenario({
+      sourceText: [
+        "@glitchFilter power:0.45 blockJump:0.5 burstJump:0.25 pixelScatter:0.75 colorNoise:0.35 speed:0.8 seed:12 time:0.3 easing:linear wait!",
+        "@glitchFilter legacy power:0.5 ghost:2"
+      ].join("\n"),
+      scriptPath: "glitch-filter.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.script.commands[0]).toEqual(
+      expect.objectContaining({
+        commandId: "glitchfilter",
+        canonicalName: "glitchFilter",
+        params: {
+          power: 0.45,
+          blockJump: 0.5,
+          burstJump: 0.25,
+          pixelScatter: 0.75,
+          colorNoise: 0.35,
+          speed: 0.8,
+          seed: 12,
+          easing: "linear",
+          durationMs: 300,
+          lazy: false,
+          wait: true
+        }
+      })
+    );
+    expect(result.script.commands[1]?.params).not.toHaveProperty("ghost");
+    expect(result.diagnostics).toContainEqual({
+      code: "invalid-command-param",
+      message: "@glitchFilter does not declare parameter ghost; commandCatalog is the authority.",
+      severity: "warning"
+    });
+  });
+
   it("normalizes aliases, defaults, flags, and labels", () => {
     const { scenario } = parseScenario({
       sourceText: [

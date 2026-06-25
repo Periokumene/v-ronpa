@@ -298,9 +298,19 @@ Narrator: CHECKPOINT 00B - runtime state。分支 2 开始：右侧 Runtime 面�
 @rain power:1 time:0.1 xSpeed:-1.4 ySpeed:7
 Narrator: CHECKPOINT 01A - rain only。背景为 bg:harness，画面前景应出现清晰、持续下落的斜向雨线；此处不叠加 blur、bokeh 或 sun。
 @rain power:0 time:0.1
-@snow power:1 time:0.1 scale:1.2,1.2,1
-Narrator: CHECKPOINT 01B - snow only。雨线应消失，画面前景应出现清晰、缓慢飘落的雪花；此处仍不叠加 blur、bokeh 或 sun。
+@back bg:black effect:fade time:0.12
+@char idAndAppearance:character:felix.portrait:felix:neutral pos:36,0
+@char idAndAppearance:character:mira.portrait:mira:neutral pos:68,0
+@snow power:0.55 time:0.1 xSpeed:-0.1 ySpeed:0.75 density:0.85 flakeScale:1 sway:0.45 fog:0.18 noise:0.012 seed:11
+Narrator: CHECKPOINT 01B-L1 - snow light。黑底与双立绘用于检查参数映射和轻雾染色：低档也应有明确雪粒、可见下落重力与轻微冷色雾。
+@snow power:0.78 time:0.1 xSpeed:-0.18 ySpeed:0.95 density:1.25 flakeScale:1.22 sway:0.78 fog:0.3 noise:0.024 seed:12
+Narrator: CHECKPOINT 01B-L2 - snow medium。相比 L1，雪点数量、尺寸、下落速度和横向摆动都应明显增强；立绘应出现更清楚的冷雾染色。
+@snow power:0.92 time:0.1 xSpeed:-0.25 ySpeed:1.15 density:1.6 flakeScale:1.48 sway:1.02 fog:0.42 noise:0.036 seed:13
+Narrator: CHECKPOINT 01B-L3 - snow heavy。黑底上应出现清晰大雪、较强重力下落和更明显轻雾；角色仍不应被雪层遮没。
+@snow power:1 time:0.1 xSpeed:-0.35 ySpeed:1.35 density:2 flakeScale:1.78 sway:1.28 fog:0.55 noise:0.055 seed:14
+Narrator: CHECKPOINT 01B-L4 - snow storm。黑底压力档：大雪、强重力、强摆动、较高雾与噪声同时开启，用于检查公开 snow 参数是否都能产生可见差异。
 @snow power:0 time:0.1
+@back bg:harness effect:fade time:0.12
 @sun power:0.3 time:0.2 pos:12,88 scale:1.1,1.1,1
 @blur actorId:MainBackground power:0.12 time:0.2
 Narrator: CHECKPOINT 01C - sun + blur。右上应出现柔和光束，背景轻微虚化；雨雪此时应已关闭。
@@ -319,12 +329,28 @@ Narrator: CHECKPOINT 06 - shake。Ren 或其 fallback 应进行水平和垂直�
 @bokeh focus:character:felix dist:10 power:0.55 time:0.2
 Narrator: CHECKPOINT 07 - bokeh only。画面应进入明显景深/柔焦状态，并出现柔和圆形光斑；下一步会先关闭 bokeh 再测试 glitch。
 @bokeh power:0 time:0.15
-@glitch power:0.9 time:2
-Narrator: CHECKPOINT 07B - glitch only。bokeh 已关闭；本句出现时应能直接看到明显的扫描线、色差、横向噪声条或画面扰动；此处不测试 wait。
-@glitch power:0.9 time:0.8 wait!
-Narrator: CHECKPOINT 08 - glitch only + wait。保留 wait 检查点用于后续专项修复；本轮独立 glitch 视觉验收以 CHECKPOINT 07B 为准。
+@back bg:black effect:fade time:0.12
+@char idAndAppearance:character:felix.portrait:felix:neutral pos:36,0
+@char idAndAppearance:character:mira.portrait:mira:neutral pos:68,0
+@glitch power:0.35 time:1 blockJump:0.45 burstJump:0.1 pixelScatter:0.35 colorNoise:0.12 speed:0.8 seed:41
+Narrator: CHECKPOINT 07B-L1 - glitch light。黑底与多名立绘用于检查轻微 Morton 地址跳变；应只有少量块错位，人物边缘仍稳定可辨。
+@glitch power:0.6 time:1 blockJump:0.9 burstJump:0.35 pixelScatter:0.75 colorNoise:0.35 speed:1 seed:42
+Narrator: CHECKPOINT 07B-L2 - glitch medium。相比 L1 应出现更明显 block jump 与少量随机色替换，画面不能全白或全黑。
+@glitch power:0.82 time:1 blockJump:1.25 burstJump:0.75 pixelScatter:1.2 colorNoise:0.68 speed:1.25 seed:43
+Narrator: CHECKPOINT 07B-L3 - glitch heavy。应出现明显 Morton 重排、像素散射和角色边缘块错位，但对话框 DOM 不应被扰动。
+@glitch power:1 time:1 blockJump:1.6 burstJump:1.15 pixelScatter:1.65 colorNoise:1 speed:1.5 seed:44
+Narrator: CHECKPOINT 07B-L4 - glitch stress。压力档应有强地址跳变和随机色替换，用于确认 shader 不产生整屏白、整屏黑或残留 filter。
+@glitch power:0.95 time:0.8 blockJump:1.2 burstJump:0.8 pixelScatter:1.25 colorNoise:0.85 speed:1.3 seed:45 wait!
+Narrator: CHECKPOINT 08 - glitch shader + wait。保留 wait 检查点：本句出现代表 glitch wait 已完成，stage root filter 应已清理。
+@glitchFilter power:0.54 time:0.25 blockJump:0.95 burstJump:0.55 pixelScatter:0.95 colorNoise:0.58 speed:3.2 seed:51 easing:linear wait!
+Narrator: CHECKPOINT 08A - glitchFilter persistent。持久 glitchFilter 已开启；黑底与多名立绘应持续出现可见 Morton 跳变和色块刷新，且本状态应进入 Pixi snapshot。
+Narrator: CHECKPOINT 08B - glitchFilter persists。未重新触发 @glitch 的第二句仍应保留并持续变化，用于确认它跨句存在而不是一次性 pulse 或静止滤镜。
+@glitch power:0.9 time:1 blockJump:1.4 burstJump:0.95 pixelScatter:1.35 colorNoise:0.9 speed:1.35 seed:52
+Narrator: CHECKPOINT 08C - glitchFilter + pulse。持久 glitchFilter 底噪上叠加一次性 @glitch 冲击；DOM 对话框仍不应被扰动。
+@glitchFilter power:0 time:0.3 easing:linear wait!
+Narrator: CHECKPOINT 08D - glitchFilter off cleanup。持久 glitchFilter 已关闭；画面应回到稳定黑底，无 Morton 残留，后续雨雪不应被污染。
 @back bg:classroom effect:fade time:0.2
-@snow power:0.85 time:0.2 pos:62,82 scale:1,1,1
+@snow power:0.85 time:0.2 xSpeed:-0.18 ySpeed:0.85 density:1.35 flakeScale:1.18 sway:0.82 fog:0.32 noise:0.03 seed:29
 @rain power:0.85 time:0.2 xSpeed:0.5 ySpeed:5
 @char idAndAppearance:character:mira.portrait:mira:neutral pos:24,0
 @arrange ren.18,felix.50,mira.82 look! time:0.2
