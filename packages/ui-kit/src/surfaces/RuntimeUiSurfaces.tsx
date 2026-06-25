@@ -86,7 +86,6 @@ export function RuntimeMovieOverlaySurface({
     <section aria-label="Runtime movie overlay" data-testid="runtime-movie-overlay" style={movieOverlayStyle}>
       {uri ? (
         <video
-          controls
           data-testid="runtime-movie-video"
           key={uri}
           onEnded={onEnded}
@@ -170,18 +169,20 @@ const promptButtonStyle: CSSProperties = {
 
 const movieOverlayStyle: CSSProperties = {
   position: "absolute",
-  zIndex: 9,
+  zIndex: 30,
   inset: 0,
   display: "grid",
   placeItems: "center",
-  background: "rgba(0, 0, 0, 0.76)",
+  background: "#000",
   pointerEvents: "auto"
 };
 
 const movieVideoStyle: CSSProperties = {
-  width: "min(960px, 92vw)",
-  maxHeight: "78vh",
-  background: "#000"
+  display: "block",
+  width: "100%",
+  height: "100%",
+  background: "#000",
+  objectFit: "contain"
 };
 
 const movieMissingStyle: CSSProperties = {
