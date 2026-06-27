@@ -783,12 +783,24 @@ export function getNaniCommandDefinition(id: string): NaniCommandDefinition | un
   return naniCommandCatalogById.get(normalizeNaniCommandId(id));
 }
 
+export const RuntimeAssetKindSchema = z.enum([
+  "portrait",
+  "background",
+  "bgm",
+  "sfx",
+  "voice",
+  "video",
+  "glb",
+  "texture",
+  "fx"
+]);
+export type RuntimeAssetKind = z.infer<typeof RuntimeAssetKindSchema>;
+
 export const AssetRefSchema = z.object({
   id: IdSchema,
-  kind: z.enum(["portrait", "background", "bgm", "sfx", "voice", "video", "glb", "texture", "fx"]),
-  uri: z.string(),
+  kind: RuntimeAssetKindSchema,
   tags: z.array(z.string()).default([])
-});
+}).strict();
 export type AssetRef = z.infer<typeof AssetRefSchema>;
 
 export const RuntimeExpressionSchema = z.object({ type: z.literal("expression"), source: z.string() }).strict();
@@ -865,11 +877,10 @@ export type UiAssetRole = z.infer<typeof UiAssetRoleSchema>;
 export const UiAssetRefSchema = z.object({
   id: IdSchema,
   role: UiAssetRoleSchema,
-  assetId: IdSchema.optional(),
-  uri: z.string().optional(),
+  assetId: IdSchema,
   slice: z.enum(["stretch", "nine-slice", "tile"]).default("stretch"),
   tags: z.array(z.string()).default([])
-});
+}).strict();
 export type UiAssetRef = z.infer<typeof UiAssetRefSchema>;
 
 export const InteractionStyleProfileSchema = z.object({
@@ -886,19 +897,6 @@ export const InteractionStyleProfileSchema = z.object({
     .default({})
 });
 export type InteractionStyleProfile = z.infer<typeof InteractionStyleProfileSchema>;
-
-export const RuntimeAssetKindSchema = z.enum([
-  "portrait",
-  "background",
-  "bgm",
-  "sfx",
-  "voice",
-  "video",
-  "glb",
-  "texture",
-  "fx"
-]);
-export type RuntimeAssetKind = z.infer<typeof RuntimeAssetKindSchema>;
 
 export const RuntimeAssetFormatSchema = z.enum([
   "glb",
@@ -933,11 +931,11 @@ export type LodRef = z.infer<typeof LodRefSchema>;
 export const CollisionProxySchema = z.object({
   id: IdSchema,
   kind: z.enum(["box", "sphere", "capsule", "convex-mesh", "trimesh", "navmesh"]),
-  uri: z.string().optional(),
+  assetId: IdSchema.optional(),
   size: Vector3Schema.optional(),
   radius: z.number().positive().optional(),
   height: z.number().positive().optional()
-});
+}).strict();
 export type CollisionProxy = z.infer<typeof CollisionProxySchema>;
 
 export const RuntimeAssetSchema = z.object({
@@ -951,7 +949,7 @@ export const RuntimeAssetSchema = z.object({
   lods: z.array(LodRefSchema).default([]),
   collisionProxyIds: z.array(IdSchema).default([]),
   tags: z.array(z.string()).default([])
-});
+}).strict();
 export type RuntimeAsset = z.infer<typeof RuntimeAssetSchema>;
 
 export const ItemCategorySchema = z.enum(["gift", "tool"]);
@@ -1531,8 +1529,8 @@ export const SaveDataSchema = z.object({
 export type SaveData = z.infer<typeof SaveDataSchema>;
 
 export const ContentManifestSchema = z.object({
-  version: z.literal(1),
-  assets: z.array(AssetRefSchema),
+  version: z.literal(2),
+  assets: z.array(AssetRefSchema).default([]),
   uiAssets: z.array(UiAssetRefSchema).default([]),
   interactionStyles: z.array(InteractionStyleProfileSchema).default([]),
   runtimeAssets: z.array(RuntimeAssetSchema).default([]),
@@ -1542,7 +1540,7 @@ export const ContentManifestSchema = z.object({
   items: z.array(ItemDefSchema),
   evidence: z.array(EvidenceDefSchema).default([]),
   trials: z.array(TrialDefinitionSchema)
-});
+}).strict();
 export type ContentManifest = z.infer<typeof ContentManifestSchema>;
 
 export function parseContract<T>(schema: z.ZodType<T>, value: unknown): T {

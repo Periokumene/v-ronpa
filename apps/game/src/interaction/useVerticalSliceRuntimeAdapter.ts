@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AssetRegistryDiagnostic, AssetResolver } from "@v-ronpa/asset-registry";
 import type {
-  AssetRef,
   GameInteractionContext,
   GameUiAction,
   NaviInteractionSensorReport,
   NaviRuntimeState,
   PlayerPose,
   PixiStageSnapshot,
-  RuntimeAsset,
   RuntimeCommand,
   SaveData,
   GameplayEvent,
@@ -56,7 +55,6 @@ import {
 import {
   verticalSliceEvidence,
   verticalSliceMaps,
-  verticalSliceRuntimeAssets,
   verticalSliceScript,
   verticalSliceTrial
 } from "../harness/fixtures/verticalSlice";
@@ -130,7 +128,7 @@ export interface TrialRuntime {
   lastOutcome: string;
 }
 
-export type VerticalSliceDiagnosticSource = "parser" | "compiler" | "story" | "transaction" | "media" | "ui" | "trial";
+export type VerticalSliceDiagnosticSource = "parser" | "compiler" | "story" | "transaction" | "media" | "ui" | "trial" | "asset";
 
 export interface VerticalSliceRuntimeDiagnostic {
   source: VerticalSliceDiagnosticSource;
@@ -157,9 +155,7 @@ export type AdapterMediaKind = "bgm" | "sfx" | "voice" | "video";
 export interface MediaSourceResolverInput {
   sourceRef: string;
   kind: AdapterMediaKind;
-  runtimeAssets?: RuntimeAsset[];
-  manifestAssets?: AssetRef[];
-  scriptAssets?: AssetRef[];
+  assetResolver?: AssetResolver;
 }
 
 export interface MediaSourceResolverResult {
@@ -187,6 +183,7 @@ export interface VerticalSliceRuntimeAdapterOptions {
   audioPort?: AudioPort;
   videoPort?: VideoPort;
   storyPlayTiming?: StoryPlayTimingPolicy;
+  assetResolver?: AssetResolver;
   onEnterTrial?: () => void;
   onEnterNavi?: () => void;
 }
@@ -265,6 +262,7 @@ export function useVerticalSliceRuntimeAdapter(
   const runtimeRouteTable = options.routeTable;
   const audioPort = useMemo(() => options.audioPort ?? createHowlerAudioPort(), [options.audioPort]);
   const videoPort = useMemo(() => options.videoPort ?? createHtmlVideoPort(), [options.videoPort]);
+  const assetResolver = options.assetResolver;
   const storyPlayTiming = options.storyPlayTiming;
   const onEnterTrial = options.onEnterTrial;
   const onEnterNavi = options.onEnterNavi;
@@ -385,6 +383,13 @@ export function useVerticalSliceRuntimeAdapter(
     if (diagnostics.length === 0) return;
     setRuntimeDiagnostics((current) => limitRuntimeDiagnostics([...current, ...diagnostics]));
   }, []);
+
+  const observeAssetDiagnostic = useCallback(
+    (diagnostic: { code?: string; severity?: "info" | "warning" | "error"; message: string; assetId?: string; kind?: string }) => {
+      appendRuntimeDiagnostics([toVerticalSliceAssetDiagnostic(diagnostic)]);
+    },
+    [appendRuntimeDiagnostics]
+  );
 
   const attachMovieElement = useCallback(
     (element: HTMLVideoElement | null) => {
@@ -543,10 +548,12 @@ export function useVerticalSliceRuntimeAdapter(
 
   const firstPersonBridge = useFirstPersonExplorationBridge({
     map: activeMap,
+    ...(assetResolver ? { assetResolver } : {}),
     cameraMode: currentCameraMode,
     inputLock: navi.inputLock,
     inputActionsRef,
     ...(navi.activeInteractableId ? { activeInteractableId: navi.activeInteractableId } : {}),
+    onAssetDiagnostic: observeAssetDiagnostic,
     onSensorReport: recordSensorReport,
     onInteractRequest: confirmInteraction
   });
@@ -855,8 +862,7 @@ export function useVerticalSliceRuntimeAdapter(
       const resolved = resolveMediaSource({
         kind: "video",
         sourceRef: effect.sourceRef,
-        runtimeAssets: verticalSliceRuntimeAssets,
-        scriptAssets: compiled.script.assets
+        ...(assetResolver ? { assetResolver } : {})
       });
       if (resolved.diagnostic) movieDiagnostics.push(resolved.diagnostic);
       if (resolved.uri) pendingMoviePlayback = { sourceRef: effect.sourceRef, uri: resolved.uri };
@@ -887,8 +893,7 @@ export function useVerticalSliceRuntimeAdapter(
           resolveMediaSource({
             kind,
             sourceRef,
-            runtimeAssets: verticalSliceRuntimeAssets,
-            scriptAssets: compiled.script.assets
+            ...(assetResolver ? { assetResolver } : {})
           })
       };
       void applyMediaRuntimeEffects(mediaEffectInput).then(appendRuntimeDiagnostics);
@@ -1049,6 +1054,7 @@ export function useVerticalSliceRuntimeAdapter(
     mediaRuntime,
     moveToPreset,
     navi,
+    observeAssetDiagnostic,
     parsed,
     pixiStageRuntime,
     resetSlice,
@@ -1277,32 +1283,33 @@ export function createVerticalSlicePresentationTransaction({
 }
 
 export function resolveMediaSource({
+  assetResolver,
   kind,
-  manifestAssets = [],
-  runtimeAssets = [],
-  scriptAssets = [],
   sourceRef
 }: MediaSourceResolverInput): MediaSourceResolverResult {
-  const runtimeAsset = runtimeAssets.find(
-    (asset) => asset.kind === kind && (asset.id === sourceRef || asset.sourceUri === sourceRef)
-  );
-  if (runtimeAsset) return { uri: runtimeAsset.optimizedUri };
-
-  const manifestAsset = manifestAssets.find((asset) => asset.kind === kind && asset.id === sourceRef);
-  if (manifestAsset) return { uri: manifestAsset.uri };
-
-  const scriptAsset = scriptAssets.find((asset) => asset.kind === kind && asset.id === sourceRef);
-  if (scriptAsset) return { uri: scriptAsset.uri };
-
-  if (isRawMediaUri(sourceRef)) return { uri: sourceRef };
+  if (!assetResolver) {
+    return {
+      diagnostic: {
+        source: "asset",
+        code: "asset-resolver-missing",
+        severity: "error",
+        message: `Media source ${sourceRef} (${kind}) could not be resolved because no AssetResolver was provided.`
+      }
+    };
+  }
+  const resolved = assetResolver.resolve({ id: sourceRef, kind });
+  if (resolved.uri) return { uri: resolved.uri };
 
   return {
-    diagnostic: {
-      source: "media",
-      code: "media-source-unresolved",
-      severity: "warning",
-      message: `Media source ${sourceRef} (${kind}) could not be resolved.`
-    }
+    diagnostic: toVerticalSliceAssetDiagnostic(
+      resolved.diagnostic ?? {
+        code: "asset-missing",
+        severity: "error",
+        id: sourceRef,
+        kind,
+        message: `Media source ${sourceRef} (${kind}) could not be resolved.`
+      }
+    )
   };
 }
 
@@ -1394,10 +1401,6 @@ function applyGameplayEvents(gameplay: GameplayState, events: GameplayEvent[]): 
   return events.reduce((current, event) => {
     return applyGameplayEvent(current, event).state;
   }, gameplay);
-}
-
-function isRawMediaUri(sourceRef: string): boolean {
-  return /^(\/|\.\/|\.\.\/|https?:\/\/|data:|blob:)/u.test(sourceRef);
 }
 
 function mediaHandleMissing(message: string): VerticalSliceRuntimeDiagnostic {
@@ -1519,6 +1522,25 @@ function toVerticalSliceTrialDiagnostic(diagnostic: TrialDefinitionDiagnostic): 
     code: diagnostic.code,
     severity: diagnostic.severity,
     message: details ? `${diagnostic.message} (${details})` : diagnostic.message
+  };
+}
+
+function toVerticalSliceAssetDiagnostic(
+  diagnostic: Pick<AssetRegistryDiagnostic, "message"> & {
+    code?: string;
+    severity?: "info" | "warning" | "error";
+    id?: string;
+    assetId?: string;
+    kind?: string;
+  }
+): VerticalSliceRuntimeDiagnostic {
+  const assetId = diagnostic.assetId ?? diagnostic.id;
+  const detail = [assetId, diagnostic.kind].filter(Boolean).join(" ");
+  return {
+    source: "asset",
+    code: diagnostic.code ?? "asset-unresolved",
+    severity: diagnostic.severity ?? "error",
+    message: detail ? `${diagnostic.message} (${detail})` : diagnostic.message
   };
 }
 

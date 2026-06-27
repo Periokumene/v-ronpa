@@ -21,6 +21,7 @@ import type {
   InputLockState,
   NaviInteractionSensorReport,
   PlayerPose,
+  RuntimeAssetKind,
   TrialPresentationProfile,
   Vector3,
   WorldMapDef
@@ -44,7 +45,9 @@ export interface ExplorationStageProps {
   onSensorReport?: (report: NaviInteractionSensorReport) => void;
   onInteractRequest?: (request: FirstPersonInteractRequest) => void;
   onFallbackChange?: (status: FirstPersonFallbackStatus) => void;
+  onAssetDiagnostic?: (diagnostic: R3fAssetDiagnostic) => void;
   onPointerLockChange?: (status: PointerLockStatus) => void;
+  assetResolver?: R3fAssetResolver;
 }
 
 export interface TrialRoundTableStageProps {
@@ -68,6 +71,38 @@ export interface FirstPersonInteractRequest {
   mapId?: string;
   pose: PlayerPose;
   facing?: Vector3;
+}
+
+export interface R3fAssetResolveInput {
+  id: string;
+  kind: RuntimeAssetKind;
+}
+
+export interface R3fAssetResolver {
+  resolve(input: R3fAssetResolveInput): {
+    uri?: string;
+    diagnostic?: {
+      code?: string;
+      severity?: "info" | "warning" | "error";
+      message: string;
+    };
+  };
+}
+
+export interface R3fAssetDiagnostic {
+  source: "asset";
+  code: string;
+  severity: "info" | "warning" | "error";
+  message: string;
+  assetId?: string;
+  kind?: RuntimeAssetKind;
+}
+
+export interface R3fMapModelAssetResolution {
+  assetId?: string;
+  uri?: string;
+  diagnostic?: R3fAssetDiagnostic;
+  fallbackReason?: FirstPersonFallbackStatus["reason"];
 }
 
 type MovementAction = Extract<InputAction, "move-forward" | "move-back" | "move-left" | "move-right">;
@@ -102,6 +137,8 @@ export function ExplorationStage3D({
   onSensorReport,
   onInteractRequest,
   onFallbackChange,
+  onAssetDiagnostic,
+  assetResolver,
   onPointerLockChange
 }: ExplorationStageProps) {
   const controlsEnabled = inputLock === "none" && cameraMode !== "locked" && cameraMode !== "scripted-focus";
@@ -116,7 +153,7 @@ export function ExplorationStage3D({
       <color attach="background" args={["#111720"]} />
       <ambientLight intensity={0.85} />
       <directionalLight position={[4, 6, 3]} intensity={1.6} />
-      <MapAssetLayer map={map} onFallbackChange={onFallbackChange} />
+      <MapAssetLayer map={map} assetResolver={assetResolver} onAssetDiagnostic={onAssetDiagnostic} onFallbackChange={onFallbackChange} />
       {(map?.interactables ?? []).map((interactable) => (
         <Hotspot
           key={interactable.id}
@@ -409,19 +446,77 @@ function FirstPersonRig({
 }
 
 function MapAssetLayer({
+  assetResolver,
   map,
+  onAssetDiagnostic,
   onFallbackChange
 }: {
+  assetResolver: R3fAssetResolver | undefined;
   map: WorldMapDef | undefined;
+  onAssetDiagnostic: ((diagnostic: R3fAssetDiagnostic) => void) | undefined;
   onFallbackChange: ((status: FirstPersonFallbackStatus) => void) | undefined;
 }) {
-  const modelAsset = map?.assetRefs.find((asset) => asset.kind === "glb" && asset.uri.length > 0);
+  const resolved = useMemo(() => resolveMapModelAsset(map, assetResolver), [assetResolver, map]);
 
-  if (!modelAsset) {
+  useEffect(() => {
+    if (resolved.diagnostic) onAssetDiagnostic?.(resolved.diagnostic);
+  }, [onAssetDiagnostic, resolved]);
+
+  if (resolved.fallbackReason === "no-model") {
     return <FallbackRoom map={map} reason="no-model" onFallbackChange={onFallbackChange} />;
   }
 
-  return <ProbedMapAsset map={map} assetUri={modelAsset.uri} onFallbackChange={onFallbackChange} />;
+  if (!resolved.uri) {
+    return (
+      <FallbackRoom
+        map={map}
+        reason="asset-error"
+        {...(resolved.assetId ? { assetUri: resolved.assetId } : {})}
+        onFallbackChange={onFallbackChange}
+      />
+    );
+  }
+
+  return <ProbedMapAsset map={map} assetUri={resolved.uri} onFallbackChange={onFallbackChange} />;
+}
+
+export function resolveMapModelAsset(
+  map: WorldMapDef | undefined,
+  assetResolver: R3fAssetResolver | undefined
+): R3fMapModelAssetResolution {
+  const modelAsset = map?.assetRefs.find((asset) => asset.kind === "glb");
+  if (!modelAsset) return { fallbackReason: "no-model" };
+
+  if (!assetResolver) {
+    return {
+      assetId: modelAsset.id,
+      fallbackReason: "asset-error",
+      diagnostic: {
+        source: "asset",
+        code: "asset-resolver-missing",
+        severity: "error",
+        assetId: modelAsset.id,
+        kind: "glb",
+        message: `R3F map asset '${modelAsset.id}' could not be resolved because no AssetResolver was provided.`
+      }
+    };
+  }
+
+  const resolved = assetResolver.resolve({ id: modelAsset.id, kind: "glb" });
+  if (resolved.uri) return { assetId: modelAsset.id, uri: resolved.uri };
+
+  return {
+    assetId: modelAsset.id,
+    fallbackReason: "asset-error",
+    diagnostic: {
+      source: "asset",
+      code: resolved.diagnostic?.code ?? "asset-missing",
+      severity: resolved.diagnostic?.severity ?? "error",
+      assetId: modelAsset.id,
+      kind: "glb",
+      message: resolved.diagnostic?.message ?? `R3F map asset '${modelAsset.id}' could not be resolved.`
+    }
+  };
 }
 
 function ProbedMapAsset({

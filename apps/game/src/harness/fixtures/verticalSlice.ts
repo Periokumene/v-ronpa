@@ -1,4 +1,4 @@
-import type { EvidenceDef, ItemDef, RuntimeAsset, TrialDefinition, WorldMapDef } from "@v-ronpa/contracts";
+import type { EvidenceDef, ItemDef, TrialDefinition, WorldMapDef } from "@v-ronpa/contracts";
 
 export const verticalSliceItem: ItemDef = {
   id: "tool:notebook",
@@ -21,89 +21,6 @@ export const verticalSliceEvidence: EvidenceDef = {
   },
   tags: ["harness", "vertical-slice"]
 };
-
-export const verticalSliceRuntimeAssets: RuntimeAsset[] = [
-  {
-    id: "bgm:validation-main",
-    kind: "bgm",
-    optimizedUri: "/harness/media/bgm/bgm-validation-main.ogg",
-    format: "ogg",
-    compression: [],
-    lods: [],
-    collisionProxyIds: [],
-    tags: ["harness", "non-pixi-command-baseline"]
-  },
-  {
-    id: "bgm:validation-alt",
-    kind: "bgm",
-    optimizedUri: "/harness/media/bgm/bgm-validation-alt.ogg",
-    format: "ogg",
-    compression: [],
-    lods: [],
-    collisionProxyIds: [],
-    tags: ["harness", "non-pixi-command-baseline"]
-  },
-  {
-    id: "bgm:validation-layer",
-    kind: "bgm",
-    optimizedUri: "/harness/media/bgm/bgm-validation-layer.ogg",
-    format: "ogg",
-    compression: [],
-    lods: [],
-    collisionProxyIds: [],
-    tags: ["harness", "non-pixi-command-baseline"]
-  },
-  {
-    id: "bgm:validation-extra",
-    kind: "bgm",
-    optimizedUri: "/harness/media/bgm/bgm-validation-extra.ogg",
-    format: "ogg",
-    compression: [],
-    lods: [],
-    collisionProxyIds: [],
-    tags: ["harness", "non-pixi-command-baseline"]
-  },
-  {
-    id: "sfx:rain-inside-car-loop",
-    kind: "sfx",
-    optimizedUri: "/harness/media/sfx/rain-inside-car-loop.ogg",
-    format: "ogg",
-    compression: [],
-    lods: [],
-    collisionProxyIds: [],
-    tags: ["harness", "non-pixi-command-baseline"]
-  },
-  {
-    id: "sfx:knock-door",
-    kind: "sfx",
-    optimizedUri: "/harness/media/sfx/knock-door.ogg",
-    format: "ogg",
-    compression: [],
-    lods: [],
-    collisionProxyIds: [],
-    tags: ["harness", "non-pixi-command-baseline"]
-  },
-  {
-    id: "sfx:shock-fadeout",
-    kind: "sfx",
-    optimizedUri: "/harness/media/sfx/shock-fadeout.ogg",
-    format: "ogg",
-    compression: [],
-    lods: [],
-    collisionProxyIds: [],
-    tags: ["harness", "non-pixi-command-baseline"]
-  },
-  {
-    id: "video:validation-intro",
-    kind: "video",
-    optimizedUri: "/harness/media/video/movie-validation-intro.mp4",
-    format: "mp4",
-    compression: [],
-    lods: [],
-    collisionProxyIds: [],
-    tags: ["harness", "non-pixi-command-baseline"]
-  }
-];
 
 export const verticalSliceTrial: TrialDefinition = {
   id: "trial:door-lock",
@@ -159,9 +76,7 @@ export const verticalSliceMaps: WorldMapDef[] = [
       fov: 65
     },
     collisionProxyIds: ["collision:academy-hall:aabb"],
-    assetRefs: [
-      { id: "model:academy-hall", kind: "glb", uri: "/harness/models/academy-hall.gltf", tags: ["harness"] }
-    ],
+    assetRefs: [{ id: "model:academy-hall", kind: "glb", tags: ["harness"] }],
     interactables: [
       {
         id: "interactable:notebook",
@@ -219,9 +134,7 @@ export const verticalSliceMaps: WorldMapDef[] = [
       fov: 65
     },
     collisionProxyIds: ["collision:classroom:aabb"],
-    assetRefs: [
-      { id: "model:classroom", kind: "glb", uri: "/harness/models/classroom.gltf", tags: ["harness"] }
-    ],
+    assetRefs: [{ id: "model:classroom", kind: "glb", tags: ["harness"] }],
     interactables: [
       {
         id: "interactable:hall-door",
@@ -317,7 +230,7 @@ Narrator: CHECKPOINT 01C - sun + blur。右上应出现柔和光束，背景轻�
 @char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
 @char idAndAppearance:character:mira.portrait:mira:neutral pos:78,0
 @char idAndAppearance:character:ren.portrait:ren:neutral pos:22,0
-Narrator: CHECKPOINT 02 - char。Felix、Mira、Ren 三个 actor 均应可见；Ren 没有真实资源时显示 fallback，占位也算通过。
+Narrator: CHECKPOINT 02 - char。Felix、Mira、Ren 三个 actor 均应可见；所有立绘都应通过 ContentManifest 解析。
 @arrange ren.18,felix.50,mira.82 look! time:0.25
 Narrator: CHECKPOINT 03 - arrange。三名角色应重新排到左、中、右；右侧 Pixi Slots 应显示 left/center/right。
 @flash color:#8fd3ff duration:160

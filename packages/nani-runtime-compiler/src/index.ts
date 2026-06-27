@@ -61,7 +61,6 @@ export function compileRuntimeScript(scenario: ScenarioIR): CompileRuntimeScript
       assets: scenario.assets.map((asset) => ({
         id: asset.id,
         kind: asset.kind as RuntimeScript["assets"][number]["kind"],
-        uri: asset.uri ?? "",
         tags: []
       })),
       dependencies: scenario.dependencies

@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "packages/contracts" },
+    { "path": "packages/asset-registry" },
     { "path": "packages/nani-parser" },
     { "path": "packages/nani-runtime-compiler" },
     { "path": "packages/story-engine" },

@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import {
   createPixiPresenter,
+  type PixiAssetResolver,
+  type PixiPresenterDiagnostic,
   type PixiPresentationTaskSnapshot,
   type PixiPresenterPort,
   type PixiStageRenderHint
@@ -12,13 +14,17 @@ export function PixiLayer({
   hints,
   hintSequence,
   onTasksChanged,
+  onDiagnostic,
   presentationTasks = [],
   snapshot,
-  visible
+  visible,
+  assetResolver
 }: {
   animate: boolean;
+  assetResolver?: PixiAssetResolver;
   hints: PixiStageRenderHint[];
   hintSequence: number;
+  onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
   onTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
   presentationTasks?: PixiPresentationTaskSnapshot[];
   snapshot: PixiStageSnapshot;
@@ -27,25 +33,33 @@ export function PixiLayer({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const presenterRef = useRef<PixiPresenterPort | null>(null);
   const onTasksChangedRef = useRef<typeof onTasksChanged>(onTasksChanged);
+  const onDiagnosticRef = useRef<typeof onDiagnostic>(onDiagnostic);
 
   useEffect(() => {
     onTasksChangedRef.current = onTasksChanged;
   }, [onTasksChanged]);
 
   useEffect(() => {
+    onDiagnosticRef.current = onDiagnostic;
+  }, [onDiagnostic]);
+
+  useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const presenter = createPixiPresenter({
+    const options = {
       host,
-      onTasksChanged: (tasks) => onTasksChangedRef.current?.(tasks)
-    });
+      ...(assetResolver ? { assetResolver } : {}),
+      onDiagnostic: (diagnostic: PixiPresenterDiagnostic) => onDiagnosticRef.current?.(diagnostic),
+      onTasksChanged: (tasks: PixiPresentationTaskSnapshot[]) => onTasksChangedRef.current?.(tasks)
+    };
+    const presenter = createPixiPresenter(options);
     presenterRef.current = presenter;
     void presenter.mount();
     return () => {
       presenter.destroy();
       presenterRef.current = null;
     };
-  }, []);
+  }, [assetResolver]);
 
   useEffect(() => {
     const presenter = presenterRef.current;

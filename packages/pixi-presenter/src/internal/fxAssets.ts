@@ -1,4 +1,6 @@
 import { Assets, Texture } from "pixi.js";
+import type { RuntimeAsset } from "@v-ronpa/contracts";
+import { type PixiAssetResolver, type PixiPresenterDiagnostic, resolvePixiAsset } from "./assetResolver";
 
 export type PixiFxAssetId =
   | "noise"
@@ -11,11 +13,6 @@ export type PixiFxAssetId =
   | "radial-vignette"
   | "soft-dust"
   | "generated-fx-atlas";
-
-export interface PixiFxAsset {
-  id: PixiFxAssetId;
-  uri: string;
-}
 
 const assetUris: Record<PixiFxAssetId, string> = {
   "noise": new URL("./assets/fx/noise.png", import.meta.url).href,
@@ -32,23 +29,24 @@ const assetUris: Record<PixiFxAssetId, string> = {
 
 const generatedFxAtlasUri = new URL("./assets/generated-fx-atlas.png", import.meta.url).href;
 
-export const builtInPixiFxAssets: PixiFxAsset[] = [
-  { id: "noise", uri: assetUris.noise },
-  { id: "blue-noise", uri: assetUris["blue-noise"] },
-  { id: "bokeh-disc", uri: assetUris["bokeh-disc"] },
-  { id: "rain-streak", uri: assetUris["rain-streak"] },
-  { id: "godray-mask", uri: assetUris["godray-mask"] },
-  { id: "glitch-scanline", uri: assetUris["glitch-scanline"] },
-  { id: "chromatic-noise", uri: assetUris["chromatic-noise"] },
-  { id: "radial-vignette", uri: assetUris["radial-vignette"] },
-  { id: "soft-dust", uri: assetUris["soft-dust"] },
-  { id: "generated-fx-atlas", uri: generatedFxAtlasUri }
+export const builtInPixiFxRuntimeAssets: RuntimeAsset[] = [
+  runtimeFxAsset("noise", assetUris.noise),
+  runtimeFxAsset("blue-noise", assetUris["blue-noise"]),
+  runtimeFxAsset("bokeh-disc", assetUris["bokeh-disc"]),
+  runtimeFxAsset("rain-streak", assetUris["rain-streak"]),
+  runtimeFxAsset("godray-mask", assetUris["godray-mask"]),
+  runtimeFxAsset("glitch-scanline", assetUris["glitch-scanline"]),
+  runtimeFxAsset("chromatic-noise", assetUris["chromatic-noise"]),
+  runtimeFxAsset("radial-vignette", assetUris["radial-vignette"]),
+  runtimeFxAsset("soft-dust", assetUris["soft-dust"]),
+  runtimeFxAsset("generated-fx-atlas", generatedFxAtlasUri)
 ];
 
 let preloadPromise: Promise<void> | undefined;
+let preloadKey = "";
 
-export function getBuiltInPixiFxAssetUri(id: PixiFxAssetId): string {
-  return builtInPixiFxAssets.find((asset) => asset.id === id)?.uri ?? builtInPixiFxAssets[0]!.uri;
+export function getBuiltInPixiFxRuntimeAssetId(id: PixiFxAssetId): string {
+  return `fx:${id}`;
 }
 
 export function getBuiltInPixiFxAssetAlias(id: PixiFxAssetId): string {
@@ -59,14 +57,37 @@ export function getBuiltInPixiFxTexture(id: PixiFxAssetId): Texture {
   return Texture.from(getBuiltInPixiFxAssetAlias(id));
 }
 
-export function preloadBuiltInPixiFxAssets(): Promise<void> {
-  if (!preloadPromise) {
-    const unresolved = builtInPixiFxAssets.map((asset) => ({
-      alias: getBuiltInPixiFxAssetAlias(asset.id),
-      src: asset.uri
-    }));
+export function preloadBuiltInPixiFxAssets(
+  assetResolver: PixiAssetResolver | undefined,
+  onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void
+): Promise<void> {
+  const unresolved = builtInPixiFxRuntimeAssets.flatMap((asset) => {
+    const fxId = asset.id.replace(/^fx:/u, "") as PixiFxAssetId;
+    const src = resolvePixiAsset(assetResolver, { id: asset.id, kind: "fx" }, onDiagnostic);
+    return src ? [{ alias: getBuiltInPixiFxAssetAlias(fxId), src }] : [];
+  });
+  const nextKey = unresolved.map((asset) => `${asset.alias}:${asset.src}`).join("|");
+  if (!preloadPromise || preloadKey !== nextKey) {
+    preloadKey = nextKey;
+    if (unresolved.length === 0) {
+      preloadPromise = Promise.resolve();
+      return preloadPromise;
+    }
     Assets.add(unresolved);
     preloadPromise = Assets.load<Texture>(unresolved.map((asset) => asset.alias)).then(() => undefined);
   }
   return preloadPromise;
+}
+
+function runtimeFxAsset(id: PixiFxAssetId, optimizedUri: string): RuntimeAsset {
+  return {
+    id: getBuiltInPixiFxRuntimeAssetId(id),
+    kind: "fx",
+    optimizedUri,
+    format: "png",
+    compression: [],
+    lods: [],
+    collisionProxyIds: [],
+    tags: ["pixi", "built-in-fx"]
+  };
 }

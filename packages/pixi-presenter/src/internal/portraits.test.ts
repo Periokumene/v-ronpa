@@ -1,18 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { calculatePortraitLayout, formatFallbackPortraitLabel, resolveHarnessPortraitUrl } from "./portraits";
+import { calculatePortraitLayout, formatFallbackPortraitLabel } from "./portraits";
 
 describe("pixi portrait helpers", () => {
-  it("resolves harness portrait ids with the local naming convention", () => {
-    expect(resolveHarnessPortraitUrl("portrait:felix:neutral")).toBe("/harness/portraits/felix-neutral.png");
-    expect(resolveHarnessPortraitUrl("portrait:mira:neutral")).toBe("/harness/portraits/mira-neutral.png");
-  });
-
-  it("keeps unsupported portrait ids on the fallback path", () => {
-    expect(resolveHarnessPortraitUrl(undefined)).toBeUndefined();
-    expect(resolveHarnessPortraitUrl("character:felix")).toBeUndefined();
-    expect(resolveHarnessPortraitUrl("portrait:felix")).toBeUndefined();
-  });
-
   it("computes deterministic left center right slots from renderer size", () => {
     expect(calculatePortraitLayout(1000, 600, "left")).toEqual({
       slot: "left",

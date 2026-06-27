@@ -23,7 +23,14 @@ and merge the change through the integration baseline first.
 - Input and camera coordination must flow through `InputBindingMap`,
   `InputActionState`, `InputLockState`, and `CameraControlMode`.
 - Browser assets must declare runtime files, compression, LOD, and collision
-  proxy relationships through `RuntimeAsset` and `CollisionProxy`.
+  proxy relationships through `ContentManifest.runtimeAssets`,
+  `RuntimeAsset`, and `CollisionProxy`.
+- Runtime asset references must be id-only. `AssetRef`,
+  `WorldMapDef.assetRefs`, `RuntimeScript.assets`, `UiAssetRef`, evidence
+  visuals, and mesh-backed collision proxies must not carry direct URLs.
+- Apps create `AssetRegistry` instances from parsed content manifests and
+  inject structural resolvers into renderer/media adapters. Pixi, R3F, Howler,
+  and DOM UI code must not assemble public asset paths.
 - `GameMode` is intentionally narrow: `navi` and `trial` are the playable root
   modes; VN2D/VN3D belong to Navi substates or Trial presentation profiles.
   `title`, `paused`, and `saving` are shell flow states and must not absorb

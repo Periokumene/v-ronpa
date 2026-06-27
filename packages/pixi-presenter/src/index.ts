@@ -9,7 +9,8 @@ import {
   TweenSystem,
   WeatherSystem
 } from "./internal/systems";
-import { preloadBuiltInPixiFxAssets } from "./internal/fxAssets";
+import { builtInPixiFxRuntimeAssets, preloadBuiltInPixiFxAssets } from "./internal/fxAssets";
+import type { PixiAssetResolver, PixiPresenterDiagnostic } from "./internal/assetResolver";
 import { PresentationTaskController, type PixiPresentationTaskSnapshot } from "./internal/presentationTasks";
 import { type PixiStageRenderHint } from "./stageSnapshot";
 
@@ -25,12 +26,16 @@ export {
   type PixiStageRenderHint
 } from "./stageSnapshot";
 export type { PixiPresentationTaskSnapshot } from "./internal/presentationTasks";
+export { builtInPixiFxRuntimeAssets };
+export type { PixiAssetResolver, PixiPresenterDiagnostic };
 
 export interface PixiPresenterOptions {
   host: HTMLElement;
   width?: number;
   height?: number;
   onTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
+  assetResolver?: PixiAssetResolver;
+  onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
 }
 
 export interface PixiStageReconcileOptions {
@@ -93,7 +98,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
         ? { ...initOptions, width: options.width, height: options.height }
         : initOptions
     );
-    await preloadBuiltInPixiFxAssets();
+    await preloadBuiltInPixiFxAssets(options.assetResolver, options.onDiagnostic);
     initialized = true;
     if (destroyed) {
       app.destroy(true);
@@ -103,7 +108,13 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     app.canvas.dataset.testid = "pixi-canvas";
     options.host.appendChild(app.canvas);
     app.stage.addChild(stageRoot);
-    const systemOptions = { root: stageRoot, width: size.width, height: size.height };
+    const systemOptions = {
+      root: stageRoot,
+      width: size.width,
+      height: size.height,
+      ...(options.assetResolver ? { assetResolver: options.assetResolver } : {}),
+      ...(options.onDiagnostic ? { onDiagnostic: options.onDiagnostic } : {})
+    };
     actors = new ActorSystem(systemOptions, filters, tweens, tasks);
     weather = new WeatherSystem(systemOptions, filters, tweens, tasks);
     screenOverlays = new ScreenOverlaySystem(systemOptions, tweens, tasks);

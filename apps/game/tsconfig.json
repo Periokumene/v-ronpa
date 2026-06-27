@@ -10,6 +10,7 @@
     "types": ["vite/client"]
   },
   "references": [
+    { "path": "../../packages/asset-registry" },
     { "path": "../../packages/contracts" },
     { "path": "../../packages/nani-parser" },
     { "path": "../../packages/nani-runtime-compiler" },

@@ -9,6 +9,11 @@
 - R3F: 3D map exploration, trial round table, 3D camera focus, interaction
   hotspots, and future GLB scene content.
 
+Runtime visual and media assets do not belong to presenter packages. They are
+declared in `ContentManifest.runtimeAssets`, resolved by an app-created
+`AssetRegistry`, and passed into presenters through structural resolver props.
+Pixi and R3F may load a URL only after the resolver returns it.
+
 ## Command Model
 
 Scripts use preset commands rather than renderer-specific instructions:
@@ -48,6 +53,11 @@ commands such as `back`, `char`, `shake`, `flash`, `focus`, and
 `trialkeyword` are reduced into `PixiStageSnapshot` plus transient render hints
 before React rendering. Saves store the snapshot and story/gameplay state, not
 the runtime command stream or presenter trace.
+
+Asset ids inside these commands are semantic ids. For example,
+`@back bg:harness` and `@char ... portrait:felix:neutral` write ids into the Pixi
+snapshot; Pixi then asks the injected resolver for `background` or `portrait`
+URLs. Scripts and reducers must not derive `/harness/...` paths from those ids.
 
 Expression params such as `duration:{flashDuration}` are preserved by the
 compiler, evaluated by StoryEngine against story variables, and should be
@@ -91,8 +101,8 @@ statement. Debate rules, accepted evidence, and next-segment transitions live in
 
 First round:
 
-- single-layer placeholder portraits
-- background tint/plates
+- single-layer placeholder portraits loaded through `AssetResolver`
+- manifest-backed background textures with visible fallback plates
 - snapshot-driven VN stage rendering
 - simple debate keyword overlay
 - screenshot-friendly canvas state
@@ -113,6 +123,10 @@ optimization; first baseline can use independent canvas layers as long as
 presenter adapters render from committed runtime snapshots. Pixi reducers
 consume routed RuntimeCommands directly and may produce Pixi-local render hints,
 but StoryEngine does not emit presenter-specific logs.
+
+R3F model refs are the same asset-id contract: `WorldMapDef.assetRefs` contains
+id-only `AssetRef` entries, and the R3F adapter resolves the selected `glb` id
+before probing or calling `useGLTF`.
 
 ## VN3D Versus Trial
 
@@ -149,6 +163,11 @@ See `docs/architecture/vn-runtime-dispatcher.md` for the app-layer route table.
 Evidence display data is declared in the content manifest as `EvidenceDef`.
 Evidence ownership is stored in `EvidenceState.ownedEvidenceIds`. Inventory
 items remain limited to gifts and tools.
+
+Evidence and UI visuals use texture asset ids (`thumbnailAssetId`,
+`iconAssetId`, `UiAssetRef.assetId`). They are validated against
+`ContentManifest.runtimeAssets` even when a current harness surface does not
+render every image.
 
 `.nani` can grant evidence through a typed gameplay event, but evidence
 submission is not a script command. Submit actions originate from Trial UI,

@@ -8,16 +8,6 @@ export interface PortraitLayout {
   maxHeight: number;
 }
 
-const portraitIdPattern = /^portrait:([^:]+):([^:]+)$/;
-
-export function resolveHarnessPortraitUrl(portraitId: string | undefined): string | undefined {
-  if (!portraitId) return undefined;
-  const match = portraitIdPattern.exec(portraitId);
-  if (!match) return undefined;
-  const [, character, expression] = match;
-  return `/harness/portraits/${character}-${expression}.png`;
-}
-
 export function calculatePortraitLayout(width: number, height: number, slot: PortraitSlot): PortraitLayout {
   const safeWidth = Math.max(320, width);
   const safeHeight = Math.max(240, height);

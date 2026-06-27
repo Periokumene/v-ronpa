@@ -31,7 +31,8 @@ VN runtime output is split in two app-layer steps:
 - `createVnRuntimePresentationTransaction` owns app-level fanout from emitted
   `RuntimeCommand` records.
 - `VnRuntimeDispatcher` owns React rendering of the Pixi layer from committed
-  runtime state.
+  runtime state and receives the app-created structural asset resolver for Pixi
+  texture loads.
 - `GameInteractionShell` owns React mounting for DOM runtime UI surfaces from
   committed app runtime state. Script-controlled `showUI` / `hideUI` visibility
   applies only to concrete runtime UI surfaces, not shell overlays, debug
@@ -50,6 +51,9 @@ VN runtime output is split in two app-layer steps:
 - Pixi owns VN/trial 2D effects, backgrounds, portraits, filters, particles,
   and fast 2D overlays.
 - R3F owns 3D staging, camera rigs, and spatial interaction.
+- Media, Pixi, R3F, and UI/evidence image references all resolve through the
+  app-created `AssetRegistry`. Low-level ports such as Howler and HTML video
+  receive only already-resolved URLs.
 
 ## Route Table
 
@@ -90,6 +94,13 @@ skips the output and reports a transaction diagnostic instead of falling back.
 Pixi reducers also return diagnostic no-op output for commands with missing or
 unsupported Pixi-consumable params rather than writing placeholder stage ids.
 
+Media source refs, Pixi appearances, R3F model refs, and UI/evidence texture
+refs are asset ids, not paths. The vertical-slice runtime adapter resolves
+media ids before calling `AudioPort` or `VideoPort`; `VnRuntimeDispatcher`
+passes the same resolver to Pixi; and the first-person bridge passes it to the
+R3F stage. Missing asset resolution is surfaced as runtime diagnostics and
+visible fallback behavior, not guessed public URLs.
+
 Presentation wait release is task-driven. `createVnRuntimePresentationTransaction`
 returns Pixi wait descriptors, the runtime adapter stores them on
 `StoryRuntimeState.presentationWait.expectedTasks`, and `onTasksChanged`
@@ -106,6 +117,8 @@ The vertical-slice harness uses:
 - `StoryEngine` stepping over `RuntimeScript`.
 - `story-play` selection of AUTO/SKIP/manual playback schedule and pacing.
 - `createVnRuntimePresentationTransaction` for emitted command fanout.
+- `harnessContentManifest` plus `AssetRegistry` for all media, Pixi, R3F, and
+  UI/evidence asset ids.
 - `VnRuntimeDispatcher` for Pixi snapshot rendering.
 - `GameInteractionShell` for VN dialog, command bar, toast, input prompt, movie
   overlay, and durable shell overlay mounting.

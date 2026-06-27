@@ -4,6 +4,7 @@
 
 - `pnpm validate:baseline`
 - `pnpm validate:contracts`
+- `pnpm validate:assets`
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm validate:boundaries`
@@ -12,12 +13,17 @@
 Hard gates verify public contracts, input/camera/asset schemas, parser IR,
 RuntimeCommand compilation, StoryEngine state and emitted command outputs,
 gameplay outcomes, Navi/Trial director flow, Trial graph diagnostics, save
-migration validation, task path boundaries, CCR requirements, and dependency
-boundaries.
+migration validation, generated runtime asset registration, task path
+boundaries, CCR requirements, and dependency boundaries.
 
 `validate:boundaries` checks source imports, `package.json` dependency
 direction, and `tsconfig.json` project references against the same workspace
 dependency matrix.
+
+`validate:assets` dry-runs harness asset generation, verifies generated
+`RuntimeAsset` files exist, checks harness asset ids resolve through registered
+assets, and rejects hardcoded runtime asset file paths in source outside the
+generator and registration allowlist.
 
 ## Smoke And Evidence Gates
 
@@ -71,7 +77,9 @@ through a Navi interactable, Trial presentation/input state comes from
 real `VnDialogSurface`, VN AUTO timing responds to settings,
 VN toolbar/backlog/save-load surfaces are interactive, Navi ESC opens the pause
 menu, canvas layers are present, Pixi task debug readouts stay terminal after
-load/skip, and `InputLockState` changes at Navi/Trial/VN and menu boundaries.
+load/skip, runtime asset diagnostics remain at zero through the covered
+asset-loading paths, and `InputLockState` changes at Navi/Trial/VN and menu
+boundaries.
 
 The first app build intentionally allows the large R3F/Pixi/Three bundle
 warning. A later performance task should add route or adapter code splitting

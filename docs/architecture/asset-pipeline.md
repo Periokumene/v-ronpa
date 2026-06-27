@@ -1,24 +1,91 @@
-# Web 3D Asset Pipeline Contracts
+# Content Asset Pipeline
 
 ## Intent
 
-Browser assets must be declared in contracts before renderer worktrees depend
-on them. Source files, optimized runtime files, collision proxies, LODs, and
-texture budgets are separate concerns.
+Runtime-loading assets are declared once in `ContentManifest.runtimeAssets`.
+Scripts, maps, UI config, evidence, and renderer adapters may reference asset
+ids, but must not carry raw file URLs or public paths.
+
+`packages/asset-registry` is the pure lookup layer. Apps create an
+`AssetRegistry` from a parsed `ContentManifest` and inject the structural
+resolver into Pixi, R3F, media, and UI adapters.
+
+The registry validates the manifest with the contracts schema before indexing.
+Unsupported manifest versions, invalid manifests, duplicate runtime asset ids,
+missing ids, kind mismatches, and raw URI-like refs are reported as
+`AssetRegistryDiagnostic` entries. Registry diagnostics are runtime visibility
+signals; the registry still does not fetch, preload, transform, or inspect
+files.
 
 ## Runtime Assets
 
 `RuntimeAsset` is the shipping asset shape:
 
+- `id`: stable content id such as `bg:harness`, `portrait:felix:neutral`, or
+  `video:validation-intro`.
+- `kind`: runtime family, including `portrait`, `background`, `bgm`, `sfx`,
+  `voice`, `video`, `glb`, `texture`, and `fx`.
 - `sourceUri`: optional authoring source for traceability.
-- `optimizedUri`: runtime file loaded by the app.
-- `format`: `glb`, `gltf`, `webp`, `ktx2`, `mp3`, `mp4`, etc.
-- `compression`: `meshopt`, `draco`, `ktx2`, `webp`, and related runtime
-  constraints.
-- `lods`: lower-detail runtime alternatives with distance thresholds.
-- `collisionProxyIds`: explicit links to non-render collision data.
+- `optimizedUri`: app-loadable file emitted by the asset pipeline.
+- `format`: `glb`, `gltf`, `webp`, `png`, `ogg`, `mp4`, and related runtime
+  formats.
+- `compression`, `lods`, `textureBudget`, and `collisionProxyIds`: production
+  metadata used by future build and review gates.
 
-Renderer packages load `optimizedUri`. They should not load authoring sources.
+Only the registry reads `optimizedUri` for app runtime resolution. Renderer
+packages receive a resolver and load the returned URL; they do not assemble
+paths.
+
+## Asset References
+
+`AssetRef` is id-only: `{ id, kind, tags? }`. It appears in dependency lists
+such as `RuntimeScript.assets` and `WorldMapDef.assetRefs`. These lists declare
+what content a script or map needs, not where the file lives.
+
+UI and evidence resources follow the same rule:
+
+- `UiAssetRef.assetId` points to a `RuntimeAsset` of kind `texture`.
+- `EvidenceVisual.iconAssetId` and `thumbnailAssetId` point to texture runtime
+  assets.
+- `CollisionProxy.assetId`, when used for mesh-backed collision data, points to
+  a declared runtime asset. The current harness keeps collision as simple
+  bounds and does not add mesh collision files.
+
+## Generator And Validation
+
+Harness assets use a convention-plus-override generator:
+
+- `pnpm generate:assets` scans `apps/game/public/harness/**` and writes
+  `apps/game/src/harness/generatedAssets.ts`.
+- `pnpm validate:assets` dry-runs the generator, checks generated files exist,
+  checks manifest references resolve through `AssetRegistry`, and rejects
+  hardcoded runtime asset paths in source.
+
+Generated asset files and the Pixi built-in FX manifest are allowed to contain
+runtime URLs because they are asset registration sources. Runtime adapters,
+scripts, and renderer systems must use asset ids and injected resolvers.
+
+## App Composition
+
+`apps/game/src/harness/contentManifest.ts` composes the vertical-slice manifest:
+
+- generated harness assets from `harnessRuntimeAssets`
+- Pixi built-in FX assets from `builtInPixiFxRuntimeAssets`
+- maps, items, evidence, trials, and input fixtures
+
+The vertical-slice app creates one `AssetRegistry` from this manifest and passes
+it through adapter props:
+
+- media commands resolve `bgm`, `sfx`, `voice`, and `video` ids before calling
+  Howler or the HTML video port.
+- Pixi resolves backgrounds, portraits, and FX ids before loading textures.
+- R3F resolves `WorldMapDef.assetRefs` model ids before probing or loading
+  glTF assets.
+- UI/evidence image references are validated even when the current harness does
+  not render every thumbnail.
+
+Missing assets must produce diagnostics and keep the existing visible fallback.
+They must not crash the app and must not fail silently.
 
 ## Collision Proxies
 
@@ -28,12 +95,4 @@ interactable space.
 
 Navi first-person movement must be collision-ready before production maps are
 added. Harness placeholders can still use simple geometry, but map definitions
-must keep the proxy references.
-
-## Budgets
-
-Texture and mesh budgets live beside runtime assets so review can happen during
-contract changes. A future asset build task should use glTF Transform and image
-compression tooling, then validate the generated manifest against
-`ContentManifestSchema`.
-
+must keep proxy references.

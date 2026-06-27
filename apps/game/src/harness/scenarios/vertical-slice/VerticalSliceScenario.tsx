@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, type ButtonHTMLAttributes } from "react";
+import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
 import type { PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
@@ -20,17 +21,20 @@ import {
 } from "../../../interaction/useVerticalSliceRuntimeAdapter";
 import { useVerticalSliceSaveAdapter } from "../../../interaction/useVerticalSliceSaveAdapter";
 import { VnRuntimeDispatcher } from "../../../VnRuntimeDispatcher";
+import { harnessContentManifest } from "../../contentManifest";
 
 type DebugTabId = "runtime" | "inspector";
 
 export function VerticalSliceScenario() {
   const flow = useGameFlowActor();
   const settings = useGameSettingsAdapter();
+  const assetRegistry = useMemo(() => createAssetRegistry(harnessContentManifest), []);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
   const enterTrialMode = useCallback(() => flow.send({ type: "ENTER_TRIAL" }), [flow.send]);
   const enterNaviMode = useCallback(() => flow.send({ type: "ENTER_NAVI" }), [flow.send]);
   const runtime = useVerticalSliceRuntimeAdapter(flow.mode, {
+    assetResolver: assetRegistry,
     storyPlayTiming,
     onEnterTrial: enterTrialMode,
     onEnterNavi: enterNaviMode
@@ -56,12 +60,14 @@ export function VerticalSliceScenario() {
             )}
             <VnRuntimeDispatcher
               active={flow.mode !== "trial" && runtime.storyRuntime.active}
+              assetResolver={assetRegistry}
               pixiAnimate={runtime.pixiStageRuntime.animate}
               pixiHintSequence={runtime.pixiStageRuntime.hintSequence}
               pixiHints={runtime.pixiStageRuntime.hints}
               pixiPresentationTasks={runtime.pixiStageRuntime.presentationTasks}
               pixiStage={runtime.pixiStageRuntime.snapshot}
               storySession={runtime.storySession}
+              onPixiDiagnostic={runtime.observeAssetDiagnostic}
               onPixiTasksChanged={runtime.updatePixiPresentationTasks}
             />
           </div>
@@ -104,6 +110,7 @@ export function VerticalSliceScenario() {
             >
               <VerticalSliceReadout
                 activeInteractableId={runtime.navi.activeInteractableId ?? "none"}
+                assetDiagnosticCount={String(countAssetDiagnostics(runtime.runtimeDiagnostics))}
                 blockedReason={runtime.interactionView.blockedReason ?? "none"}
                 canConfirm={String(runtime.interactionView.canConfirm)}
                 diagnosticCount={String(runtime.runtimeDiagnostics.length)}
@@ -326,6 +333,7 @@ function displayStorySpeaker(speaker: string): string {
 
 function VerticalSliceReadout({
   activeInteractableId,
+  assetDiagnosticCount,
   blockedReason,
   canConfirm,
   diagnosticCount,
@@ -351,6 +359,7 @@ function VerticalSliceReadout({
   trialSegment
 }: {
   activeInteractableId: string;
+  assetDiagnosticCount: string;
   blockedReason: string;
   canConfirm: string;
   diagnosticCount: string;
@@ -391,6 +400,7 @@ function VerticalSliceReadout({
         <Readout label="Can" testId="vertical-slice-can-confirm" value={canConfirm} />
         <Readout label="Block" testId="vertical-slice-blocked-reason" value={blockedReason} />
         <Readout label="Diag" testId="vertical-slice-diagnostics-count" value={diagnosticCount} />
+        <Readout label="Asset Diag" testId="vertical-slice-asset-diagnostics-count" value={assetDiagnosticCount} />
         <Readout label="Inventory" testId="vertical-slice-inventory" value={inventory} />
         <Readout label="Evidence" testId="vertical-slice-evidence" value={evidence} />
         <Readout label="Route" testId="vertical-slice-route" value={route} />
@@ -417,6 +427,10 @@ function formatLatestDiagnostic(diagnostics: VerticalSliceRuntimeDiagnostic[]): 
   const location = latest.loc ? ` ${latest.loc}` : "";
   const command = latest.commandId ? ` @${latest.commandId}` : "";
   return `${latest.severity}:${latest.source}:${latest.code}${command}${location} - ${latest.message}`;
+}
+
+function countAssetDiagnostics(diagnostics: VerticalSliceRuntimeDiagnostic[]): number {
+  return diagnostics.filter((diagnostic) => diagnostic.source === "asset").length;
 }
 
 function Readout({ label, testId, value, wide = false }: { label: string; testId: string; value: string; wide?: boolean }) {

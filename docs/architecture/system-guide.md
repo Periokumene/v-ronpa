@@ -28,6 +28,9 @@ docs/archive/completed-tasks/*
 packages/contracts
   -> public schemas and semantic contracts
 
+packages/asset-registry
+  -> pure ContentManifest runtime asset lookup and diagnostics
+
 adapters and apps
   -> rendering, persistence, media, and harness surfaces
 ```
@@ -59,6 +62,10 @@ adapters and apps
   HTMLVideo playback, and future WebAudio rhythm adapter notes.
 - `contracts` owns RuntimeCommand and saveable runtime contracts; renderer-local
   hint and trace shapes stay in presenter packages.
+- `asset-registry` owns id-to-runtime-asset lookup for parsed
+  `ContentManifest` data. It depends only on `contracts`, validates manifests
+  at runtime, diagnoses duplicate, missing, mismatched, or raw asset
+  references, and does not load Pixi, Three, Howler, DOM, or files.
 - `r3f-adapter` owns 3D scene presentation only.
 - `pixi-presenter` owns 2D canvas/WebGL presentation only, including internal
   presenter traces used for adapter tests and inspection.
@@ -128,6 +135,7 @@ submission remains a Trial UI action routed through `trial-director`.
   -> story-play playback state + pacing schedule
   -> VN runtime transaction + route table
   -> routed RuntimeCommand consumption
+  -> app-created AssetRegistry resolves media/Pixi/R3F/UI asset ids
   -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events
   -> VnRuntimeDispatcher renders DOM dialog and Pixi snapshot
 ```

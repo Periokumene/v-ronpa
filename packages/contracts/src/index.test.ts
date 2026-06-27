@@ -38,21 +38,16 @@ import {
 describe("contracts", () => {
   it("validates the baseline content manifest", () => {
     const manifest = ContentManifestSchema.parse({
-      version: 1,
+      version: 2,
       assets: [
-        { id: "portrait:hero:neutral", kind: "portrait", uri: "/assets/hero.png", tags: ["placeholder"] },
-        {
-          id: "texture:evidence:keycard-icon",
-          kind: "texture",
-          uri: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='14' fill='%23ffe66d'/%3E%3Crect x='18' y='34' width='60' height='28' rx='6' fill='%231f2937'/%3E%3Ccircle cx='31' cy='48' r='5' fill='%23ffffff'/%3E%3C/svg%3E",
-          tags: ["placeholder", "evidence"]
-        }
+        { id: "portrait:hero:neutral", kind: "portrait", tags: ["placeholder"] },
+        { id: "texture:evidence:keycard-icon", kind: "texture", tags: ["placeholder", "evidence"] }
       ],
       uiAssets: [
         {
           id: "ui:title:bg",
           role: "title-background",
-          uri: "/harness/ui/title-bg.webp",
+          assetId: "texture:title:bg",
           slice: "stretch",
           tags: ["harness"]
         }
@@ -61,11 +56,39 @@ describe("contracts", () => {
         {
           id: "style:harness:vn",
           name: "Harness VN",
-          assets: [{ id: "ui:dialog:frame", role: "dialog-frame", assetId: "ui:title:bg", slice: "nine-slice" }],
+          assets: [{ id: "ui:dialog:frame", role: "dialog-frame", assetId: "texture:title:bg", slice: "nine-slice" }],
           tokens: { accentColor: "#ffd166", panelOpacity: 0.82, motionScale: 1 }
         }
       ],
       runtimeAssets: [
+        {
+          id: "portrait:hero:neutral",
+          kind: "portrait",
+          sourceUri: "assets/source/hero.psd",
+          optimizedUri: "assets/runtime/hero.webp",
+          format: "webp",
+          compression: ["webp"],
+          lods: [],
+          collisionProxyIds: []
+        },
+        {
+          id: "texture:evidence:keycard-icon",
+          kind: "texture",
+          optimizedUri: "assets/runtime/keycard-icon.png",
+          format: "png",
+          compression: [],
+          lods: [],
+          collisionProxyIds: []
+        },
+        {
+          id: "texture:title:bg",
+          kind: "texture",
+          optimizedUri: "assets/runtime/title-bg.webp",
+          format: "webp",
+          compression: ["webp"],
+          lods: [],
+          collisionProxyIds: []
+        },
         {
           id: "glb:academy-hall",
           kind: "glb",
@@ -81,7 +104,7 @@ describe("contracts", () => {
         {
           id: "collision:academy-hall",
           kind: "navmesh",
-          uri: "assets/runtime/academy-hall.navmesh.glb"
+          assetId: "glb:academy-hall"
         }
       ],
       input: {
@@ -650,10 +673,48 @@ describe("contracts", () => {
       InteractionStyleProfileSchema.parse({
         id: "style:default",
         name: "Default",
-        assets: [{ id: "ui:toolbar:icon", role: "toolbar-icon", uri: "/harness/ui/icon.png" }],
+        assets: [{ id: "ui:toolbar:icon", role: "toolbar-icon", assetId: "texture:evidence:keycard-icon" }],
         tokens: { accentColor: "#6ee7d8", panelOpacity: 0.9 }
       })
     ).toMatchObject({ assets: [{ role: "toolbar-icon" }], tokens: { accentColor: "#6ee7d8", panelOpacity: 0.9 } });
+  });
+
+  it("rejects legacy asset references that carry direct URIs", () => {
+    expect(() =>
+      RuntimeScriptSchema.parse({
+        scriptPath: "story.nani",
+        commands: [],
+        labels: {},
+        assets: [{ id: "bg:harness", kind: "background", uri: "/bg.png" }],
+        dependencies: []
+      })
+    ).toThrow();
+
+    expect(() =>
+      UiAssetRefSchema.parse({
+        id: "ui:toolbar:icon",
+        role: "toolbar-icon",
+        uri: "/harness/ui/icon.png"
+      })
+    ).toThrow();
+
+    expect(() =>
+      ContentManifestSchema.parse({
+        version: 2,
+        assets: [],
+        runtimeAssets: [],
+        maps: [
+          {
+            id: "map:harness",
+            name: "Harness",
+            spawn: [0, 0, 0],
+            assetRefs: [{ id: "model:harness", kind: "glb", uri: "/harness/models/harness.gltf" }]
+          }
+        ],
+        items: [],
+        trials: []
+      })
+    ).toThrow();
   });
 
   it("validates additive story runtime text and runtime wait contracts", () => {
@@ -845,7 +906,7 @@ describe("contracts", () => {
         scriptPath: "story.nani",
         commands: [command],
         labels: { Start: 0 },
-        assets: [{ id: "bg:harness", kind: "background", uri: "/bg.png" }],
+        assets: [{ id: "bg:harness", kind: "background" }],
         dependencies: [{ endpoint: "common.nani" }]
       })
     ).toMatchObject({ scriptPath: "story.nani", commands: [{ commandId: "flash" }] });

@@ -5,5 +5,8 @@ export type {
   FirstPersonFallbackStatus,
   FirstPersonInteractRequest,
   PointerLockStatus,
+  R3fAssetDiagnostic,
+  R3fMapModelAssetResolution,
+  R3fAssetResolver,
   TrialRoundTableStageProps
 } from "./stages";

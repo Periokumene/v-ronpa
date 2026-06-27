@@ -68,16 +68,16 @@ This task may use pre-seeded harness media fixtures for media command
 validation. These assets are validation fixtures, not production content and
 not resolver placeholder fallbacks.
 
-| Asset id | Public URI | Kind | Validation role |
-|---|---|---|---|
-| `bgm:validation-main` | `/harness/media/bgm/bgm-validation-main.ogg` | `bgm` | Default BGM group playback |
-| `bgm:validation-alt` | `/harness/media/bgm/bgm-validation-alt.ogg` | `bgm` | Same-group BGM replacement |
-| `bgm:validation-layer` | `/harness/media/bgm/bgm-validation-layer.ogg` | `bgm` | Second BGM group coexistence |
-| `bgm:validation-extra` | `/harness/media/bgm/bgm-validation-extra.ogg` | `bgm` | Reserved BGM resolver coverage |
-| `sfx:rain-inside-car-loop` | `/harness/media/sfx/rain-inside-car-loop.ogg` | `sfx` | Looping SFX tracking |
-| `sfx:shock-fadeout` | `/harness/media/sfx/shock-fadeout.ogg` | `sfx` | One-shot or `sfxFast` playback |
-| `sfx:knock-door` | `/harness/media/sfx/knock-door.ogg` | `sfx` | One-shot SFX playback |
-| `video:validation-intro` | `/harness/media/video/movie-validation-intro.mp4` | `video` | Blocking movie playback |
+| Asset id | Kind | Validation role |
+|---|---|---|
+| `bgm:validation-main` | `bgm` | Default BGM group playback |
+| `bgm:validation-alt` | `bgm` | Same-group BGM replacement |
+| `bgm:validation-layer` | `bgm` | Second BGM group coexistence |
+| `bgm:validation-extra` | `bgm` | Reserved BGM resolver coverage |
+| `sfx:rain-inside-car-loop` | `sfx` | Looping SFX tracking |
+| `sfx:shock-fadeout` | `sfx` | One-shot or `sfxFast` playback |
+| `sfx:knock-door` | `sfx` | One-shot SFX playback |
+| `video:validation-intro` | `video` | Blocking movie playback |
 
 Asset intake rules:
 
@@ -85,9 +85,9 @@ Asset intake rules:
 - Do not commit source-system junk files such as `.DS_Store`.
 - Do not add new media formats for this task; use the prepared `.ogg` audio and
   `.mp4` video assets.
-- Do not hard-code public URIs in compiler, StoryEngine, or pure
-  `mediaRuntime`; expose the ids through canonical runtime asset refs at the app
-  adapter boundary.
+- Do not hard-code runtime file URIs in compiler, StoryEngine, or pure
+  `mediaRuntime`; expose the ids through `ContentManifest.runtimeAssets` and
+  the app-created resolver boundary.
 - Future production assets must go through the project asset pipeline instead
   of reusing the harness validation folder.
 
@@ -696,48 +696,43 @@ Media resource management invariants:
   - `bgmPath`, `sfxPath`, and `moviePath` remain source refs until app adapter
     resolution.
   - The adapter resolver input must be explicit and app-boundary owned:
-    `sourceRef`, media `kind` (`"bgm" | "sfx" | "voice" | "video"`), optional
-    `ContentManifest.runtimeAssets`, optional manifest `assets`, and optional
-    `RuntimeScript.assets`. The resolver must not import a global manifest or
-    load assets by itself.
+    `sourceRef`, media `kind` (`"bgm" | "sfx" | "voice" | "video"`), and the
+    app-created `AssetResolver`. The resolver must not import a global manifest
+    or load assets by itself.
   - Lookup keys are exact and case-sensitive. Do not normalize slashes, trim
     extensions, derive basenames, or treat command paths as catalog groups.
-  - Lookup order:
-    1. `ContentManifest.runtimeAssets`: match `sourceRef` against
-       `RuntimeAsset.id` first, then `RuntimeAsset.sourceUri`; require matching
-       `kind`; return `RuntimeAsset.optimizedUri`.
-    2. Manifest `AssetRef` entries: match `sourceRef` against `AssetRef.id`;
-       require matching `kind`; return `AssetRef.uri`.
-    3. `RuntimeScript.assets`: match `sourceRef` against `AssetRef.id`; require
-       matching `kind`; return `AssetRef.uri`.
-    4. Raw fallback only when `sourceRef` is URI-like (`/`, `./`, `../`,
-       `http://`, `https://`, `data:`, or `blob:`).
-  - A non-URI alias that misses the manifest and script asset tables is
-    unresolved.
-  - Missing or unresolvable media source is a `media` adapter diagnostic plus
-    no-op.
+  - Lookup source:
+    1. `ContentManifest.runtimeAssets` is the only runtime-loading authority.
+       `sourceRef` must match `RuntimeAsset.id`; matching `kind` is required;
+       the app resolver returns `RuntimeAsset.optimizedUri`.
+    2. Manifest `assets` and `RuntimeScript.assets` are id-only dependency
+       declarations. They can be validated, but they do not carry URLs and are
+       not fallback loading catalogs.
+    3. Raw URI-like refs (`/`, `./`, `../`, `http://`, `https://`, `data:`, or
+       `blob:`) are rejected as asset diagnostics.
+  - Missing or unresolvable media source is an asset diagnostic plus no-op.
   - Do not add or play placeholder media resources in this task; the prepared
     harness media files are explicit validation assets only.
 - Validation asset declaration policy:
   - The normal harness showcase path should declare all prepared validation ids
     as `ContentManifest.runtimeAssets` entries with stable `id`, matching
-    `kind`, public `optimizedUri`, format, and empty `compression`.
-  - Adapter resolver unit tests may additionally use manifest `AssetRef` entries
-    and `RuntimeScript.assets` entries to cover fallback priority.
+    `kind`, app-loadable `optimizedUri`, format, and empty `compression`.
+  - Adapter resolver unit tests should use mock `AssetResolver` instances;
+    manifest `AssetRef` and `RuntimeScript.assets` can be tested as dependency
+    declarations but not as URL fallbacks.
   - The prepared movie fixture id is `video:validation-intro` with
     `kind:"video"`; normal validation must resolve it through canonical runtime
-    asset refs, not raw URI fallback.
+    asset registration and must not rely on raw URI inputs.
   - Do not introduce a second ad hoc media catalog file; use
-    `ContentManifest.runtimeAssets`, manifest `assets`, or `RuntimeScript.assets`
-    exactly as the resolver policy defines.
+    `ContentManifest.runtimeAssets` plus the app-created `AssetRegistry`.
   - The app adapter must be able to resolve all prepared asset ids without raw
     URI fallback in the normal validation path.
 - Movie validation policy:
   - `apps/game/public/harness/media/video/movie-validation-intro.mp4` is the
     canonical harness video fixture for this task.
   - `video:validation-intro` must resolve through the adapter resolver before
-    playback. Do not reference `/harness/media/video/movie-validation-intro.mp4`
-    directly from compiler, StoryEngine, pure mediaRuntime, or `.nani`.
+    playback. Do not reference the public `optimizedUri` directly from
+    compiler, StoryEngine, pure mediaRuntime, or `.nani`.
   - `movie` playback uses the existing `VideoPort` / `HTMLVideoElement`
     boundary. Do not route movie playback through Pixi or add a cinematic
     effect system in this task.
@@ -760,10 +755,15 @@ Media resource management invariants:
   - Stop BGM groups with `@stopBgm group:music fade:0.5` and
     `@stopBgm group:ambient fade:0.2`.
 - Adapter diagnostics:
-  - App adapter media diagnostics use the runtime diagnostic source `"media"`.
-  - Required diagnostic codes include `media-source-unresolved` for resolver
-    misses, `media-handle-missing` for missing tracked stop targets, and
-    `media-port-error` for caught `AudioPort` / `VideoPort` failures.
+  - App adapter asset resolution misses use the runtime diagnostic source
+    `"asset"`.
+  - Media runtime diagnostics use source `"media"` for media-owned failures
+    such as missing tracked stop targets and caught `AudioPort` / `VideoPort`
+    failures.
+  - Required diagnostic codes include `asset-missing` / `raw-uri-disallowed`
+    for resolver misses or raw path refs, `media-handle-missing` for missing
+    tracked stop targets, and `media-port-error` for caught `AudioPort` /
+    `VideoPort` failures.
   - Compiler diagnostics remain compiler-owned, StoryEngine diagnostics remain
     story-owned, and transaction routing diagnostics remain transaction-owned.
 - Unsupported media params:
@@ -1080,7 +1080,7 @@ Allowed path caveats:
 | one-shot SFX and `sfxFast` stay effects-only | mediaRuntime tests |
 | looping SFX is tracked and can be stopped by key | mediaRuntime tests |
 | media source resolution is adapter-owned | adapter tests |
-| unresolved media source no-ops with `"media"` diagnostics | adapter tests |
+| unresolved media source no-ops with `"asset"` diagnostics | adapter tests |
 | `AudioHandle.fadeOutAndStop` releases faded handles | media-save tests |
 | runtime UI surfaces do not become shell overlay enum entries | adapter/ui-kit tests and review |
 | choice id/enabled/setExpression works | StoryEngine tests |
@@ -1123,11 +1123,12 @@ Required regression cases:
 - Boundary path: `fadeOutAndStop(0)` behaves like `stop()`, and repeated
   `stop()` / `fadeOutAndStop()` calls are idempotent without leaked timers or
   double release.
-- Normal path: adapter resolver resolves media refs from manifest runtime
-  assets / asset refs, then script assets, then raw URI/data URI fallback.
+- Normal path: adapter resolver resolves media refs from the app-created
+  `AssetResolver` backed by manifest runtime assets.
 - Boundary path: adapter resolver lookup uses exact key matching, validates
-  media `kind`, returns `optimizedUri` for `RuntimeAsset`, returns `uri` for
-  `AssetRef`, and only raw-falls back for URI-like source refs.
+  media `kind`, returns `optimizedUri` for `RuntimeAsset`, treats manifest
+  `AssetRef` / `RuntimeScript.assets` as id-only dependency declarations, and
+  rejects URI-like source refs.
 - Normal path: prepared harness ids resolve through canonical
   `ContentManifest.runtimeAssets` declarations and cover BGM same-group
   replacement, second BGM group coexistence, looping SFX start/stop, one-shot
@@ -1151,7 +1152,7 @@ Required regression cases:
 - Boundary path: media `wait!` produces an unsupported-param diagnostic and
   does not create `runtimeWait` or `presentationWait`.
 - No-op path: unresolved media source emits adapter diagnostics with source
-  `"media"` and does not call `AudioPort` / `VideoPort`.
+  `"asset"` and does not call `AudioPort` / `VideoPort`.
 - No-op path: `stopSfx` with no active handle does not throw.
 - No-op path: unsupported command params produce diagnostics.
 - No-op path: one-shot `sfx` and `sfxFast` produce effects but no tracked media
@@ -1260,13 +1261,14 @@ The implementation is programmatically acceptable when:
   `choice`.
 - Old and new story snapshots validate.
 - BGM group replacement/coexistence, SFX tracking, missing media no-op with
-  `"media"` diagnostics, `fadeOutAndStop` idempotent release, and adapter
-  resolver priority/key/kind rules are covered by tests.
+  `"asset"` diagnostics, `fadeOutAndStop` idempotent release, and adapter
+  resolver key/kind rules are covered by tests.
 - Prepared harness media ids, including `video:validation-intro`, are wired
   through canonical `ContentManifest.runtimeAssets` declarations for normal
-  validation; resolver fallback sources are covered only by adapter unit tests.
-  No runtime path hard-codes those public URIs outside the app adapter fixture
-  boundary.
+  validation; adapter unit tests use mock resolvers instead of fallback source
+  tables.
+  No runtime code hard-codes those optimized URIs outside generator and
+  registration sources.
 - The former fast-exit branch is treated as `#MainInteractionFlow`, and the
   Pixi showcase branch remains separate.
 - Runtime UI surfaces are covered through `GameInteractionShell` without adding
@@ -1305,10 +1307,10 @@ The reviewer should inspect that:
 - Media source refs are resolved only in the app adapter; compiler,
   StoryEngine, and pure mediaRuntime do not load assets or hold live handles.
 - Prepared harness media assets are referenced by stable ids, not by hard-coded
-  public URIs in compiler, StoryEngine, or pure `mediaRuntime`.
+  runtime file URIs in compiler, StoryEngine, or pure `mediaRuntime`.
 - `video:validation-intro` resolves to the canonical harness video fixture
-  through canonical runtime asset refs; movie playback uses `VideoPort` / DOM
-  video, not Pixi.
+  through `ContentManifest.runtimeAssets`; movie playback uses `VideoPort` /
+  DOM video, not Pixi.
 - Future showcase `.nani` commands are staged in the main interaction branch,
   not mixed into the Pixi visual validation branch.
 - Runtime UI surfaces are mounted through `GameInteractionShell` as the single
@@ -1326,18 +1328,16 @@ The reviewer should inspect that:
   media playback state.
 - Existing smoke text assertions may change for renamed branch copy, but no new
   smoke flow or screenshot baseline is introduced.
-- Adapter media resolution receives manifest/runtime script asset tables
-  explicitly from the app boundary; it does not import or own a global asset
-  catalog. Normal harness showcase validation uses canonical
-  `ContentManifest.runtimeAssets`; mixed source fallback stays in adapter unit
-  tests.
+- Adapter media resolution receives the app-created `AssetResolver`; it does
+  not import or own a global asset catalog. Normal harness showcase validation
+  uses canonical `ContentManifest.runtimeAssets`; raw URI inputs are rejected.
 - Adapter media lookup uses exact source-ref keys and media kind checks; it
   does not infer catalog groups, basenames, or extension-stripped aliases.
 - BGM is an explicit group-keyed multi-track implementation, where same-group
   playback replaces and different groups may coexist.
 - One-shot `sfx` and `sfxFast` are effect-only, while only looping `sfx` is
   tracked app-locally.
-- Missing media sources no-op with `"media"` adapter diagnostics and do not use
+- Missing media sources no-op with `"asset"` adapter diagnostics and do not use
   placeholder media.
 - `AudioHandle.fadeOutAndStop` is the only media-save audio API extension added
   for fade-stop cleanup.
@@ -1364,11 +1364,10 @@ The reviewer should inspect that:
 - Explicit list of unsupported Naninovel params left as diagnostics.
 - Explicit summary of media resource handling: BGM group-track behavior, SFX
   tracking behavior, adapter resolver input sources, resolver key/kind policy,
-  missing-source `"media"` diagnostics, and `fadeOutAndStop` usage.
+  missing-source `"asset"` diagnostics, and `fadeOutAndStop` usage.
 - Explicit summary of prepared harness media asset usage: ids, canonical
-  `ContentManifest.runtimeAssets` declaration path, adapter fallback test
-  sources, canonical movie fixture path, and the `.nani` media validation
-  sequence.
+  `ContentManifest.runtimeAssets` declaration path, mock resolver tests,
+  canonical movie asset id, and the `.nani` media validation sequence.
 - Explicit summary of runtime UI surface handling: which shell overlays remain
   `GameOverlayKind`, which script-driven surfaces are app-local runtime UI, and
   confirmation that Pixi visual behavior was not changed.

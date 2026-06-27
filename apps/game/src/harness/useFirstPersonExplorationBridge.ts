@@ -7,7 +7,7 @@ import type {
   PlayerPose,
   WorldMapDef
 } from "@v-ronpa/contracts";
-import type { ExplorationStageProps, FirstPersonInteractRequest, PointerLockStatus } from "@v-ronpa/r3f-adapter";
+import type { ExplorationStageProps, FirstPersonInteractRequest, PointerLockStatus, R3fAssetDiagnostic, R3fAssetResolver } from "@v-ronpa/r3f-adapter";
 
 const POINTER_LOCK_TRIGGER_ATTRIBUTE = "data-first-person-pointer-lock-trigger";
 const POINTER_LOCK_TRIGGER_SELECTOR = `[${POINTER_LOCK_TRIGGER_ATTRIBUTE}="true"]`;
@@ -21,6 +21,8 @@ export interface FirstPersonExplorationBridgeOptions {
   activeInteractableId?: string;
   onSensorReport: (report: NaviInteractionSensorReport) => void;
   onInteractRequest: (request: FirstPersonInteractRequest) => void;
+  assetResolver?: R3fAssetResolver;
+  onAssetDiagnostic?: (diagnostic: R3fAssetDiagnostic) => void;
 }
 
 export interface FirstPersonPointerLockTriggerProps {
@@ -43,7 +45,9 @@ export function useFirstPersonExplorationBridge({
   inputActionsRef,
   activeInteractableId,
   onSensorReport,
-  onInteractRequest
+  onInteractRequest,
+  assetResolver,
+  onAssetDiagnostic
 }: FirstPersonExplorationBridgeOptions) {
   const [interactSignal, setInteractSignal] = useState(0);
   const [pointerLockStatus, setPointerLockStatus] = useState<PointerLockStatus>("idle");
@@ -81,6 +85,7 @@ export function useFirstPersonExplorationBridge({
   const explorationStageProps = useMemo<ExplorationStageProps>(() => {
     const props: ExplorationStageProps = {
       map,
+      ...(assetResolver ? { assetResolver } : {}),
       cameraMode,
       inputLock,
       inputActionsRef,
@@ -88,6 +93,7 @@ export function useFirstPersonExplorationBridge({
       pointerLockSelector: POINTER_LOCK_TRIGGER_SELECTOR,
       onSensorReport,
       onInteractRequest,
+      ...(onAssetDiagnostic ? { onAssetDiagnostic } : {}),
       onPointerLockChange: setPointerLockStatus
     };
 
@@ -100,11 +106,13 @@ export function useFirstPersonExplorationBridge({
     return props;
   }, [
     activeInteractableId,
+    assetResolver,
     cameraMode,
     inputActionsRef,
     inputLock,
     interactSignal,
     map,
+    onAssetDiagnostic,
     onInteractRequest,
     onSensorReport,
     poseCommand.pose,

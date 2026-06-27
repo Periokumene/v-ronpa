@@ -14,11 +14,11 @@
 
 ## Status
 
-- State: `Draft`
+- State: `Archived`
 - Owner: `TBD`
 - Created: `2026-06-24`
-- Updated: `2026-06-24`
-- Completed Commit: `TBD`
+- Updated: `2026-06-27`
+- Completed Commit: `128bb1303c4b476b977b87f121176ae89a095447`
 - Archive Target: `docs/archive/completed-tasks/pixi-weather-glitch-effect-polish.md`
 
 ## Worktree Environment

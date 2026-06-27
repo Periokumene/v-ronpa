@@ -1,11 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { Container, Rectangle, TilingSprite, type Filter, type Ticker } from "pixi.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Assets, Container, Rectangle, Texture, TilingSprite, type Filter, type Ticker } from "pixi.js";
 import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "@v-ronpa/contracts";
 import { createInitialPixiStageSnapshot } from "../stageSnapshot";
 import { ActorSystem, FilterSystem, RootFilterStack, TransientEffectSystem, TweenSystem, WeatherSystem } from "./systems";
 import { PresentationTaskController } from "./presentationTasks";
+import type { PixiAssetResolver, PixiPresenterDiagnostic } from "./assetResolver";
 
 describe("pixi presentation task system integration", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("creates and completes an actor transition task", () => {
     const { actors, tasks, tweens } = createSystems();
     actors.reconcile(stageWithActor(backgroundActor({ durationMs: 100 }), 1), true);
@@ -35,6 +40,70 @@ describe("pixi presentation task system integration", () => {
 
     expect(tasks.snapshot()).toEqual([]);
   });
+
+  it("loads background and portrait textures through an injected asset resolver", () => {
+    const load = vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
+    const resolverCalls: unknown[] = [];
+    const { actors } = createSystems({
+      assetResolver: {
+        resolve(input) {
+          resolverCalls.push(input);
+          return { uri: `/resolved/${input.id}.png` };
+        }
+      }
+    });
+
+    actors.reconcile(stageWithActors(
+      backgroundActor({ durationMs: 0 }),
+      [characterActor("character:felix", "portrait:felix:neutral")]
+    ), false);
+
+    expect(resolverCalls).toEqual([
+      { id: "bg:test", kind: "background" },
+      { id: "portrait:felix:neutral", kind: "portrait" }
+    ]);
+    expect(load).toHaveBeenCalledWith("/resolved/bg:test.png");
+    expect(load).toHaveBeenCalledWith("/resolved/portrait:felix:neutral.png");
+  });
+
+  it("emits diagnostics for missing background and portrait assets while keeping fallbacks", () => {
+    const load = vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
+    const diagnostics: PixiPresenterDiagnostic[] = [];
+    const { actors } = createSystems({
+      assetResolver: {
+        resolve(input) {
+          return { diagnostic: { code: "asset-missing", severity: "error", message: `${input.id} missing` } };
+        }
+      },
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic)
+    });
+
+    actors.reconcile(stageWithActors(
+      backgroundActor({ durationMs: 0 }),
+      [characterActor("character:felix", "portrait:felix:neutral")]
+    ), false);
+
+    expect(load).not.toHaveBeenCalled();
+    expect(diagnostics).toEqual([
+      {
+        source: "asset",
+        code: "asset-missing",
+        severity: "error",
+        assetId: "bg:test",
+        kind: "background",
+        message: "bg:test missing"
+      },
+      {
+        source: "asset",
+        code: "asset-missing",
+        severity: "error",
+        assetId: "portrait:felix:neutral",
+        kind: "portrait",
+        message: "portrait:felix:neutral missing"
+      }
+    ]);
+  });
+
 
   it("creates and completes flash tasks through transient effects", () => {
     const { effects, tasks, tweens } = createSystems();
@@ -280,9 +349,9 @@ describe("pixi presentation task system integration", () => {
   });
 });
 
-function createSystems() {
+function createSystems(overrides: { assetResolver?: PixiAssetResolver; onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void } = {}) {
   const root = new Container({ label: "test-root" });
-  const options = { root, width: () => 960, height: () => 540 };
+  const options = { root, width: () => 960, height: () => 540, ...overrides };
   const tweens = new TweenSystem();
   const tasks = new PresentationTaskController();
   const rootFilters = new RootFilterStack(options);
@@ -325,6 +394,16 @@ function stageWithActor(actor: PixiActorSnapshot, revision: number): PixiStageSn
   };
 }
 
+function stageWithActors(background: PixiActorSnapshot, characters: PixiActorSnapshot[]): PixiStageSnapshot {
+  return {
+    ...createInitialPixiStageSnapshot(),
+    revision: 1,
+    backgroundsById: { [background.id]: background },
+    charactersById: Object.fromEntries(characters.map((actor) => [actor.id, actor])),
+    actorOrder: [background.id, ...characters.map((actor) => actor.id)]
+  };
+}
+
 function backgroundActor({ durationMs, wait = false }: { durationMs: number; wait?: boolean }): PixiActorSnapshot {
   return {
     id: "MainBackground",
@@ -335,6 +414,20 @@ function backgroundActor({ durationMs, wait = false }: { durationMs: number; wai
     z: 0,
     filters: {},
     transition: { durationMs, lazy: false, wait }
+  };
+}
+
+function characterActor(id: string, appearance: string): PixiActorSnapshot {
+  return {
+    id,
+    kind: "character",
+    appearance,
+    visible: true,
+    alpha: 1,
+    z: 0,
+    pos: [0.5, 0],
+    filters: {},
+    transition: { durationMs: 0, lazy: false, wait: false }
   };
 }
 

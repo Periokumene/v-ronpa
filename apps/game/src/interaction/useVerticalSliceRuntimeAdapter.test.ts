@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { NaniCommandCategory, RuntimeAsset, RuntimeCommand, RuntimeScript, RuntimeValue } from "@v-ronpa/contracts";
+import { createAssetRegistry } from "@v-ronpa/asset-registry";
+import type {
+  ContentManifest,
+  NaniCommandCategory,
+  RuntimeAsset,
+  RuntimeAssetFormat,
+  RuntimeAssetKind,
+  RuntimeCommand,
+  RuntimeScript,
+  RuntimeValue
+} from "@v-ronpa/contracts";
 import { createGameplayState } from "@v-ronpa/gameplay";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
@@ -325,24 +335,19 @@ describe("vertical slice runtime adapter helpers", () => {
     expect(plan.storyRuntime.active).toBe(false);
   });
 
-  it("resolves media sources by runtime assets, manifest assets, script assets, then raw URI fallback", () => {
-    const runtimeAssets: RuntimeAsset[] = [
-      runtimeAsset("bgm:main", "/runtime-main.ogg"),
-      { ...runtimeAsset("bgm:source", "/runtime-source.ogg"), sourceUri: "source-main.ogg" }
-    ];
-    const manifestAssets = [{ id: "bgm:main", kind: "bgm" as const, uri: "/manifest-main.ogg", tags: [] }];
-    const scriptAssets = [{ id: "bgm:script", kind: "bgm" as const, uri: "/script-main.ogg", tags: [] }];
+  it("resolves media sources through the asset registry and rejects raw URI fallback", () => {
+    const assetResolver = createAssetRegistry(manifestWithAssets([
+      runtimeAsset("bgm:main", "bgm", "/runtime-main.ogg"),
+      runtimeAsset("sfx:door", "sfx", "/door.ogg")
+    ]));
 
-    expect(resolveMediaSource({ sourceRef: "bgm:main", kind: "bgm", runtimeAssets, manifestAssets, scriptAssets })).toEqual({
+    expect(resolveMediaSource({ sourceRef: "bgm:main", kind: "bgm", assetResolver })).toEqual({
       uri: "/runtime-main.ogg"
     });
-    expect(resolveMediaSource({ sourceRef: "source-main.ogg", kind: "bgm", runtimeAssets })).toEqual({
-      uri: "/runtime-source.ogg"
+    expect(resolveMediaSource({ sourceRef: "/raw/sfx.ogg", kind: "sfx", assetResolver }).diagnostic).toMatchObject({
+      source: "asset",
+      code: "raw-uri-disallowed"
     });
-    expect(resolveMediaSource({ sourceRef: "bgm:script", kind: "bgm", manifestAssets, scriptAssets })).toEqual({
-      uri: "/script-main.ogg"
-    });
-    expect(resolveMediaSource({ sourceRef: "/raw/sfx.ogg", kind: "sfx" })).toEqual({ uri: "/raw/sfx.ogg" });
   });
 
   it("emits adapter diagnostics for unresolved media and does not call AudioPort", async () => {
@@ -357,16 +362,16 @@ describe("vertical slice runtime adapter helpers", () => {
       audioPort,
       handles: { bgm: {}, sfx: {}, oneShotSequence: 0 },
       effects: [{ type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:missing" }],
-      resolver: ({ sourceRef, kind }) => resolveMediaSource({ sourceRef, kind })
+      resolver: ({ sourceRef, kind }) => resolveMediaSource({ sourceRef, kind, assetResolver: createAssetRegistry(manifestWithAssets([])) })
     });
 
     expect(playBgm.calls).toEqual([]);
     expect(diagnostics).toEqual([
       {
-        source: "media",
-        code: "media-source-unresolved",
-        severity: "warning",
-        message: "Media source bgm:missing (bgm) could not be resolved."
+        source: "asset",
+        code: "asset-missing",
+        severity: "error",
+        message: "Runtime asset 'bgm:missing' is not declared in ContentManifest.runtimeAssets. (bgm:missing bgm)"
       }
     ]);
   });
@@ -500,12 +505,28 @@ describe("vertical slice runtime adapter helpers", () => {
   });
 });
 
-function runtimeAsset(id: string, optimizedUri: string): RuntimeAsset {
+function manifestWithAssets(runtimeAssets: RuntimeAsset[]): ContentManifest {
+  return {
+    version: 2 as const,
+    assets: [],
+    runtimeAssets,
+    uiAssets: [],
+    interactionStyles: [],
+    collisionProxies: [],
+    maps: [],
+    items: [],
+    evidence: [],
+    trials: []
+  };
+}
+
+function runtimeAsset(id: string, kind: RuntimeAssetKind, optimizedUri: string): RuntimeAsset {
+  const format: RuntimeAssetFormat = kind === "video" ? "mp4" : kind === "glb" ? "gltf" : kind === "bgm" || kind === "sfx" || kind === "voice" ? "ogg" : "png";
   return {
     id,
-    kind: "bgm",
+    kind,
     optimizedUri,
-    format: "ogg",
+    format,
     compression: [],
     lods: [],
     collisionProxyIds: [],

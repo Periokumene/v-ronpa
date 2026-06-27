@@ -19,6 +19,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vertical-slice-debug-panel-runtime")).toBeVisible();
   await expect(page.getByTestId("playfield").getByTestId("harness-commands")).toHaveCount(0);
   await expect(page.getByTestId("vertical-slice-debug-panel-runtime").getByTestId("vertical-slice-runtime-controls")).toBeVisible();
+  await expectNoRuntimeAssetDiagnostics(page);
   await expect(page.getByTestId("title-surface")).toBeVisible();
   await expect(page.getByTestId("title-new-game")).toBeEnabled();
   await expect(page.getByTestId("title-load")).toBeEnabled();
@@ -60,6 +61,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vertical-slice-debug-panel-runtime").getByTestId("vertical-slice-runtime-controls")).toBeVisible();
   await expect(page.getByTestId("vertical-slice-map")).toHaveText("map:academy-hall");
   await expect(page.getByTestId("vertical-slice-pointer-lock-status")).toHaveText("idle");
+  await expectNoRuntimeAssetDiagnostics(page);
   await expectNoDocumentScroll(page);
   await page.screenshot({ path: "test-results/vertical-slice-navi.png", fullPage: true });
 
@@ -219,6 +221,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("playfield").getByTestId("harness-status")).toBeVisible();
   await advanceMainInteractionShowcase(page);
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
+  await expectNoRuntimeAssetDiagnostics(page);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("pause-menu-overlay")).toBeVisible();
   await expect(page.getByTestId("pause-save")).toBeEnabled();
@@ -286,9 +289,10 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await advanceUntilText(page, "CHECKPOINT 09");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/vertical-slice-rain-snow-coexist.png", fullPage: true });
-  await advanceUntilText(page, "CHECKPOINT 11");
+  await advanceUntilTextOrOverlayClosed(page, "CHECKPOINT 11");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/vertical-slice-weather-cleanup.png", fullPage: true });
+  await expectNoRuntimeAssetDiagnostics(page);
 
   expect(consoleErrors).toEqual([]);
 });
@@ -305,6 +309,11 @@ async function walkForwardUntilActive(page: Page, interactableId: string) {
 async function expectNoDocumentScroll(page: Page) {
   const hasDocumentScroll = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 1);
   expect(hasDocumentScroll).toBe(false);
+}
+
+async function expectNoRuntimeAssetDiagnostics(page: Page) {
+  await expect(page.getByTestId("vertical-slice-asset-diagnostics-count")).toHaveText("0");
+  await expect(page.getByTestId("vertical-slice-latest-diagnostic")).not.toContainText(":asset:");
 }
 
 async function advanceUntilChoices(page: Page) {
@@ -357,6 +366,21 @@ async function advanceUntilText(page: Page, text: string) {
   }
 
   await expect(page.getByTestId("vn-dialog-text")).toContainText(text);
+}
+
+async function advanceUntilTextOrOverlayClosed(page: Page, text: string) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    if ((await page.getByTestId("vn-dialog-text").count()) === 0) {
+      if ((await page.getByTestId("vertical-slice-substate").textContent()) === "walk") return;
+      await page.waitForTimeout(120);
+      continue;
+    }
+    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) return;
+    await page.getByTestId("vn-dialog-advance").click();
+    await page.waitForTimeout(120);
+  }
+
+  await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
 }
 
 async function expectKeyNeverFocuses(page: Page, key: string, activeTestId: string) {

@@ -18,12 +18,15 @@ import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "
 import type { PixiStageRenderHint } from "../stageSnapshot";
 import { getBuiltInPixiFxTexture } from "./fxAssets";
 import type { PixiPresentationTaskHandle, PresentationTaskController } from "./presentationTasks";
-import { calculatePortraitLayout, formatFallbackPortraitLabel, resolveHarnessPortraitUrl } from "./portraits";
+import { calculatePortraitLayout, formatFallbackPortraitLabel } from "./portraits";
+import { pixiAssetLoadFailed, resolvePixiAsset, type PixiAssetResolver, type PixiPresenterDiagnostic } from "./assetResolver";
 
 export interface PixiPresenterSystemsOptions {
   root: Container;
   width: () => number;
   height: () => number;
+  assetResolver?: PixiAssetResolver;
+  onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
 }
 
 interface ActorRecord {
@@ -398,7 +401,7 @@ export class ActorSystem {
     if (record.contentKey !== contentKey) {
       record.contentGeneration += 1;
       record.container.removeChildren();
-      if (actor.kind === "background") this.drawBackground(record.container, actor);
+      if (actor.kind === "background") this.drawBackground(record, actor);
       else this.drawCharacter(record, actor);
       record.contentKey = contentKey;
       const targetAlpha = actor.visible ? actor.alpha : 0;
@@ -486,9 +489,36 @@ export class ActorSystem {
     };
   }
 
-  private drawBackground(container: Container, actor: PixiActorSnapshot): void {
+  private drawBackground(record: ActorRecord, actor: PixiActorSnapshot): void {
+    const container = record.container;
+    const contentGeneration = record.contentGeneration;
     const width = this.options.width();
     const height = this.options.height();
+    const fallback = this.createFallbackBackground(actor, width, height);
+    container.addChild(fallback);
+    const backgroundId = actor.appearance;
+    const backgroundUrl = backgroundId ? resolvePixiAsset(this.options.assetResolver, { id: backgroundId, kind: "background" }, this.options.onDiagnostic) : undefined;
+    if (backgroundId && backgroundUrl) {
+      const sprite = new Sprite(Texture.EMPTY);
+      sprite.visible = false;
+      container.addChildAt(sprite, 0);
+      void Assets.load<Texture>(backgroundUrl)
+        .then((texture) => {
+          if (!sprite.parent || record.contentGeneration !== contentGeneration) return;
+          sprite.texture = texture;
+          fitBackgroundSprite(sprite, texture, width, height);
+          sprite.visible = true;
+          fallback.visible = false;
+        })
+        .catch((error) => {
+          this.options.onDiagnostic?.(pixiAssetLoadFailed({ id: backgroundId, kind: "background" }, error));
+          fallback.visible = true;
+        });
+    }
+  }
+
+  private createFallbackBackground(actor: PixiActorSnapshot, width: number, height: number): Container {
+    const fallback = new Container({ label: `fallback:${actor.id}` });
     const style = backgroundStyleFromId(actor.appearance ?? "background");
     const plate = new Graphics()
       .rect(0, 0, width, height)
@@ -501,7 +531,8 @@ export class ActorSystem {
     });
     title.x = 48;
     title.y = 42;
-    container.addChild(plate, title);
+    fallback.addChild(plate, title);
+    return fallback;
   }
 
   private drawCharacter(record: ActorRecord, actor: PixiActorSnapshot): void {
@@ -511,10 +542,11 @@ export class ActorSystem {
     const height = this.options.height();
     const layout = calculatePortraitLayout(width, height, nearestSlot(actor.pos?.[0] ?? 0.5));
     const group = new Container({ label: actor.appearance ?? actor.id });
-    const portraitUrl = resolveHarnessPortraitUrl(actor.appearance);
+    const portraitId = actor.appearance;
+    const portraitUrl = portraitId ? resolvePixiAsset(this.options.assetResolver, { id: portraitId, kind: "portrait" }, this.options.onDiagnostic) : undefined;
     const fallback = this.createFallbackCharacter(actor, layout.maxWidth, layout.maxHeight, Boolean(portraitUrl));
     group.addChild(fallback);
-    if (portraitUrl) {
+    if (portraitId && portraitUrl) {
       const sprite = new Sprite(Texture.EMPTY);
       sprite.anchor.set(0.5, 1);
       sprite.visible = false;
@@ -527,7 +559,8 @@ export class ActorSystem {
           sprite.visible = true;
           fallback.visible = false;
         })
-        .catch(() => {
+        .catch((error) => {
+          this.options.onDiagnostic?.(pixiAssetLoadFailed({ id: portraitId, kind: "portrait" }, error));
           fallback.visible = true;
         });
     } else {
@@ -1236,6 +1269,16 @@ function fitSprite(sprite: Sprite, texture: Texture, maxWidth: number, maxHeight
   const scale = Math.min(maxWidth / textureWidth, maxHeight / textureHeight);
   sprite.width = textureWidth * scale;
   sprite.height = textureHeight * scale;
+}
+
+function fitBackgroundSprite(sprite: Sprite, texture: Texture, width: number, height: number): void {
+  const textureWidth = Math.max(1, texture.width);
+  const textureHeight = Math.max(1, texture.height);
+  const scale = Math.max(width / textureWidth, height / textureHeight);
+  sprite.width = textureWidth * scale;
+  sprite.height = textureHeight * scale;
+  sprite.x = (width - sprite.width) / 2;
+  sprite.y = (height - sprite.height) / 2;
 }
 
 function createWeatherContainer(kind: string): Container {

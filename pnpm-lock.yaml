@@ -41,6 +41,9 @@ importers:
       '@react-three/fiber':
         specifier: ^9.0.0
         version: 9.6.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.181.2)
+      '@v-ronpa/asset-registry':
+        specifier: workspace:*
+        version: link:../../packages/asset-registry
       '@v-ronpa/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -102,6 +105,12 @@ importers:
       '@types/three':
         specifier: ^0.181.0
         version: 0.181.0
+
+  packages/asset-registry:
+    dependencies:
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/contracts:
     dependencies:

@@ -1,0 +1,136 @@
+import { describe, expect, it } from "vitest";
+import type { ContentManifest, RuntimeAsset, RuntimeAssetFormat, RuntimeAssetKind } from "@v-ronpa/contracts";
+import { createAssetRegistry, isRawAssetReference } from "./index";
+
+describe("asset registry", () => {
+  it("resolves every runtime asset kind from ContentManifest.runtimeAssets", () => {
+    const manifest = manifestWithKinds(["portrait", "background", "bgm", "sfx", "voice", "video", "glb", "texture", "fx"]);
+    const registry = createAssetRegistry(manifest);
+
+    expect(registry.diagnostics).toEqual([]);
+    for (const asset of manifest.runtimeAssets) {
+      expect(registry.resolve({ id: asset.id, kind: asset.kind })).toMatchObject({
+        asset,
+        uri: asset.optimizedUri
+      });
+    }
+  });
+
+  it("diagnoses missing assets, kind mismatches, duplicate declarations, and raw URIs", () => {
+    const first = runtimeAsset("bgm:main", "bgm");
+    const manifest = baseManifest([first, runtimeAsset("bgm:main", "bgm"), runtimeAsset("sfx:door", "sfx")]);
+    const registry = createAssetRegistry(manifest);
+
+    expect(registry.diagnostics).toMatchObject([{ code: "duplicate-runtime-asset", id: "bgm:main" }]);
+    expect(registry.resolve({ id: "missing:asset", kind: "bgm" }).diagnostic).toMatchObject({ code: "asset-missing" });
+    expect(registry.resolve({ id: "sfx:door", kind: "bgm" }).diagnostic).toMatchObject({ code: "asset-kind-mismatch" });
+    expect(registry.resolve({ id: "/harness/media/sfx/door.ogg", kind: "sfx" }).diagnostic).toMatchObject({
+      code: "raw-uri-disallowed"
+    });
+  });
+
+  it("diagnoses unsupported manifest versions", () => {
+    const registry = createAssetRegistry({ ...baseManifest([]), version: 1 as 2 });
+
+    expect(registry.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "manifest-version-unsupported", severity: "error" }),
+        expect.objectContaining({ code: "manifest-invalid", severity: "error" })
+      ])
+    );
+  });
+
+  it("diagnoses malformed manifests without resolving partially declared assets", () => {
+    const registry = createAssetRegistry({
+      version: 2,
+      runtimeAssets: [{ id: "bg:harness", kind: "background" }],
+      maps: [],
+      items: [],
+      trials: []
+    });
+
+    expect(registry.diagnostics).toMatchObject([{ code: "manifest-invalid", severity: "error" }]);
+    expect(registry.resolve({ id: "bg:harness", kind: "background" }).diagnostic).toMatchObject({ code: "asset-missing" });
+  });
+
+  it("validates manifest-level asset references against runtimeAssets", () => {
+    const manifest: ContentManifest = {
+      ...baseManifest([
+        runtimeAsset("texture:evidence:keycard-thumbnail", "texture"),
+        runtimeAsset("model:academy-hall", "glb")
+      ]),
+      assets: [{ id: "model:academy-hall", kind: "glb", tags: [] }],
+      uiAssets: [{ id: "ui:toolbar:icon", role: "toolbar-icon", assetId: "texture:evidence:keycard-thumbnail", slice: "stretch", tags: [] }],
+      interactionStyles: [
+        {
+          id: "style:harness",
+          name: "Harness",
+          assets: [{ id: "ui:missing", role: "button-icon", assetId: "texture:missing", slice: "stretch", tags: [] }],
+          tokens: {}
+        }
+      ],
+      maps: [
+        {
+          id: "map:academy",
+          name: "Academy",
+          spawn: [0, 1, 2],
+          assetRefs: [{ id: "model:academy-hall", kind: "glb", tags: [] }],
+          interactables: [],
+          collisionProxyIds: []
+        }
+      ],
+      evidence: [
+        {
+          id: "evidence:keycard",
+          name: "Keycard",
+          shortLabel: "Keycard",
+          description: "A keycard.",
+          details: [],
+          visual: { thumbnailAssetId: "texture:evidence:keycard-thumbnail", iconAssetId: "texture:evidence:keycard-thumbnail" },
+          tags: []
+        }
+      ]
+    };
+
+    expect(createAssetRegistry(manifest).validateReferences()).toMatchObject([{ code: "asset-missing", id: "texture:missing" }]);
+  });
+
+  it("detects raw asset reference syntax", () => {
+    expect(isRawAssetReference("/harness/foo.png")).toBe(true);
+    expect(isRawAssetReference("https://example.test/foo.png")).toBe(true);
+    expect(isRawAssetReference("portrait:felix:neutral")).toBe(false);
+  });
+});
+
+function manifestWithKinds(kinds: RuntimeAssetKind[]): ContentManifest {
+  return baseManifest(kinds.map((kind) => runtimeAsset(`${kind}:sample`, kind)));
+}
+
+function baseManifest(runtimeAssets: RuntimeAsset[]): ContentManifest {
+  return {
+    version: 2,
+    assets: [],
+    runtimeAssets,
+    uiAssets: [],
+    interactionStyles: [],
+    collisionProxies: [],
+    maps: [],
+    items: [],
+    evidence: [],
+    trials: []
+  };
+}
+
+function runtimeAsset(id: string, kind: RuntimeAssetKind): RuntimeAsset {
+  const format: RuntimeAssetFormat = kind === "bgm" || kind === "sfx" || kind === "voice" ? "ogg" : kind === "video" ? "mp4" : kind === "glb" ? "gltf" : "png";
+  return {
+    id,
+    kind,
+    optimizedUri: `/assets/${id.replaceAll(":", "-")}`,
+    format,
+    compression: [],
+    lods: [],
+    collisionProxyIds: [],
+    tags: []
+  };
+}
