@@ -143,6 +143,23 @@ describe("nani parser", () => {
     expect(result.diagnostics[0]?.message).toBe("Duplicate label: Start");
   });
 
+  it("collects layered character pack references from char and slide commands", () => {
+    const result = parseScenario({
+      sourceText: [
+        "@char Ema.Pensive1,ArmR3 pos:50",
+        "@slide Ema from:40,0 to:50,0",
+        "@slide Rina.Pensive1 from:30,0 to:50,0"
+      ].join("\n"),
+      scriptPath: "character-assets.nani"
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.scenario.assets).toEqual([
+      { id: "Ema", kind: "character-pack" },
+      { id: "Rina", kind: "character-pack" }
+    ]);
+  });
+
   it("loads P1 fixture files into stable IR", () => {
     const results = [
       parseFixture("basic-navi.p1.nani"),
@@ -175,17 +192,73 @@ describe("nani parser", () => {
               "commandId": "char",
               "line": 8,
               "params": {
-                "idAndAppearance": "character:felix.portrait:felix:neutral",
-                "pos": [
-                  50,
-                  0,
-                ],
+                "pos": 50,
               },
-              "primary": undefined,
+              "primary": "Ema.Pensive1",
+            },
+            {
+              "commandId": "char",
+              "line": 9,
+              "params": {
+                "pos": 50,
+              },
+              "primary": [
+                "Ema.Pensive1",
+                "ArmR3",
+              ],
+            },
+            {
+              "commandId": "char",
+              "line": 10,
+              "params": {
+                "pos": 50,
+              },
+              "primary": [
+                "Ema.Pensive1",
+                "ArmR3",
+                "ArmR4",
+              ],
+            },
+            {
+              "commandId": "char",
+              "line": 11,
+              "params": {
+                "pos": 50,
+              },
+              "primary": [
+                "Ema.Pensive1",
+                "ArmR4",
+                "Angle01/Head01/Facial01/Mouth01>Mouth01_Smile_Open",
+              ],
+            },
+            {
+              "commandId": "char",
+              "line": 12,
+              "params": {
+                "pos": 50,
+              },
+              "primary": [
+                "Ema.Pensive1",
+                "ArmR4",
+                "Angle01/Head01/Facial01/Sweat01+Sweat01_01",
+              ],
+            },
+            {
+              "commandId": "char",
+              "line": 13,
+              "params": {
+                "pos": 50,
+              },
+              "primary": [
+                "Ema.Pensive1",
+                "ArmR4",
+                "Angle01/Head01/Facial01/Sweat01+Sweat01_01",
+                "Angle01/Head01/Facial01/Sweat01-",
+              ],
             },
             {
               "commandId": "choice",
-              "line": 12,
+              "line": 17,
               "params": {
                 "goto": "#InspectFile",
               },
@@ -193,7 +266,7 @@ describe("nani parser", () => {
             },
             {
               "commandId": "choice",
-              "line": 13,
+              "line": 18,
               "params": {
                 "goto": "#AskMira",
               },
@@ -201,7 +274,7 @@ describe("nani parser", () => {
             },
             {
               "commandId": "gameplay",
-              "line": 16,
+              "line": 21,
               "params": {
                 "id": "evidence:keycard",
               },
@@ -209,26 +282,11 @@ describe("nani parser", () => {
             },
             {
               "commandId": "shake",
-              "line": 17,
-              "params": {
-                "actorId": "character:felix",
-                "duration": 220,
-                "intensity": 0.35,
-              },
-              "primary": undefined,
-            },
-            {
-              "commandId": "goto",
-              "line": 19,
-              "params": {},
-              "primary": "#End",
-            },
-            {
-              "commandId": "flash",
               "line": 22,
               "params": {
-                "color": "#8fd3ff",
-                "duration": 120,
+                "actorId": "Ema",
+                "duration": 220,
+                "intensity": 0.35,
               },
               "primary": undefined,
             },
@@ -239,8 +297,23 @@ describe("nani parser", () => {
               "primary": "#End",
             },
             {
-              "commandId": "end",
+              "commandId": "flash",
               "line": 27,
+              "params": {
+                "color": "#8fd3ff",
+                "duration": 120,
+              },
+              "primary": undefined,
+            },
+            {
+              "commandId": "goto",
+              "line": 29,
+              "params": {},
+              "primary": "#End",
+            },
+            {
+              "commandId": "end",
+              "line": 32,
               "params": {},
               "primary": undefined,
             },
@@ -250,7 +323,7 @@ describe("nani parser", () => {
               "appearance": "Neutral",
               "commandId": "<",
               "inlineIndex": 1,
-              "line": 9,
+              "line": 14,
               "params": {
                 "speed": 0.8,
               },
@@ -260,7 +333,7 @@ describe("nani parser", () => {
               "appearance": "Neutral",
               "commandId": ">",
               "inlineIndex": 3,
-              "line": 9,
+              "line": 14,
               "params": {},
               "speaker": "Felix",
             },
@@ -268,7 +341,7 @@ describe("nani parser", () => {
               "appearance": "Calm",
               "commandId": ">",
               "inlineIndex": 1,
-              "line": 10,
+              "line": 15,
               "params": {},
               "speaker": "Mira",
             },
@@ -276,7 +349,7 @@ describe("nani parser", () => {
               "appearance": undefined,
               "commandId": ">",
               "inlineIndex": 1,
-              "line": 18,
+              "line": 23,
               "params": {},
               "speaker": "Narrator",
             },
@@ -284,15 +357,15 @@ describe("nani parser", () => {
               "appearance": "Calm",
               "commandId": ">",
               "inlineIndex": 1,
-              "line": 23,
+              "line": 28,
               "params": {},
               "speaker": "Mira",
             },
           ],
           "labels": {
-            "AskMira": 16,
-            "End": 20,
-            "InspectFile": 11,
+            "AskMira": 21,
+            "End": 25,
+            "InspectFile": 16,
             "Start": 3,
           },
           "scriptPath": "basic-navi.p1.nani",
@@ -301,6 +374,11 @@ describe("nani parser", () => {
             "comment",
             "comment",
             "label",
+            "command",
+            "command",
+            "command",
+            "command",
+            "command",
             "command",
             "command",
             "command",
@@ -335,7 +413,7 @@ describe("nani parser", () => {
               "commandId": "back",
               "line": 7,
               "params": {
-                "bg": "trial-room",
+                "bg": "classroom",
                 "effect": "fade",
               },
               "primary": undefined,
@@ -344,38 +422,96 @@ describe("nani parser", () => {
               "commandId": "char",
               "line": 8,
               "params": {
-                "idAndAppearance": "character:felix.portrait:felix:serious",
-                "pos": [
-                  50,
-                  0,
-                ],
+                "pos": 50,
               },
-              "primary": undefined,
+              "primary": "Ema.Pensive1",
             },
             {
               "commandId": "char",
               "line": 9,
               "params": {
-                "idAndAppearance": "character:mira.portrait:mira:calm",
                 "pos": [
                   76,
                   0,
                 ],
               },
-              "primary": undefined,
+              "primary": [
+                "Ema.Pensive1",
+                "ArmR3",
+              ],
+            },
+            {
+              "commandId": "char",
+              "line": 10,
+              "params": {
+                "pos": [
+                  76,
+                  0,
+                ],
+              },
+              "primary": [
+                "Ema.Pensive1",
+                "ArmR3",
+                "ArmR4",
+              ],
+            },
+            {
+              "commandId": "char",
+              "line": 11,
+              "params": {
+                "pos": [
+                  76,
+                  0,
+                ],
+              },
+              "primary": [
+                "Ema.Pensive1",
+                "ArmR4",
+                "Angle01/Head01/Facial01/Mouth01>Mouth01_Smile_Open",
+              ],
+            },
+            {
+              "commandId": "char",
+              "line": 12,
+              "params": {
+                "pos": [
+                  76,
+                  0,
+                ],
+              },
+              "primary": [
+                "Ema.Pensive1",
+                "ArmR4",
+                "Angle01/Head01/Facial01/Sweat01+Sweat01_01",
+              ],
+            },
+            {
+              "commandId": "char",
+              "line": 13,
+              "params": {
+                "pos": [
+                  76,
+                  0,
+                ],
+              },
+              "primary": [
+                "Ema.Pensive1",
+                "ArmR4",
+                "Angle01/Head01/Facial01/Sweat01+Sweat01_01",
+                "Angle01/Head01/Facial01/Sweat01-",
+              ],
             },
             {
               "commandId": "focus",
-              "line": 11,
+              "line": 15,
               "params": {
-                "character": "mira",
                 "duration": 420,
               },
-              "primary": undefined,
+              "primary": "Ema",
             },
             {
               "commandId": "choice",
-              "line": 14,
+              "line": 18,
               "params": {
                 "goto": "#PressQuestion",
               },
@@ -383,7 +519,7 @@ describe("nani parser", () => {
             },
             {
               "commandId": "choice",
-              "line": 15,
+              "line": 19,
               "params": {
                 "goto": "#ListenLonger",
               },
@@ -391,7 +527,7 @@ describe("nani parser", () => {
             },
             {
               "commandId": "flash",
-              "line": 18,
+              "line": 22,
               "params": {
                 "color": "#ffe66d",
                 "duration": 160,
@@ -400,15 +536,15 @@ describe("nani parser", () => {
             },
             {
               "commandId": "goto",
-              "line": 20,
+              "line": 24,
               "params": {},
               "primary": "#TrialEnd",
             },
             {
               "commandId": "shake",
-              "line": 23,
+              "line": 27,
               "params": {
-                "actorId": "character:mira",
+                "actorId": "Ema",
                 "duration": 180,
                 "intensity": 0.25,
               },
@@ -416,13 +552,13 @@ describe("nani parser", () => {
             },
             {
               "commandId": "goto",
-              "line": 25,
+              "line": 29,
               "params": {},
               "primary": "#TrialEnd",
             },
             {
               "commandId": "end",
-              "line": 28,
+              "line": 32,
               "params": {},
               "primary": undefined,
             },
@@ -432,7 +568,7 @@ describe("nani parser", () => {
               "appearance": "Serious",
               "commandId": ">",
               "inlineIndex": 1,
-              "line": 10,
+              "line": 14,
               "params": {},
               "speaker": "Felix",
             },
@@ -440,7 +576,7 @@ describe("nani parser", () => {
               "appearance": "Calm",
               "commandId": "<",
               "inlineIndex": 1,
-              "line": 12,
+              "line": 16,
               "params": {
                 "speed": 0.8,
               },
@@ -450,7 +586,7 @@ describe("nani parser", () => {
               "appearance": "Calm",
               "commandId": ">",
               "inlineIndex": 2,
-              "line": 12,
+              "line": 16,
               "params": {},
               "speaker": "Mira",
             },
@@ -458,7 +594,7 @@ describe("nani parser", () => {
               "appearance": undefined,
               "commandId": ">",
               "inlineIndex": 1,
-              "line": 19,
+              "line": 23,
               "params": {},
               "speaker": "Narrator",
             },
@@ -466,15 +602,15 @@ describe("nani parser", () => {
               "appearance": "Serious",
               "commandId": ">",
               "inlineIndex": 1,
-              "line": 24,
+              "line": 28,
               "params": {},
               "speaker": "Felix",
             },
           ],
           "labels": {
-            "ListenLonger": 17,
-            "PressQuestion": 13,
-            "TrialEnd": 21,
+            "ListenLonger": 21,
+            "PressQuestion": 17,
+            "TrialEnd": 25,
             "TrialOpening": 3,
           },
           "scriptPath": "basic-trial-discussion.p1.nani",
@@ -483,6 +619,10 @@ describe("nani parser", () => {
             "comment",
             "comment",
             "label",
+            "command",
+            "command",
+            "command",
+            "command",
             "command",
             "command",
             "command",

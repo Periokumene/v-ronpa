@@ -21,13 +21,13 @@ files.
 
 `RuntimeAsset` is the shipping asset shape:
 
-- `id`: stable content id such as `bg:harness`, `portrait:felix:neutral`, or
+- `id`: stable content id such as `bg:harness`, `Ema`, or
   `video:validation-intro`.
-- `kind`: runtime family, including `portrait`, `background`, `bgm`, `sfx`,
-  `voice`, `video`, `glb`, `texture`, and `fx`.
+- `kind`: runtime family, including `character-pack`, `background`, `bgm`,
+  `sfx`, `voice`, `video`, `glb`, `texture`, and `fx`.
 - `sourceUri`: optional authoring source for traceability.
 - `optimizedUri`: app-loadable file emitted by the asset pipeline.
-- `format`: `glb`, `gltf`, `webp`, `png`, `ogg`, `mp4`, and related runtime
+- `format`: `json`, `glb`, `gltf`, `webp`, `png`, `ogg`, `mp4`, and related runtime
   formats.
 - `compression`, `lods`, `textureBudget`, and `collisionProxyIds`: production
   metadata used by future build and review gates.
@@ -78,7 +78,15 @@ it through adapter props:
 
 - media commands resolve `bgm`, `sfx`, `voice`, and `video` ids before calling
   Howler or the HTML video port.
-- Pixi resolves backgrounds, portraits, and FX ids before loading textures.
+- Pixi resolves backgrounds, character-pack entry JSON, and FX ids before
+  loading textures.
+- Character-pack runtime assets point only to `character.json`. Pixi resolves
+  that entry, loads sibling `layers.json` and `compositions.json`, then uses the
+  pure layered-character resolver to determine the current active layers before
+  fetching per-layer metadata and PNGs. Layer paths inside `layers.json` must be
+  pack-relative paths; absolute URLs and parent-directory escapes are contract
+  failures. Unused layer metadata is not a required dependency for the current
+  render.
 - R3F resolves `WorldMapDef.assetRefs` model ids before probing or loading
   glTF assets.
 - UI/evidence image references are validated even when the current harness does

@@ -4,7 +4,7 @@ import { createAssetRegistry, isRawAssetReference } from "./index";
 
 describe("asset registry", () => {
   it("resolves every runtime asset kind from ContentManifest.runtimeAssets", () => {
-    const manifest = manifestWithKinds(["portrait", "background", "bgm", "sfx", "voice", "video", "glb", "texture", "fx"]);
+    const manifest = manifestWithKinds(["character-pack", "background", "bgm", "sfx", "voice", "video", "glb", "texture", "fx"]);
     const registry = createAssetRegistry(manifest);
 
     expect(registry.diagnostics).toEqual([]);
@@ -98,7 +98,7 @@ describe("asset registry", () => {
   it("detects raw asset reference syntax", () => {
     expect(isRawAssetReference("/harness/foo.png")).toBe(true);
     expect(isRawAssetReference("https://example.test/foo.png")).toBe(true);
-    expect(isRawAssetReference("portrait:felix:neutral")).toBe(false);
+    expect(isRawAssetReference("Ema.Pensive1")).toBe(false);
   });
 });
 
@@ -122,7 +122,16 @@ function baseManifest(runtimeAssets: RuntimeAsset[]): ContentManifest {
 }
 
 function runtimeAsset(id: string, kind: RuntimeAssetKind): RuntimeAsset {
-  const format: RuntimeAssetFormat = kind === "bgm" || kind === "sfx" || kind === "voice" ? "ogg" : kind === "video" ? "mp4" : kind === "glb" ? "gltf" : "png";
+  const format: RuntimeAssetFormat =
+    kind === "bgm" || kind === "sfx" || kind === "voice"
+      ? "ogg"
+      : kind === "video"
+        ? "mp4"
+        : kind === "glb"
+          ? "gltf"
+          : kind === "character-pack"
+            ? "json"
+            : "png";
   return {
     id,
     kind,

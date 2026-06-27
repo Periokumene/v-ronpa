@@ -122,9 +122,9 @@ export function VerticalSliceScenario() {
                 lastOutcome={runtime.lastOutcome}
                 mapId={runtime.navi.activeMapId ?? "none"}
                 mode={flow.mode}
-                pixiBackground={runtime.pixiStageRuntime.snapshot.background?.backgroundId ?? "none"}
+                pixiBackground={runtime.pixiStageRuntime.snapshot.backgroundsById.MainBackground?.appearance ?? "none"}
+                pixiCharacters={formatPixiStageCharacters(runtime.pixiStageRuntime.snapshot)}
                 pixiRevision={String(runtime.pixiStageRuntime.snapshot.revision)}
-                pixiSlots={formatPixiStageSlots(runtime.pixiStageRuntime.snapshot)}
                 pixiTasks={formatPixiPresentationTasks(runtime.pixiStageRuntime.presentationTasks)}
                 pointerLockStatus={runtime.firstPersonBridge.pointerLockStatus}
                 route={String(runtime.storyRuntime.state.variables.route ?? "none")}
@@ -300,11 +300,12 @@ function formatEvidence(gameplay: GameplayState): string {
   return gameplay.evidence.ownedEvidenceIds.length > 0 ? gameplay.evidence.ownedEvidenceIds.join(", ") : "empty";
 }
 
-function formatPixiStageSlots(stage: Pick<PixiStageSnapshot, "slots">): string {
-  const entries = (["left", "center", "right"] as const).flatMap((slot) => {
-    const portrait = stage.slots[slot];
-    if (!portrait) return [];
-    return [`${slot}:${portrait.characterId}${portrait.portraitId ? `/${portrait.portraitId}` : ""}`];
+function formatPixiStageCharacters(stage: Pick<PixiStageSnapshot, "actorOrder" | "charactersById">): string {
+  const entries = stage.actorOrder.flatMap((id) => {
+    const actor = stage.charactersById[id];
+    if (!actor) return [];
+    const pos = actor.pos ? `@${actor.pos[0].toFixed(2)},${actor.pos[1].toFixed(2)}` : "";
+    return [`${actor.id}/${actor.appearanceExpression || "default"}${pos}`];
   });
   return entries.length > 0 ? entries.join(", ") : "empty";
 }
@@ -346,8 +347,8 @@ function VerticalSliceReadout({
   mapId,
   mode,
   pixiBackground,
+  pixiCharacters,
   pixiRevision,
-  pixiSlots,
   pixiTasks,
   pointerLockStatus,
   route,
@@ -372,8 +373,8 @@ function VerticalSliceReadout({
   mapId: string;
   mode: string;
   pixiBackground: string;
+  pixiCharacters: string;
   pixiRevision: string;
-  pixiSlots: string;
   pixiTasks: string;
   pointerLockStatus: string;
   route: string;
@@ -406,7 +407,7 @@ function VerticalSliceReadout({
         <Readout label="Route" testId="vertical-slice-route" value={route} />
         <Readout label="Pixi BG" testId="vertical-slice-pixi-background" value={pixiBackground} />
         <Readout label="Pixi Rev" testId="vertical-slice-pixi-revision" value={pixiRevision} />
-        <Readout label="Pixi Slots" testId="vertical-slice-pixi-slots" value={pixiSlots} wide />
+        <Readout label="Pixi Chars" testId="vertical-slice-pixi-characters" value={pixiCharacters} wide />
         <Readout label="Pixi Tasks" testId="vertical-slice-pixi-tasks" value={pixiTasks} wide />
         <Readout label="Trial Segment" testId="vertical-slice-trial-segment" value={trialSegment} wide />
         <Readout label="Trial View" testId="vertical-slice-trial-presentation" value={trialPresentation} />

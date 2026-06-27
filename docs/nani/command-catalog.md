@@ -177,6 +177,13 @@ Shared shorthand:
   `position:decimal list`, `rotation:decimal list`, `scale:decimal list`,
   `tint:string`, `easing:string`, `time:decimal`, `lazy:boolean`,
   `wait:boolean`.
+- Layered characters use `@char Character.Expression` as the only appearance
+  syntax. The runtime stores `appearanceExpression` in `PixiStageSnapshot v3`;
+  `appearance:` remains a cataloged Naninovel actor parameter but is not consumed
+  by layered `@char`. Use `@slide`, `@arrange`, and `@hideChars` for
+  transform-only changes. `@slide Character.Expression` updates appearance,
+  while `@slide Character` is transform-only and does not create a
+  `character-pack` resource reference.
 - `audio params`: `volume:decimal`, `loop:boolean`, `fade:decimal`,
   `group:string`, `time:decimal`, `wait:boolean`.
 - `particle params`: `power:decimal`, `time:decimal`, `pos:decimal list`,

@@ -48,8 +48,8 @@ VN runtime output is split in two app-layer steps:
   adapters and `GameInteractionShell` / `VnDialogSurface`.
 - DOM UI owns dialogue text, choices, menus, settings, save/load screens, and
   other accessibility-sensitive surfaces.
-- Pixi owns VN/trial 2D effects, backgrounds, portraits, filters, particles,
-  and fast 2D overlays.
+- Pixi owns VN/trial 2D effects, backgrounds, layered characters, filters,
+  particles, and fast 2D overlays.
 - R3F owns 3D staging, camera rigs, and spatial interaction.
 - Media, Pixi, R3F, and UI/evidence image references all resolve through the
   app-created `AssetRegistry`. Low-level ports such as Howler and HTML video

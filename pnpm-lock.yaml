@@ -133,6 +133,12 @@ importers:
         specifier: workspace:*
         version: link:../contracts
 
+  packages/layered-character:
+    dependencies:
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
   packages/media-save:
     dependencies:
       '@v-ronpa/contracts':
@@ -177,6 +183,9 @@ importers:
       '@v-ronpa/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@v-ronpa/layered-character':
+        specifier: workspace:*
+        version: link:../layered-character
       pixi-filters:
         specifier: ^6.1.5
         version: 6.1.5(pixi.js@8.19.0)

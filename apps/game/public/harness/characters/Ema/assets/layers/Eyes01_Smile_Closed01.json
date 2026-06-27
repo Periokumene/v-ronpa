@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/Head01/Facial01/Eyes01/Eyes01_Smile_Closed01",
+  "drawOrder": 88,
+  "texture": {
+    "fileName": "Eyes01_Smile_Closed01.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 453,
+      "height": 253
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 4272,
+      "y": 358,
+      "width": 453,
+      "height": 253
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -0.265000342,
+      "y": 23.5079988,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 4.53,
+      "y": 2.53
+    }
+  }
+}

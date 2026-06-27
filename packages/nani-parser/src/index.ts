@@ -36,7 +36,6 @@ const commandAssetKinds: Record<string, string> = {
   sfx: "sfx",
   voice: "voice",
   back: "background",
-  char: "portrait",
   video: "video"
 };
 
@@ -321,10 +320,31 @@ function collectCommandMetadata(
     assets.push({ id: firstArgValue.value, kind: assetKind });
   }
 
+  if (command.commandId === "char" || command.commandId === "slide") {
+    const characterId = characterPackIdForActorAppearanceCommand(command);
+    if (characterId) assets.push({ id: characterId, kind: "character-pack" });
+  }
+
   if ((command.commandId === "goto" || command.commandId === "call") && firstArgValue?.type === "raw") {
     const endpoint = firstArgValue.value;
     if (!endpoint.startsWith("#")) dependencies.push({ endpoint });
   }
+}
+
+function characterPackIdForActorAppearanceCommand(command: CommandIR): string | undefined {
+  const raw = command.args.find((arg) => arg.kind === "value")?.raw;
+  if (command.commandId === "slide" && (!raw || !raw.includes("."))) return undefined;
+  const idParam = command.params.id;
+  const idFromParam = idParam ? stringValue(idParam) : undefined;
+  const idFromPrimary = raw ? raw.split(/[.,]/u)[0] : undefined;
+  const id = idFromParam ?? idFromPrimary;
+  if (!id || id === "*") return undefined;
+  return id;
+}
+
+function stringValue(value: NaniValue): string | undefined {
+  if (value.type === "string" || value.type === "raw") return value.value;
+  return undefined;
 }
 
 function collectLocalLabelReferenceDiagnostics(

@@ -1,0 +1,572 @@
+{
+  "groups": {
+    "Angle01": {
+      "layers": {
+        "Body": {
+          "src": "assets/layers/Body.png",
+          "metadata": "assets/layers/Body.json"
+        }
+      }
+    },
+    "Angle01/ArmL": {
+      "layers": {
+        "ArmL16": {
+          "src": "assets/layers/ArmL16.png",
+          "metadata": "assets/layers/ArmL16.json"
+        },
+        "ArmL15": {
+          "src": "assets/layers/ArmL15.png",
+          "metadata": "assets/layers/ArmL15.json"
+        },
+        "ArmL14": {
+          "src": "assets/layers/ArmL14.png",
+          "metadata": "assets/layers/ArmL14.json"
+        },
+        "ArmL13": {
+          "src": "assets/layers/ArmL13.png",
+          "metadata": "assets/layers/ArmL13.json"
+        },
+        "ArmL12": {
+          "src": "assets/layers/ArmL12.png",
+          "metadata": "assets/layers/ArmL12.json"
+        },
+        "ArmL11": {
+          "src": "assets/layers/ArmL11.png",
+          "metadata": "assets/layers/ArmL11.json"
+        },
+        "ArmL10": {
+          "src": "assets/layers/ArmL10.png",
+          "metadata": "assets/layers/ArmL10.json"
+        },
+        "ArmL09": {
+          "src": "assets/layers/ArmL09.png",
+          "metadata": "assets/layers/ArmL09.json"
+        },
+        "ArmL08": {
+          "src": "assets/layers/ArmL08.png",
+          "metadata": "assets/layers/ArmL08.json"
+        },
+        "ArmL07": {
+          "src": "assets/layers/ArmL07.png",
+          "metadata": "assets/layers/ArmL07.json"
+        },
+        "ArmL06": {
+          "src": "assets/layers/ArmL06.png",
+          "metadata": "assets/layers/ArmL06.json"
+        },
+        "ArmL05": {
+          "src": "assets/layers/ArmL05.png",
+          "metadata": "assets/layers/ArmL05.json"
+        },
+        "ArmL04": {
+          "src": "assets/layers/ArmL04.png",
+          "metadata": "assets/layers/ArmL04.json"
+        },
+        "ArmL03": {
+          "src": "assets/layers/ArmL03.png",
+          "metadata": "assets/layers/ArmL03.json"
+        },
+        "ArmL02": {
+          "src": "assets/layers/ArmL02.png",
+          "metadata": "assets/layers/ArmL02.json"
+        },
+        "ArmL01": {
+          "src": "assets/layers/ArmL01.png",
+          "metadata": "assets/layers/ArmL01.json"
+        }
+      }
+    },
+    "Angle01/ArmR": {
+      "layers": {
+        "ArmR13": {
+          "src": "assets/layers/ArmR13.png",
+          "metadata": "assets/layers/ArmR13.json"
+        },
+        "ArmR12": {
+          "src": "assets/layers/ArmR12.png",
+          "metadata": "assets/layers/ArmR12.json"
+        },
+        "ArmR11": {
+          "src": "assets/layers/ArmR11.png",
+          "metadata": "assets/layers/ArmR11.json"
+        },
+        "ArmR10": {
+          "src": "assets/layers/ArmR10.png",
+          "metadata": "assets/layers/ArmR10.json"
+        },
+        "ArmR09": {
+          "src": "assets/layers/ArmR09.png",
+          "metadata": "assets/layers/ArmR09.json"
+        },
+        "ArmR08": {
+          "src": "assets/layers/ArmR08.png",
+          "metadata": "assets/layers/ArmR08.json"
+        },
+        "ArmR07": {
+          "src": "assets/layers/ArmR07.png",
+          "metadata": "assets/layers/ArmR07.json"
+        },
+        "ArmR06": {
+          "src": "assets/layers/ArmR06.png",
+          "metadata": "assets/layers/ArmR06.json"
+        },
+        "ArmR05": {
+          "src": "assets/layers/ArmR05.png",
+          "metadata": "assets/layers/ArmR05.json"
+        },
+        "ArmR04": {
+          "src": "assets/layers/ArmR04.png",
+          "metadata": "assets/layers/ArmR04.json"
+        },
+        "ArmR03": {
+          "src": "assets/layers/ArmR03.png",
+          "metadata": "assets/layers/ArmR03.json"
+        },
+        "ArmR02_02": {
+          "src": "assets/layers/ArmR02_02.png",
+          "metadata": "assets/layers/ArmR02_02.json"
+        },
+        "ArmR02_01": {
+          "src": "assets/layers/ArmR02_01.png",
+          "metadata": "assets/layers/ArmR02_01.json"
+        },
+        "ArmR01": {
+          "src": "assets/layers/ArmR01.png",
+          "metadata": "assets/layers/ArmR01.json"
+        }
+      }
+    },
+    "Angle01/Head01": {
+      "layers": {
+        "HeadBase01": {
+          "src": "assets/layers/HeadBase01.png",
+          "metadata": "assets/layers/HeadBase01.json"
+        },
+        "HairClippingMask01": {
+          "src": "assets/layers/HairClippingMask01.png",
+          "metadata": "assets/layers/HairClippingMask01.json"
+        },
+        "FacialLineDrawing01": {
+          "src": "assets/layers/FacialLineDrawing01.png",
+          "metadata": "assets/layers/FacialLineDrawing01.json"
+        }
+      }
+    },
+    "Angle01/Head01/Facial01/Cheeks01": {
+      "layers": {
+        "Cheeks01_Flushed": {
+          "src": "assets/layers/Cheeks01_Flushed.png",
+          "metadata": "assets/layers/Cheeks01_Flushed.json"
+        },
+        "Cheeks01_Normal": {
+          "src": "assets/layers/Cheeks01_Normal.png",
+          "metadata": "assets/layers/Cheeks01_Normal.json"
+        }
+      }
+    },
+    "Angle01/Head01/Facial01/Eyes01": {
+      "layers": {
+        "Eyes01_Scream_Closed02": {
+          "src": "assets/layers/Eyes01_Scream_Closed02.png",
+          "metadata": "assets/layers/Eyes01_Scream_Closed02.json"
+        },
+        "Eyes01_Scream_Closed01": {
+          "src": "assets/layers/Eyes01_Scream_Closed01.png",
+          "metadata": "assets/layers/Eyes01_Scream_Closed01.json"
+        },
+        "Eyes01_Thinking_Closed01": {
+          "src": "assets/layers/Eyes01_Thinking_Closed01.png",
+          "metadata": "assets/layers/Eyes01_Thinking_Closed01.json"
+        },
+        "Eyes01_Fearful_Open03": {
+          "src": "assets/layers/Eyes01_Fearful_Open03.png",
+          "metadata": "assets/layers/Eyes01_Fearful_Open03.json"
+        },
+        "Eyes01_Fearful_Open02": {
+          "src": "assets/layers/Eyes01_Fearful_Open02.png",
+          "metadata": "assets/layers/Eyes01_Fearful_Open02.json"
+        },
+        "Eyes01_Fearful_Open01": {
+          "src": "assets/layers/Eyes01_Fearful_Open01.png",
+          "metadata": "assets/layers/Eyes01_Fearful_Open01.json"
+        },
+        "Eyes01_Surprised_Open03": {
+          "src": "assets/layers/Eyes01_Surprised_Open03.png",
+          "metadata": "assets/layers/Eyes01_Surprised_Open03.json"
+        },
+        "Eyes01_Surprised_Open02": {
+          "src": "assets/layers/Eyes01_Surprised_Open02.png",
+          "metadata": "assets/layers/Eyes01_Surprised_Open02.json"
+        },
+        "Eyes01_Surprised_Open01": {
+          "src": "assets/layers/Eyes01_Surprised_Open01.png",
+          "metadata": "assets/layers/Eyes01_Surprised_Open01.json"
+        },
+        "Eyes01_Flushed_Open02": {
+          "src": "assets/layers/Eyes01_Flushed_Open02.png",
+          "metadata": "assets/layers/Eyes01_Flushed_Open02.json"
+        },
+        "Eyes01_Flushed_Open01": {
+          "src": "assets/layers/Eyes01_Flushed_Open01.png",
+          "metadata": "assets/layers/Eyes01_Flushed_Open01.json"
+        },
+        "Eyes01_Cry_Lifeless02": {
+          "src": "assets/layers/Eyes01_Cry_Lifeless02.png",
+          "metadata": "assets/layers/Eyes01_Cry_Lifeless02.json"
+        },
+        "Eyes01_Cry_Lifeless01": {
+          "src": "assets/layers/Eyes01_Cry_Lifeless01.png",
+          "metadata": "assets/layers/Eyes01_Cry_Lifeless01.json"
+        },
+        "Eyes01_Cry_Closed03": {
+          "src": "assets/layers/Eyes01_Cry_Closed03.png",
+          "metadata": "assets/layers/Eyes01_Cry_Closed03.json"
+        },
+        "Eyes01_Cry_Closed02": {
+          "src": "assets/layers/Eyes01_Cry_Closed02.png",
+          "metadata": "assets/layers/Eyes01_Cry_Closed02.json"
+        },
+        "Eyes01_Cry_Closed01": {
+          "src": "assets/layers/Eyes01_Cry_Closed01.png",
+          "metadata": "assets/layers/Eyes01_Cry_Closed01.json"
+        },
+        "Eyes01_Cry_Open01": {
+          "src": "assets/layers/Eyes01_Cry_Open01.png",
+          "metadata": "assets/layers/Eyes01_Cry_Open01.json"
+        },
+        "Eyes01_Pensive_Lifeless03": {
+          "src": "assets/layers/Eyes01_Pensive_Lifeless03.png",
+          "metadata": "assets/layers/Eyes01_Pensive_Lifeless03.json"
+        },
+        "Eyes01_Pensive_Lifeless02": {
+          "src": "assets/layers/Eyes01_Pensive_Lifeless02.png",
+          "metadata": "assets/layers/Eyes01_Pensive_Lifeless02.json"
+        },
+        "Eyes01_Pensive_Lifeless01": {
+          "src": "assets/layers/Eyes01_Pensive_Lifeless01.png",
+          "metadata": "assets/layers/Eyes01_Pensive_Lifeless01.json"
+        },
+        "Eyes01_Pensive_Open02": {
+          "src": "assets/layers/Eyes01_Pensive_Open02.png",
+          "metadata": "assets/layers/Eyes01_Pensive_Open02.json"
+        },
+        "Eyes01_Pensive_Open01": {
+          "src": "assets/layers/Eyes01_Pensive_Open01.png",
+          "metadata": "assets/layers/Eyes01_Pensive_Open01.json"
+        },
+        "Eyes01_Angry_Open04": {
+          "src": "assets/layers/Eyes01_Angry_Open04.png",
+          "metadata": "assets/layers/Eyes01_Angry_Open04.json"
+        },
+        "Eyes01_Angry_Open03": {
+          "src": "assets/layers/Eyes01_Angry_Open03.png",
+          "metadata": "assets/layers/Eyes01_Angry_Open03.json"
+        },
+        "Eyes01_Angry_Open02": {
+          "src": "assets/layers/Eyes01_Angry_Open02.png",
+          "metadata": "assets/layers/Eyes01_Angry_Open02.json"
+        },
+        "Eyes01_Angry_Open01": {
+          "src": "assets/layers/Eyes01_Angry_Open01.png",
+          "metadata": "assets/layers/Eyes01_Angry_Open01.json"
+        },
+        "Eyes01_Smile_Closed04": {
+          "src": "assets/layers/Eyes01_Smile_Closed04.png",
+          "metadata": "assets/layers/Eyes01_Smile_Closed04.json"
+        },
+        "Eyes01_Smile_Closed03": {
+          "src": "assets/layers/Eyes01_Smile_Closed03.png",
+          "metadata": "assets/layers/Eyes01_Smile_Closed03.json"
+        },
+        "Eyes01_Smile_Closed02": {
+          "src": "assets/layers/Eyes01_Smile_Closed02.png",
+          "metadata": "assets/layers/Eyes01_Smile_Closed02.json"
+        },
+        "Eyes01_Smile_Closed01": {
+          "src": "assets/layers/Eyes01_Smile_Closed01.png",
+          "metadata": "assets/layers/Eyes01_Smile_Closed01.json"
+        },
+        "Eyes01_Normal_Lifeless04": {
+          "src": "assets/layers/Eyes01_Normal_Lifeless04.png",
+          "metadata": "assets/layers/Eyes01_Normal_Lifeless04.json"
+        },
+        "Eyes01_Normal_Lifeless03": {
+          "src": "assets/layers/Eyes01_Normal_Lifeless03.png",
+          "metadata": "assets/layers/Eyes01_Normal_Lifeless03.json"
+        },
+        "Eyes01_Normal_Lifeless02": {
+          "src": "assets/layers/Eyes01_Normal_Lifeless02.png",
+          "metadata": "assets/layers/Eyes01_Normal_Lifeless02.json"
+        },
+        "Eyes01_Normal_Lifeless01": {
+          "src": "assets/layers/Eyes01_Normal_Lifeless01.png",
+          "metadata": "assets/layers/Eyes01_Normal_Lifeless01.json"
+        },
+        "Eyes01_Normal_Closed04": {
+          "src": "assets/layers/Eyes01_Normal_Closed04.png",
+          "metadata": "assets/layers/Eyes01_Normal_Closed04.json"
+        },
+        "Eyes01_Normal_Closed03": {
+          "src": "assets/layers/Eyes01_Normal_Closed03.png",
+          "metadata": "assets/layers/Eyes01_Normal_Closed03.json"
+        },
+        "Eyes01_Normal_Closed02": {
+          "src": "assets/layers/Eyes01_Normal_Closed02.png",
+          "metadata": "assets/layers/Eyes01_Normal_Closed02.json"
+        },
+        "Eyes01_Normal_Closed01": {
+          "src": "assets/layers/Eyes01_Normal_Closed01.png",
+          "metadata": "assets/layers/Eyes01_Normal_Closed01.json"
+        },
+        "Eyes01_Normal_Open04": {
+          "src": "assets/layers/Eyes01_Normal_Open04.png",
+          "metadata": "assets/layers/Eyes01_Normal_Open04.json"
+        },
+        "Eyes01_Normal_Open03": {
+          "src": "assets/layers/Eyes01_Normal_Open03.png",
+          "metadata": "assets/layers/Eyes01_Normal_Open03.json"
+        },
+        "Eyes01_Normal_Open02": {
+          "src": "assets/layers/Eyes01_Normal_Open02.png",
+          "metadata": "assets/layers/Eyes01_Normal_Open02.json"
+        },
+        "Eyes01_Normal_Open01": {
+          "src": "assets/layers/Eyes01_Normal_Open01.png",
+          "metadata": "assets/layers/Eyes01_Normal_Open01.json"
+        }
+      }
+    },
+    "Angle01/Head01/Facial01/Mouth01": {
+      "layers": {
+        "Mouth01_Scream_Open": {
+          "src": "assets/layers/Mouth01_Scream_Open.png",
+          "metadata": "assets/layers/Mouth01_Scream_Open.json"
+        },
+        "Mouth01_Confused_Middle": {
+          "src": "assets/layers/Mouth01_Confused_Middle.png",
+          "metadata": "assets/layers/Mouth01_Confused_Middle.json"
+        },
+        "Mouth01_Confused_Open": {
+          "src": "assets/layers/Mouth01_Confused_Open.png",
+          "metadata": "assets/layers/Mouth01_Confused_Open.json"
+        },
+        "Mouth01_Determined_Closed": {
+          "src": "assets/layers/Mouth01_Determined_Closed.png",
+          "metadata": "assets/layers/Mouth01_Determined_Closed.json"
+        },
+        "Mouth01_Nervous_Closed": {
+          "src": "assets/layers/Mouth01_Nervous_Closed.png",
+          "metadata": "assets/layers/Mouth01_Nervous_Closed.json"
+        },
+        "Mouth01_Neutral_Closed": {
+          "src": "assets/layers/Mouth01_Neutral_Closed.png",
+          "metadata": "assets/layers/Mouth01_Neutral_Closed.json"
+        },
+        "Mouth01_Fearful_Open": {
+          "src": "assets/layers/Mouth01_Fearful_Open.png",
+          "metadata": "assets/layers/Mouth01_Fearful_Open.json"
+        },
+        "Mouth01_Surprised_Open": {
+          "src": "assets/layers/Mouth01_Surprised_Open.png",
+          "metadata": "assets/layers/Mouth01_Surprised_Open.json"
+        },
+        "Mouth01_Flushed_Closed02": {
+          "src": "assets/layers/Mouth01_Flushed_Closed02.png",
+          "metadata": "assets/layers/Mouth01_Flushed_Closed02.json"
+        },
+        "Mouth01_Flushed_Closed01": {
+          "src": "assets/layers/Mouth01_Flushed_Closed01.png",
+          "metadata": "assets/layers/Mouth01_Flushed_Closed01.json"
+        },
+        "Mouth01_Flushed_Middle": {
+          "src": "assets/layers/Mouth01_Flushed_Middle.png",
+          "metadata": "assets/layers/Mouth01_Flushed_Middle.json"
+        },
+        "Mouth01_Flushed_Open": {
+          "src": "assets/layers/Mouth01_Flushed_Open.png",
+          "metadata": "assets/layers/Mouth01_Flushed_Open.json"
+        },
+        "Mouth01_Cry_Closed": {
+          "src": "assets/layers/Mouth01_Cry_Closed.png",
+          "metadata": "assets/layers/Mouth01_Cry_Closed.json"
+        },
+        "Mouth01_Cry_Open": {
+          "src": "assets/layers/Mouth01_Cry_Open.png",
+          "metadata": "assets/layers/Mouth01_Cry_Open.json"
+        },
+        "Mouth01_Pensive_Closed": {
+          "src": "assets/layers/Mouth01_Pensive_Closed.png",
+          "metadata": "assets/layers/Mouth01_Pensive_Closed.json"
+        },
+        "Mouth01_Pensive_Middle": {
+          "src": "assets/layers/Mouth01_Pensive_Middle.png",
+          "metadata": "assets/layers/Mouth01_Pensive_Middle.json"
+        },
+        "Mouth01_Pensive_Open": {
+          "src": "assets/layers/Mouth01_Pensive_Open.png",
+          "metadata": "assets/layers/Mouth01_Pensive_Open.json"
+        },
+        "Mouth01_Angry_Closed": {
+          "src": "assets/layers/Mouth01_Angry_Closed.png",
+          "metadata": "assets/layers/Mouth01_Angry_Closed.json"
+        },
+        "Mouth01_Angry_Middle": {
+          "src": "assets/layers/Mouth01_Angry_Middle.png",
+          "metadata": "assets/layers/Mouth01_Angry_Middle.json"
+        },
+        "Mouth01_Angry_Open": {
+          "src": "assets/layers/Mouth01_Angry_Open.png",
+          "metadata": "assets/layers/Mouth01_Angry_Open.json"
+        },
+        "Mouth01_Smile_Closed": {
+          "src": "assets/layers/Mouth01_Smile_Closed.png",
+          "metadata": "assets/layers/Mouth01_Smile_Closed.json"
+        },
+        "Mouth01_Smile_Open": {
+          "src": "assets/layers/Mouth01_Smile_Open.png",
+          "metadata": "assets/layers/Mouth01_Smile_Open.json"
+        },
+        "Mouth01_Normal_Closed": {
+          "src": "assets/layers/Mouth01_Normal_Closed.png",
+          "metadata": "assets/layers/Mouth01_Normal_Closed.json"
+        },
+        "Mouth01_Normal_Middle": {
+          "src": "assets/layers/Mouth01_Normal_Middle.png",
+          "metadata": "assets/layers/Mouth01_Normal_Middle.json"
+        },
+        "Mouth01_Normal_Open": {
+          "src": "assets/layers/Mouth01_Normal_Open.png",
+          "metadata": "assets/layers/Mouth01_Normal_Open.json"
+        }
+      }
+    },
+    "Angle01/Head01/Facial01/Pale01": {
+      "layers": {
+        "Pale01_03": {
+          "src": "assets/layers/Pale01_03.png",
+          "metadata": "assets/layers/Pale01_03.json"
+        },
+        "Pale01_02": {
+          "src": "assets/layers/Pale01_02.png",
+          "metadata": "assets/layers/Pale01_02.json"
+        },
+        "Pale01_01": {
+          "src": "assets/layers/Pale01_01.png",
+          "metadata": "assets/layers/Pale01_01.json"
+        }
+      }
+    },
+    "Angle01/Head01/Facial01/Sweat01": {
+      "layers": {
+        "Sweat01_01": {
+          "src": "assets/layers/Sweat01_01.png",
+          "metadata": "assets/layers/Sweat01_01.json"
+        }
+      }
+    },
+    "Angle01/Head02": {
+      "layers": {
+        "HeadBase02": {
+          "src": "assets/layers/HeadBase02.png",
+          "metadata": "assets/layers/HeadBase02.json"
+        },
+        "HairClippingMask02": {
+          "src": "assets/layers/HairClippingMask02.png",
+          "metadata": "assets/layers/HairClippingMask02.json"
+        },
+        "FacialLineDrawing02": {
+          "src": "assets/layers/FacialLineDrawing02.png",
+          "metadata": "assets/layers/FacialLineDrawing02.json"
+        }
+      }
+    },
+    "Angle01/Head02/Facial02/Cheeks02": {
+      "layers": {
+        "Cheeks02_Normal": {
+          "src": "assets/layers/Cheeks02_Normal.png",
+          "metadata": "assets/layers/Cheeks02_Normal.json"
+        }
+      }
+    },
+    "Angle01/Head02/Facial02/Eyes02": {
+      "layers": {
+        "Eyes02_Normal_Lifeless": {
+          "src": "assets/layers/Eyes02_Normal_Lifeless.png",
+          "metadata": "assets/layers/Eyes02_Normal_Lifeless.json"
+        },
+        "Eyes02_Determined_Closed": {
+          "src": "assets/layers/Eyes02_Determined_Closed.png",
+          "metadata": "assets/layers/Eyes02_Determined_Closed.json"
+        },
+        "Eyes02_Determined_Open": {
+          "src": "assets/layers/Eyes02_Determined_Open.png",
+          "metadata": "assets/layers/Eyes02_Determined_Open.json"
+        }
+      }
+    },
+    "Angle01/Head02/Facial02/Mouth02": {
+      "layers": {
+        "Mouth02_Neutral_Closed": {
+          "src": "assets/layers/Mouth02_Neutral_Closed.png",
+          "metadata": "assets/layers/Mouth02_Neutral_Closed.json"
+        },
+        "Mouth02_Nervous_Open": {
+          "src": "assets/layers/Mouth02_Nervous_Open.png",
+          "metadata": "assets/layers/Mouth02_Nervous_Open.json"
+        },
+        "Mouth02_Surprised_Open": {
+          "src": "assets/layers/Mouth02_Surprised_Open.png",
+          "metadata": "assets/layers/Mouth02_Surprised_Open.json"
+        },
+        "Mouth02_Angry_Open": {
+          "src": "assets/layers/Mouth02_Angry_Open.png",
+          "metadata": "assets/layers/Mouth02_Angry_Open.json"
+        },
+        "Mouth02_Determined_Closed": {
+          "src": "assets/layers/Mouth02_Determined_Closed.png",
+          "metadata": "assets/layers/Mouth02_Determined_Closed.json"
+        }
+      }
+    },
+    "Angle01/Head02/Facial02/Pale02": {
+      "layers": {
+        "Pale02_03": {
+          "src": "assets/layers/Pale02_03.png",
+          "metadata": "assets/layers/Pale02_03.json"
+        },
+        "Pale02_02": {
+          "src": "assets/layers/Pale02_02.png",
+          "metadata": "assets/layers/Pale02_02.json"
+        },
+        "Pale02_01": {
+          "src": "assets/layers/Pale02_01.png",
+          "metadata": "assets/layers/Pale02_01.json"
+        }
+      }
+    },
+    "Angle01/Head02/Facial02/Sweat02": {
+      "layers": {
+        "Sweat02_01": {
+          "src": "assets/layers/Sweat02_01.png",
+          "metadata": "assets/layers/Sweat02_01.json"
+        }
+      }
+    },
+    "Angle01/Shadow": {
+      "layers": {
+        "Shadow_ArmR13": {
+          "src": "assets/layers/Shadow_ArmR13.png",
+          "metadata": "assets/layers/Shadow_ArmR13.json"
+        },
+        "Shadow_ArmR12": {
+          "src": "assets/layers/Shadow_ArmR12.png",
+          "metadata": "assets/layers/Shadow_ArmR12.json"
+        },
+        "Shadow_ArmR10": {
+          "src": "assets/layers/Shadow_ArmR10.png",
+          "metadata": "assets/layers/Shadow_ArmR10.json"
+        }
+      }
+    }
+  }
+}

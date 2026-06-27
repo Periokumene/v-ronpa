@@ -127,7 +127,7 @@ describe("vertical slice runtime adapter helpers", () => {
     const runtimeScript = compileScenario(
       [
         "@back bg:harness effect:fade",
-        "@char character:felix.portrait:felix:neutral pos:50,0",
+        "@char Ema.Pensive1,ArmR3 pos:50",
         "@gameplay grant-evidence id:evidence:keycard",
         "Felix: Routed."
       ].join("\n"),
@@ -252,8 +252,8 @@ describe("vertical slice runtime adapter helpers", () => {
     const pixiStage = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
       runtimeCommand("char", "actor", {
-        target: "character:felix",
-        appearance: "portrait:felix:neutral",
+        target: "Ema",
+        appearanceExpression: "Pensive1,ArmR3",
         pos: [0.5, 0]
       })
     ).snapshot;
@@ -521,7 +521,16 @@ function manifestWithAssets(runtimeAssets: RuntimeAsset[]): ContentManifest {
 }
 
 function runtimeAsset(id: string, kind: RuntimeAssetKind, optimizedUri: string): RuntimeAsset {
-  const format: RuntimeAssetFormat = kind === "video" ? "mp4" : kind === "glb" ? "gltf" : kind === "bgm" || kind === "sfx" || kind === "voice" ? "ogg" : "png";
+  const format: RuntimeAssetFormat =
+    kind === "video"
+      ? "mp4"
+      : kind === "glb"
+        ? "gltf"
+        : kind === "bgm" || kind === "sfx" || kind === "voice"
+          ? "ogg"
+          : kind === "character-pack"
+            ? "json"
+            : "png";
   return {
     id,
     kind,

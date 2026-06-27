@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/Head02/Facial02/Pale02/Pale02_02",
+  "drawOrder": 22,
+  "texture": {
+    "fileName": "Pale02_02.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 427,
+      "height": 331
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 3359,
+      "y": 4541,
+      "width": 427,
+      "height": 331
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -0.21700039,
+      "y": 23.544,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 4.27,
+      "y": 3.31
+    }
+  }
+}

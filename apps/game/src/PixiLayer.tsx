@@ -71,13 +71,13 @@ export function PixiLayer({
     <div
       ref={hostRef}
       data-testid="pixi-layer"
-      data-pixi-background={snapshot.backgroundsById.MainBackground?.appearance ?? snapshot.background?.backgroundId ?? "none"}
+      data-pixi-background={snapshot.backgroundsById.MainBackground?.appearance ?? "none"}
       data-pixi-revision={String(snapshot.revision)}
       data-pixi-actors={formatPixiStageActors(snapshot)}
       data-pixi-animate={String(animate)}
       data-pixi-hints={formatPixiHints(hints)}
       data-pixi-hint-sequence={String(hintSequence)}
-      data-pixi-slots={formatPixiStageSlots(snapshot)}
+      data-pixi-characters={formatPixiStageCharacters(snapshot)}
       data-pixi-active-tasks={formatPixiPresentationTasks(presentationTasks)}
       className={visible ? "pixi-layer" : "pixi-layer pixi-layer-hidden"}
       aria-hidden={!visible}
@@ -98,16 +98,18 @@ function formatPixiStageActors(snapshot: PixiStageSnapshot): string {
   const entries = [...Object.values(snapshot.backgroundsById), ...Object.values(snapshot.charactersById)].map((actor) => {
     const visibility = actor.visible ? "visible" : "hidden";
     const pos = actor.pos ? `@${actor.pos[0].toFixed(2)},${actor.pos[1].toFixed(2)}` : "";
-    return `${actor.id}:${visibility}${pos}`;
+    const appearance = actor.kind === "character" ? `/${actor.appearanceExpression || "default"}` : actor.appearance ? `/${actor.appearance}` : "";
+    return `${actor.id}${appearance}:${visibility}${pos}`;
   });
   return entries.length > 0 ? entries.join(", ") : "empty";
 }
 
-function formatPixiStageSlots(snapshot: PixiStageSnapshot): string {
-  const entries = (["left", "center", "right"] as const).flatMap((slot) => {
-    const portrait = snapshot.slots[slot];
-    if (!portrait) return [];
-    return [`${slot}:${portrait.characterId}${portrait.portraitId ? `/${portrait.portraitId}` : ""}`];
+function formatPixiStageCharacters(snapshot: PixiStageSnapshot): string {
+  const entries = snapshot.actorOrder.flatMap((id) => {
+    const actor = snapshot.charactersById[id];
+    if (!actor) return [];
+    const pos = actor.pos ? `@${actor.pos[0].toFixed(2)},${actor.pos[1].toFixed(2)}` : "";
+    return [`${actor.id}/${actor.appearanceExpression || "default"}${pos}`];
   });
   return entries.length > 0 ? entries.join(", ") : "empty";
 }

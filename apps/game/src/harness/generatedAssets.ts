@@ -87,6 +87,18 @@ export const harnessRuntimeAssets = [
       ]
     },
     {
+      "id": "Ema",
+      "kind": "character-pack",
+      "optimizedUri": "/harness/characters/Ema/character.json",
+      "format": "json",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
       "id": "model:academy-hall",
       "kind": "glb",
       "optimizedUri": "/harness/models/academy-hall.gltf",
@@ -127,54 +139,6 @@ export const harnessRuntimeAssets = [
       "kind": "glb",
       "optimizedUri": "/harness/models/props-door.gltf",
       "format": "gltf",
-      "compression": [],
-      "lods": [],
-      "collisionProxyIds": [],
-      "tags": [
-        "harness"
-      ]
-    },
-    {
-      "id": "portrait:felix:concerned",
-      "kind": "portrait",
-      "optimizedUri": "/harness/portraits/felix-concerned.png",
-      "format": "png",
-      "compression": [],
-      "lods": [],
-      "collisionProxyIds": [],
-      "tags": [
-        "harness"
-      ]
-    },
-    {
-      "id": "portrait:felix:neutral",
-      "kind": "portrait",
-      "optimizedUri": "/harness/portraits/felix-neutral.png",
-      "format": "png",
-      "compression": [],
-      "lods": [],
-      "collisionProxyIds": [],
-      "tags": [
-        "harness"
-      ]
-    },
-    {
-      "id": "portrait:mira:neutral",
-      "kind": "portrait",
-      "optimizedUri": "/harness/portraits/mira-neutral.png",
-      "format": "png",
-      "compression": [],
-      "lods": [],
-      "collisionProxyIds": [],
-      "tags": [
-        "harness"
-      ]
-    },
-    {
-      "id": "portrait:ren:neutral",
-      "kind": "portrait",
-      "optimizedUri": "/harness/portraits/ren-neutral.png",
-      "format": "png",
       "compression": [],
       "lods": [],
       "collisionProxyIds": [],

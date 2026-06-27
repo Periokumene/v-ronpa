@@ -11,7 +11,7 @@ describe("VN runtime presentation transaction", () => {
     const runtimeScript = compileScenario(
       [
         "@back bg:harness effect:fade",
-        "@char character:felix.portrait:felix:neutral pos:50,0",
+        "@char Ema.Pensive1,ArmR3 pos:50",
         "Felix: Hello."
       ].join("\n"),
       "transaction-test.nani"
@@ -28,7 +28,7 @@ describe("VN runtime presentation transaction", () => {
     expect(advanced.state.backlog).toEqual([{ speaker: "Felix", text: "Hello." }]);
     expect(advanced.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "char", "print"]);
     expect(transaction.pixiStage).toMatchObject({
-      version: 2,
+      version: 3,
       revision: 2,
       backgroundsById: {
         MainBackground: {
@@ -38,23 +38,17 @@ describe("VN runtime presentation transaction", () => {
         }
       },
       charactersById: {
-        "character:felix": {
-          id: "character:felix",
+        Ema: {
+          id: "Ema",
           kind: "character",
-          appearance: "portrait:felix:neutral",
+          appearanceExpression: "Pensive1,ArmR3",
           pos: [0.5, 0]
         }
       },
-      actorOrder: ["MainBackground", "character:felix"],
-      background: { backgroundId: "bg:harness" },
-      slots: {
-        center: {
-          slot: "center",
-          characterId: "character:felix",
-          portraitId: "portrait:felix:neutral"
-        }
-      }
+      actorOrder: ["MainBackground", "Ema"]
     });
+    expect(transaction.pixiStage).not.toHaveProperty("background");
+    expect(transaction.pixiStage).not.toHaveProperty("slots");
     expect(transaction.pixiHints).toEqual([]);
   });
 
@@ -81,7 +75,7 @@ describe("VN runtime presentation transaction", () => {
 
   it("projects waitable Pixi commands into task descriptors for Story/Pixi synchronization", () => {
     const runtimeScript = compileScenario(
-      ["@char character:felix.portrait:felix:neutral time:0.25 wait!", "Felix: After wait."].join("\n"),
+      ["@char Ema.Pensive1 time:0.25 wait!", "Felix: After wait."].join("\n"),
       "transaction-wait-test.nani"
     );
     const advanced = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
@@ -96,13 +90,13 @@ describe("VN runtime presentation transaction", () => {
       durationMs: 250
     });
     expect(transaction.pixiWaitTasks).toEqual([
-      { kind: "actor-transition", target: "character:felix", revision: transaction.pixiStage.revision }
+      { kind: "actor-transition", target: "Ema", revision: transaction.pixiStage.revision }
     ]);
   });
 
   it("reports unsupported Pixi-routed runtime commands without changing stage state", () => {
     const runtimeScript = compileScenario(
-      ["Felix: First.", "@focus character:felix duration:420", "Felix: Second."].join("\n"),
+      ["Felix: First.", "@focus Ema duration:420", "Felix: Second."].join("\n"),
       "transaction-unsupported-pixi-test.nani"
     );
     const initialStory = createInitialStoryState(runtimeScript);

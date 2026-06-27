@@ -158,8 +158,8 @@ describe("nani runtime compiler", () => {
       sourceText: [
         "#Start",
         "@back bg:flower id:Flower",
-        "@char character:felix.p:felix pos:50,0",
-        "@char id:* tint:#ffdc22",
+        "@char Ema.Pensive1,ArmR3 pos:50",
+        "@char Ema",
         "@shake actorId:stage wait!"
       ].join("\n"),
       scriptPath: "aliases.nani"
@@ -180,8 +180,8 @@ describe("nani runtime compiler", () => {
       expect.objectContaining({
         commandId: "char",
         params: expect.objectContaining({
-          target: "character:felix",
-          appearance: "p:felix",
+          target: "Ema",
+          appearanceExpression: "Pensive1,ArmR3",
           pos: [50, 0],
           lazy: false,
           wait: false
@@ -191,7 +191,7 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands[2]).toEqual(
       expect.objectContaining({
         commandId: "char",
-        params: expect.objectContaining({ target: "*", tint: "#ffdc22" })
+        params: expect.objectContaining({ target: "Ema", appearanceExpression: "" })
       })
     );
     expect(result.script.commands[3]).toEqual(
@@ -202,6 +202,48 @@ describe("nani runtime compiler", () => {
     );
     expect(result.script.commands[3]?.params).not.toHaveProperty("actorId");
     expect(result.script.commands[3]?.params).not.toHaveProperty("intensity");
+  });
+
+  it("does not treat legacy char appearance params as layered expressions", () => {
+    const { scenario } = parseScenario({
+      sourceText: "@char Ema appearance:LegacyPortrait",
+      scriptPath: "char-appearance-param.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.script.commands[0]).toEqual(
+      expect.objectContaining({
+        commandId: "char",
+        params: expect.objectContaining({ target: "Ema", appearanceExpression: "" })
+      })
+    );
+    expect(result.diagnostics).toContainEqual({
+      code: "unsupported-command-param",
+      message: "@char accepts appearance:string, but the current runtime compiler does not consume it yet.",
+      severity: "warning"
+    });
+  });
+
+  it("does not accept comma-only character appearance as a second layered syntax", () => {
+    const { scenario } = parseScenario({
+      sourceText: ["@char Ema,ArmR3 pos:50", "@slide Ema,ArmR3 from:30,0 to:50,0"].join("\n"),
+      scriptPath: "comma-only-character-expression.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.script.commands[0]).toEqual(
+      expect.objectContaining({
+        commandId: "char",
+        params: expect.objectContaining({ target: "Ema", appearanceExpression: "", pos: [50, 0] })
+      })
+    );
+    expect(result.script.commands[1]).toEqual(
+      expect.objectContaining({
+        commandId: "slide",
+        params: expect.not.objectContaining({ appearanceExpression: "ArmR3" })
+      })
+    );
+    expect(result.script.commands[1]?.params).toMatchObject({ target: "Ema", from: [30, 0], to: [50, 0] });
   });
 
   it("preserves expression params in canonical fields without default fallback", () => {

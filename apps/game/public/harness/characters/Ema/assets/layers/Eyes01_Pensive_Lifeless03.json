@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/Head01/Facial01/Eyes01/Eyes01_Pensive_Lifeless03",
+  "drawOrder": 76,
+  "texture": {
+    "fileName": "Eyes01_Pensive_Lifeless03.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 443,
+      "height": 214
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 3815,
+      "y": 4952,
+      "width": 443,
+      "height": 214
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -0.277000048,
+      "y": 23.4210012,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 4.43,
+      "y": 2.14
+    }
+  }
+}

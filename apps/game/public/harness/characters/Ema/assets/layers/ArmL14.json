@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/ArmL/ArmL14",
+  "drawOrder": 114,
+  "texture": {
+    "fileName": "ArmL14.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 809,
+      "height": 618
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 2540,
+      "y": 904,
+      "width": 809,
+      "height": 618
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -0.007000162000000004,
+      "y": 18.789000299999998,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 8.09,
+      "y": 6.18
+    }
+  }
+}

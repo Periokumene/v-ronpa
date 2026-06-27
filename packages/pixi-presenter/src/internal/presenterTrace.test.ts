@@ -9,21 +9,20 @@ describe("presenter trace recorder", () => {
     recorder.apply(runtimeCommand("back", "scene", { appearance: "bg:court" }));
     recorder.apply(
       runtimeCommand("char", "actor", {
-        target: "character:felix",
-        appearance: "portrait:felix:neutral",
+        target: "Ema",
+        appearanceExpression: "Pensive1,ArmR3",
         pos: [0.5, 0]
       })
     );
-    recorder.apply(runtimeCommand("shake", "effect", { target: "character:felix", power: 0.3, durationMs: 240 }));
+    recorder.apply(runtimeCommand("shake", "effect", { target: "Ema", power: 0.3, durationMs: 240 }));
 
     const trace = recorder.getTrace();
     expect(trace.backgroundId).toBe("bg:court");
     expect(trace.commands.map((command) => command.commandId)).toEqual(["back", "char", "shake"]);
-    expect(trace.portraits).toEqual([
+    expect(trace.characters).toEqual([
       {
-        characterId: "character:felix",
-        portraitId: "portrait:felix:neutral",
-        slot: "center"
+        characterId: "Ema",
+        appearanceExpression: "Pensive1,ArmR3"
       }
     ]);
     expect(trace.activePerforms).toMatchObject([
@@ -31,7 +30,7 @@ describe("presenter trace recorder", () => {
         blocksUserNext: false,
         durationMs: 240,
         id: "shake:3",
-        command: { commandId: "shake", params: { target: "character:felix", power: 0.3, durationMs: 240 } }
+        command: { commandId: "shake", params: { target: "Ema", power: 0.3, durationMs: 240 } }
       }
     ]);
   });
@@ -44,7 +43,7 @@ describe("presenter trace recorder", () => {
     recorder.clear();
 
     expect(recorder.getTrace()).toEqual({
-      portraits: [],
+      characters: [],
       commands: [],
       activePerforms: []
     });

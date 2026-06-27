@@ -51,7 +51,7 @@ const baseSave = SaveDataSchema.parse({
     ended: false
   },
   pixiStage: {
-    version: 2 as const,
+    version: 3 as const,
     revision: 2,
     backgroundsById: {
       MainBackground: {
@@ -61,20 +61,16 @@ const baseSave = SaveDataSchema.parse({
       }
     },
     charactersById: {
-      "character:felix": {
-        id: "character:felix",
+      Ema: {
+        id: "Ema",
         kind: "character",
-        appearance: "portrait:felix:neutral",
+        appearanceExpression: "Pensive1,ArmR3",
         pos: [0.5, 0]
       }
     },
-    actorOrder: ["MainBackground", "character:felix"],
+    actorOrder: ["MainBackground", "Ema"],
     weather: {},
-    screenFilters: {},
-    background: { backgroundId: "bg:harness" },
-    slots: {
-      center: { slot: "center" as const, characterId: "character:felix", portraitId: "portrait:felix:neutral" }
-    }
+    screenFilters: {}
   },
   inventory: { items: { "gift:coffee": 1 } },
   evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] },
@@ -105,14 +101,13 @@ describe("media save contracts", () => {
         ended: false
       },
       pixiStage: {
-        version: 2,
+        version: 3,
         revision: 0,
         backgroundsById: {},
         charactersById: {},
         actorOrder: [],
         weather: {},
-        screenFilters: {},
-        slots: {}
+        screenFilters: {}
       },
       inventory: { items: { "gift:coffee": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] },

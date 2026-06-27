@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/ArmR/ArmR08",
+  "drawOrder": 134,
+  "texture": {
+    "fileName": "ArmR08.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 449,
+      "height": 791
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 3815,
+      "y": 4,
+      "width": 449,
+      "height": 791
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -2.3410000600000003,
+      "y": 18.4140003,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 4.49,
+      "y": 7.91
+    }
+  }
+}

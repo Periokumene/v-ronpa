@@ -24,55 +24,49 @@ describe("pixi presenter port", () => {
   it("reduces persistent VN commands into a terminal Pixi stage snapshot", () => {
     const initial = createInitialPixiStageSnapshot();
     const withBackground = reducePixiRuntimeCommand(initial, runtimeCommand("back", "scene", { appearance: "bg:harness" }));
-    const withPortrait = reducePixiRuntimeCommand(
+    const withCharacter = reducePixiRuntimeCommand(
       withBackground.snapshot,
       runtimeCommand("char", "actor", {
-        target: "character:felix",
-        appearance: "portrait:felix:neutral",
+        target: "Ema",
+        appearanceExpression: "Pensive1,ArmR3",
         pos: [50, 0]
       })
     );
 
     expect(withBackground).toMatchObject({
       snapshot: {
-        version: 2,
+        version: 3,
         revision: 1,
         backgroundsById: {
           MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness", visible: true }
         },
-        actorOrder: ["MainBackground"],
-        background: { backgroundId: "bg:harness" }
+        actorOrder: ["MainBackground"]
       },
       hints: [],
       diagnostics: []
     });
-    expect(withPortrait.snapshot).toMatchObject({
-      version: 2,
+    expect(withBackground.snapshot).not.toHaveProperty("background");
+    expect(withCharacter.snapshot).toMatchObject({
+      version: 3,
       revision: 2,
       backgroundsById: {
         MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness" }
       },
       charactersById: {
-        "character:felix": {
-          id: "character:felix",
+        Ema: {
+          id: "Ema",
           kind: "character",
-          appearance: "portrait:felix:neutral",
+          appearanceExpression: "Pensive1,ArmR3",
           pos: [0.5, 0],
           visible: true
         }
       },
-      actorOrder: ["MainBackground", "character:felix"],
-      background: { backgroundId: "bg:harness" },
-      slots: {
-        center: {
-          slot: "center",
-          characterId: "character:felix",
-          portraitId: "portrait:felix:neutral"
-        }
-      }
+      actorOrder: ["MainBackground", "Ema"]
     });
-    expect(withPortrait.hints).toEqual([]);
-    expect(withPortrait.diagnostics).toEqual([]);
+    expect(withCharacter.snapshot).not.toHaveProperty("background");
+    expect(withCharacter.snapshot).not.toHaveProperty("slots");
+    expect(withCharacter.hints).toEqual([]);
+    expect(withCharacter.diagnostics).toEqual([]);
   });
 
   it("keeps transient Pixi runtime commands out of the saveable stage snapshot", () => {
@@ -131,7 +125,7 @@ describe("pixi presenter port", () => {
       ]
     });
     expect(
-      reducePixiRuntimeCommand(initial, runtimeCommand("slide", "actor", { target: "character:missing", to: [50, 0] }))
+      reducePixiRuntimeCommand(initial, runtimeCommand("slide", "actor", { target: "Missing", to: [50, 0] }))
     ).toEqual({
       snapshot: initial,
       hints: [],
@@ -140,7 +134,7 @@ describe("pixi presenter port", () => {
         {
           code: "unsupported-pixi-params",
           commandId: "slide",
-          message: "@slide is routed to Pixi but cannot be consumed: unknown actor target: character:missing."
+          message: "@slide is routed to Pixi but cannot be consumed: unknown actor target: Missing."
         }
       ]
     });
@@ -171,7 +165,7 @@ describe("pixi presenter port", () => {
     });
   });
 
-  it("updates fixed portrait slots independently and preserves unrelated stage state", () => {
+  it("updates layered character expressions independently and preserves unrelated stage state", () => {
     let stage = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
       runtimeCommand("back", "scene", { appearance: "bg:harness" })
@@ -179,62 +173,59 @@ describe("pixi presenter port", () => {
     stage = reducePixiRuntimeCommand(
       stage,
       runtimeCommand("char", "actor", {
-        target: "character:ren",
-        appearance: "portrait:ren:neutral",
+        target: "Ren",
+        appearanceExpression: "Default",
         pos: [24, 0]
       })
     ).snapshot;
     stage = reducePixiRuntimeCommand(
       stage,
       runtimeCommand("char", "actor", {
-        target: "character:felix",
-        appearance: "portrait:felix:neutral",
+        target: "Ema",
+        appearanceExpression: "Pensive1",
         pos: [50, 0]
       })
     ).snapshot;
     stage = reducePixiRuntimeCommand(
       stage,
       runtimeCommand("char", "actor", {
-        target: "character:mira",
-        appearance: "portrait:mira:neutral",
+        target: "Mira",
+        appearanceExpression: "Default",
         pos: [76, 0]
       })
     ).snapshot;
     const replacedCenter = reducePixiRuntimeCommand(
       stage,
       runtimeCommand("char", "actor", {
-        target: "character:felix",
-        appearance: "portrait:felix:concerned"
+        target: "Ema",
+        appearanceExpression: "Pensive1,ArmR3"
       })
     ).snapshot;
 
     expect(replacedCenter).toMatchObject({
-      version: 2,
+      version: 3,
       revision: 5,
-      background: { backgroundId: "bg:harness" },
       charactersById: {
-        "character:ren": {
-          id: "character:ren",
-          appearance: "portrait:ren:neutral",
+        Ren: {
+          id: "Ren",
+          appearanceExpression: "Default",
           pos: [0.24, 0]
         },
-        "character:felix": {
-          id: "character:felix",
-          appearance: "portrait:felix:concerned",
+        Ema: {
+          id: "Ema",
+          appearanceExpression: "Pensive1,ArmR3",
           pos: [0.5, 0]
         },
-        "character:mira": {
-          id: "character:mira",
-          appearance: "portrait:mira:neutral",
+        Mira: {
+          id: "Mira",
+          appearanceExpression: "Default",
           pos: [0.76, 0]
         }
       },
-      slots: {
-        left: { slot: "left", characterId: "character:ren", portraitId: "portrait:ren:neutral" },
-        center: { slot: "center", characterId: "character:felix", portraitId: "portrait:felix:concerned" },
-        right: { slot: "right", characterId: "character:mira", portraitId: "portrait:mira:neutral" }
-      }
+      actorOrder: ["MainBackground", "Ren", "Ema", "Mira"]
     });
+    expect(replacedCenter).not.toHaveProperty("background");
+    expect(replacedCenter).not.toHaveProperty("slots");
   });
 
   it("uses command-count revision semantics for repeated persistent commands", () => {
@@ -245,33 +236,33 @@ describe("pixi presenter port", () => {
     const second = reducePixiRuntimeCommand(first, runtimeCommand("back", "scene", { appearance: "bg:harness" })).snapshot;
 
     expect(second).toMatchObject({
-      version: 2,
+      version: 3,
       revision: 2,
       backgroundsById: {
         MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness" }
-      },
-      background: { backgroundId: "bg:harness" }
+      }
     });
+    expect(second).not.toHaveProperty("background");
   });
 
   it("applies wildcard character commands to visible actors instead of creating a literal star actor", () => {
     let stage = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
-      runtimeCommand("char", "actor", { target: "character:ren", appearance: "portrait:ren:neutral", pos: [24, 0] })
+      runtimeCommand("char", "actor", { target: "Ren", appearanceExpression: "Default", pos: [24, 0] })
     ).snapshot;
     stage = reducePixiRuntimeCommand(
       stage,
-      runtimeCommand("char", "actor", { target: "character:mira", appearance: "portrait:mira:neutral", pos: [76, 0] })
+      runtimeCommand("char", "actor", { target: "Mira", appearanceExpression: "Default", pos: [76, 0] })
     ).snapshot;
 
     const tinted = reducePixiRuntimeCommand(stage, runtimeCommand("char", "actor", { target: "*", tint: "#ffdc22" })).snapshot;
 
     expect(tinted.charactersById).not.toHaveProperty("*");
-    expect(tinted.charactersById["character:ren"]).toMatchObject({ tint: "#ffdc22", pos: [0.24, 0] });
-    expect(tinted.charactersById["character:mira"]).toMatchObject({ tint: "#ffdc22", pos: [0.76, 0] });
+    expect(tinted.charactersById.Ren).toMatchObject({ tint: "#ffdc22", pos: [0.24, 0], appearanceExpression: "" });
+    expect(tinted.charactersById.Mira).toMatchObject({ tint: "#ffdc22", pos: [0.76, 0], appearanceExpression: "" });
   });
 
-  it("stores explicitly targeted background actors without overwriting the main background compatibility field", () => {
+  it("stores explicitly targeted background actors without legacy compatibility fields", () => {
     let stage = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
       runtimeCommand("back", "scene", { target: "MainBackground", appearance: "bg:harness" })
@@ -282,7 +273,7 @@ describe("pixi presenter port", () => {
       MainBackground: { id: "MainBackground", appearance: "bg:harness" },
       Flower: { id: "Flower", appearance: "Bloomed" }
     });
-    expect(stage.background).toEqual({ backgroundId: "bg:harness" });
+    expect(stage).not.toHaveProperty("background");
     expect(stage.actorOrder).toEqual(["MainBackground", "Flower"]);
   });
 
@@ -290,8 +281,8 @@ describe("pixi presenter port", () => {
     const stage = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
       runtimeCommand("char", "actor", {
-        target: "character:felix",
-        appearance: "portrait:felix:neutral",
+        target: "Ema",
+        appearanceExpression: "Pensive1",
         pos: [50, 0],
         visible: false
       })
@@ -299,16 +290,16 @@ describe("pixi presenter port", () => {
     const slid = reducePixiRuntimeCommand(
       stage,
       runtimeCommand("slide", "actor", {
-        target: "character:felix",
-        appearance: "portrait:felix:concerned",
+        target: "Ema",
+        appearanceExpression: "Pensive1,ArmR3",
         from: [15, 50],
         to: [85, 0],
         durationMs: 500
       })
     ).snapshot;
 
-    expect(slid.charactersById["character:felix"]).toMatchObject({
-      appearance: "portrait:felix:concerned",
+    expect(slid.charactersById.Ema).toMatchObject({
+      appearanceExpression: "Pensive1,ArmR3",
       visible: true,
       pos: [0.85, 0],
       transition: {
@@ -324,14 +315,14 @@ describe("pixi presenter port", () => {
     const withActor = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
       runtimeCommand("char", "actor", {
-        target: "character:felix",
-        appearance: "portrait:felix:neutral",
+        target: "Ema",
+        appearanceExpression: "Pensive1",
         durationMs: 400,
         wait: true
       })
     );
     expect(withActor.waitTasks).toEqual([
-      { kind: "actor-transition", target: "character:felix", revision: withActor.snapshot.revision }
+      { kind: "actor-transition", target: "Ema", revision: withActor.snapshot.revision }
     ]);
 
     const flash = reducePixiRuntimeCommand(

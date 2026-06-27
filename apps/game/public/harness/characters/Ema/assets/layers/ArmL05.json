@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/ArmL/ArmL05",
+  "drawOrder": 123,
+  "texture": {
+    "fileName": "ArmL05.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 558,
+      "height": 946
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 1730,
+      "y": 2662,
+      "width": 558,
+      "height": 946
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": 1.2379996999999998,
+      "y": 19.233000179999998,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 5.58,
+      "y": 9.46
+    }
+  }
+}

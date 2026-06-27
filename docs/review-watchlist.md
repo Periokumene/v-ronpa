@@ -219,35 +219,39 @@ delete, split, or execute entries from it.
   - `docs/architecture/vn-runtime-dispatcher.md`
 - Current Observation: Pixi now receives `PixiStageSnapshot` plus transient
   render hints through `reconcile(snapshot, options)`. This protects the public
-  app/runtime/save boundary from command-log replay, but the presenter v1 still
-  performs coarse full redraw inside the renderer adapter. That is acceptable for
-  the current background plus three-slot VN stage, but it can become fragile as
-  portraits, filters, particles, Live2D, or trial overlays become richer.
+  app/runtime/save boundary from command-log replay. `ActorSystem` owns actor
+  lifecycle, transforms, filters, tweens, and transition tasks, while
+  `CharacterSystem` owns layered character pack loading and active-layer content
+  swaps. The current implementation is still a coarse actor reconciliation pass;
+  that is acceptable for backgrounds plus layered characters, but it can become
+  fragile as filters, particles, Live2D/spine, or trial overlays become richer.
 - Why Not Actionable Yet: Current scope only needs stable save/load restoration
-  of VN background and portrait slots. A full differential renderer needs a
-  deliberate design pass for stage diffing, renderer instance cache, async asset
-  swap behavior, hint-lane isolation, hydrate/no-animation rules, and regression
-  coverage. Implementing it opportunistically would add complexity before the
-  next richer Pixi presentation requirements are known.
+  of VN backgrounds and layered character semantic appearances. A full
+  differential renderer needs a deliberate design pass for stage diffing,
+  renderer instance cache, async asset swap behavior, hint-lane isolation,
+  hydrate/no-animation rules, and regression coverage. Implementing it
+  opportunistically would add complexity before the next richer Pixi
+  presentation requirements are known.
 - Future Review Questions:
   - Should `pixi-presenter` add a first-class `diffPixiStage(previous, next)`
-    helper with background, slot add/remove/update, unchanged-slot, and
+    helper with background, character add/remove/update, unchanged-actor, and
     hints-only cases?
-  - Should each portrait slot retain a renderer instance cache keyed by
-    `slot + characterId + portraitId`?
-  - Should new portrait assets load offscreen and atomically swap only after the
-    replacement is ready, preserving the old slot during async loading?
+  - Should each character actor retain a content cache keyed by
+    `characterId + appearanceExpression + pack entry URI`?
+  - Should new layered character textures continue to load offscreen and
+    atomically swap only after every active layer is ready, preserving the old
+    character content during async loading?
   - Should snapshot lane and hint lane be tested as separate paths so
-    flash/shake/subtitle hints never rebuild persistent background or portrait
+    flash/shake/subtitle hints never rebuild persistent background or character
     layers?
   - Should load/hydrate have presenter-level assertions that `animate: false`
     never triggers fadeIn, flash, shake, or trial overlay hints?
   - What tests should prove repeated identical snapshots produce no renderer
-    mutation, background-only changes do not rebuild portraits, and single-slot
-    changes do not affect other slots?
+    mutation, background-only changes do not rebuild characters, and
+    single-character changes do not affect other actors?
 - Auto Action: Forbidden
 - Review Cadence: Review before adding richer Pixi VN staging, Live2D/spine
-  portrait handling, persistent trial overlays, or Pixi performance work.
+  character handling, persistent trial overlays, or Pixi performance work.
 - Next Review: TBD
 - Status: Watching
 - Linked Task / ADR / CCR: TBD

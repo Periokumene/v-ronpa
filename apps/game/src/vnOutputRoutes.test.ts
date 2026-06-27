@@ -25,7 +25,7 @@ describe("VN output routes", () => {
     const commands: RuntimeCommand[] = [
       runtimeCommand("print", "text", { text: "Line", autoNext: false }),
       runtimeCommand("back", "scene", { appearance: "bg:harness" }),
-      runtimeCommand("char", "actor", { target: "character:felix", appearance: "portrait:felix:neutral", pos: [50, 0] })
+      runtimeCommand("char", "actor", { target: "Ema", appearanceExpression: "Pensive1,ArmR3", pos: [50, 0] })
     ];
 
     expect(selectRuntimeCommandsForTarget(commands, "pixi")).toEqual([commands[1], commands[2]]);
@@ -59,7 +59,7 @@ describe("VN output routes", () => {
   });
 
   it("requires explicit command or category routes for every runtime command", () => {
-    const command = runtimeCommand("focus", "effect", { target: "character:felix", duration: 320 });
+    const command = runtimeCommand("focus", "effect", { target: "Ema", duration: 320 });
     const routeTable: VnOutputRouteTable = {
       ...defaultVnOutputRouteTable,
       commands: {

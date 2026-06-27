@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/Head01/Facial01/Mouth01/Mouth01_Determined_Closed",
+  "drawOrder": 36,
+  "texture": {
+    "fileName": "Mouth01_Determined_Closed.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 76,
+      "height": 26
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 4186,
+      "y": 6263,
+      "width": 76,
+      "height": 26
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -0.09400043500000001,
+      "y": 22.4970006,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 0.76,
+      "y": 0.26
+    }
+  }
+}
