@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, type ButtonHTMLAttributes } from "react
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
+import type { AudioHandle, AudioHandleFinishReason, AudioPort } from "@v-ronpa/media-save";
 import type { PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
 import { ExplorationStage3D, TrialRoundTableStage } from "@v-ronpa/r3f-adapter";
 import { InspectorLite } from "@v-ronpa/ui-kit";
@@ -25,6 +26,7 @@ import { VnRuntimeDispatcher } from "../../../VnRuntimeDispatcher";
 import { harnessContentManifest } from "../../contentManifest";
 
 type DebugTabId = "runtime" | "inspector";
+const FAST_VOICE_SMOKE_DURATION_MS = 1500;
 
 export function VerticalSliceScenario() {
   const flow = useGameFlowActor();
@@ -33,9 +35,11 @@ export function VerticalSliceScenario() {
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
+  const smokeAudioPort = useMemo(() => (shouldUseFastVoiceSmokeAudio() ? createFastVoiceSmokeAudioPort() : undefined), []);
   const enterTrialMode = useCallback(() => flow.send({ type: "ENTER_TRIAL" }), [flow.send]);
   const enterNaviMode = useCallback(() => flow.send({ type: "ENTER_NAVI" }), [flow.send]);
   const runtime = useVerticalSliceRuntimeAdapter(flow.mode, {
+    ...(smokeAudioPort ? { audioPort: smokeAudioPort } : {}),
     assetResolver: assetRegistry,
     storyPlayTiming,
     voiceSettings,
@@ -332,6 +336,70 @@ function displayStorySpeaker(speaker: string): string {
     Narrator: "旁白"
   };
   return labels[speaker] ?? speaker;
+}
+
+function shouldUseFastVoiceSmokeAudio(): boolean {
+  return new URLSearchParams(window.location.search).get("voiceSmoke") === "fast";
+}
+
+function createFastVoiceSmokeAudioPort(): AudioPort {
+  const activeHandles = new Set<SmokeAudioHandle>();
+
+  function register(handle: SmokeAudioHandle): AudioHandle {
+    activeHandles.add(handle);
+    handle.finished.finally(() => activeHandles.delete(handle));
+    return handle;
+  }
+
+  return {
+    playBgm(id) {
+      return register(createSmokeAudioHandle(id));
+    },
+    playSfx(id, _uri, options) {
+      const handle = createSmokeAudioHandle(id);
+      if (options?.loop !== true) window.setTimeout(() => handle.finish("ended"), 20);
+      return register(handle);
+    },
+    playVoice(id) {
+      const handle = createSmokeAudioHandle(id);
+      window.setTimeout(() => handle.finish("ended"), FAST_VOICE_SMOKE_DURATION_MS);
+      return register(handle);
+    },
+    stopAll() {
+      for (const handle of [...activeHandles]) handle.finish("stopped");
+    }
+  };
+}
+
+interface SmokeAudioHandle extends AudioHandle {
+  finish(reason: AudioHandleFinishReason): void;
+}
+
+function createSmokeAudioHandle(id: string): SmokeAudioHandle {
+  let released = false;
+  let resolveFinished: (result: { reason: AudioHandleFinishReason }) => void = () => {};
+  const finished = new Promise<{ reason: AudioHandleFinishReason }>((resolve) => {
+    resolveFinished = resolve;
+  });
+
+  function finish(reason: AudioHandleFinishReason) {
+    if (released) return;
+    released = true;
+    resolveFinished({ reason });
+  }
+
+  return {
+    id,
+    finished,
+    finish,
+    stop() {
+      finish("stopped");
+    },
+    fade() {},
+    fadeOutAndStop() {
+      finish("stopped");
+    }
+  };
 }
 
 function VerticalSliceReadout({

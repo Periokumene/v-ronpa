@@ -255,6 +255,294 @@ export const harnessRuntimeAssets = [
       ]
     },
     {
+      "id": "voice:zh:0102Adv03_Ema001",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Ema001.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv03_Ema002",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Ema002.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv03_Ema003",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Ema003.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv03_Ema004",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Ema004.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv03_Margo001",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Margo001.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv03_Margo002",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Margo002.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv03_Margo003",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Margo003.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv03_Margo004",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Margo004.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv03_Sherry001",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Sherry001.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv03_Sherry002",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Sherry002.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv03_Sherry003",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Sherry003.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv03_Sherry004",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv03_Sherry004.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Ema001",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Ema001.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Ema002",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Ema002.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Ema003",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Ema003.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Ema004",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Ema004.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Margo001",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Margo001.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Margo002",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Margo002.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Margo003",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Margo003.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Margo004",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Margo004.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Sherry001",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Sherry001.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Sherry002",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Sherry002.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Sherry003",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Sherry003.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "voice:zh:0102Adv04_Sherry004",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/0102Adv04_Sherry004.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
       "id": "voice:zh:voice_validation_0001",
       "kind": "voice",
       "optimizedUri": "/harness/media/voice/zh/voice_validation_0001.ogg",

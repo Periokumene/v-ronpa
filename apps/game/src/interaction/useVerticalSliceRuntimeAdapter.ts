@@ -178,6 +178,27 @@ export interface ApplyMediaRuntimeEffectsInput {
   videoPort?: VideoPort;
 }
 
+export interface ApplyMediaRuntimeEffectsResult {
+  diagnostics: VerticalSliceRuntimeDiagnostic[];
+  voiceHandle?: AudioHandle;
+}
+
+export type VoiceAutoAdvanceSource = Extract<StoryPlayAdvanceSource, "auto" | "auto-next">;
+
+export interface VoiceAutoAdvanceGateController {
+  clear(options?: { stopVoice?: boolean }): void;
+  install(handle: AudioHandle): void;
+  request(source: VoiceAutoAdvanceSource | "skip"): boolean;
+}
+
+export interface CreateVoiceAutoAdvanceGateControllerInput {
+  advance: (source: VoiceAutoAdvanceSource) => void;
+  clearTimeoutFn: (timeout: ReturnType<typeof setTimeout>) => void;
+  postDelayMs?: number;
+  setTimeoutFn: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
+  stopVoice: () => void;
+}
+
 export interface VerticalSliceRuntimeAdapterOptions {
   profile?: VnRuntimeProfile;
   routeTable?: VnOutputRouteTable;
@@ -218,6 +239,7 @@ const initialMap = verticalSliceMaps[0] ?? createFallbackMap();
 const MAX_RUNTIME_DIAGNOSTICS = 50;
 const DEFAULT_TOAST_DURATION_MS = 2500;
 const DEFAULT_VOICE_SETTINGS: AdapterVoiceSettings = { locale: "zh", volume: 1 };
+export const POST_VOICE_AUTO_ADVANCE_DELAY_MS = 500;
 
 export interface SyncRuntimeToastDismissalTimersInput {
   state: UiRuntimeState;
@@ -312,6 +334,10 @@ export function useVerticalSliceRuntimeAdapter(
     active: false,
     schedule: { type: "idle" }
   });
+  // Voice gates resolve after a later render; keep AUTO advance on the current Story state.
+  const advanceStoryRef = useRef<(source?: StoryPlayAdvanceSource) => void>(() => undefined);
+  const voiceAutoAdvanceGateControllerRef = useRef<VoiceAutoAdvanceGateController | undefined>(undefined);
+  const voiceEffectTokenRef = useRef(0);
   const storyPlaySchedule = useMemo(
     () =>
       selectStoryPlaySchedule(storyPlay, storyRuntime.state, {
@@ -428,7 +454,7 @@ export function useVerticalSliceRuntimeAdapter(
     const timeout = window.setTimeout(() => {
       const currentHost = storyPlayHostRef.current;
       if (!currentHost.active || currentHost.schedule !== scheduled) return;
-      advanceStory(scheduled.source);
+      if (getVoiceAutoAdvanceGateController().request(scheduled.source)) advanceStory(scheduled.source);
     }, delayMs);
     return () => window.clearTimeout(timeout);
   }, [storyPlaySchedule, storyRuntime.active]);
@@ -477,11 +503,44 @@ export function useVerticalSliceRuntimeAdapter(
     return () => {
       for (const timeout of Object.values(toastTimeoutsRef.current)) window.clearTimeout(timeout);
       toastTimeoutsRef.current = {};
+      voiceAutoAdvanceGateControllerRef.current?.clear({ stopVoice: true });
     };
   }, []);
 
+  function getVoiceAutoAdvanceGateController(): VoiceAutoAdvanceGateController {
+    if (!voiceAutoAdvanceGateControllerRef.current) {
+      voiceAutoAdvanceGateControllerRef.current = createVoiceAutoAdvanceGateController({
+        advance: (source) => {
+          if (!storyPlayHostRef.current.active) return;
+          advanceStoryRef.current(source);
+        },
+        clearTimeoutFn: window.clearTimeout.bind(window),
+        setTimeoutFn: window.setTimeout.bind(window),
+        stopVoice: stopActiveVoiceHandle
+      });
+    }
+    return voiceAutoAdvanceGateControllerRef.current;
+  }
+
+  function stopActiveVoiceHandle() {
+    mediaHandlesRef.current.voice?.stop();
+    delete mediaHandlesRef.current.voice;
+  }
+
+  function beginVoiceBoundary(): number {
+    voiceEffectTokenRef.current += 1;
+    getVoiceAutoAdvanceGateController().clear();
+    return voiceEffectTokenRef.current;
+  }
+
+  function clearVoiceAutoAdvanceGate(options: { stopVoice?: boolean } = {}) {
+    voiceEffectTokenRef.current += 1;
+    getVoiceAutoAdvanceGateController().clear(options);
+  }
+
   function resetSlice() {
     cancelStoryPlayHostSchedule();
+    clearVoiceAutoAdvanceGate();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     const spawnPose: PlayerPose = { position: initialMap.spawn, yaw: 0, pitch: 0 };
@@ -592,7 +651,10 @@ export function useVerticalSliceRuntimeAdapter(
   }
 
   function advanceStory(source: StoryPlayAdvanceSource = "manual") {
-    if (source === "manual") cancelStoryPlayHostSchedule();
+    if (source === "manual" || source === "skip") {
+      cancelStoryPlayHostSchedule();
+      if (canStoryAdvanceFromSource(storyRuntimeRef.current, source)) clearVoiceAutoAdvanceGate({ stopVoice: true });
+    }
     if (storyRuntime.state.presentationWait) {
       completePresentationWaitAndAdvance(source, { settlePixi: true });
       return;
@@ -635,9 +697,11 @@ export function useVerticalSliceRuntimeAdapter(
       setLastOutcome(nextStory.presentationWait ? "presentation-wait" : nextStory.pendingChoices.length > 0 ? "choices" : "line");
     }
   }
+  advanceStoryRef.current = advanceStory;
 
   function chooseStory(index: number) {
     cancelStoryPlayHostSchedule();
+    clearVoiceAutoAdvanceGate({ stopVoice: true });
     const step = chooseStoryPlayOption(storyPlay, {
       state: storyRuntime.state,
       script: compiled.script,
@@ -661,7 +725,10 @@ export function useVerticalSliceRuntimeAdapter(
 
   function toggleStoryAuto() {
     if (!canToggleStoryAutomation(storyRuntime)) return;
-    if (storyPlay.mode === "auto") cancelStoryPlayHostSchedule();
+    if (storyPlay.mode === "auto") {
+      cancelStoryPlayHostSchedule();
+      clearVoiceAutoAdvanceGate();
+    }
     setStoryPlayNow((current) => toggleAutoStoryPlay(current));
     setLastAction("story:auto");
     setLastOutcome(storyPlay.mode === "auto" ? "manual" : "auto");
@@ -670,6 +737,7 @@ export function useVerticalSliceRuntimeAdapter(
   function toggleStorySkip() {
     if (!canToggleStoryAutomation(storyRuntime)) return;
     if (storyPlay.mode === "skip") cancelStoryPlayHostSchedule();
+    clearVoiceAutoAdvanceGate({ stopVoice: true });
     setStoryPlayNow((current) => toggleSkipStoryPlay(current));
     setLastAction("story:skip");
     setLastOutcome(storyPlay.mode === "skip" ? "manual" : "skip");
@@ -677,11 +745,13 @@ export function useVerticalSliceRuntimeAdapter(
 
   function stopStoryAutomation(reason: StoryPlayStopReason) {
     cancelStoryPlayHostSchedule();
+    clearVoiceAutoAdvanceGate();
     setStoryPlayNow((current) => stopStoryPlayAutomation(current, reason));
   }
 
   function submitStoryInput(value: string | number | boolean) {
     cancelStoryPlayHostSchedule();
+    clearVoiceAutoAdvanceGate({ stopVoice: true });
     const currentStory = storyRuntimeRef.current;
     if (!currentStory.active || currentStory.state.runtimeWait?.kind !== "input") return;
     const submitted = storyReducer(currentStory.state, { type: "SUBMIT_INPUT", script: compiled.script, value });
@@ -715,6 +785,7 @@ export function useVerticalSliceRuntimeAdapter(
 
   function startTrial(outcome: Extract<ExplorationOutcome, { type: "start-trial" }>) {
     cancelStoryPlayHostSchedule();
+    clearVoiceAutoAdvanceGate({ stopVoice: true });
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     setStoryRuntimeNow((current) => ({ ...current, active: false }));
@@ -786,6 +857,7 @@ export function useVerticalSliceRuntimeAdapter(
 
   function closeStoryOverlay(action = "dialog:cancel") {
     cancelStoryPlayHostSchedule();
+    clearVoiceAutoAdvanceGate();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
@@ -801,6 +873,7 @@ export function useVerticalSliceRuntimeAdapter(
 
   function restoreFromSave(save: Pick<SaveData, "mode" | "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters" | "trial">) {
     cancelStoryPlayHostSchedule();
+    clearVoiceAutoAdvanceGate();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     const plan = createVerticalSliceRuntimeRestorePlan(save, compiled.script);
@@ -894,6 +967,8 @@ export function useVerticalSliceRuntimeAdapter(
     setUiRuntimeNow({ state: deriveUiRuntimeLifecycleState(nextUiStateFromCommands, nextStoryState) });
     const audioMediaEffects = transaction.mediaEffects.filter((effect) => effect.type !== "play-movie");
     const voiceMediaEffects = deriveVoiceMediaEffects(storyStep.emittedRuntimeCommands, voiceSettings, pacing);
+    const hasVoiceBoundary = voiceMediaEffects.some((effect) => effect.type === "stop-voice");
+    const voiceBoundaryToken = hasVoiceBoundary ? beginVoiceBoundary() : undefined;
     const audioEffects = [...audioMediaEffects, ...voiceMediaEffects];
     if (audioEffects.length > 0) {
       const mediaEffectInput: ApplyMediaRuntimeEffectsInput = {
@@ -907,7 +982,12 @@ export function useVerticalSliceRuntimeAdapter(
             ...(assetResolver ? { assetResolver } : {})
           })
       };
-      void applyMediaRuntimeEffects(mediaEffectInput).then(appendRuntimeDiagnostics);
+      void applyMediaRuntimeEffects(mediaEffectInput).then((result) => {
+        appendRuntimeDiagnostics(result.diagnostics);
+        if (result.voiceHandle && voiceBoundaryToken === voiceEffectTokenRef.current) {
+          getVoiceAutoAdvanceGateController().install(result.voiceHandle);
+        }
+      });
     }
     if (
       forcePixiCommit ||
@@ -1140,18 +1220,86 @@ export function createVoiceAssetId(textId: string, locale: string): string {
   return `voice:${locale}:${textId}`;
 }
 
+export function createVoiceAutoAdvanceGateController({
+  advance,
+  clearTimeoutFn,
+  postDelayMs = POST_VOICE_AUTO_ADVANCE_DELAY_MS,
+  setTimeoutFn,
+  stopVoice
+}: CreateVoiceAutoAdvanceGateControllerInput): VoiceAutoAdvanceGateController {
+  let nextToken = 0;
+  let gate:
+    | {
+        pendingSource?: VoiceAutoAdvanceSource;
+        postDelayTimeout?: ReturnType<typeof setTimeout>;
+        ready: boolean;
+        token: number;
+      }
+    | undefined;
+
+  function clear({ stopVoice: shouldStopVoice = false }: { stopVoice?: boolean } = {}) {
+    nextToken += 1;
+    if (gate?.postDelayTimeout) clearTimeoutFn(gate.postDelayTimeout);
+    gate = undefined;
+    if (shouldStopVoice) stopVoice();
+  }
+
+  function releaseReadyGate(token: number) {
+    const current = gate;
+    if (!current || current.token !== token) return;
+    current.ready = true;
+    const pendingSource = current.pendingSource;
+    if (!pendingSource) return;
+    clear();
+    advance(pendingSource);
+  }
+
+  return {
+    clear,
+    install(handle) {
+      clear();
+      const token = ++nextToken;
+      gate = { ready: false, token };
+      void handle.finished.then(({ reason }) => {
+        const current = gate;
+        if (!current || current.token !== token) return;
+        if (reason !== "ended") {
+          clear();
+          return;
+        }
+        current.postDelayTimeout = setTimeoutFn(() => releaseReadyGate(token), postDelayMs);
+      });
+    },
+    request(source) {
+      if (source === "skip") {
+        clear({ stopVoice: true });
+        return true;
+      }
+      const current = gate;
+      if (!current) return true;
+      if (current.ready) {
+        clear();
+        return true;
+      }
+      current.pendingSource = source;
+      return false;
+    }
+  };
+}
+
 export function deriveVoiceMediaEffects(
   runtimeCommands: RuntimeCommand[],
   voiceSettings: AdapterVoiceSettings = DEFAULT_VOICE_SETTINGS,
   pacing: StoryPlayPacing = "normal"
 ): MediaRuntimeEffect[] {
-  if (pacing === "skip") return [];
   return runtimeCommands.flatMap((command) => {
     if (command.commandId !== "print") return [];
+    const stopVoice: MediaRuntimeEffect = { type: "stop-voice" };
+    if (pacing === "skip") return [stopVoice];
     const textId = stringRuntimeParam(command, "textId");
-    if (!textId) return [];
+    if (!textId || voiceSettings.volume <= 0) return [stopVoice];
     const sourceRef = createVoiceAssetId(textId, voiceSettings.locale);
-    return [{ type: "play-voice" as const, key: sourceRef, textId, sourceRef, volume: voiceSettings.volume }];
+    return [stopVoice, { type: "play-voice" as const, key: sourceRef, textId, sourceRef, volume: voiceSettings.volume }];
   });
 }
 
@@ -1204,6 +1352,15 @@ export function canToggleStoryAutomation(storyRuntime: StoryRuntime): boolean {
     !storyRuntime.state.presentationWait &&
     !storyRuntime.state.runtimeWait
   );
+}
+
+export function canStoryAdvanceFromSource(storyRuntime: StoryRuntime, source: StoryPlayAdvanceSource): boolean {
+  if (!storyRuntime.active || storyRuntime.state.ended || storyRuntime.state.pendingChoices.length > 0) return false;
+  if (storyRuntime.state.presentationWait) return true;
+  const wait = storyRuntime.state.runtimeWait;
+  if (!wait) return true;
+  if (wait.kind === "pause") return canCompletePauseRuntimeWaitFromSource(wait, source);
+  return wait.kind === "movie";
 }
 
 export function canCompletePauseRuntimeWaitFromSource(
@@ -1350,8 +1507,9 @@ export async function applyMediaRuntimeEffects({
   handles,
   resolver,
   videoPort
-}: ApplyMediaRuntimeEffectsInput): Promise<VerticalSliceRuntimeDiagnostic[]> {
+}: ApplyMediaRuntimeEffectsInput): Promise<ApplyMediaRuntimeEffectsResult> {
   const diagnostics: VerticalSliceRuntimeDiagnostic[] = [];
+  let voiceHandle: AudioHandle | undefined;
   for (const effect of effects) {
     try {
       if (effect.type === "play-bgm") {
@@ -1415,7 +1573,15 @@ export async function applyMediaRuntimeEffects({
         continue;
       }
 
+      if (effect.type === "stop-voice") {
+        voiceHandle = undefined;
+        handles.voice?.stop();
+        delete handles.voice;
+        continue;
+      }
+
       if (effect.type === "play-voice") {
+        voiceHandle = undefined;
         handles.voice?.stop();
         delete handles.voice;
         const resolved = resolver({ sourceRef: effect.sourceRef, kind: "voice" });
@@ -1427,9 +1593,10 @@ export async function applyMediaRuntimeEffects({
           diagnostics.push(mediaPortError("AudioPort is not available for voice playback."));
           continue;
         }
-        handles.voice = audioPort.playVoice(effect.key, resolved.uri, {
+        voiceHandle = audioPort.playVoice(effect.key, resolved.uri, {
           ...(effect.volume !== undefined ? { volume: effect.volume } : {})
         });
+        handles.voice = voiceHandle;
         continue;
       }
 
@@ -1443,7 +1610,10 @@ export async function applyMediaRuntimeEffects({
       diagnostics.push(mediaPortError(error instanceof Error ? error.message : String(error)));
     }
   }
-  return diagnostics;
+  return {
+    diagnostics,
+    ...(voiceHandle ? { voiceHandle } : {})
+  };
 }
 
 function applyGameplayEvents(gameplay: GameplayState, events: GameplayEvent[]): GameplayState {

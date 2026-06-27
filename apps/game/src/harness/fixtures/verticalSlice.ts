@@ -161,12 +161,40 @@ Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command sh
 @clearChoice temp-clear
 @choice "分支1：主交互流程验证入口" goto:#MainInteractionFlow
 @choice "分支2：完整 Pixi 命令视觉验收" goto:#PixiCommandShowcase
-@choice "分支3：textId 语音自动绑定验证" goto:#VoiceAutoBindingValidation
+@choice "分支3：真实 textId-音频验证" goto:#VoiceTextIdAudioValidation
 
-#VoiceAutoBindingValidation
-Felix.Neutral: CHECKPOINT VOICE 01 - 有 textId 且存在 voice asset，应自动播放验证音频。|#voice_validation_0001|[>]
-Mira.Neutral: CHECKPOINT VOICE 02 - 有 textId 但故意缺少 voice asset，应产生 asset warning 且不播放。|#voice_validation_missing|[>]
-Narrator: CHECKPOINT VOICE 03 - 无 textId，正常显示且不查询 voice。[>]
+#VoiceTextIdAudioValidation
+@back bg:harness effect:fade time:0.15
+@char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
+@char idAndAppearance:character:mira.portrait:mira:neutral pos:24,0
+@char idAndAppearance:character:ren.portrait:ren:neutral pos:76,0
+Narrator: CHECKPOINT VOICE REAL 00 - 真实 textId-音频验证。下面是一条连续支线：每条角色台词都应按 textId 自动播放对应 voice，并停止上一条 voice。
+Narrator: 夜里的牢房被帘子隔成一间临时密室。艾玛、雪莉和玛格围着一台拆开的旧广播装置，谁都没有先碰那个红色开关。
+Ema: 如果把证据广播出去，外面的人就会知道这里发生了什么。|#0102Adv03_Ema001|
+Sherry: 也会知道信号从这里发出。广播塔会反向定位，我们可能连走出房间的时间都没有。|#0102Adv03_Sherry001|
+Margo: 呵呵，危险才让选择变得有价值。安全的真相通常没人愿意听。|#0102Adv03_Margo001|
+Ema: 我想让大家活下去。可如果一直沉默，我们只是换一种方式死在这里。|#0102Adv03_Ema002|
+Sherry: 那就先保存证据，再找能撤离的时间窗口。只要我们活着，真相还能说第二遍。|#0102Adv03_Sherry002|
+Margo: 或者现在就说。让整座监狱在同一秒听见我们的声音。很浪漫，也很愚蠢。|#0102Adv03_Margo002|
+Ema: 雪莉，如果我按下开关，你能拖住追踪程序吗？|#0102Adv03_Ema003|
+Sherry: 能拖住一小会儿。但我不保证能救下每个人，尤其不保证能救下你。|#0102Adv03_Sherry003|
+Margo: 真诚的警告。艾玛，选择吧。你要的是立刻被听见，还是稍后被相信？|#0102Adv03_Margo003|
+Ema: 我们先活下去。然后让证据自己说话。|#0102Adv03_Ema004|
+Sherry: 我会把它拆成三份。任意一份流出去，都足够证明这里被伪装过。|#0102Adv03_Sherry004|
+Margo: 明智，但不够漂亮。好吧，我喜欢能活到下一幕的主角。|#0102Adv03_Margo004|
+Narrator: 第二天下午，三人把拆下来的存储芯带到图书室。这里的墙厚，信号弱，适合把证据切分成更难追踪的碎片。
+Ema: 昨晚没有广播，不代表我们退缩。今天我们要让证据离开这里。|#0102Adv04_Ema001|
+Sherry: 我做了三个副本。一个藏在旧书封里，一个写进维护日志，还有一个交给玛格。|#0102Adv04_Sherry001|
+Margo: 交给我？你们真有胆量。坏人通常最擅长保管秘密。|#0102Adv04_Margo001|
+Margo: 我当然会保管。只要秘密够漂亮，我就舍不得弄丢。|#0102Adv04_Margo002|
+Ema: 我不是完全信任你。只是现在我们三个人必须互相信任一点点。|#0102Adv04_Ema002|
+Sherry: 一点点就够。计划本来就是给会害怕的人用的。|#0102Adv04_Sherry002|
+Margo: 如果广播塔不能立刻用，那我们就让它变成诱饵。等追踪系统盯着塔，我们从维修廊离开。|#0102Adv04_Margo003|
+Ema: 也就是说，真相先走，我们随后跟上。|#0102Adv04_Ema003|
+Sherry: 对。活人负责下一次广播，证据负责今晚的沉默。|#0102Adv04_Sherry003|
+Ema: 下一次，我们会把它讲给所有人听。|#0102Adv04_Ema004|
+Margo: 那就请你活到下一次。主角缺席的话，故事会很难收场。|#0102Adv04_Margo004|
+Sherry: 先离开这里。故事以后再写。|#0102Adv04_Sherry004|
 @end
 
 #MainInteractionFlow

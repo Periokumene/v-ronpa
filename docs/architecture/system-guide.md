@@ -59,7 +59,8 @@ adapters and apps
 - `gameplay` owns domain reducers for exploration, inventory, evidence
   ownership, character state, and pure trial rule judgments.
 - `media-save` owns Dexie IndexedDB save storage, Howler audio playback,
-  HTMLVideo playback, and future WebAudio rhythm adapter notes.
+  `AudioHandle.finished` lifecycle reporting, HTMLVideo playback, and future
+  WebAudio rhythm adapter notes.
 - `contracts` owns RuntimeCommand and saveable runtime contracts; renderer-local
   hint and trace shapes stay in presenter packages.
 - `asset-registry` owns id-to-runtime-asset lookup for parsed
@@ -138,6 +139,7 @@ submission remains a Trial UI action routed through `trial-director`.
   -> VN runtime transaction + route table
   -> routed RuntimeCommand consumption
   -> app commit derives voice:<locale>:<textId> from emitted print textId
+  -> AUTO/autoNext voice gate waits for AudioHandle.finished ended + 500ms
   -> app-created AssetRegistry resolves media/Pixi/R3F/UI asset ids
   -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events / AudioPort voice playback
   -> VnRuntimeDispatcher renders DOM dialog and Pixi snapshot
@@ -147,6 +149,12 @@ Dialogue lines may include one `|#textId|` marker. The marker is parser
 metadata, not visible text, and the current implementation uses it only for
 auto voice lookup. Full localization, managed text files, and explicit voice
 commands remain future tasks.
+
+AUTO voice waiting is app policy, not script semantics. `story-play` computes
+the minimum text stay time, while the app adapter waits for a successfully
+started voice handle to end naturally and then adds 500ms before advancing.
+Manual advance and SKIP do not wait for voice; missing, muted, zero-volume, or
+failed voice playback does not block automation.
 
 For Pixi presentation commands, `wait!` is opt-in. StoryEngine creates a
 presentation wait, app transaction code attaches Pixi expected task descriptors,

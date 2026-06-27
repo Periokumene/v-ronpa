@@ -17,6 +17,8 @@ describe("harness content manifest", () => {
     expect(registry.resolve({ id: "model:academy-hall", kind: "glb" }).uri).toBe("/harness/models/academy-hall.gltf");
     expect(registry.resolve({ id: "texture:evidence:keycard-thumbnail", kind: "texture" }).uri).toBe("/harness/thumbnails/evidence-keycard.png");
     expect(registry.resolve({ id: "voice:zh:voice_validation_0001", kind: "voice" }).uri).toBe("/harness/media/voice/zh/voice_validation_0001.ogg");
+    expect(registry.resolve({ id: "voice:zh:0102Adv03_Ema001", kind: "voice" }).uri).toBe("/harness/media/voice/zh/0102Adv03_Ema001.ogg");
+    expect(registry.resolve({ id: "voice:zh:0102Adv04_Sherry004", kind: "voice" }).uri).toBe("/harness/media/voice/zh/0102Adv04_Sherry004.ogg");
   });
 
   it("composes Pixi built-in FX assets into the app manifest", () => {

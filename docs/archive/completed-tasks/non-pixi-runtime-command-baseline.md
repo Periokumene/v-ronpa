@@ -14,11 +14,11 @@
 
 ## Status
 
-- State: `Draft`
+- State: `Archived`
 - Owner: `TBD`
 - Created: `2026-06-24`
-- Updated: `2026-06-24`
-- Completed Commit: `TBD`
+- Updated: `2026-06-27`
+- Completed Commit: `128bb13`
 - Archive Target: `docs/archive/completed-tasks/non-pixi-runtime-command-baseline.md`
 
 ## Worktree Environment

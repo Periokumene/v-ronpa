@@ -83,6 +83,40 @@ test("VN wait! resumes from Pixi task completion and manual continue settles the
   expect(consoleErrors).toEqual([]);
 });
 
+test("VN AUTO voice gate advances branch 3 without returning to the baseline checkpoint", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && !isExpectedPointerLockError(message.text())) consoleErrors.push(message.text());
+  });
+
+  await page.addInitScript(() => localStorage.removeItem("v-ronpa:settings:v1"));
+  await page.goto("/?scenario=vertical-slice&voiceSmoke=fast");
+  await page.getByTestId("title-new-game").click();
+  await startWitnessStory(page);
+  await advanceUntilChoices(page);
+
+  await page.getByTestId("vn-command-settings").click();
+  await expect(page.getByTestId("settings-overlay")).toBeVisible();
+  await page.getByTestId("settings-automation-auto-speed").fill("100");
+  await expect(page.getByTestId("settings-automation-auto-speed-value")).toHaveText("100%");
+  await page.getByTestId("settings-overlay-close").click();
+  await expect(page.getByTestId("settings-overlay")).toBeHidden();
+
+  await page.getByTestId("vn-dialog-choice-2").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT VOICE REAL 00");
+  await page.getByTestId("vn-dialog-advance").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("夜里的牢房");
+  await page.getByTestId("vn-dialog-advance").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("如果把证据广播出去");
+
+  await page.getByTestId("vn-command-auto").click();
+  await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("也会知道信号从这里发出", { timeout: 6_000 });
+  await expect(page.getByTestId("vn-dialog-text")).not.toContainText("CHECKPOINT 00 - baseline");
+
+  expect(consoleErrors).toEqual([]);
+});
+
 async function startWitnessStory(page: Page) {
   await page.getByTestId("vertical-slice-move-witness").click();
   await expect(page.getByTestId("vertical-slice-active-interactable")).toHaveText("interactable:witness");

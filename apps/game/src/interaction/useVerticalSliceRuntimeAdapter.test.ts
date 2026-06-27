@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import type {
   ContentManifest,
@@ -21,9 +21,12 @@ import type { AudioHandle, AudioPort, VideoPort } from "@v-ronpa/media-save";
 import {
   applyMediaRuntimeEffects,
   canCompletePauseRuntimeWaitFromSource,
+  canStoryAdvanceFromSource,
   canToggleStoryAutomation,
   collectVerticalSliceRuntimeDiagnostics,
+  createVoiceAutoAdvanceGateController,
   createInitialVerticalSliceDiagnostics,
+  POST_VOICE_AUTO_ADVANCE_DELAY_MS,
   createVoiceAssetId,
   createVerticalSliceInteractionContext,
   createVerticalSlicePresentationTransaction,
@@ -32,6 +35,7 @@ import {
   resolveMediaSource,
   shouldAnimateStoryPlayPacing,
   syncRuntimeToastDismissalTimers,
+  type MediaHandleStore,
   type StoryRuntime
 } from "./useVerticalSliceRuntimeAdapter";
 
@@ -353,16 +357,16 @@ describe("vertical slice runtime adapter helpers", () => {
   });
 
   it("emits adapter diagnostics for unresolved media and does not call AudioPort", async () => {
-    const playBgm = viFn(() => ({ id: "unused", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
-    const playSfx = viFn(() => ({ id: "unused", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
-    const playVoice = viFn(() => ({ id: "unused", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
+    const playBgm = viFn(() => audioHandle("unused"));
+    const playSfx = viFn(() => audioHandle("unused"));
+    const playVoice = viFn(() => audioHandle("unused"));
     const audioPort: AudioPort = {
       playBgm,
       playSfx,
       playVoice,
       stopAll: viFn()
     };
-    const diagnostics = await applyMediaRuntimeEffects({
+    const result = await applyMediaRuntimeEffects({
       audioPort,
       handles: { bgm: {}, sfx: {}, oneShotSequence: 0 },
       effects: [{ type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:missing" }],
@@ -371,7 +375,7 @@ describe("vertical slice runtime adapter helpers", () => {
 
     expect(playBgm.calls).toEqual([]);
     expect(playVoice.calls).toEqual([]);
-    expect(diagnostics).toEqual([
+    expect(result.diagnostics).toEqual([
       {
         source: "asset",
         code: "asset-missing",
@@ -382,12 +386,12 @@ describe("vertical slice runtime adapter helpers", () => {
   });
 
   it("applies audio effects through AudioPort handles with fade cleanup semantics", async () => {
-    const bgmHandle: AudioHandle = { id: "music", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
-    const sfxHandle: AudioHandle = { id: "rain", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
+    const bgmHandle = audioHandle("music");
+    const sfxHandle = audioHandle("rain");
     const handles = { bgm: {}, sfx: {}, oneShotSequence: 0 };
     const playBgm = viFn(() => bgmHandle);
     const playSfx = viFn(() => sfxHandle);
-    const playVoice = viFn(() => ({ id: "voice", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
+    const playVoice = viFn(() => audioHandle("voice"));
     const audioPort: AudioPort = {
       playBgm,
       playSfx,
@@ -421,20 +425,29 @@ describe("vertical slice runtime adapter helpers", () => {
 
     expect(createVoiceAssetId("voice_validation_0001", "zh")).toBe("voice:zh:voice_validation_0001");
     expect(deriveVoiceMediaEffects(commands, { locale: "zh", volume: 0.25 }, "normal")).toEqual([
+      { type: "stop-voice" },
       {
         type: "play-voice",
         key: "voice:zh:voice_validation_0001",
         textId: "voice_validation_0001",
         sourceRef: "voice:zh:voice_validation_0001",
         volume: 0.25
-      }
+      },
+      { type: "stop-voice" }
     ]);
-    expect(deriveVoiceMediaEffects(commands, { locale: "zh", volume: 0.25 }, "skip")).toEqual([]);
+    expect(deriveVoiceMediaEffects(commands, { locale: "zh", volume: 0.25 }, "skip")).toEqual([
+      { type: "stop-voice" },
+      { type: "stop-voice" }
+    ]);
+    expect(deriveVoiceMediaEffects(commands, { locale: "zh", volume: 0 }, "normal")).toEqual([
+      { type: "stop-voice" },
+      { type: "stop-voice" }
+    ]);
   });
 
   it("applies voice effects through AssetRegistry and interrupts the previous voice handle", async () => {
-    const previousVoice: AudioHandle = { id: "voice:old", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
-    const nextVoice: AudioHandle = { id: "voice:zh:voice_validation_0001", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
+    const previousVoice = audioHandle("voice:old");
+    const nextVoice = audioHandle("voice:zh:voice_validation_0001");
     const playVoice = viFn(() => nextVoice);
     const handles = { bgm: {}, sfx: {}, voice: previousVoice, oneShotSequence: 0 };
     const assetResolver = createAssetRegistry(manifestWithAssets([
@@ -447,10 +460,11 @@ describe("vertical slice runtime adapter helpers", () => {
       stopAll: viFn()
     };
 
-    const diagnostics = await applyMediaRuntimeEffects({
+    const result = await applyMediaRuntimeEffects({
       audioPort,
       handles,
       effects: [
+        { type: "stop-voice" },
         {
           type: "play-voice",
           key: "voice:zh:voice_validation_0001",
@@ -462,7 +476,8 @@ describe("vertical slice runtime adapter helpers", () => {
       resolver: ({ sourceRef, kind }) => resolveMediaSource({ sourceRef, kind, assetResolver })
     });
 
-    expect(diagnostics).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.voiceHandle).toBe(nextVoice);
     expect((previousVoice.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
     expect(playVoice.calls).toEqual([
       ["voice:zh:voice_validation_0001", "/voice/voice_validation_0001.ogg", { volume: 0.42 }]
@@ -471,8 +486,8 @@ describe("vertical slice runtime adapter helpers", () => {
   });
 
   it("reports missing voice assets without calling AudioPort", async () => {
-    const previousVoice: AudioHandle = { id: "voice:old", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
-    const playVoice = viFn(() => ({ id: "unused", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
+    const previousVoice = audioHandle("voice:old");
+    const playVoice = viFn(() => audioHandle("unused"));
     const handles = { bgm: {}, sfx: {}, voice: previousVoice, oneShotSequence: 0 };
     const audioPort: AudioPort = {
       playBgm: viFn(),
@@ -481,10 +496,11 @@ describe("vertical slice runtime adapter helpers", () => {
       stopAll: viFn()
     };
 
-    const diagnostics = await applyMediaRuntimeEffects({
+    const result = await applyMediaRuntimeEffects({
       audioPort,
       handles,
       effects: [
+        { type: "stop-voice" },
         {
           type: "play-voice",
           key: "voice:zh:missing_line",
@@ -498,7 +514,8 @@ describe("vertical slice runtime adapter helpers", () => {
     expect((previousVoice.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
     expect(playVoice.calls).toEqual([]);
     expect(handles.voice).toBeUndefined();
-    expect(diagnostics).toEqual([
+    expect(result.voiceHandle).toBeUndefined();
+    expect(result.diagnostics).toEqual([
       {
         source: "asset",
         code: "asset-missing",
@@ -508,6 +525,176 @@ describe("vertical slice runtime adapter helpers", () => {
     ]);
   });
 
+  it("does not return an earlier voice handle after a later voice boundary fails", async () => {
+    const firstVoice = audioHandle("voice:zh:first_line");
+    const playVoice = viFn(() => firstVoice);
+    const handles: MediaHandleStore = { bgm: {}, sfx: {}, oneShotSequence: 0 };
+    const audioPort: AudioPort = {
+      playBgm: viFn(),
+      playSfx: viFn(),
+      playVoice,
+      stopAll: viFn()
+    };
+    const assetResolver = createAssetRegistry(
+      manifestWithAssets([runtimeAsset("voice:zh:first_line", "voice", "/voice/first_line.ogg")])
+    );
+
+    const result = await applyMediaRuntimeEffects({
+      audioPort,
+      handles,
+      effects: [
+        {
+          type: "play-voice",
+          key: "voice:zh:first_line",
+          textId: "first_line",
+          sourceRef: "voice:zh:first_line"
+        },
+        { type: "stop-voice" },
+        {
+          type: "play-voice",
+          key: "voice:zh:missing_line",
+          textId: "missing_line",
+          sourceRef: "voice:zh:missing_line"
+        }
+      ],
+      resolver: ({ sourceRef, kind }) => resolveMediaSource({ sourceRef, kind, assetResolver })
+    });
+
+    expect(playVoice.calls).toEqual([["voice:zh:first_line", "/voice/first_line.ogg", {}]]);
+    expect((firstVoice.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
+    expect(handles.voice).toBeUndefined();
+    expect(result.voiceHandle).toBeUndefined();
+    expect(result.diagnostics).toEqual([
+      {
+        source: "asset",
+        code: "asset-missing",
+        severity: "warning",
+        message: "Runtime asset 'voice:zh:missing_line' is not declared in ContentManifest.runtimeAssets. (voice:zh:missing_line voice)"
+      }
+    ]);
+  });
+
+  it("reports voice playback failures without returning a gateable handle", async () => {
+    const handles: MediaHandleStore = { bgm: {}, sfx: {}, oneShotSequence: 0 };
+    const audioPort: AudioPort = {
+      playBgm: viFn(),
+      playSfx: viFn(),
+      playVoice: viFn(() => {
+        throw new Error("voice channel unavailable");
+      }),
+      stopAll: viFn()
+    };
+
+    const result = await applyMediaRuntimeEffects({
+      audioPort,
+      handles,
+      effects: [
+        {
+          type: "play-voice",
+          key: "voice:zh:voice_validation_0001",
+          textId: "voice_validation_0001",
+          sourceRef: "voice:zh:voice_validation_0001"
+        }
+      ],
+      resolver: () => ({ uri: "/voice/voice_validation_0001.ogg" })
+    });
+
+    expect(handles.voice).toBeUndefined();
+    expect(result.voiceHandle).toBeUndefined();
+    expect(result.diagnostics).toEqual([
+      {
+        source: "media",
+        code: "media-port-error",
+        severity: "warning",
+        message: "voice channel unavailable"
+      }
+    ]);
+  });
+
+  it("waits for voice end and post-voice delay before releasing pending AUTO advance", async () => {
+    vi.useFakeTimers();
+    try {
+      const advances: string[] = [];
+      const { handle, resolve } = deferredAudioHandle("voice:zh:line");
+      const controller = createVoiceAutoAdvanceGateController({
+        advance: (source) => advances.push(source),
+        clearTimeoutFn: clearTimeout,
+        setTimeoutFn: setTimeout,
+        stopVoice: viFn()
+      });
+
+      controller.install(handle);
+      expect(controller.request("auto")).toBe(false);
+
+      resolve({ reason: "ended" });
+      await Promise.resolve();
+      vi.advanceTimersByTime(POST_VOICE_AUTO_ADVANCE_DELAY_MS - 1);
+      expect(advances).toEqual([]);
+
+      vi.advanceTimersByTime(1);
+      expect(advances).toEqual(["auto"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not advance from voice end before the text minimum timer asks for AUTO", async () => {
+    vi.useFakeTimers();
+    try {
+      const advances: string[] = [];
+      const { handle, resolve } = deferredAudioHandle("voice:zh:line");
+      const controller = createVoiceAutoAdvanceGateController({
+        advance: (source) => advances.push(source),
+        clearTimeoutFn: clearTimeout,
+        setTimeoutFn: setTimeout,
+        stopVoice: viFn()
+      });
+
+      controller.install(handle);
+      resolve({ reason: "ended" });
+      await Promise.resolve();
+      vi.advanceTimersByTime(POST_VOICE_AUTO_ADVANCE_DELAY_MS);
+
+      expect(advances).toEqual([]);
+      expect(controller.request("auto-next")).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not release pending AUTO from stopped or cleared voice handles", async () => {
+    vi.useFakeTimers();
+    try {
+      const advances: string[] = [];
+      const stopVoice = viFn();
+      const stopped = deferredAudioHandle("voice:zh:stopped");
+      const cleared = deferredAudioHandle("voice:zh:cleared");
+      const controller = createVoiceAutoAdvanceGateController({
+        advance: (source) => advances.push(source),
+        clearTimeoutFn: clearTimeout,
+        setTimeoutFn: setTimeout,
+        stopVoice
+      });
+
+      controller.install(stopped.handle);
+      expect(controller.request("auto")).toBe(false);
+      stopped.resolve({ reason: "stopped" });
+      await Promise.resolve();
+      vi.advanceTimersByTime(POST_VOICE_AUTO_ADVANCE_DELAY_MS);
+      expect(advances).toEqual([]);
+
+      controller.install(cleared.handle);
+      expect(controller.request("skip")).toBe(true);
+      expect(stopVoice.calls).toEqual([[]]);
+      cleared.resolve({ reason: "ended" });
+      await Promise.resolve();
+      vi.advanceTimersByTime(POST_VOICE_AUTO_ADVANCE_DELAY_MS);
+      expect(advances).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("can apply movie effects through an attached VideoPort when used directly", async () => {
     const play = viFn(async () => undefined);
     const videoPort: VideoPort = {
@@ -515,14 +702,14 @@ describe("vertical slice runtime adapter helpers", () => {
       play,
       stop: viFn()
     };
-    const diagnostics = await applyMediaRuntimeEffects({
+    const result = await applyMediaRuntimeEffects({
       videoPort,
       handles: { bgm: {}, sfx: {}, oneShotSequence: 0 },
       effects: [{ type: "play-movie", sourceRef: "video:intro", block: true }],
       resolver: () => ({ uri: "/resolved/intro.mp4" })
     });
 
-    expect(diagnostics).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
     expect(play.calls).toEqual([["/resolved/intro.mp4"]]);
   });
 
@@ -605,6 +792,65 @@ describe("vertical slice runtime adapter helpers", () => {
       )
     ).toBe(true);
   });
+
+  it("only treats user advance as story-mutating when the current wait can actually complete", () => {
+    const runtimeScript = compileScenario("Felix: Adapter.", "adapter-advance-test.nani");
+    const activeStory: StoryRuntime = {
+      active: true,
+      state: createInitialStoryState(runtimeScript)
+    };
+
+    expect(canStoryAdvanceFromSource(activeStory, "manual")).toBe(true);
+    expect(canStoryAdvanceFromSource(activeStory, "skip")).toBe(true);
+    expect(
+      canStoryAdvanceFromSource(
+        {
+          ...activeStory,
+          state: {
+            ...activeStory.state,
+            pendingChoices: [{ text: "Choice", enabled: true }]
+          }
+        },
+        "manual"
+      )
+    ).toBe(false);
+    expect(
+      canStoryAdvanceFromSource(
+        {
+          ...activeStory,
+          state: {
+            ...activeStory.state,
+            runtimeWait: { kind: "pause", commandId: "wait", commandIndex: 0, mode: "timer", durationMs: 5000 }
+          }
+        },
+        "manual"
+      )
+    ).toBe(false);
+    expect(
+      canStoryAdvanceFromSource(
+        {
+          ...activeStory,
+          state: {
+            ...activeStory.state,
+            runtimeWait: { kind: "input", commandId: "input", commandIndex: 0, variableName: "answer", valueType: "string" }
+          }
+        },
+        "manual"
+      )
+    ).toBe(false);
+    expect(
+      canStoryAdvanceFromSource(
+        {
+          ...activeStory,
+          state: {
+            ...activeStory.state,
+            runtimeWait: { kind: "pause", commandId: "wait", commandIndex: 0, mode: "timer-or-confirm", durationMs: 5000 }
+          }
+        },
+        "manual"
+      )
+    ).toBe(true);
+  });
 });
 
 function manifestWithAssets(runtimeAssets: RuntimeAsset[]): ContentManifest {
@@ -643,6 +889,18 @@ function viFn<T extends (...args: any[]) => any>(implementation?: T): T & { call
     return implementation?.(...(args as Parameters<T>));
   };
   return Object.assign(fn as T, { calls });
+}
+
+function audioHandle(id: string, finished: Promise<{ reason: "ended" | "stopped" }> = Promise.resolve({ reason: "stopped" })): AudioHandle {
+  return { id, finished, stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
+}
+
+function deferredAudioHandle(id: string) {
+  let resolve: (result: { reason: "ended" | "stopped" }) => void = () => {};
+  const finished = new Promise<{ reason: "ended" | "stopped" }>((next) => {
+    resolve = next;
+  });
+  return { handle: audioHandle(id, finished), resolve };
 }
 
 function compileScenario(sourceText: string, scriptPath: string): RuntimeScript {

@@ -209,21 +209,22 @@ describe("media save contracts", () => {
     expect(howlerMock.instances[1]?.stop).toHaveBeenCalledTimes(1);
   });
 
-  it("plays voice as a one-shot handle and releases it on end", () => {
+  it("plays voice as a one-shot handle and resolves finished on end", async () => {
     const port = createHowlerAudioPort();
 
-    port.playVoice("voice:zh:line", "/voice.ogg", { volume: 0.5 });
+    const handle = port.playVoice("voice:zh:line", "/voice.ogg", { volume: 0.5 });
 
     expect(howlerMock.instances[0]?.config).toMatchObject({ src: ["/voice.ogg"], loop: false, volume: 0.5 });
     expect(howlerMock.instances[0]?.once).toHaveBeenCalledWith("end", expect.any(Function));
 
     howlerMock.instances[0]?.emit("end");
+    await expect(handle.finished).resolves.toEqual({ reason: "ended" });
     port.stopAll();
 
     expect(howlerMock.instances[0]?.stop).not.toHaveBeenCalled();
   });
 
-  it("fades to zero and releases handles exactly once", () => {
+  it("fades to zero and resolves stopped exactly once", async () => {
     vi.useFakeTimers();
     const port = createHowlerAudioPort();
     const handle = port.playBgm("bgm:main", "/main.ogg", { volume: 0.7 });
@@ -237,6 +238,7 @@ describe("media save contracts", () => {
     expect(howl?.stop).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
     expect(howl?.stop).toHaveBeenCalledTimes(1);
+    await expect(handle.finished).resolves.toEqual({ reason: "stopped" });
 
     handle.fadeOutAndStop(250);
     handle.stop();
@@ -244,7 +246,7 @@ describe("media save contracts", () => {
     expect(howl?.stop).toHaveBeenCalledTimes(1);
   });
 
-  it("clears fade timers when a handle is stopped immediately", () => {
+  it("clears fade timers when a handle is stopped immediately", async () => {
     vi.useFakeTimers();
     const port = createHowlerAudioPort();
     const handle = port.playBgm("bgm:main", "/main.ogg");
@@ -255,5 +257,23 @@ describe("media save contracts", () => {
     vi.advanceTimersByTime(500);
 
     expect(howl?.stop).toHaveBeenCalledTimes(1);
+    await expect(handle.finished).resolves.toEqual({ reason: "stopped" });
+  });
+
+  it("resolves stopped when handles are replaced or stopAll is called", async () => {
+    const port = createHowlerAudioPort();
+    const first = port.playVoice("voice:zh:line", "/first.ogg");
+    const second = port.playVoice("voice:zh:line", "/second.ogg");
+    const bgm = port.playBgm("bgm:main", "/main.ogg");
+
+    await expect(first.finished).resolves.toEqual({ reason: "stopped" });
+    expect(howlerMock.instances[0]?.stop).toHaveBeenCalledTimes(1);
+
+    port.stopAll();
+
+    await expect(second.finished).resolves.toEqual({ reason: "stopped" });
+    await expect(bgm.finished).resolves.toEqual({ reason: "stopped" });
+    expect(howlerMock.instances[1]?.stop).toHaveBeenCalledTimes(1);
+    expect(howlerMock.instances[2]?.stop).toHaveBeenCalledTimes(1);
   });
 });

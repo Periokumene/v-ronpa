@@ -28,7 +28,8 @@ VN runtime output is split in two app-layer steps:
   `emittedRuntimeCommands`.
 - `story-play` owns StoryEngine playback control: manual/AUTO/SKIP mode,
   one-shot `autoNext`, schedule selection, pacing intent, and automation stop
-  reasons. It does not own timers, React effects, Pixi, DOM, or save data.
+  reasons. It does not own timers, React effects, Pixi, DOM, voice state, or
+  save data.
 - `StoryRuntimeState` is saveable story state only. It must not store runtime
   command streams, presentation logs, or transient effects.
 - `createVnRuntimePresentationTransaction` owns app-level fanout from emitted
@@ -114,6 +115,7 @@ Dialogue textId voice is a media derivation, not StoryEngine behavior:
 ```text
 print.params.textId
   -> app story step commit
+  -> stop-voice boundary for the new print
   -> voice:<locale>:<textId>
   -> AssetRegistry.resolve({ kind: "voice" })
   -> AudioPort.playVoice()
@@ -122,6 +124,20 @@ print.params.textId
 Story current text, backlog, and save snapshots keep only visible dialogue
 text. Load restore, backlog rendering, React rerender, and SKIP pacing must not
 replay derived voice.
+
+AUTO and one-shot `autoNext` still use `story-play` only for the text minimum
+stay time. When that app-hosted timer reaches zero, the runtime adapter checks
+the current voice gate: if a voice handle was successfully started and remains
+audible, AUTO waits for `AudioHandle.finished` to resolve with `ended`, then
+waits the app policy delay of 500ms before requesting the next StoryEngine step.
+Stopped handles, missing assets, playback failures, muted or zero-volume voice,
+and SKIP pacing never block automatic advance.
+
+Every emitted `print` is a voice boundary. A print without `textId` stops the
+previous active voice but does not install a new gate. Manual advance and choice,
+load, reset, overlay close, story end, and trial entry clear any pending gate;
+manual advance only stops voice when the current Story state can actually
+advance or complete its wait.
 
 Presentation wait release is task-driven. `createVnRuntimePresentationTransaction`
 returns Pixi wait descriptors, the runtime adapter stores them on
