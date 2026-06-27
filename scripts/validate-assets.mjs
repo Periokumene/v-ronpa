@@ -6,10 +6,12 @@ import { collectHarnessRuntimeAssets, generateHarnessRuntimeAssetsModule } from 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const generatedPath = join(repoRoot, "apps/game/src/harness/generatedAssets.ts");
 const pixiFxAssetsPath = join(repoRoot, "packages/pixi-presenter/src/internal/fxAssets.ts");
+const voiceAssetsRoot = join(repoRoot, "apps/game/public/harness/media/voice");
 const sourceRoots = ["apps/game/src", "packages", "scripts"].map((path) => join(repoRoot, path));
 const harnessReferenceFiles = ["apps/game/src/harness/fixtures/verticalSlice.ts"].map((path) => join(repoRoot, path));
 const hardcodedAssetPattern = /(["'`])(?:\/harness\/|\.\/assets\/|\.\.\/assets\/|https?:\/\/|data:image\/|blob:)[^"'`]*\.(?:png|webp|avif|ktx2|ogg|mp3|mp4|webm|gltf|glb)\1/u;
 const assetIdPattern = /\b(?:bg|portrait|bgm|sfx|voice|video|model|texture|fx):[a-zA-Z0-9:_./-]+/gu;
+const voiceTextIdPattern = /^[a-zA-Z0-9_-]+$/u;
 const allowedHardcodedFiles = new Set([
   "apps/game/src/harness/generatedAssets.ts",
   "packages/pixi-presenter/src/internal/fxAssets.ts",
@@ -21,6 +23,7 @@ let failed = false;
 
 checkGeneratedAssets();
 checkHarnessFilesExist();
+checkHarnessVoiceAssetLayout();
 checkHarnessReferencesResolve();
 checkNoHardcodedRuntimeAssetPaths();
 
@@ -39,6 +42,24 @@ function checkHarnessFilesExist() {
     ids.add(asset.id);
     const filePath = join(repoRoot, "apps/game/public", asset.optimizedUri.replace(/^\//u, ""));
     if (!existsSync(filePath)) fail(`Generated asset '${asset.id}' points to missing file ${relative(repoRoot, filePath)}.`);
+  }
+}
+
+function checkHarnessVoiceAssetLayout() {
+  if (!existsSync(voiceAssetsRoot)) return;
+  for (const filePath of walkFiles(voiceAssetsRoot)) {
+    const rel = toPosix(relative(voiceAssetsRoot, filePath));
+    const parts = rel.split("/");
+    const filename = parts.at(-1) ?? "";
+    const ext = extname(filename);
+    const textId = filename.slice(0, -ext.length);
+    if (parts.length !== 2 || ext !== ".ogg") {
+      fail(`${toPosix(relative(repoRoot, filePath))} must use apps/game/public/harness/media/voice/<locale>/<textId>.ogg.`);
+      continue;
+    }
+    if (!voiceTextIdPattern.test(textId)) {
+      fail(`${toPosix(relative(repoRoot, filePath))} uses invalid voice textId '${textId}'. Use only letters, numbers, '_' and '-'.`);
+    }
   }
 }
 

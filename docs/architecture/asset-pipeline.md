@@ -57,6 +57,13 @@ Harness assets use a convention-plus-override generator:
 
 - `pnpm generate:assets` scans `apps/game/public/harness/**` and writes
   `apps/game/src/harness/generatedAssets.ts`.
+- Voice validation assets live under
+  `apps/game/public/harness/media/voice/<locale>/*.ogg`; the generator emits
+  ids as `voice:<locale>:<file-name-without-extension>`, for example
+  `voice:zh:voice_validation_0001`.
+- Voice text ids use the same flat filename-safe stem as the `.ogg` file:
+  letters, numbers, `_`, and `-`. `pnpm validate:assets` rejects nested voice
+  files or path-like text ids under `media/voice`.
 - `pnpm validate:assets` dry-runs the generator, checks generated files exist,
   checks manifest references resolve through `AssetRegistry`, and rejects
   hardcoded runtime asset paths in source.
@@ -78,6 +85,8 @@ it through adapter props:
 
 - media commands resolve `bgm`, `sfx`, `voice`, and `video` ids before calling
   Howler or the HTML video port.
+- dialogue textId auto voice resolves `voice:<locale>:<textId>` through the
+  same registry before calling `AudioPort.playVoice`.
 - Pixi resolves backgrounds, portraits, and FX ids before loading textures.
 - R3F resolves `WorldMapDef.assetRefs` model ids before probing or loading
   glTF assets.

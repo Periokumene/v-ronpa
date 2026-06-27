@@ -143,6 +143,82 @@ describe("nani parser", () => {
     expect(result.diagnostics[0]?.message).toBe("Duplicate label: Start");
   });
 
+  it("extracts Naninovel textId markers from visible text while preserving inline commands", () => {
+    const result = parseScenario({
+      sourceText: "Felix.Neutral: 文本|#voice_validation_0001|[>]",
+      scriptPath: "textid.nani"
+    });
+    const text = result.scenario.statements[0] as TextIR;
+
+    expect(result.diagnostics).toEqual([]);
+    expect(text.textId).toBe("voice_validation_0001");
+    expect(text.tokens).toEqual([
+      { kind: "text", text: "文本" },
+      expect.objectContaining({
+        kind: "inline-command",
+        command: expect.objectContaining({ commandId: ">" })
+      })
+    ]);
+  });
+
+  it("diagnoses invalid, empty, multiple, and duplicate textId markers without leaking markers into text tokens", () => {
+    const result = parseScenario({
+      sourceText: [
+        "Felix: Empty|#|[>]",
+        "Mira: Bad|#bad id|[>]",
+        "Ren: Path-like|#chapter/line|[>]",
+        "Narrator: Many|#one| markers|#two|[>]",
+        "Felix: First duplicate|#dup_id|[>]",
+        "Mira: Second duplicate|#dup_id|[>]"
+      ].join("\n"),
+      scriptPath: "textid-errors.nani"
+    });
+
+    expect(result.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+      "Invalid textId marker: (empty)",
+      "Invalid textId marker: bad id",
+      "Invalid textId marker: chapter/line",
+      "Text line may contain only one textId marker.",
+      "Duplicate textId: dup_id"
+    ]);
+    expect(
+      result.scenario.statements
+        .filter(isText)
+        .flatMap((statement) => statement.tokens.filter((token) => token.kind === "text").map((token) => token.text))
+        .join("\n")
+    ).not.toContain("|#");
+    expect((result.scenario.statements[0] as TextIR).textId).toBeUndefined();
+    expect((result.scenario.statements[1] as TextIR).textId).toBeUndefined();
+    expect((result.scenario.statements[2] as TextIR).textId).toBeUndefined();
+    expect((result.scenario.statements[3] as TextIR).textId).toBeUndefined();
+  });
+
+  it("does not parse textId markers from top-level text commands", () => {
+    const result = parseScenario({
+      sourceText: [
+        '@print "Visible marker|#print_marker|"',
+        '@append "Visible marker|#append_marker|"',
+        '@toast "Visible marker|#toast_marker|"'
+      ].join("\n"),
+      scriptPath: "textid-command-markers.nani"
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.scenario.statements.map((statement) => statement.kind)).toEqual(["command", "command", "command"]);
+    expect((result.scenario.statements[0] as CommandIR).primary).toEqual({
+      type: "string",
+      value: "Visible marker|#print_marker|"
+    });
+    expect((result.scenario.statements[1] as CommandIR).primary).toEqual({
+      type: "string",
+      value: "Visible marker|#append_marker|"
+    });
+    expect((result.scenario.statements[2] as CommandIR).primary).toEqual({
+      type: "string",
+      value: "Visible marker|#toast_marker|"
+    });
+  });
+
   it("loads P1 fixture files into stable IR", () => {
     const results = [
       parseFixture("basic-navi.p1.nani"),

@@ -7,6 +7,9 @@ VN runtime output is split in two app-layer steps:
 - `createVnRuntimePresentationTransaction` fans those emitted runtime commands
   out to runtime consumers such as Pixi stage snapshots, render hints, and
   gameplay events.
+- The vertical-slice app adapter also derives auto voice playback from emitted
+  `print.params.textId` during story step commit; this is intentionally outside
+  React render/effect replay.
 - `VnRuntimeDispatcher` renders already-materialized Pixi stage state.
   `GameInteractionShell` renders DOM runtime UI surfaces such as dialog,
   command bar, toast, input prompt, and movie overlay. Dialog text and choices
@@ -46,6 +49,11 @@ VN runtime output is split in two app-layer steps:
   `apps/game` derives VN dialog display props and story-play timing policy from
   the canonical settings snapshot, then passes those narrow values into runtime
   adapters and `GameInteractionShell` / `VnDialogSurface`.
+- Voice locale and volume are likewise app-derived settings. The app maps
+  `zh-CN` / `zh-TW` to voice locale `zh`, currently permits `ja` / `en` as
+  direct voice locales, and falls back other UI languages to `zh` until a voice
+  locale is explicitly added. Voice volume is
+  `muted ? 0 : masterVolume * voiceVolume`.
 - DOM UI owns dialogue text, choices, menus, settings, save/load screens, and
   other accessibility-sensitive surfaces.
 - Pixi owns VN/trial 2D effects, backgrounds, portraits, filters, particles,
@@ -100,6 +108,20 @@ media ids before calling `AudioPort` or `VideoPort`; `VnRuntimeDispatcher`
 passes the same resolver to Pixi; and the first-person bridge passes it to the
 R3F stage. Missing asset resolution is surfaced as runtime diagnostics and
 visible fallback behavior, not guessed public URLs.
+
+Dialogue textId voice is a media derivation, not StoryEngine behavior:
+
+```text
+print.params.textId
+  -> app story step commit
+  -> voice:<locale>:<textId>
+  -> AssetRegistry.resolve({ kind: "voice" })
+  -> AudioPort.playVoice()
+```
+
+Story current text, backlog, and save snapshots keep only visible dialogue
+text. Load restore, backlog rendering, React rerender, and SKIP pacing must not
+replay derived voice.
 
 Presentation wait release is task-driven. `createVnRuntimePresentationTransaction`
 returns Pixi wait descriptors, the runtime adapter stores them on

@@ -217,13 +217,22 @@ describe("VN runtime presentation transaction", () => {
           loc: { scriptPath: "transaction-story-control-routing.nani", line: 2, column: 1, raw: "@wait i" }
         },
         {
+          commandId: "voice",
+          canonicalName: "voice",
+          category: "media",
+          source: "naninovel",
+          status: "stubbed",
+          params: { primary: "voice:zh:voice_validation_0001" },
+          loc: { scriptPath: "transaction-story-control-routing.nani", line: 3, column: 1, raw: "@voice voice:zh:voice_validation_0001" }
+        },
+        {
           commandId: "stopvoice",
           canonicalName: "stopVoice",
           category: "media",
           source: "naninovel",
           status: "stubbed",
           params: {},
-          loc: { scriptPath: "transaction-story-control-routing.nani", line: 3, column: 1, raw: "@stopVoice" }
+          loc: { scriptPath: "transaction-story-control-routing.nani", line: 4, column: 1, raw: "@stopVoice" }
         }
       ]
     };

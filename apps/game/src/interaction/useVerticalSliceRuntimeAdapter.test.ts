@@ -24,9 +24,11 @@ import {
   canToggleStoryAutomation,
   collectVerticalSliceRuntimeDiagnostics,
   createInitialVerticalSliceDiagnostics,
+  createVoiceAssetId,
   createVerticalSliceInteractionContext,
   createVerticalSlicePresentationTransaction,
   createVerticalSliceRuntimeRestorePlan,
+  deriveVoiceMediaEffects,
   resolveMediaSource,
   shouldAnimateStoryPlayPacing,
   syncRuntimeToastDismissalTimers,
@@ -353,9 +355,11 @@ describe("vertical slice runtime adapter helpers", () => {
   it("emits adapter diagnostics for unresolved media and does not call AudioPort", async () => {
     const playBgm = viFn(() => ({ id: "unused", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
     const playSfx = viFn(() => ({ id: "unused", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
+    const playVoice = viFn(() => ({ id: "unused", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
     const audioPort: AudioPort = {
       playBgm,
       playSfx,
+      playVoice,
       stopAll: viFn()
     };
     const diagnostics = await applyMediaRuntimeEffects({
@@ -366,6 +370,7 @@ describe("vertical slice runtime adapter helpers", () => {
     });
 
     expect(playBgm.calls).toEqual([]);
+    expect(playVoice.calls).toEqual([]);
     expect(diagnostics).toEqual([
       {
         source: "asset",
@@ -382,9 +387,11 @@ describe("vertical slice runtime adapter helpers", () => {
     const handles = { bgm: {}, sfx: {}, oneShotSequence: 0 };
     const playBgm = viFn(() => bgmHandle);
     const playSfx = viFn(() => sfxHandle);
+    const playVoice = viFn(() => ({ id: "voice", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
     const audioPort: AudioPort = {
       playBgm,
       playSfx,
+      playVoice,
       stopAll: viFn()
     };
 
@@ -404,6 +411,101 @@ describe("vertical slice runtime adapter helpers", () => {
     expect(playSfx.calls).toEqual([["rain", "/resolved/sfx:rain.ogg", { loop: true, volume: 0.3 }]]);
     expect((bgmHandle.fadeOutAndStop as ReturnType<typeof viFn>).calls).toEqual([[200]]);
     expect((sfxHandle.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
+  });
+
+  it("derives voice effects from print textId only for non-skip pacing", () => {
+    const commands = [
+      runtimeCommand("print", "text", { text: "Voiced.", textId: "voice_validation_0001" }),
+      runtimeCommand("print", "text", { text: "Unvoiced." })
+    ];
+
+    expect(createVoiceAssetId("voice_validation_0001", "zh")).toBe("voice:zh:voice_validation_0001");
+    expect(deriveVoiceMediaEffects(commands, { locale: "zh", volume: 0.25 }, "normal")).toEqual([
+      {
+        type: "play-voice",
+        key: "voice:zh:voice_validation_0001",
+        textId: "voice_validation_0001",
+        sourceRef: "voice:zh:voice_validation_0001",
+        volume: 0.25
+      }
+    ]);
+    expect(deriveVoiceMediaEffects(commands, { locale: "zh", volume: 0.25 }, "skip")).toEqual([]);
+  });
+
+  it("applies voice effects through AssetRegistry and interrupts the previous voice handle", async () => {
+    const previousVoice: AudioHandle = { id: "voice:old", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
+    const nextVoice: AudioHandle = { id: "voice:zh:voice_validation_0001", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
+    const playVoice = viFn(() => nextVoice);
+    const handles = { bgm: {}, sfx: {}, voice: previousVoice, oneShotSequence: 0 };
+    const assetResolver = createAssetRegistry(manifestWithAssets([
+      runtimeAsset("voice:zh:voice_validation_0001", "voice", "/voice/voice_validation_0001.ogg")
+    ]));
+    const audioPort: AudioPort = {
+      playBgm: viFn(),
+      playSfx: viFn(),
+      playVoice,
+      stopAll: viFn()
+    };
+
+    const diagnostics = await applyMediaRuntimeEffects({
+      audioPort,
+      handles,
+      effects: [
+        {
+          type: "play-voice",
+          key: "voice:zh:voice_validation_0001",
+          textId: "voice_validation_0001",
+          sourceRef: "voice:zh:voice_validation_0001",
+          volume: 0.42
+        }
+      ],
+      resolver: ({ sourceRef, kind }) => resolveMediaSource({ sourceRef, kind, assetResolver })
+    });
+
+    expect(diagnostics).toEqual([]);
+    expect((previousVoice.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
+    expect(playVoice.calls).toEqual([
+      ["voice:zh:voice_validation_0001", "/voice/voice_validation_0001.ogg", { volume: 0.42 }]
+    ]);
+    expect(handles.voice).toBe(nextVoice);
+  });
+
+  it("reports missing voice assets without calling AudioPort", async () => {
+    const previousVoice: AudioHandle = { id: "voice:old", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
+    const playVoice = viFn(() => ({ id: "unused", stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() }));
+    const handles = { bgm: {}, sfx: {}, voice: previousVoice, oneShotSequence: 0 };
+    const audioPort: AudioPort = {
+      playBgm: viFn(),
+      playSfx: viFn(),
+      playVoice,
+      stopAll: viFn()
+    };
+
+    const diagnostics = await applyMediaRuntimeEffects({
+      audioPort,
+      handles,
+      effects: [
+        {
+          type: "play-voice",
+          key: "voice:zh:missing_line",
+          textId: "missing_line",
+          sourceRef: "voice:zh:missing_line"
+        }
+      ],
+      resolver: ({ sourceRef, kind }) => resolveMediaSource({ sourceRef, kind, assetResolver: createAssetRegistry(manifestWithAssets([])) })
+    });
+
+    expect((previousVoice.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
+    expect(playVoice.calls).toEqual([]);
+    expect(handles.voice).toBeUndefined();
+    expect(diagnostics).toEqual([
+      {
+        source: "asset",
+        code: "asset-missing",
+        severity: "warning",
+        message: "Runtime asset 'voice:zh:missing_line' is not declared in ContentManifest.runtimeAssets. (voice:zh:missing_line voice)"
+      }
+    ]);
   });
 
   it("can apply movie effects through an attached VideoPort when used directly", async () => {

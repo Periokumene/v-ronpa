@@ -23,12 +23,16 @@ such as VN dialog display and AUTO/SKIP timing.
 
 - `system`: language, skip-all preference, fullscreen preference.
 - `display`: text speed, text size, textbox opacity, and font id.
-- `sound`: master/BGM/SFX/voice/UI volumes, mute, and voice interruption.
+- `sound`: master/BGM/SFX/voice/UI volumes and mute.
 - `automation`: AUTO and SKIP speed preferences.
 
 Normalized numeric preferences use `0..1`. The app persists this snapshot in
 localStorage and rewrites missing fields with defaults. Settings do not enter
 `SaveData`, StoryEngine state, RuntimeCommand output, or `media-save`.
+
+Follow-up CCR `textid-auto-voice-runtime` removes the unused
+`sound.voiceInterruption` field and migrates legacy localStorage by stripping
+that field while preserving the rest of the settings snapshot.
 
 ## Fixtures And Tests
 

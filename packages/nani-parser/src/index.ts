@@ -40,6 +40,9 @@ const commandAssetKinds: Record<string, string> = {
   video: "video"
 };
 
+const textIdPattern = /\|#([^|]*)\|/gu;
+const textIdValuePattern = /^[a-zA-Z0-9_-]+$/u;
+
 export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
   const diagnostics: Diagnostic[] = [];
   const statements: StatementIR[] = [];
@@ -78,9 +81,10 @@ export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
       return;
     }
 
-    statements.push(parseText(trimmed, loc));
+    statements.push(parseText(trimmed, loc, diagnostics));
   });
 
+  collectDuplicateTextIdDiagnostics(statements, diagnostics);
   collectLocalLabelReferenceDiagnostics(statements, labels, diagnostics);
 
   return {
@@ -100,7 +104,7 @@ function firstNonWhitespaceColumn(raw: string): number {
   return match ? (match.index ?? 0) + 1 : 1;
 }
 
-function parseText(line: string, loc: SourceLocation): StatementIR {
+function parseText(line: string, loc: SourceLocation, diagnostics: Diagnostic[]): StatementIR {
   const speakerMatch = line.match(/^([A-Za-z0-9_. -]+):\s*(.*)$/);
   const speakerDirective = speakerMatch?.[1]?.trim();
   const body = speakerMatch?.[2] ?? line;
@@ -108,6 +112,11 @@ function parseText(line: string, loc: SourceLocation): StatementIR {
   const bodyStart = Math.max(0, line.indexOf(body));
   const tokens = parseInlineTokens(body, { ...loc, column: loc.column + bodyStart });
   const printParams: Record<string, NaniValue> = {};
+  const textIdResult = extractTextIdFromTokens(tokens);
+
+  if (textIdResult.diagnostic) {
+    diagnostics.push({ severity: "error", message: textIdResult.diagnostic, loc });
+  }
 
   for (const token of tokens) {
     if (token.kind === "inline-command" && token.command.commandId === "<") {
@@ -122,6 +131,7 @@ function parseText(line: string, loc: SourceLocation): StatementIR {
   };
   if (speaker) statement.speaker = speaker;
   if (appearance) statement.appearance = appearance;
+  if (textIdResult.textId) statement.textId = textIdResult.textId;
   if (Object.keys(printParams).length > 0) statement.printParams = printParams;
   return statement;
 }
@@ -172,6 +182,28 @@ function parseInlineTokens(text: string, loc: SourceLocation): TextToken[] {
   }
 
   return tokens;
+}
+
+function extractTextIdFromTokens(tokens: TextToken[]): { textId?: string; diagnostic?: string } {
+  const matches: string[] = [];
+
+  for (const token of tokens) {
+    if (token.kind !== "text") continue;
+    token.text = token.text.replace(textIdPattern, (_marker, id: string) => {
+      matches.push(id);
+      return "";
+    });
+  }
+
+  if (matches.length === 0) return {};
+  if (matches.length > 1) return { diagnostic: "Text line may contain only one textId marker." };
+
+  const textId = matches[0] ?? "";
+  if (!textId || !textIdValuePattern.test(textId)) {
+    return { diagnostic: `Invalid textId marker: ${textId || "(empty)"}` };
+  }
+
+  return { textId };
 }
 
 function findClosingBracket(text: string, start: number): number {
@@ -345,6 +377,22 @@ function collectLocalLabelReferenceDiagnostics(
         }
       }
     }
+  }
+}
+
+function collectDuplicateTextIdDiagnostics(statements: StatementIR[], diagnostics: Diagnostic[]): void {
+  const seen = new Map<string, SourceLocation>();
+  for (const statement of statements) {
+    if (statement.kind !== "text" || !statement.textId) continue;
+    if (seen.has(statement.textId)) {
+      diagnostics.push({
+        severity: "error",
+        message: `Duplicate textId: ${statement.textId}`,
+        loc: statement.loc
+      });
+      continue;
+    }
+    seen.set(statement.textId, statement.loc);
   }
 }
 

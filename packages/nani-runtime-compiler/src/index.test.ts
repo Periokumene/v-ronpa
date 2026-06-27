@@ -4,7 +4,7 @@ import { compileRuntimeScript } from "./index";
 
 describe("nani runtime compiler", () => {
   it("compiles text statements into print runtime commands", () => {
-    const { scenario } = parseScenario({ sourceText: "Felix: Hello.[>]", scriptPath: "text.nani" });
+    const { scenario } = parseScenario({ sourceText: "Felix: Hello.|#voice_validation_0001|[>]\nMira: No voice.[>]", scriptPath: "text.nani" });
     const result = compileRuntimeScript(scenario);
 
     expect(result.diagnostics).toEqual([]);
@@ -15,9 +15,14 @@ describe("nani runtime compiler", () => {
         category: "text",
         source: "v-ronpa",
         status: "implemented",
-        params: { text: "Hello.", speaker: "Felix", autoNext: true }
+        params: { text: "Hello.", speaker: "Felix", autoNext: true, textId: "voice_validation_0001" }
+      }),
+      expect.objectContaining({
+        commandId: "print",
+        params: { text: "No voice.", speaker: "Mira", autoNext: true }
       })
     ]);
+    expect(result.script.commands.map((command) => command.commandId)).toEqual(["print", "print"]);
   });
 
   it("normalizes visual runtime params without producing downstream command shapes", () => {
@@ -331,6 +336,42 @@ describe("nani runtime compiler", () => {
       message: "@async is declared for Naninovel compatibility, but this runtime does not implement its execution boundary yet.",
       severity: "warning"
     });
+  });
+
+  it("keeps explicit voice commands declared-only while textId auto voice stays app-derived", () => {
+    const { scenario } = parseScenario({
+      sourceText: "@voice voice:zh:voice_validation_0001 volume:0.5\n@stopVoice",
+      scriptPath: "explicit-voice-declared-only.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.script.commands).toEqual([
+      expect.objectContaining({
+        commandId: "voice",
+        status: "stubbed",
+        params: expect.objectContaining({
+          primary: "voice:zh:voice_validation_0001",
+          volume: 0.5
+        })
+      }),
+      expect.objectContaining({
+        commandId: "stopvoice",
+        status: "stubbed",
+        params: {}
+      })
+    ]);
+    expect(result.diagnostics).toEqual([
+      {
+        code: "declared-only-command",
+        message: "@voice is declared for Naninovel compatibility, but this runtime does not implement its execution boundary yet.",
+        severity: "warning"
+      },
+      {
+        code: "declared-only-command",
+        message: "@stopVoice is declared for Naninovel compatibility, but this runtime does not implement its execution boundary yet.",
+        severity: "warning"
+      }
+    ]);
   });
 
   it("diagnoses shake loop as an unsupported Pixi boundary instead of silently approximating it", () => {

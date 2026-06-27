@@ -46,6 +46,8 @@ and merge the change through the integration baseline first.
   versioned user-preference shape grouped by system, display, sound, and
   automation. It is persisted by app adapters outside `SaveData`; `media-save`
   must not store or merge settings as part of save slots.
+- Legacy persisted settings may contain removed fields. App adapters should
+  migrate them at the storage boundary instead of weakening the public schema.
 - Presenter runtime traces are adapter internals. They must not be used as
   SaveData shapes or as public stage snapshots.
 - UI asset refs and interaction style profiles are manifest/config references.
@@ -53,6 +55,9 @@ and merge the change through the integration baseline first.
   Three.js objects.
 - Renderer-specific objects must not appear in contracts.
 - Script source locations must be preserved through parse and compile outputs.
+- Dialogue `TextIR.textId`, when present, is metadata extracted from
+  `|#textId|` markers. It may compile to `print.params.textId`, but the marker
+  and id must not enter visible text, backlog text, or save snapshots.
 - `.nani` `CommandIR.args` must preserve ordered command tokens with raw
   value/param/flag information. Legacy `primary`, `params`, and `flags` may
   exist for migration, but compiler logic should derive command shape from

@@ -209,6 +209,20 @@ describe("media save contracts", () => {
     expect(howlerMock.instances[1]?.stop).toHaveBeenCalledTimes(1);
   });
 
+  it("plays voice as a one-shot handle and releases it on end", () => {
+    const port = createHowlerAudioPort();
+
+    port.playVoice("voice:zh:line", "/voice.ogg", { volume: 0.5 });
+
+    expect(howlerMock.instances[0]?.config).toMatchObject({ src: ["/voice.ogg"], loop: false, volume: 0.5 });
+    expect(howlerMock.instances[0]?.once).toHaveBeenCalledWith("end", expect.any(Function));
+
+    howlerMock.instances[0]?.emit("end");
+    port.stopAll();
+
+    expect(howlerMock.instances[0]?.stop).not.toHaveBeenCalled();
+  });
+
   it("fades to zero and releases handles exactly once", () => {
     vi.useFakeTimers();
     const port = createHowlerAudioPort();

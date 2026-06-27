@@ -9,7 +9,8 @@ import {
   initializeGameSettings,
   loadGameSettings,
   settingsToDialogDisplaySettings,
-  settingsToStoryPlayTimingPolicy
+  settingsToStoryPlayTimingPolicy,
+  settingsToVoiceRuntimeSettings
 } from "./useGameSettingsAdapter";
 
 describe("game settings adapter helpers", () => {
@@ -41,6 +42,35 @@ describe("game settings adapter helpers", () => {
     expect(settings.display.textboxOpacity).toBe(0.75);
     expect(settings.sound.bgmVolume).toBe(0.25);
     expect(JSON.parse(storage.getItem(GAME_SETTINGS_STORAGE_KEY) ?? "")).toEqual(settings);
+  });
+
+  it("migrates legacy voice interruption without resetting other settings", () => {
+    const storage = createMemorySettingsStorage({
+      [GAME_SETTINGS_STORAGE_KEY]: JSON.stringify({
+        version: 1,
+        system: { language: "zh-TW", skipAll: true, preferFullscreen: false },
+        display: { textSpeed: 0.75, textSize: "large", textboxOpacity: 0.4, fontFamilyId: "font:default" },
+        sound: {
+          masterVolume: 0.5,
+          bgmVolume: 0.2,
+          sfxVolume: 0.6,
+          voiceVolume: 0.8,
+          uiVolume: 0.7,
+          muted: false,
+          voiceInterruption: "interrupt"
+        },
+        automation: { autoSpeed: 0.25, skipSpeed: 0.9 }
+      })
+    });
+
+    const settings = initializeGameSettings(storage);
+
+    expect(settings.system.language).toBe("zh-TW");
+    expect(settings.display.textSize).toBe("large");
+    expect(settings.sound.voiceVolume).toBe(0.8);
+    expect(settings.automation.skipSpeed).toBe(0.9);
+    expect(settings.sound).not.toHaveProperty("voiceInterruption");
+    expect(JSON.parse(storage.getItem(GAME_SETTINGS_STORAGE_KEY) ?? "").sound).not.toHaveProperty("voiceInterruption");
   });
 
   it("falls back to defaults and rewrites corrupt settings", () => {
@@ -113,10 +143,24 @@ describe("game settings adapter helpers", () => {
       textboxOpacity: 0.75,
       textSpeed: 0.5
     });
+    expect(settingsToVoiceRuntimeSettings(defaults)).toEqual({
+      locale: "zh",
+      volume: 1
+    });
 
     const fast = applySettingsPatch(defaults, { automation: { autoSpeed: 1, skipSpeed: 1 } });
     const timing = settingsToStoryPlayTimingPolicy(fast);
     expect(timing.autoBaseDelayMs).toBeLessThan(defaultStoryPlayTimingPolicy.autoBaseDelayMs);
     expect(timing.skipDelayMs).toBeLessThan(defaultStoryPlayTimingPolicy.skipDelayMs);
+
+    const muted = applySettingsPatch(defaults, { sound: { masterVolume: 0.5, voiceVolume: 0.4, muted: true } });
+    const audibleJapanese = applySettingsPatch(defaults, {
+      system: { language: "ja" },
+      sound: { masterVolume: 0.5, voiceVolume: 0.4 }
+    });
+    const unsupportedVoiceLocale = applySettingsPatch(defaults, { system: { language: "ko" } });
+    expect(settingsToVoiceRuntimeSettings(muted)).toEqual({ locale: "zh", volume: 0 });
+    expect(settingsToVoiceRuntimeSettings(audibleJapanese)).toEqual({ locale: "ja", volume: 0.2 });
+    expect(settingsToVoiceRuntimeSettings(unsupportedVoiceLocale)).toEqual({ locale: "zh", volume: 1 });
   });
 });

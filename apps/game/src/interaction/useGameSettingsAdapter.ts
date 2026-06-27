@@ -36,6 +36,11 @@ export interface UseGameSettingsAdapterOptions {
   debounceMs?: number | undefined;
 }
 
+export interface VoiceRuntimeSettings {
+  locale: string;
+  volume: number;
+}
+
 interface ResolvedGameSettingsWriterConfig {
   storage: GameSettingsStorage | undefined;
   storageKey: string;
@@ -133,7 +138,12 @@ export function loadGameSettings(
   try {
     const parsed = JSON.parse(raw) as unknown;
     const result = SettingsSnapshotSchema.safeParse(parsed);
-    if (!result.success) return { settings: createDefaultSettingsSnapshot(), migrated: true };
+    if (!result.success) {
+      const legacy = stripLegacySettingsFields(parsed);
+      const legacyResult = SettingsSnapshotSchema.safeParse(legacy.value);
+      if (!legacyResult.success) return { settings: createDefaultSettingsSnapshot(), migrated: true };
+      return { settings: legacyResult.data, migrated: true };
+    }
     const settings = result.data;
     return {
       settings,
@@ -187,6 +197,13 @@ export function settingsToDialogDisplaySettings(settings: SettingsSnapshot): VnD
     textSize: settings.display.textSize,
     textboxOpacity: settings.display.textboxOpacity,
     textSpeed: settings.display.textSpeed
+  };
+}
+
+export function settingsToVoiceRuntimeSettings(settings: SettingsSnapshot): VoiceRuntimeSettings {
+  return {
+    locale: settingsLanguageToVoiceLocale(settings.system.language),
+    volume: settings.sound.muted ? 0 : settings.sound.masterVolume * settings.sound.voiceVolume
   };
 }
 
@@ -251,4 +268,22 @@ function resolveBrowserSettingsStorage(): GameSettingsStorage | undefined {
 
 function speedToDelayMultiplier(speed: number): number {
   return 1.75 - speed * 1.5;
+}
+
+function settingsLanguageToVoiceLocale(language: SettingsSnapshot["system"]["language"]): string {
+  if (language === "zh-CN" || language === "zh-TW") return "zh";
+  if (language === "ja" || language === "en") return language;
+  return "zh";
+}
+
+function stripLegacySettingsFields(value: unknown): { value: unknown; stripped: boolean } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { value, stripped: false };
+  const root = value as Record<string, unknown>;
+  const sound = root.sound;
+  if (!sound || typeof sound !== "object" || Array.isArray(sound) || !("voiceInterruption" in sound)) {
+    return { value, stripped: false };
+  }
+  const { voiceInterruption: _voiceInterruption, ...nextSound } = sound as Record<string, unknown>;
+  void _voiceInterruption;
+  return { value: { ...root, sound: nextSound }, stripped: true };
 }

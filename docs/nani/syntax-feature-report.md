@@ -73,7 +73,13 @@ P1 text supports:
 - inline commands such as `[>]` and `[< speed:0.8]`
 - print parameter extraction from inline `<` commands
 
-P1 does not parse localization IDs or managed-text references.
+The current parser also supports one Naninovel-style dialogue text identity
+marker, for example `Felix.Neutral: 这里太安静了。|#ch01_hall_0001|[>]`.
+`|#textId|` is metadata on `TextIR.textId`; it is stripped from visible text
+tokens and is not parsed inside top-level `@print`, `@append`, or `@toast`
+commands. Current textIds are filename-safe flat ids using letters, numbers,
+`_`, and `-`. This is a voice-binding identity only in the current runtime, not
+a complete localization or managed-text system.
 
 ### Local Flow Syntax
 
@@ -120,14 +126,14 @@ but are intentionally unused in the P1 fixtures.
 
 | Feature area | Reason not in P1 | Suggested phase | Owning subsystem |
 |---|---|---|---|
-| Text localization IDs and text references | Requires stable localization and voice/backlog identity design | P2 | StoryEngine + tooling |
+| Full text localization references | Requires locale files, managed text tooling, and project-level duplicate detection | P2 | StoryEngine + tooling |
 | Indentation child blocks | Requires block tree construction, not just line-oriented IR | P2 | nani-parser + StoryEngine |
 | Block control flow | Requires block tree and call-stack semantics; command-level `if` / `unless` expression evaluation exists in StoryEngine v1 | P2 | StoryEngine |
 | Subroutine flow | Requires call stack semantics | P2 | StoryEngine |
 | Input/save/unlock/toast style app commands | Requires UI, save, achievement, or notification contracts | P3 | app/harness + media-save + ui-kit |
 | Multi-speaker text | Requires dialogue presentation and backlog policy | P2 | StoryEngine + ui-kit |
 | Async, await, and track control | Requires scheduler/runtime track model | P3 | StoryEngine |
-| Managed text and automatic voice mapping | Requires content tooling and asset pipeline | P3 | tooling + media-save |
+| Explicit voice commands and voice replay | Requires command semantics, replay UI, and richer media policy | P3 | tooling + media-save |
 | Rich reveal events | Requires text reveal runtime and presentation ports | P3 | StoryEngine + presentation |
 | Unity scene/timeline/effect command families | Not part of the browser-first V-Ronpa contract | P3 / Future ADR | out of scope unless a future ADR adds them |
 
@@ -141,7 +147,7 @@ is stable:
 - local label reference diagnostics for endpoint params beyond command primary
   `#Label` and `goto:#Label`
 - explicit parse support for indentation blocks
-- stable text identity syntax after localization requirements are approved
+- project-level textId duplicate tooling and future locale-file ownership
 - richer inline token classification for wait markers and print parameter
   patches
 - external script dependency modeling for cross-file jumps or calls

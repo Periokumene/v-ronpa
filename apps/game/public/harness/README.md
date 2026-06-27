@@ -16,6 +16,9 @@ scripts.
   `apps/game/src/harness/generatedAssets.ts`.
 - Run `pnpm validate:assets` to verify the generated manifest is current, files
   exist, and source code does not contain hardcoded runtime asset paths.
+- Voice fixtures must use `media/voice/<locale>/<textId>.ogg`. The `<textId>`
+  stem is the script `|#textId|` value and may contain only letters, numbers,
+  `_`, and `-`.
 
 ## Registered Asset Ids
 
@@ -41,6 +44,7 @@ scripts.
 | `sfx:rain-inside-car-loop` | `sfx` | Looping SFX tracking |
 | `sfx:shock-fadeout` | `sfx` | One-shot or `sfxFast` |
 | `sfx:knock-door` | `sfx` | One-shot SFX |
+| `voice:zh:voice_validation_0001` | `voice` | textId auto voice validation |
 | `video:validation-intro` | `video` | Blocking movie playback |
 
 These files are harness fixtures. They may be removed after the vertical-slice

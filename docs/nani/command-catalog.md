@@ -8,6 +8,12 @@ catalog instead of redefining command metadata elsewhere.
 Runtime command ids are lowercase. `canonicalName` preserves the official or
 project-facing spelling for diagnostics and tools.
 
+Dialogue text identity is not a top-level command. A dialogue line may include
+one Naninovel-style marker such as `|#voice_validation_0001|`; the parser
+stores it on `TextIR.textId`, the compiler forwards it as synthetic
+`print.params.textId`, and the app may auto-bind voice from the emitted
+`print`. Explicit `@voice` and `@stopVoice` remain stubbed commands.
+
 ## Command Status Semantics
 
 `NaniCommandStatus` is the command maturity signal. Do not add a parallel
@@ -128,7 +134,7 @@ release mechanism.
 | `look` | `look` | actor | `enable:boolean`, `zone:decimal list`, `speed:decimal list`, `gravity:boolean` | no | stubbed |
 | `movie` | `movie` | media | `moviePath:string`, `time:decimal`, `block:boolean` | no | implemented |
 | `openURL` | `openurl` | ui | `uRL:string`, `target:string` | no | stubbed |
-| `print` | `print` | text | `text:string`, `printer:string`, `author:string`, `as:string`, `speed:decimal`, `reset:boolean`, `default:boolean`, `waitInput:boolean`, `append:boolean`, `fadeTime:decimal`, `wait:boolean` | no | implemented |
+| `print` | `print` | text | `text:string`, `printer:string`, `author:string`, `as:string`, `speed:decimal`, `reset:boolean`, `default:boolean`, `waitInput:boolean`, `append:boolean`, `fadeTime:decimal`, `wait:boolean`; dialogue-line compiler output may also carry `textId:string` | no | implemented |
 | `printer` | `printer` | text | `idAndAppearance:named string`, `default:boolean`, `hideOther:boolean`, `anchor:boolean`, `pos:decimal list`, actor transform params | no | stubbed |
 | `processInput` | `processinput` | ui | `inputEnabled:boolean`, `set:named boolean list` | no | stubbed |
 | `purgeRollback` | `purgerollback` | state | none | no | stubbed |
@@ -223,3 +229,19 @@ implementation, not top-level `@` commands:
 They are intentionally not part of `commandCatalog` in this baseline. If they
 grow beyond inline text control, add a separate inline-token contract instead of
 mixing them with top-level Naninovel commands.
+
+## Dialogue Text Identity
+
+`|#textId|` is a dialogue-line marker, not an inline command and not visible
+text. Current rules:
+
+- Only text statements support the marker.
+- One text statement may contain at most one marker.
+- `textId` is filename-safe: letters, numbers, `_`, and `-`.
+- Empty, invalid, multiple, or duplicate same-script textIds produce parser
+  diagnostics.
+- The marker is stripped before DOM dialog rendering, backlog storage, and
+  search-visible text.
+- The runtime compiler forwards the id on the emitted `print` command so app
+  adapters can derive `voice:<locale>:<textId>`.
+- `@print`, `@append`, and `@toast` do not interpret `|#...|` as metadata.

@@ -101,6 +101,8 @@ payloads. `packages/contracts` declares the versioned `SettingsSnapshot`;
 `ui-kit` renders controlled controls only. Runtime consumers receive narrow
 derived values such as `StoryPlayTimingPolicy` and VN dialog display props
 instead of the full settings snapshot.
+Voice runtime settings follow the same pattern: the app derives locale and
+volume from settings and passes only those narrow values to the runtime adapter.
 
 See also:
 
@@ -135,10 +137,16 @@ submission remains a Trial UI action routed through `trial-director`.
   -> story-play playback state + pacing schedule
   -> VN runtime transaction + route table
   -> routed RuntimeCommand consumption
+  -> app commit derives voice:<locale>:<textId> from emitted print textId
   -> app-created AssetRegistry resolves media/Pixi/R3F/UI asset ids
-  -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events
+  -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events / AudioPort voice playback
   -> VnRuntimeDispatcher renders DOM dialog and Pixi snapshot
 ```
+
+Dialogue lines may include one `|#textId|` marker. The marker is parser
+metadata, not visible text, and the current implementation uses it only for
+auto voice lookup. Full localization, managed text files, and explicit voice
+commands remain future tasks.
 
 For Pixi presentation commands, `wait!` is opt-in. StoryEngine creates a
 presentation wait, app transaction code attaches Pixi expected task descriptors,

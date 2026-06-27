@@ -10,6 +10,7 @@ import { useGameFlowActor } from "../../../interaction/useGameFlowActor";
 import {
   settingsToDialogDisplaySettings,
   settingsToStoryPlayTimingPolicy,
+  settingsToVoiceRuntimeSettings,
   useGameSettingsAdapter
 } from "../../../interaction/useGameSettingsAdapter";
 import { useOverlayPageAdapters } from "../../../interaction/useOverlayPageAdapters";
@@ -31,11 +32,13 @@ export function VerticalSliceScenario() {
   const assetRegistry = useMemo(() => createAssetRegistry(harnessContentManifest), []);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
+  const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
   const enterTrialMode = useCallback(() => flow.send({ type: "ENTER_TRIAL" }), [flow.send]);
   const enterNaviMode = useCallback(() => flow.send({ type: "ENTER_NAVI" }), [flow.send]);
   const runtime = useVerticalSliceRuntimeAdapter(flow.mode, {
     assetResolver: assetRegistry,
     storyPlayTiming,
+    voiceSettings,
     onEnterTrial: enterTrialMode,
     onEnterNavi: enterNaviMode
   });

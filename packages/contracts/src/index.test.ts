@@ -641,8 +641,7 @@ describe("contracts", () => {
         sfxVolume: 1,
         voiceVolume: 1,
         uiVolume: 0.5,
-        muted: false,
-        voiceInterruption: "continue"
+        muted: false
       },
       automation: { autoSpeed: 0.5, skipSpeed: 0.5 }
     });
@@ -848,6 +847,10 @@ describe("contracts", () => {
       execution: "story-control"
     });
     expect(getNaniCommandDefinition("stopVoice")).toMatchObject({
+      status: "stubbed",
+      execution: "declared-only"
+    });
+    expect(getNaniCommandDefinition("voice")).toMatchObject({
       status: "stubbed",
       execution: "declared-only"
     });

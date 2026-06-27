@@ -72,6 +72,7 @@ export interface TextIR {
   kind: "text";
   speaker?: string;
   appearance?: string;
+  textId?: string;
   tokens: TextToken[];
   printParams?: Record<string, NaniValue>;
   loc: SourceLocation;

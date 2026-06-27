@@ -87,6 +87,7 @@ function compileText(statement: TextIR): RuntimeCommand {
   };
   if (statement.speaker) params.speaker = statement.speaker;
   if (statement.appearance) params.appearance = statement.appearance;
+  if (statement.textId) params.textId = statement.textId;
 
   return {
     commandId: "print",

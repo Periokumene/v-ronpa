@@ -403,6 +403,24 @@ describe("story engine", () => {
     expect(state.backlog).toEqual([{ speaker: "Mira", text: "After clear." }]);
   });
 
+  it("emits print textId for app adapters without persisting it into current text or backlog", () => {
+    const runtimeScript = runtimeScriptFixture("textid-story.nani", [
+      runtimeCommand("print", "text", { speaker: "Felix", text: "Voiced line.", autoNext: false, textId: "voice_validation_0001" })
+    ]);
+
+    const result = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+
+    expect(result.emittedRuntimeCommands).toEqual([
+      expect.objectContaining({
+        commandId: "print",
+        params: expect.objectContaining({ textId: "voice_validation_0001" })
+      })
+    ]);
+    expect(result.state.backlog).toEqual([{ speaker: "Felix", text: "Voiced line." }]);
+    expect(result.state.text?.current).toEqual({ speaker: "Felix", text: "Voiced line." });
+    expect(storyRuntimeSnapshot(result.state).backlog).toEqual([{ speaker: "Felix", text: "Voiced line." }]);
+  });
+
   it("blocks on wait runtimeWait until a matching completion event arrives", () => {
     const runtimeScript = runtimeScriptFixture("wait.nani", [
       runtimeCommand("wait", "text", { waitMode: "i5" }),

@@ -1388,9 +1388,6 @@ export type SettingsLanguage = z.infer<typeof SettingsLanguageSchema>;
 export const SettingsTextSizeSchema = z.enum(["small", "medium", "large"]);
 export type SettingsTextSize = z.infer<typeof SettingsTextSizeSchema>;
 
-export const SettingsVoiceInterruptionSchema = z.enum(["interrupt", "continue"]);
-export type SettingsVoiceInterruption = z.infer<typeof SettingsVoiceInterruptionSchema>;
-
 const NormalizedSettingSchema = z.number().min(0).max(1);
 
 export const SettingsSystemSnapshotSchema = z
@@ -1419,8 +1416,7 @@ export const SettingsSoundSnapshotSchema = z
     sfxVolume: NormalizedSettingSchema.default(1),
     voiceVolume: NormalizedSettingSchema.default(1),
     uiVolume: NormalizedSettingSchema.default(0.5),
-    muted: z.boolean().default(false),
-    voiceInterruption: SettingsVoiceInterruptionSchema.default("continue")
+    muted: z.boolean().default(false)
   })
   .strict();
 export type SettingsSoundSnapshot = z.infer<typeof SettingsSoundSnapshotSchema>;
@@ -1452,8 +1448,7 @@ const DEFAULT_SETTINGS_SOUND_SNAPSHOT = {
   sfxVolume: 1,
   voiceVolume: 1,
   uiVolume: 0.5,
-  muted: false,
-  voiceInterruption: "continue"
+  muted: false
 } as const;
 
 const DEFAULT_SETTINGS_AUTOMATION_SNAPSHOT = {

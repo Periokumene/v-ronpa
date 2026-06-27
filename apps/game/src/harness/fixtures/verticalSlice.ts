@@ -161,6 +161,13 @@ Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command sh
 @clearChoice temp-clear
 @choice "分支1：主交互流程验证入口" goto:#MainInteractionFlow
 @choice "分支2：完整 Pixi 命令视觉验收" goto:#PixiCommandShowcase
+@choice "分支3：textId 语音自动绑定验证" goto:#VoiceAutoBindingValidation
+
+#VoiceAutoBindingValidation
+Felix.Neutral: CHECKPOINT VOICE 01 - 有 textId 且存在 voice asset，应自动播放验证音频。|#voice_validation_0001|[>]
+Mira.Neutral: CHECKPOINT VOICE 02 - 有 textId 但故意缺少 voice asset，应产生 asset warning 且不播放。|#voice_validation_missing|[>]
+Narrator: CHECKPOINT VOICE 03 - 无 textId，正常显示且不查询 voice。[>]
+@end
 
 #MainInteractionFlow
 @set route:"return"

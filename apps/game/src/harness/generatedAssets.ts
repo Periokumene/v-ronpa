@@ -253,5 +253,17 @@ export const harnessRuntimeAssets = [
       "tags": [
         "harness"
       ]
+    },
+    {
+      "id": "voice:zh:voice_validation_0001",
+      "kind": "voice",
+      "optimizedUri": "/harness/media/voice/zh/voice_validation_0001.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
     }
   ] satisfies RuntimeAsset[];

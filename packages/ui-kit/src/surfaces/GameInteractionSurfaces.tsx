@@ -327,16 +327,6 @@ export function SettingsOverlay({ onClose, onPatchSettings, onResetSettings, set
             testId="settings-sound-ui"
             value={settings.sound.uiVolume}
           />
-          <SettingsSelect
-            label="Voice interruption"
-            testId="settings-sound-voice-interruption"
-            value={settings.sound.voiceInterruption}
-            options={[
-              ["continue", "Continue voice"],
-              ["interrupt", "Interrupt voice"]
-            ]}
-            onChange={(voiceInterruption) => onPatchSettings({ sound: { voiceInterruption: voiceInterruption as SettingsSnapshot["sound"]["voiceInterruption"] } })}
-          />
         </section>
 
         <section aria-label="Automation settings" data-testid="settings-group-automation" style={settingsGroupStyle}>

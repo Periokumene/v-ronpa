@@ -166,6 +166,7 @@ export interface MediaSourceResolverResult {
 export interface MediaHandleStore {
   bgm: Record<string, AudioHandle>;
   sfx: Record<string, AudioHandle>;
+  voice?: AudioHandle;
   oneShotSequence: number;
 }
 
@@ -183,9 +184,15 @@ export interface VerticalSliceRuntimeAdapterOptions {
   audioPort?: AudioPort;
   videoPort?: VideoPort;
   storyPlayTiming?: StoryPlayTimingPolicy;
+  voiceSettings?: AdapterVoiceSettings;
   assetResolver?: AssetResolver;
   onEnterTrial?: () => void;
   onEnterNavi?: () => void;
+}
+
+export interface AdapterVoiceSettings {
+  locale: string;
+  volume: number;
 }
 
 export interface VerticalSlicePresentationTransactionInput {
@@ -210,6 +217,7 @@ export const verticalSlicePosePresets: PosePreset[] = [
 const initialMap = verticalSliceMaps[0] ?? createFallbackMap();
 const MAX_RUNTIME_DIAGNOSTICS = 50;
 const DEFAULT_TOAST_DURATION_MS = 2500;
+const DEFAULT_VOICE_SETTINGS: AdapterVoiceSettings = { locale: "zh", volume: 1 };
 
 export interface SyncRuntimeToastDismissalTimersInput {
   state: UiRuntimeState;
@@ -264,6 +272,7 @@ export function useVerticalSliceRuntimeAdapter(
   const videoPort = useMemo(() => options.videoPort ?? createHtmlVideoPort(), [options.videoPort]);
   const assetResolver = options.assetResolver;
   const storyPlayTiming = options.storyPlayTiming;
+  const voiceSettings = options.voiceSettings ?? DEFAULT_VOICE_SETTINGS;
   const onEnterTrial = options.onEnterTrial;
   const onEnterNavi = options.onEnterNavi;
   const [navi, setNavi] = useState<NaviRuntimeState>(() => ({
@@ -884,10 +893,12 @@ export function useVerticalSliceRuntimeAdapter(
     setMediaRuntimeNow({ state: transaction.mediaState });
     setUiRuntimeNow({ state: deriveUiRuntimeLifecycleState(nextUiStateFromCommands, nextStoryState) });
     const audioMediaEffects = transaction.mediaEffects.filter((effect) => effect.type !== "play-movie");
-    if (audioMediaEffects.length > 0) {
+    const voiceMediaEffects = deriveVoiceMediaEffects(storyStep.emittedRuntimeCommands, voiceSettings, pacing);
+    const audioEffects = [...audioMediaEffects, ...voiceMediaEffects];
+    if (audioEffects.length > 0) {
       const mediaEffectInput: ApplyMediaRuntimeEffectsInput = {
         audioPort,
-        effects: audioMediaEffects,
+        effects: audioEffects,
         handles: mediaHandlesRef.current,
         resolver: ({ kind, sourceRef }) =>
           resolveMediaSource({
@@ -1087,6 +1098,7 @@ export function useVerticalSliceRuntimeAdapter(
   function stopAllMediaHandles() {
     for (const handle of Object.values(mediaHandlesRef.current.bgm)) handle.stop();
     for (const handle of Object.values(mediaHandlesRef.current.sfx)) handle.stop();
+    mediaHandlesRef.current.voice?.stop();
     mediaHandlesRef.current = { bgm: {}, sfx: {}, oneShotSequence: mediaHandlesRef.current.oneShotSequence };
     pendingMoviePlaybackRef.current = undefined;
     videoPort.stop();
@@ -1122,6 +1134,25 @@ export function collectVerticalSliceRuntimeDiagnostics({
     ...mediaDiagnostics.map(toVerticalSliceMediaDiagnostic),
     ...uiDiagnostics.map(toVerticalSliceUiDiagnostic)
   ];
+}
+
+export function createVoiceAssetId(textId: string, locale: string): string {
+  return `voice:${locale}:${textId}`;
+}
+
+export function deriveVoiceMediaEffects(
+  runtimeCommands: RuntimeCommand[],
+  voiceSettings: AdapterVoiceSettings = DEFAULT_VOICE_SETTINGS,
+  pacing: StoryPlayPacing = "normal"
+): MediaRuntimeEffect[] {
+  if (pacing === "skip") return [];
+  return runtimeCommands.flatMap((command) => {
+    if (command.commandId !== "print") return [];
+    const textId = stringRuntimeParam(command, "textId");
+    if (!textId) return [];
+    const sourceRef = createVoiceAssetId(textId, voiceSettings.locale);
+    return [{ type: "play-voice" as const, key: sourceRef, textId, sourceRef, volume: voiceSettings.volume }];
+  });
 }
 
 export function createVerticalSliceInteractionContext({
@@ -1384,6 +1415,24 @@ export async function applyMediaRuntimeEffects({
         continue;
       }
 
+      if (effect.type === "play-voice") {
+        handles.voice?.stop();
+        delete handles.voice;
+        const resolved = resolver({ sourceRef: effect.sourceRef, kind: "voice" });
+        if (!resolved.uri) {
+          if (resolved.diagnostic) diagnostics.push({ ...resolved.diagnostic, severity: "warning" });
+          continue;
+        }
+        if (!audioPort) {
+          diagnostics.push(mediaPortError("AudioPort is not available for voice playback."));
+          continue;
+        }
+        handles.voice = audioPort.playVoice(effect.key, resolved.uri, {
+          ...(effect.volume !== undefined ? { volume: effect.volume } : {})
+        });
+        continue;
+      }
+
       const resolved = resolver({ sourceRef: effect.sourceRef, kind: "video" });
       if (!resolved.uri) {
         if (resolved.diagnostic) diagnostics.push(resolved.diagnostic);
@@ -1409,6 +1458,11 @@ function mediaHandleMissing(message: string): VerticalSliceRuntimeDiagnostic {
 
 function mediaPortError(message: string): VerticalSliceRuntimeDiagnostic {
   return { source: "media", code: "media-port-error", severity: "warning", message };
+}
+
+function stringRuntimeParam(command: RuntimeCommand, key: string): string | undefined {
+  const value = command.params[key];
+  return typeof value === "string" ? value : undefined;
 }
 
 function createSensorReportFromRequest(request: FirstPersonInteractRequest | undefined): NaviInteractionSensorReport | undefined {

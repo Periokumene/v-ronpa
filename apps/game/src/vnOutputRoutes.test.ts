@@ -21,15 +21,16 @@ describe("VN output routes", () => {
     expect(routeRuntimeCommand(command, routeTable)).toEqual(["ui", "debug"]);
   });
 
-  it("keeps print out of the UI command stream because dialog reads Story state", () => {
+  it("keeps print out of UI and media command streams because dialog and textId voice are app-derived", () => {
     const commands: RuntimeCommand[] = [
-      runtimeCommand("print", "text", { text: "Line", autoNext: false }),
+      runtimeCommand("print", "text", { text: "Line", autoNext: false, textId: "voice_validation_0001" }),
       runtimeCommand("back", "scene", { appearance: "bg:harness" }),
       runtimeCommand("char", "actor", { target: "character:felix", appearance: "portrait:felix:neutral", pos: [50, 0] })
     ];
 
     expect(selectRuntimeCommandsForTarget(commands, "pixi")).toEqual([commands[1], commands[2]]);
     expect(selectRuntimeCommandsForTarget(commands, "ui")).toEqual([]);
+    expect(selectRuntimeCommandsForTarget(commands, "media")).toEqual([]);
     expect(selectRuntimeCommandsForTarget(commands, "debug")).toEqual([commands[0]]);
   });
 
@@ -47,15 +48,17 @@ describe("VN output routes", () => {
 
   it("does not route known unpromoted media or story-control commands through category fallback", () => {
     const commands: RuntimeCommand[] = [
+      runtimeCommand("voice", "media", { primary: "voice:zh:voice_validation_0001" }, "naninovel", "stubbed"),
       runtimeCommand("stopvoice", "media", {}, "naninovel", "stubbed"),
       runtimeCommand("wait", "flow", { waitMode: "i" }, "naninovel", "implemented"),
       runtimeCommand("unknownMedia", "media", { path: "raw" }, "v-ronpa", "implemented")
     ];
 
     expect(routeRuntimeCommand(commands[0]!)).toEqual(["debug"]);
-    expect(routeRuntimeCommand(commands[1]!)).toEqual(["app"]);
-    expect(routeRuntimeCommand(commands[2]!)).toEqual(["media"]);
-    expect(selectRuntimeCommandsForTarget(commands, "media")).toEqual([commands[2]]);
+    expect(routeRuntimeCommand(commands[1]!)).toEqual(["debug"]);
+    expect(routeRuntimeCommand(commands[2]!)).toEqual(["app"]);
+    expect(routeRuntimeCommand(commands[3]!)).toEqual(["media"]);
+    expect(selectRuntimeCommandsForTarget(commands, "media")).toEqual([commands[3]]);
   });
 
   it("requires explicit command or category routes for every runtime command", () => {
