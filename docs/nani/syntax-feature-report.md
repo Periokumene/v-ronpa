@@ -134,7 +134,7 @@ but are intentionally unused in the P1 fixtures.
 | Multi-speaker text | Requires dialogue presentation and backlog policy | P2 | StoryEngine + ui-kit |
 | Async, await, and track control | Requires scheduler/runtime track model | P3 | StoryEngine |
 | Explicit voice commands and voice replay | Requires command semantics, replay UI, and richer media policy | P3 | tooling + media-save |
-| Rich reveal events | Requires text reveal runtime and presentation ports | P3 | StoryEngine + presentation |
+| Script-authored rich reveal events | Requires command semantics and presentation ports; app-local dialogue typewriter reveal v1 is handled outside StoryEngine | P3 | StoryEngine + presentation |
 | Unity scene/timeline/effect command families | Not part of the browser-first V-Ronpa contract | P3 / Future ADR | out of scope unless a future ADR adds them |
 
 No P1 acceptance test should depend on these features.

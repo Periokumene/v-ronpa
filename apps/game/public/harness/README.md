@@ -19,6 +19,9 @@ scripts.
 - Voice fixtures must use `media/voice/<locale>/<textId>.ogg`. The `<textId>`
   stem is the script `|#textId|` value and may contain only letters, numbers,
   `_`, and `-`.
+- Dialogue bleep fixtures must use `media/bleep/<bleepId>.ogg`. The `<bleepId>`
+  stem becomes `bleep:<bleepId>` and may contain only letters, numbers, `_`,
+  and `-`.
 
 ## Voice Fixture Set
 
@@ -33,13 +36,20 @@ debugging.
 
 | TextId range | Files | Scenario branch |
 |---|---:|---|
-| `voice_validation_0001` | 1 | Basic textId auto voice smoke test |
+| `voice_validation_0001` | 1 | Basic textId voice asset smoke test |
 | `0102Adv03_Ema001..004` | 4 | Real sample A: broadcast decision |
 | `0102Adv03_Sherry001..004` | 4 | Real sample A: broadcast decision |
 | `0102Adv03_Margo001..004` | 4 | Real sample A: broadcast decision |
 | `0102Adv04_Ema001..004` | 4 | Real sample B: evidence handoff |
 | `0102Adv04_Sherry001..004` | 4 | Real sample B: evidence handoff |
 | `0102Adv04_Margo001..004` | 4 | Real sample B: evidence handoff |
+
+## Dialogue Bleep Fixture Set
+
+Dialogue bleep fixtures validate the dialogue audio planner's unvoiced fallback
+path. `bleep:dialogue-default` is the manifest default, `bleep:dialogue-felix`
+is the speaker override sample, and the `Narrator` speaker is configured as a
+null override in the harness manifest.
 
 ## Registered Asset Ids
 
@@ -62,9 +72,11 @@ debugging.
 | `sfx:rain-inside-car-loop` | `sfx` | Looping SFX tracking |
 | `sfx:shock-fadeout` | `sfx` | One-shot or `sfxFast` |
 | `sfx:knock-door` | `sfx` | One-shot SFX |
-| `voice:zh:voice_validation_0001` | `voice` | textId auto voice validation |
-| `voice:zh:0102Adv03_*` | `voice` | Choice 3 real textId auto voice validation |
-| `voice:zh:0102Adv04_*` | `voice` | Choice 3 real textId auto voice validation |
+| `bleep:dialogue-default` | `bleep` | Default dialogue bleep fallback |
+| `bleep:dialogue-felix` | `bleep` | Speaker override dialogue bleep fallback |
+| `voice:zh:voice_validation_0001` | `voice` | textId voice asset validation |
+| `voice:zh:0102Adv03_*` | `voice` | Choice 3 real textId voice asset validation |
+| `voice:zh:0102Adv04_*` | `voice` | Choice 3 real textId voice asset validation |
 | `video:validation-intro` | `video` | Blocking movie playback |
 
 These files are harness fixtures. They may be removed after the vertical-slice

@@ -207,6 +207,20 @@ describe("media save contracts", () => {
     expect(howlerMock.instances[1]?.stop).toHaveBeenCalledTimes(1);
   });
 
+  it("plays dialogue bleep as a looped handle until stopped", async () => {
+    const port = createHowlerAudioPort();
+
+    const handle = port.playDialogueBleep("dialogue-bleep:line", "/bleep.ogg", { volume: 0.4 });
+
+    expect(howlerMock.instances[0]?.config).toMatchObject({ src: ["/bleep.ogg"], loop: true, volume: 0.4 });
+    expect(registeredHowlerEvents(0)).toEqual(["loaderror", "playerror"]);
+
+    handle.stop();
+
+    await expect(handle.finished).resolves.toEqual({ reason: "stopped" });
+    expect(howlerMock.instances[0]?.stop).toHaveBeenCalledTimes(1);
+  });
+
   it("plays voice as a one-shot handle and resolves finished on end", async () => {
     const port = createHowlerAudioPort();
 

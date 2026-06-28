@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-test.setTimeout(120_000);
+test.setTimeout(180_000);
 
 test("vertical slice connects Navi exploration, gameplay state, VN dialog, and branch outcomes", async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -148,7 +148,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vn-dialog-state")).toHaveText("可继续");
   await expect(page.getByTestId("vn-dialog-advance")).toHaveText("继续");
   await expect(page.getByTestId("vn-dialog-cancel")).toHaveText("取消");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("请选择测试路径");
+  await advanceUntilText(page, "请选择测试路径");
   await advanceUntilChoices(page);
   await expect(page.getByTestId("vn-dialog-state")).toHaveText("等待选择");
   await expect(page.getByTestId("vertical-slice-pixi-background")).toHaveText("bg:harness");
@@ -300,16 +300,13 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await advanceUntilText(page, "CHECKPOINT 07B-L4");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/vertical-slice-glitch-stress.png", fullPage: true });
-  await page.getByTestId("vn-dialog-advance").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT 08", { timeout: 6000 });
+  await advanceUntilText(page, "CHECKPOINT 08");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/vertical-slice-glitch-wait-cleanup.png", fullPage: true });
-  await page.getByTestId("vn-dialog-advance").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT 08A", { timeout: 6000 });
+  await advanceUntilText(page, "CHECKPOINT 08A");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/vertical-slice-glitch-filter-on.png", fullPage: true });
-  await page.getByTestId("vn-dialog-advance").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT 08B", { timeout: 6000 });
+  await advanceUntilText(page, "CHECKPOINT 08B");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/vertical-slice-glitch-filter-persistent.png", fullPage: true });
   await page.waitForTimeout(1000);
@@ -317,8 +314,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await advanceUntilText(page, "CHECKPOINT 08C");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/vertical-slice-glitch-filter-plus-pulse.png", fullPage: true });
-  await page.getByTestId("vn-dialog-advance").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT 08D", { timeout: 6000 });
+  await advanceUntilText(page, "CHECKPOINT 08D");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/vertical-slice-glitch-filter-off-cleanup.png", fullPage: true });
   await advanceUntilText(page, "CHECKPOINT 09");
@@ -371,36 +367,36 @@ async function advanceUntilOverlayClosed(page: Page) {
 
 async function advanceMainInteractionShowcase(page: Page) {
   await page.getByTestId("vertical-slice-advance").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 01B");
+  await advanceUntilText(page, "CHECKPOINT MAIN 01B");
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
-  await page.getByTestId("vn-dialog-advance").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("附加文本验证");
+  await advanceUntilText(page, "附加文本验证");
   await page.getByTestId("vn-dialog-advance").click();
   await expect(page.getByTestId("runtime-input-prompt")).toBeVisible();
   await page.getByTestId("runtime-input-field").fill("Smoke");
   await page.getByTestId("runtime-input-submit").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 02");
-  await page.getByTestId("vn-dialog-advance").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 03");
-  await page.getByTestId("vn-dialog-advance").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 04");
+  await advanceUntilText(page, "CHECKPOINT MAIN 02");
+  await advanceUntilText(page, "CHECKPOINT MAIN 03");
+  await advanceUntilText(page, "CHECKPOINT MAIN 04");
   await page.getByTestId("vn-dialog-advance").click();
   await expect(page.getByTestId("runtime-movie-overlay")).toBeVisible();
   await page.getByTestId("runtime-movie-skip").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 05");
-  await page.getByTestId("vn-dialog-advance").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT MAIN 06");
+  await advanceUntilText(page, "CHECKPOINT MAIN 05");
+  await advanceUntilText(page, "CHECKPOINT MAIN 06");
   await advanceUntilOverlayClosed(page);
 }
 
 async function advanceUntilText(page: Page, text: string) {
   for (let attempt = 0; attempt < 80; attempt += 1) {
-    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) return;
+    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) {
+      await waitForDialogTextToSettle(page);
+      return;
+    }
     await page.getByTestId("vn-dialog-advance").click();
     await page.waitForTimeout(120);
   }
 
   await expect(page.getByTestId("vn-dialog-text")).toContainText(text);
+  await waitForDialogTextToSettle(page);
 }
 
 async function advanceUntilTextOrOverlayClosed(page: Page, text: string) {
@@ -410,12 +406,26 @@ async function advanceUntilTextOrOverlayClosed(page: Page, text: string) {
       await page.waitForTimeout(120);
       continue;
     }
-    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) return;
+    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) {
+      await waitForDialogTextToSettle(page);
+      return;
+    }
     await page.getByTestId("vn-dialog-advance").click();
     await page.waitForTimeout(120);
   }
 
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
+}
+
+async function waitForDialogTextToSettle(page: Page) {
+  let previous = (await page.getByTestId("vn-dialog-text").textContent()) ?? "";
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await page.waitForTimeout(120);
+    if ((await page.getByTestId("vn-dialog-text").count()) === 0) return;
+    const current = (await page.getByTestId("vn-dialog-text").textContent()) ?? "";
+    if (current === previous) return;
+    previous = current;
+  }
 }
 
 async function expectKeyNeverFocuses(page: Page, key: string, activeTestId: string) {

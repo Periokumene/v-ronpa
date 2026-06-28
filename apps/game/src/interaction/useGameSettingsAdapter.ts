@@ -41,6 +41,10 @@ export interface VoiceRuntimeSettings {
   volume: number;
 }
 
+export interface DialogueBleepRuntimeSettings {
+  volume: number;
+}
+
 interface ResolvedGameSettingsWriterConfig {
   storage: GameSettingsStorage | undefined;
   storageKey: string;
@@ -204,6 +208,12 @@ export function settingsToVoiceRuntimeSettings(settings: SettingsSnapshot): Voic
   return {
     locale: settingsLanguageToVoiceLocale(settings.system.language),
     volume: settings.sound.muted ? 0 : settings.sound.masterVolume * settings.sound.voiceVolume
+  };
+}
+
+export function settingsToDialogueBleepRuntimeSettings(settings: SettingsSnapshot): DialogueBleepRuntimeSettings {
+  return {
+    volume: settings.sound.muted ? 0 : settings.sound.masterVolume * settings.sound.bleepVolume
   };
 }
 

@@ -50,6 +50,8 @@ describe("vertical slice save adapter", () => {
     expect(save).not.toHaveProperty("storyPlay");
     expect(save).not.toHaveProperty("playback");
     expect(save).not.toHaveProperty("settings");
+    expect(save).not.toHaveProperty("dialogRevealRuntime");
+    expect(save.story).not.toHaveProperty("dialogRevealRuntime");
     expect(save).not.toHaveProperty("summary");
   });
 

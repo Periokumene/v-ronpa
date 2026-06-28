@@ -7,13 +7,17 @@ VN runtime output is split in two app-layer steps:
 - `createVnRuntimePresentationTransaction` fans those emitted runtime commands
   out to runtime consumers such as Pixi stage snapshots, render hints, and
   gameplay events.
-- The vertical-slice app adapter also derives auto voice playback from emitted
-  `print.params.textId` during story step commit; this is intentionally outside
-  React render/effect replay.
+- The vertical-slice app adapter also derives dialogue line audio from emitted
+  `print.params.textId` and reveal state during story step commit; this is
+  intentionally outside React render/effect replay.
+- The vertical-slice app adapter derives transient dialog text reveal state
+  from the emitted `print` plus the current Story line during the same commit.
+  The reveal runtime owns grapheme pacing and lifecycle events only; StoryEngine
+  continues to own the complete visible line, backlog, and save snapshot.
 - `VnRuntimeDispatcher` renders already-materialized Pixi stage state.
   `GameInteractionShell` renders DOM runtime UI surfaces such as dialog,
   command bar, toast, input prompt, and movie overlay. Dialog text and choices
-  come from Story state, not from command stream replay.
+  come from committed Story/app runtime state, not from command stream replay.
 
 ## Ownership
 
@@ -50,6 +54,9 @@ VN runtime output is split in two app-layer steps:
   `apps/game` derives VN dialog display props and story-play timing policy from
   the canonical settings snapshot, then passes those narrow values into runtime
   adapters and `GameInteractionShell` / `VnDialogSurface`.
+- Dialog reveal uses the same app-derived display `textSpeed` as
+  `VnDialogSurface`. It is not a settings schema extension and does not add a
+  second saved pacing authority.
 - Voice locale and volume are likewise app-derived settings. The app maps
   `zh-CN` / `zh-TW` to voice locale `zh`, currently permits `ja` / `en` as
   direct voice locales, and falls back other UI languages to `zh` until a voice
@@ -110,20 +117,42 @@ passes the same resolver to Pixi; and the first-person bridge passes it to the
 R3F stage. Missing asset resolution is surfaced as runtime diagnostics and
 visible fallback behavior, not guessed public URLs.
 
-Dialogue textId voice is a media derivation, not StoryEngine behavior:
+Dialogue line audio is a media derivation, not StoryEngine behavior. The app
+uses one dialogue audio planner for each committed `print`: a resolvable
+`voice:<locale>:<textId>` asset wins and suppresses bleep, even when voice
+volume is zero; otherwise reveal bleep may fallback through
+`ContentManifest.audio.dialogueBleep`.
 
 ```text
 print.params.textId
-  -> app story step commit
+  -> app story step commit voice availability check
   -> stop-voice boundary for the new print
-  -> voice:<locale>:<textId>
-  -> AssetRegistry.resolve({ kind: "voice" })
-  -> AudioPort.playVoice()
+  -> if voice asset resolves: AudioPort.playVoice()
+  -> else if reveal is active: dialogue bleep lookup/play
 ```
 
 Story current text, backlog, and save snapshots keep only visible dialogue
 text. Load restore, backlog rendering, React rerender, and SKIP pacing must not
 replay derived voice.
+
+Dialogue reveal bleep is independent from script-authored SFX and only acts as
+the unvoiced reveal fallback:
+
+```text
+print speaker from nani xxx:
+  -> app dialogue audio planner after voice availability check
+  -> ContentManifest.audio.dialogueBleep exact speaker lookup
+  -> AssetRegistry.resolve({ kind: "bleep" })
+  -> AudioPort.playDialogueBleep()
+  -> reveal finish / clear / skip / reset / trial entry stops the handle
+```
+
+The bleep handle is not stored in looping SFX handles, is not stopped by
+script-level `@stopSfx`, and never installs or releases the voice auto-advance
+gate. A planned `textId` with no matching voice asset is treated as an unvoiced
+line and may fallback to bleep without a missing-voice warning; a voice asset
+kind mismatch is warned and still falls back. Missing bleep assets or playback
+failures produce runtime diagnostics and must not block StoryEngine advancement.
 
 AUTO and one-shot `autoNext` still use `story-play` only for the text minimum
 stay time. When that app-hosted timer reaches zero, the runtime adapter checks
@@ -142,6 +171,37 @@ previous active voice but does not install a new gate. Manual advance and choice
 load, reset, overlay close, story end, and trial entry clear any pending gate;
 manual advance only stops voice when the current Story state can actually
 advance or complete its wait.
+
+Dialog text reveal is app-local transient presentation state:
+
+```text
+emitted print + selectCurrentStoryLine()
+  -> app dialogRevealRuntime
+  -> visible text slice for GameInteractionShell
+  -> VnDialogSurface text prop
+```
+
+The full line remains in `StoryRuntimeState.text.current`, backlog, save data,
+and load summaries. `VnDialogSurface` does not own timers or reveal state; it
+only renders the text it receives and forwards advance input. Manual advance
+while reveal is active completes the current line and returns; the following
+advance is the one that enters StoryEngine. AUTO and one-shot `autoNext` use one
+line budget from the print commit time: elapsed reveal time counts toward that
+budget, but the adapter will not request the voice gate or StoryEngine advance
+until reveal is complete. SKIP completes the active reveal immediately and then
+continues on the skip schedule. A `print` committed while the dialog surface is
+hidden stores a complete reveal state and does not gate advance. Load, restore,
+reset, overlay close, and trial entry clear reveal state so restored lines do
+not replay typewriter effects.
+Reveal overlay state is scoped to the `print` step that created it; if a later
+StoryEngine step changes the current line without emitting a new `print`, the
+adapter clears the overlay so text mutations such as `@append` are not hidden
+behind stale partial text.
+Reveal lifecycle events (`reveal-start`, `reveal-tick`, `reveal-finish`) remain
+app-local presentation signals. Dialogue bleep uses reveal start/finish as a
+loop boundary only; completing or instantly revealing a line does not synthesize
+catch-up `reveal-tick` events, so bleep playback does not burst during manual
+completion, SKIP, or restore-like paths.
 
 Presentation wait release is task-driven. `createVnRuntimePresentationTransaction`
 returns Pixi wait descriptors, the runtime adapter stores them on

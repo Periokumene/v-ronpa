@@ -25,6 +25,24 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands.map((command) => command.commandId)).toEqual(["print", "print"]);
   });
 
+  it("forwards inline text speed params on generic dialogue lines", () => {
+    const { scenario } = parseScenario({
+      sourceText: "Felix: A[< speed:0.8]B[>]\nMira: C[>]\nRen: Z[< speed:0]ero[>]",
+      scriptPath: "text-speed.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.script.commands[0]).toEqual(
+      expect.objectContaining({
+        commandId: "print",
+        params: expect.objectContaining({ text: "AB", speaker: "Felix", speed: 0.8, autoNext: true })
+      })
+    );
+    expect(result.script.commands[1]?.params).not.toHaveProperty("speed");
+    expect(result.script.commands[2]?.params).toMatchObject({ text: "Zero", speaker: "Ren", speed: 0, autoNext: true });
+  });
+
   it("normalizes visual runtime params without producing downstream command shapes", () => {
     const { scenario } = parseScenario({
       sourceText: ["@back bg:harness effect:fade", "@flash color:#fff duration:120"].join("\n"),
@@ -380,7 +398,7 @@ describe("nani runtime compiler", () => {
     });
   });
 
-  it("keeps explicit voice commands declared-only while textId auto voice stays app-derived", () => {
+  it("keeps explicit voice commands declared-only while textId dialogue audio stays app-derived", () => {
     const { scenario } = parseScenario({
       sourceText: "@voice voice:zh:voice_validation_0001 volume:0.5\n@stopVoice",
       scriptPath: "explicit-voice-declared-only.nani"

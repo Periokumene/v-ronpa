@@ -68,11 +68,14 @@ Runtime behavior:
 
 - StoryEngine may emit `print.params.textId`, but current text, backlog, and
   save snapshots store only visible text.
-- App adapter derives `play-voice` effects from emitted `print` commands during
-  story step commit.
+- App adapter uses `print.params.textId` as dialogue audio identity during story
+  step commit. A resolved `voice:<locale>:<textId>` asset produces voice
+  playback and suppresses dialogue bleep; missing planned voice assets may
+  fallback to dialogue bleep.
 - Asset id convention is `voice:<locale>:<textId>`.
-- Missing voice assets produce runtime asset warnings and do not call audio
-  playback.
+- Missing voice assets are silent for voice lookup because `textId` may also
+  represent future localization or planned voice work. Voice asset kind
+  mismatches remain warnings.
 
 Settings and media behavior:
 

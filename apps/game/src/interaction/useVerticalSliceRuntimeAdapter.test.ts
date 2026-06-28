@@ -27,17 +27,17 @@ import {
   createVoiceAutoAdvanceGateController,
   createInitialVerticalSliceDiagnostics,
   POST_VOICE_AUTO_ADVANCE_DELAY_MS,
-  createVoiceAssetId,
   createVerticalSliceInteractionContext,
   createVerticalSlicePresentationTransaction,
   createVerticalSliceRuntimeRestorePlan,
-  deriveVoiceMediaEffects,
+  resolveDialogueVoiceAssetAvailability,
   resolveMediaSource,
   shouldAnimateStoryPlayPacing,
   syncRuntimeToastDismissalTimers,
   type MediaHandleStore,
   type StoryRuntime
 } from "./useVerticalSliceRuntimeAdapter";
+import { createVoiceAssetId, planDialogueLineAudio } from "./dialogueAudioRuntime";
 
 describe("vertical slice runtime adapter helpers", () => {
   it("keeps the vertical-slice script as a Pixi command showcase without parser or compiler diagnostics", () => {
@@ -64,6 +64,15 @@ describe("vertical slice runtime adapter helpers", () => {
     ]) {
       expect(commandIds.has(commandId)).toBe(true);
     }
+    expect(
+      compiled.script.commands
+        .filter((command) => command.commandId === "print" && String(command.params.text ?? "").includes("CHECKPOINT BLEEP"))
+        .map((command) => ({ speaker: command.params.speaker, text: command.params.text }))
+    ).toEqual([
+      { speaker: "Mira", text: expect.stringContaining("CHECKPOINT BLEEP DEFAULT") },
+      { speaker: "Felix", text: expect.stringContaining("CHECKPOINT BLEEP OVERRIDE") },
+      { speaker: "Narrator", text: expect.stringContaining("CHECKPOINT BLEEP NULL") }
+    ]);
   });
 
   it("extracts a small GameInteractionContext from vertical slice runtime state", () => {
@@ -363,6 +372,7 @@ describe("vertical slice runtime adapter helpers", () => {
     const audioPort: AudioPort = {
       playBgm,
       playSfx,
+      playDialogueBleep: viFn(() => audioHandle("unused")),
       playVoice,
       stopAll: viFn()
     };
@@ -395,6 +405,7 @@ describe("vertical slice runtime adapter helpers", () => {
     const audioPort: AudioPort = {
       playBgm,
       playSfx,
+      playDialogueBleep: viFn(() => audioHandle("bleep")),
       playVoice,
       stopAll: viFn()
     };
@@ -417,32 +428,288 @@ describe("vertical slice runtime adapter helpers", () => {
     expect((sfxHandle.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
   });
 
-  it("derives voice effects from print textId only for non-skip pacing", () => {
-    const commands = [
-      runtimeCommand("print", "text", { text: "Voiced.", textId: "voice_validation_0001" }),
-      runtimeCommand("print", "text", { text: "Unvoiced." })
-    ];
+  it("applies dialogue bleep effects through a dedicated AudioPort handle", async () => {
+    const previousBleep = audioHandle("dialogue-bleep:old");
+    const nextBleep = audioHandle("dialogue-bleep:next");
+    const playDialogueBleep = viFn(() => nextBleep);
+    const handles: MediaHandleStore = {
+      bgm: {},
+      sfx: { rain: audioHandle("rain") },
+      dialogueBleep: previousBleep,
+      oneShotSequence: 0
+    };
+    const audioPort: AudioPort = {
+      playBgm: viFn(),
+      playSfx: viFn(),
+      playDialogueBleep,
+      playVoice: viFn(() => audioHandle("voice")),
+      stopAll: viFn()
+    };
+
+    const result = await applyMediaRuntimeEffects({
+      audioPort,
+      handles,
+      effects: [
+        {
+          type: "play-dialogue-bleep",
+          key: "dialogue-bleep:line-1",
+          sourceRef: "bleep:dialogue-default",
+          volume: 0.25
+        },
+        { type: "stop-dialogue-bleep", key: "dialogue-bleep:line-1" }
+      ],
+      resolver: ({ sourceRef, kind }) => {
+        expect(kind).toBe("bleep");
+        return { uri: `/resolved/${sourceRef}.ogg` };
+      }
+    });
+
+    expect(result).toEqual({ diagnostics: [] });
+    expect((previousBleep.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
+    expect(playDialogueBleep.calls).toEqual([
+      ["dialogue-bleep:line-1", "/resolved/bleep:dialogue-default.ogg", { volume: 0.25 }]
+    ]);
+    expect((nextBleep.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
+    expect(handles.dialogueBleep).toBeUndefined();
+    expect(handles.sfx.rain).toBeDefined();
+  });
+
+  it("reports missing dialogue bleep assets as non-blocking warnings", async () => {
+    const previousBleep = audioHandle("dialogue-bleep:old");
+    const playDialogueBleep = viFn(() => audioHandle("unused"));
+    const playVoice = viFn(() => audioHandle("voice"));
+    const handles: MediaHandleStore = {
+      bgm: {},
+      sfx: {},
+      dialogueBleep: previousBleep,
+      oneShotSequence: 0
+    };
+    const audioPort: AudioPort = {
+      playBgm: viFn(),
+      playSfx: viFn(),
+      playDialogueBleep,
+      playVoice,
+      stopAll: viFn()
+    };
+
+    const result = await applyMediaRuntimeEffects({
+      audioPort,
+      handles,
+      effects: [
+        {
+          type: "play-dialogue-bleep",
+          key: "dialogue-bleep:line-1",
+          sourceRef: "bleep:missing"
+        }
+      ],
+      resolver: ({ sourceRef, kind }) =>
+        resolveMediaSource({ sourceRef, kind, assetResolver: createAssetRegistry(manifestWithAssets([])) })
+    });
+
+    expect((previousBleep.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
+    expect(playDialogueBleep.calls).toEqual([]);
+    expect(playVoice.calls).toEqual([]);
+    expect(handles.dialogueBleep).toBeUndefined();
+    expect(result.voiceHandle).toBeUndefined();
+    expect(result.diagnostics).toEqual([
+      {
+        source: "asset",
+        code: "asset-missing",
+        severity: "warning",
+        message: "Runtime asset 'bleep:missing' is not declared in ContentManifest.runtimeAssets. (bleep:missing bleep)"
+      }
+    ]);
+  });
+
+  it("resolves dialogue voice availability without warning for planned but missing textId audio", () => {
+    const assetResolver = createAssetRegistry(
+      manifestWithAssets([
+        runtimeAsset("voice:zh:voice_validation_0001", "voice", "/voice/voice_validation_0001.ogg"),
+        runtimeAsset("voice:zh:kind_mismatch", "sfx", "/voice/kind_mismatch.ogg")
+      ])
+    );
 
     expect(createVoiceAssetId("voice_validation_0001", "zh")).toBe("voice:zh:voice_validation_0001");
-    expect(deriveVoiceMediaEffects(commands, { locale: "zh", volume: 0.25 }, "normal")).toEqual([
+    expect(
+      resolveDialogueVoiceAssetAvailability({
+        assetResolver,
+        textId: "voice_validation_0001",
+        voiceSettings: { locale: "zh", volume: 0.25 }
+      })
+    ).toEqual({
+      available: true,
+      diagnostics: [],
+      sourceRef: "voice:zh:voice_validation_0001"
+    });
+    expect(
+      resolveDialogueVoiceAssetAvailability({
+        assetResolver,
+        textId: "planned_future_voice",
+        voiceSettings: { locale: "zh", volume: 0.25 }
+      })
+    ).toEqual({
+      available: false,
+      diagnostics: [],
+      sourceRef: "voice:zh:planned_future_voice"
+    });
+    expect(
+      resolveDialogueVoiceAssetAvailability({
+        textId: "no_resolver",
+        voiceSettings: { locale: "zh", volume: 0.25 }
+      })
+    ).toEqual({
+      available: false,
+      diagnostics: [],
+      sourceRef: "voice:zh:no_resolver"
+    });
+    expect(
+      resolveDialogueVoiceAssetAvailability({
+        assetResolver,
+        textId: "kind_mismatch",
+        voiceSettings: { locale: "zh", volume: 0.25 }
+      })
+    ).toEqual({
+      available: false,
+      diagnostics: [
+        {
+          source: "asset",
+          code: "asset-kind-mismatch",
+          severity: "warning",
+          message: "Runtime asset 'voice:zh:kind_mismatch' is 'sfx', not 'voice'. (voice:zh:kind_mismatch voice)"
+        }
+      ],
+      sourceRef: "voice:zh:kind_mismatch"
+    });
+  });
+
+  it("uses valid dialogue voice availability to suppress bleep and return a gateable voice handle", async () => {
+    const voiceHandle = audioHandle("voice:zh:voice_validation_0001");
+    const playVoice = viFn(() => voiceHandle);
+    const playDialogueBleep = viFn(() => audioHandle("bleep"));
+    const audioPort: AudioPort = {
+      playBgm: viFn(),
+      playSfx: viFn(),
+      playDialogueBleep,
+      playVoice,
+      stopAll: viFn()
+    };
+    const assetResolver = createAssetRegistry(
+      manifestWithAssets([
+        runtimeAsset("voice:zh:voice_validation_0001", "voice", "/voice/voice_validation_0001.ogg"),
+        runtimeAsset("bleep:dialogue-felix", "bleep", "/bleep/felix.ogg")
+      ])
+    );
+    const availability = resolveDialogueVoiceAssetAvailability({
+      assetResolver,
+      textId: "voice_validation_0001",
+      voiceSettings: { locale: "zh", volume: 0.25 }
+    });
+    const planned = planDialogueLineAudio(
+      {},
+      {
+        bleep: {
+          config: {
+            enabled: true,
+            defaultSound: { sourceRef: "bleep:dialogue-felix", gain: 1 },
+            speakerOverrides: {}
+          },
+          volume: 1
+        },
+        dialogVisible: true,
+        lineKey: "line:voice",
+        pacing: "normal",
+        revealStatus: "revealing",
+        speakerId: "Felix",
+        textId: "voice_validation_0001",
+        voice: { locale: "zh", volume: 0.25 },
+        voiceAssetAvailable: availability.available
+      }
+    );
+
+    const result = await applyMediaRuntimeEffects({
+      audioPort,
+      handles: { bgm: {}, sfx: {}, oneShotSequence: 0 },
+      effects: planned.effects,
+      resolver: ({ sourceRef, kind }) => resolveMediaSource({ sourceRef, kind, assetResolver })
+    });
+
+    expect(availability.diagnostics).toEqual([]);
+    expect(planned.hasVoiceBoundary).toBe(true);
+    expect(planned.effects.some((effect) => effect.type === "play-dialogue-bleep")).toBe(false);
+    expect(playDialogueBleep.calls).toEqual([]);
+    expect(playVoice.calls).toEqual([
+      ["voice:zh:voice_validation_0001", "/voice/voice_validation_0001.ogg", { volume: 0.25 }]
+    ]);
+    expect(result).toEqual({ diagnostics: [], voiceHandle });
+  });
+
+  it("falls back to bleep without a voice warning when planned textId audio is missing", async () => {
+    const bleepHandle = audioHandle("dialogue-bleep:line:missing");
+    const playVoice = viFn(() => audioHandle("voice"));
+    const playDialogueBleep = viFn(() => bleepHandle);
+    const audioPort: AudioPort = {
+      playBgm: viFn(),
+      playSfx: viFn(),
+      playDialogueBleep,
+      playVoice,
+      stopAll: viFn()
+    };
+    const assetResolver = createAssetRegistry(
+      manifestWithAssets([runtimeAsset("bleep:dialogue-default", "bleep", "/bleep/default.ogg")])
+    );
+    const availability = resolveDialogueVoiceAssetAvailability({
+      assetResolver,
+      textId: "planned_future_voice",
+      voiceSettings: { locale: "zh", volume: 0.25 }
+    });
+    const planned = planDialogueLineAudio(
+      {},
+      {
+        bleep: {
+          config: {
+            enabled: true,
+            defaultSound: { sourceRef: "bleep:dialogue-default", gain: 1 },
+            speakerOverrides: {}
+          },
+          volume: 0.5
+        },
+        dialogVisible: true,
+        lineKey: "line:missing",
+        pacing: "normal",
+        revealStatus: "revealing",
+        speakerId: "Mira",
+        textId: "planned_future_voice",
+        voice: { locale: "zh", volume: 0.25 },
+        voiceAssetAvailable: availability.available
+      }
+    );
+
+    const result = await applyMediaRuntimeEffects({
+      audioPort,
+      handles: { bgm: {}, sfx: {}, oneShotSequence: 0 },
+      effects: planned.effects,
+      resolver: ({ sourceRef, kind }) => resolveMediaSource({ sourceRef, kind, assetResolver })
+    });
+
+    expect(availability).toEqual({
+      available: false,
+      diagnostics: [],
+      sourceRef: "voice:zh:planned_future_voice"
+    });
+    expect(planned.effects).toEqual([
       { type: "stop-voice" },
       {
-        type: "play-voice",
-        key: "voice:zh:voice_validation_0001",
-        textId: "voice_validation_0001",
-        sourceRef: "voice:zh:voice_validation_0001",
-        volume: 0.25
-      },
-      { type: "stop-voice" }
+        type: "play-dialogue-bleep",
+        key: "dialogue-bleep:line:missing",
+        sourceRef: "bleep:dialogue-default",
+        volume: 0.5
+      }
     ]);
-    expect(deriveVoiceMediaEffects(commands, { locale: "zh", volume: 0.25 }, "skip")).toEqual([
-      { type: "stop-voice" },
-      { type: "stop-voice" }
+    expect(playVoice.calls).toEqual([]);
+    expect(playDialogueBleep.calls).toEqual([
+      ["dialogue-bleep:line:missing", "/bleep/default.ogg", { volume: 0.5 }]
     ]);
-    expect(deriveVoiceMediaEffects(commands, { locale: "zh", volume: 0 }, "normal")).toEqual([
-      { type: "stop-voice" },
-      { type: "stop-voice" }
-    ]);
+    expect(result).toEqual({ diagnostics: [] });
   });
 
   it("applies voice effects through AssetRegistry and interrupts the previous voice handle", async () => {
@@ -456,6 +723,7 @@ describe("vertical slice runtime adapter helpers", () => {
     const audioPort: AudioPort = {
       playBgm: viFn(),
       playSfx: viFn(),
+      playDialogueBleep: viFn(() => audioHandle("bleep")),
       playVoice,
       stopAll: viFn()
     };
@@ -492,6 +760,7 @@ describe("vertical slice runtime adapter helpers", () => {
     const audioPort: AudioPort = {
       playBgm: viFn(),
       playSfx: viFn(),
+      playDialogueBleep: viFn(() => audioHandle("bleep")),
       playVoice,
       stopAll: viFn()
     };
@@ -532,6 +801,7 @@ describe("vertical slice runtime adapter helpers", () => {
     const audioPort: AudioPort = {
       playBgm: viFn(),
       playSfx: viFn(),
+      playDialogueBleep: viFn(() => audioHandle("bleep")),
       playVoice,
       stopAll: viFn()
     };
@@ -579,6 +849,7 @@ describe("vertical slice runtime adapter helpers", () => {
     const audioPort: AudioPort = {
       playBgm: viFn(),
       playSfx: viFn(),
+      playDialogueBleep: viFn(() => audioHandle("bleep")),
       playVoice: viFn(() => {
         throw new Error("voice channel unavailable");
       }),
@@ -956,7 +1227,7 @@ function runtimeAsset(id: string, kind: RuntimeAssetKind, optimizedUri: string):
       ? "mp4"
       : kind === "glb"
         ? "gltf"
-        : kind === "bgm" || kind === "sfx" || kind === "voice"
+        : kind === "bgm" || kind === "sfx" || kind === "voice" || kind === "bleep"
           ? "ogg"
           : kind === "character-pack"
             ? "json"

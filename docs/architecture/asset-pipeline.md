@@ -85,8 +85,12 @@ it through adapter props:
 
 - media commands resolve `bgm`, `sfx`, `voice`, and `video` ids before calling
   Howler or the HTML video port.
-- dialogue textId auto voice resolves `voice:<locale>:<textId>` through the
-  same registry before calling `AudioPort.playVoice`.
+- dialogue line audio checks `voice:<locale>:<textId>` through the same
+  registry; a resolved voice asset suppresses bleep, while a missing planned
+  voice asset can fallback to dialogue bleep.
+- dialogue reveal bleep resolves `bleep:*` ids declared by
+  `ContentManifest.audio.dialogueBleep` through the same registry before
+  calling `AudioPort.playDialogueBleep`.
 - Pixi resolves backgrounds, character-pack entry JSON, and FX ids before
   loading textures.
 - Character-pack runtime assets point only to `character.json`. Pixi resolves

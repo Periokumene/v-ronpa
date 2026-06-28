@@ -41,8 +41,10 @@ The fixture command set is intentionally small:
 Excluded source-material features include input prompts, save/unlock/toast
 commands, localization text IDs, indentation blocks, block control flow,
 subroutines, multi-speaker text, async/await track control, managed text,
-automatic voice mapping, rich reveal events, and Unity-specific scene or
-timeline commands.
+automatic voice mapping, script-authored rich reveal event commands, and
+Unity-specific scene or timeline commands. The vertical-slice app may still
+apply app-local typewriter reveal to dialogue presentation without adding new
+P1 script syntax.
 
 ## `basic-navi.p1.nani`
 

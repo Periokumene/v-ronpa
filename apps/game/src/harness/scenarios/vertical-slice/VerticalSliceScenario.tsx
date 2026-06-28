@@ -10,6 +10,7 @@ import { GameInteractionShell } from "../../../interaction/GameInteractionShell"
 import { useGameFlowActor } from "../../../interaction/useGameFlowActor";
 import {
   settingsToDialogDisplaySettings,
+  settingsToDialogueBleepRuntimeSettings,
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings,
   useGameSettingsAdapter
@@ -35,6 +36,8 @@ export function VerticalSliceScenario() {
   const assetRegistry = useMemo(() => createAssetRegistry(harnessContentManifest), []);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
+  const dialogRevealSettings = useMemo(() => ({ textSpeed: dialogDisplay.textSpeed }), [dialogDisplay.textSpeed]);
+  const dialogueBleepSettings = useMemo(() => settingsToDialogueBleepRuntimeSettings(settings.settings), [settings.settings]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
   const smokeAudioPort = useMemo(() => {
     const mode = selectVoiceSmokeAudioMode();
@@ -45,6 +48,9 @@ export function VerticalSliceScenario() {
   const runtime = useVerticalSliceRuntimeAdapter(flow.mode, {
     ...(smokeAudioPort ? { audioPort: smokeAudioPort } : {}),
     assetResolver: assetRegistry,
+    ...(harnessContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: harnessContentManifest.audio.dialogueBleep } : {}),
+    dialogueBleepSettings,
+    dialogRevealSettings,
     storyPlayTiming,
     voiceSettings,
     onEnterTrial: enterTrialMode,
@@ -365,6 +371,9 @@ function createVoiceSmokeAudioPort(mode: VoiceSmokeAudioMode): AudioPort {
       const handle = createSmokeAudioHandle(id);
       if (options?.loop !== true) window.setTimeout(() => handle.finish("ended"), 20);
       return register(handle);
+    },
+    playDialogueBleep(id) {
+      return register(createSmokeAudioHandle(id));
     },
     playVoice(id) {
       const handle = createSmokeAudioHandle(id);

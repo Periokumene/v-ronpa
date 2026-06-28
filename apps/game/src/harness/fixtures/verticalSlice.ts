@@ -211,6 +211,9 @@ Sherry: 先离开这里。故事以后再写。|#0102Adv04_Sherry004|
 @wait i
 @input playerName type:string summary:"输入任意代号后继续" value:Felix
 Narrator: CHECKPOINT MAIN 02 - input。输入已提交；右侧 Runtime variables 应包含 playerName。
+Mira: CHECKPOINT BLEEP DEFAULT - nani speaker Mira 没有 override，应使用默认 dialogue bleep 008。
+Felix: CHECKPOINT BLEEP OVERRIDE - nani speaker Felix 应使用角色 override dialogue bleep 009。
+Narrator: CHECKPOINT BLEEP NULL - nani speaker Narrator 配置为 null override，应保持无 bleep。
 @bgm bgm:validation-main group:music volume:0.45 fade:0.2
 @sfx sfx:rain-inside-car-loop group:rain loop:true volume:0.35
 @sfx sfx:knock-door volume:0.9

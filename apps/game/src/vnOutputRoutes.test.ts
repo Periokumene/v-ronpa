@@ -21,7 +21,7 @@ describe("VN output routes", () => {
     expect(routeRuntimeCommand(command, routeTable)).toEqual(["ui", "debug"]);
   });
 
-  it("keeps print out of UI and media command streams because dialog and textId voice are app-derived", () => {
+  it("keeps print out of UI and media command streams because dialog and dialogue audio are app-derived", () => {
     const commands: RuntimeCommand[] = [
       runtimeCommand("print", "text", { text: "Line", autoNext: false, textId: "voice_validation_0001" }),
       runtimeCommand("back", "scene", { appearance: "bg:harness" }),
