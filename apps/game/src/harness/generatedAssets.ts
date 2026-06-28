@@ -87,6 +87,30 @@ export const harnessRuntimeAssets = [
       ]
     },
     {
+      "id": "bleep:dialogue-default",
+      "kind": "bleep",
+      "optimizedUri": "/harness/media/bleep/dialogue-default.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "bleep:dialogue-felix",
+      "kind": "bleep",
+      "optimizedUri": "/harness/media/bleep/dialogue-felix.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
       "id": "Ema",
       "kind": "character-pack",
       "optimizedUri": "/harness/characters/Ema/character.json",

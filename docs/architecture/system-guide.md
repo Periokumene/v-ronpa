@@ -138,17 +138,19 @@ submission remains a Trial UI action routed through `trial-director`.
   -> story-play playback state + pacing schedule
   -> VN runtime transaction + route table
   -> routed RuntimeCommand consumption
-  -> app commit derives voice:<locale>:<textId> from emitted print textId
+  -> app commit plans dialogue audio from emitted print textId + reveal state
   -> AUTO/autoNext voice gate handles AudioHandle.finished ended/stopped/failed
   -> app-created AssetRegistry resolves media/Pixi/R3F/UI asset ids
-  -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events / AudioPort voice playback
+  -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events / AudioPort voice or bleep playback
   -> VnRuntimeDispatcher renders DOM dialog and Pixi snapshot
 ```
 
 Dialogue lines may include one `|#textId|` marker. The marker is parser
-metadata, not visible text, and the current implementation uses it only for
-auto voice lookup. Full localization, managed text files, and explicit voice
-commands remain future tasks.
+metadata, not visible text. The app uses it as dialogue audio identity: a
+resolvable `voice:<locale>:<textId>` asset wins and suppresses dialogue bleep,
+while a missing planned voice asset can fall back to configured reveal bleep.
+Full localization, managed text files, and explicit voice commands remain
+future tasks.
 
 AUTO voice waiting is app policy, not script semantics. `story-play` computes
 the minimum text stay time, while the app adapter waits for a successfully
@@ -156,7 +158,8 @@ started voice handle to report its terminal lifecycle. Natural `ended` adds
 500ms before advancing; `failed` releases any pending AUTO/`autoNext` advance
 without the post-voice delay; and explicit `stopped` only clears stale gates.
 Manual advance and SKIP do not wait for voice; missing, muted, zero-volume, or
-failed voice playback does not block automation.
+failed voice playback does not block automation. Dialogue bleep never installs
+or releases the AUTO voice gate.
 
 For Pixi presentation commands, `wait!` is opt-in. StoryEngine creates a
 presentation wait, app transaction code attaches Pixi expected task descriptors,

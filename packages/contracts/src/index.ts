@@ -788,6 +788,7 @@ export const RuntimeAssetKindSchema = z.enum([
   "background",
   "bgm",
   "sfx",
+  "bleep",
   "voice",
   "video",
   "glb",
@@ -952,6 +953,33 @@ export const RuntimeAssetSchema = z.object({
   tags: z.array(z.string()).default([])
 }).strict();
 export type RuntimeAsset = z.infer<typeof RuntimeAssetSchema>;
+
+const NormalizedSettingSchema = z.number().min(0).max(1);
+
+export const DialogueBleepSoundSchema = z.object({
+  sourceRef: IdSchema,
+  gain: NormalizedSettingSchema.default(1)
+}).strict();
+export type DialogueBleepSoundInput = z.input<typeof DialogueBleepSoundSchema>;
+export type DialogueBleepSound = z.infer<typeof DialogueBleepSoundSchema>;
+
+export const DialogueBleepSoundRefSchema = z.union([DialogueBleepSoundSchema, z.null()]);
+export type DialogueBleepSoundRefInput = z.input<typeof DialogueBleepSoundRefSchema>;
+export type DialogueBleepSoundRef = z.infer<typeof DialogueBleepSoundRefSchema>;
+
+export const DialogueBleepConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  defaultSound: DialogueBleepSoundRefSchema.optional(),
+  speakerOverrides: z.record(z.string().min(1), DialogueBleepSoundRefSchema).default({})
+}).strict();
+export type DialogueBleepConfigInput = z.input<typeof DialogueBleepConfigSchema>;
+export type DialogueBleepConfig = z.infer<typeof DialogueBleepConfigSchema>;
+
+export const ContentAudioConfigSchema = z.object({
+  dialogueBleep: DialogueBleepConfigSchema.optional()
+}).strict();
+export type ContentAudioConfigInput = z.input<typeof ContentAudioConfigSchema>;
+export type ContentAudioConfig = z.infer<typeof ContentAudioConfigSchema>;
 
 export const LayeredCharacterObjectVector2Schema = z.object({
   x: z.number(),
@@ -1510,8 +1538,6 @@ export type SettingsLanguage = z.infer<typeof SettingsLanguageSchema>;
 export const SettingsTextSizeSchema = z.enum(["small", "medium", "large"]);
 export type SettingsTextSize = z.infer<typeof SettingsTextSizeSchema>;
 
-const NormalizedSettingSchema = z.number().min(0).max(1);
-
 export const SettingsSystemSnapshotSchema = z
   .object({
     language: SettingsLanguageSchema.default("zh-CN"),
@@ -1536,6 +1562,7 @@ export const SettingsSoundSnapshotSchema = z
     masterVolume: NormalizedSettingSchema.default(1),
     bgmVolume: NormalizedSettingSchema.default(0.25),
     sfxVolume: NormalizedSettingSchema.default(1),
+    bleepVolume: NormalizedSettingSchema.default(1),
     voiceVolume: NormalizedSettingSchema.default(1),
     uiVolume: NormalizedSettingSchema.default(0.5),
     muted: z.boolean().default(false)
@@ -1568,6 +1595,7 @@ const DEFAULT_SETTINGS_SOUND_SNAPSHOT = {
   masterVolume: 1,
   bgmVolume: 0.25,
   sfxVolume: 1,
+  bleepVolume: 1,
   voiceVolume: 1,
   uiVolume: 0.5,
   muted: false
@@ -1648,6 +1676,7 @@ export type SaveData = z.infer<typeof SaveDataSchema>;
 export const ContentManifestSchema = z.object({
   version: z.literal(2),
   assets: z.array(AssetRefSchema).default([]),
+  audio: ContentAudioConfigSchema.optional(),
   uiAssets: z.array(UiAssetRefSchema).default([]),
   interactionStyles: z.array(InteractionStyleProfileSchema).default([]),
   runtimeAssets: z.array(RuntimeAssetSchema).default([]),
@@ -1658,6 +1687,7 @@ export const ContentManifestSchema = z.object({
   evidence: z.array(EvidenceDefSchema).default([]),
   trials: z.array(TrialDefinitionSchema)
 }).strict();
+export type ContentManifestInput = z.input<typeof ContentManifestSchema>;
 export type ContentManifest = z.infer<typeof ContentManifestSchema>;
 
 export function parseContract<T>(schema: z.ZodType<T>, value: unknown): T {

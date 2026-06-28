@@ -7,9 +7,9 @@ VN runtime output is split in two app-layer steps:
 - `createVnRuntimePresentationTransaction` fans those emitted runtime commands
   out to runtime consumers such as Pixi stage snapshots, render hints, and
   gameplay events.
-- The vertical-slice app adapter also derives auto voice playback from emitted
-  `print.params.textId` during story step commit; this is intentionally outside
-  React render/effect replay.
+- The vertical-slice app adapter also derives dialogue line audio from emitted
+  `print.params.textId` and reveal state during story step commit; this is
+  intentionally outside React render/effect replay.
 - The vertical-slice app adapter derives transient dialog text reveal state
   from the emitted `print` plus the current Story line during the same commit.
   The reveal runtime owns grapheme pacing and lifecycle events only; StoryEngine
@@ -117,20 +117,42 @@ passes the same resolver to Pixi; and the first-person bridge passes it to the
 R3F stage. Missing asset resolution is surfaced as runtime diagnostics and
 visible fallback behavior, not guessed public URLs.
 
-Dialogue textId voice is a media derivation, not StoryEngine behavior:
+Dialogue line audio is a media derivation, not StoryEngine behavior. The app
+uses one dialogue audio planner for each committed `print`: a resolvable
+`voice:<locale>:<textId>` asset wins and suppresses bleep, even when voice
+volume is zero; otherwise reveal bleep may fallback through
+`ContentManifest.audio.dialogueBleep`.
 
 ```text
 print.params.textId
-  -> app story step commit
+  -> app story step commit voice availability check
   -> stop-voice boundary for the new print
-  -> voice:<locale>:<textId>
-  -> AssetRegistry.resolve({ kind: "voice" })
-  -> AudioPort.playVoice()
+  -> if voice asset resolves: AudioPort.playVoice()
+  -> else if reveal is active: dialogue bleep lookup/play
 ```
 
 Story current text, backlog, and save snapshots keep only visible dialogue
 text. Load restore, backlog rendering, React rerender, and SKIP pacing must not
 replay derived voice.
+
+Dialogue reveal bleep is independent from script-authored SFX and only acts as
+the unvoiced reveal fallback:
+
+```text
+print speaker from nani xxx:
+  -> app dialogue audio planner after voice availability check
+  -> ContentManifest.audio.dialogueBleep exact speaker lookup
+  -> AssetRegistry.resolve({ kind: "bleep" })
+  -> AudioPort.playDialogueBleep()
+  -> reveal finish / clear / skip / reset / trial entry stops the handle
+```
+
+The bleep handle is not stored in looping SFX handles, is not stopped by
+script-level `@stopSfx`, and never installs or releases the voice auto-advance
+gate. A planned `textId` with no matching voice asset is treated as an unvoiced
+line and may fallback to bleep without a missing-voice warning; a voice asset
+kind mismatch is warned and still falls back. Missing bleep assets or playback
+failures produce runtime diagnostics and must not block StoryEngine advancement.
 
 AUTO and one-shot `autoNext` still use `story-play` only for the text minimum
 stay time. When that app-hosted timer reaches zero, the runtime adapter checks
@@ -175,11 +197,11 @@ Reveal overlay state is scoped to the `print` step that created it; if a later
 StoryEngine step changes the current line without emitting a new `print`, the
 adapter clears the overlay so text mutations such as `@append` are not hidden
 behind stale partial text.
-Reveal lifecycle events (`reveal-start`, `reveal-tick`, `reveal-finish`) are
-reserved for later bleep/media integration; v1 does not resolve or play any
-sound asset from them. Completing or instantly revealing a line does not
-synthesize catch-up `reveal-tick` events, so future tick-driven bleep playback
-does not burst during manual completion, SKIP, or restore-like paths.
+Reveal lifecycle events (`reveal-start`, `reveal-tick`, `reveal-finish`) remain
+app-local presentation signals. Dialogue bleep uses reveal start/finish as a
+loop boundary only; completing or instantly revealing a line does not synthesize
+catch-up `reveal-tick` events, so bleep playback does not burst during manual
+completion, SKIP, or restore-like paths.
 
 Presentation wait release is task-driven. `createVnRuntimePresentationTransaction`
 returns Pixi wait descriptors, the runtime adapter stores them on

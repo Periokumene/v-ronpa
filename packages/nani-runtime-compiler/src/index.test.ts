@@ -398,7 +398,7 @@ describe("nani runtime compiler", () => {
     });
   });
 
-  it("keeps explicit voice commands declared-only while textId auto voice stays app-derived", () => {
+  it("keeps explicit voice commands declared-only while textId dialogue audio stays app-derived", () => {
     const { scenario } = parseScenario({
       sourceText: "@voice voice:zh:voice_validation_0001 volume:0.5\n@stopVoice",
       scriptPath: "explicit-voice-declared-only.nani"

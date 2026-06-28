@@ -8,6 +8,7 @@ const outputPath = join(repoRoot, "apps/game/src/harness/generatedAssets.ts");
 
 const kindByDirectory = new Map([
   ["backgrounds", "background"],
+  ["media/bleep", "bleep"],
   ["media/bgm", "bgm"],
   ["media/sfx", "sfx"],
   ["media/video", "video"],
@@ -95,6 +96,7 @@ function idForRelativePath(rel, kind) {
     return `voice:${locale}:${name}`;
   }
   if (kind === "background") return `bg:${name}`;
+  if (kind === "bleep") return `bleep:${name}`;
   if (kind === "bgm") return `bgm:${name}`;
   if (kind === "sfx") return `sfx:${name}`;
   if (kind === "video") return `video:${name}`;

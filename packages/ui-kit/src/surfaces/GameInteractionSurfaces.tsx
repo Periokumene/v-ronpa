@@ -316,6 +316,12 @@ export function SettingsOverlay({ onClose, onPatchSettings, onResetSettings, set
             value={settings.sound.sfxVolume}
           />
           <SettingsSlider
+            label="Bleep volume"
+            onChange={(bleepVolume) => onPatchSettings({ sound: { bleepVolume } })}
+            testId="settings-sound-bleep"
+            value={settings.sound.bleepVolume}
+          />
+          <SettingsSlider
             label="Voice volume"
             onChange={(voiceVolume) => onPatchSettings({ sound: { voiceVolume } })}
             testId="settings-sound-voice"

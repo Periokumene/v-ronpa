@@ -22,6 +22,8 @@ export type MediaRuntimeEffect =
   | { type: "stop-bgm"; key: string; group: string; fadeMs?: number }
   | { type: "play-sfx"; sourceRef: string; loop: boolean; fast: boolean; key?: string; group?: string; volume?: number }
   | { type: "stop-sfx"; key: string; group?: string; fadeMs?: number }
+  | { type: "play-dialogue-bleep"; key: string; sourceRef: string; volume?: number }
+  | { type: "stop-dialogue-bleep"; key: string }
   | { type: "stop-voice" }
   | { type: "play-voice"; key: string; textId: string; sourceRef: string; volume?: number }
   | { type: "play-movie"; sourceRef: string; block: boolean; durationMs?: number };

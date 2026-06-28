@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AssetRegistryDiagnostic, AssetResolver } from "@v-ronpa/asset-registry";
 import {
   createDefaultSettingsSnapshot,
+  type DialogueBleepConfig,
   type GameInteractionContext,
   type GameUiAction,
   type NaviInteractionSensorReport,
@@ -109,6 +110,13 @@ import {
   shouldDriveDialogReveal,
   type DialogPlaybackScheduleSource
 } from "./dialogPlaybackGate";
+import {
+  createVoiceAssetId,
+  planDialogueLineAudio,
+  reduceDialogueAudioLifecycle,
+  type DialogueAudioLifecycleSignal,
+  type DialogueAudioRuntimeState
+} from "./dialogueAudioRuntime";
 
 export type PosePresetId = "spawn" | "notebook" | "keycard" | "door" | "hall-door" | "witness" | "trial-stand" | "empty";
 
@@ -176,7 +184,7 @@ export interface VerticalSliceRuntimeRestorePlan {
   pixiStageRuntime: PixiStageRuntime;
 }
 
-export type AdapterMediaKind = "bgm" | "sfx" | "voice" | "video";
+export type AdapterMediaKind = "bgm" | "sfx" | "bleep" | "voice" | "video";
 
 export interface MediaSourceResolverInput {
   sourceRef: string;
@@ -192,6 +200,7 @@ export interface MediaSourceResolverResult {
 export interface MediaHandleStore {
   bgm: Record<string, AudioHandle>;
   sfx: Record<string, AudioHandle>;
+  dialogueBleep?: AudioHandle;
   voice?: AudioHandle;
   oneShotSequence: number;
 }
@@ -207,6 +216,18 @@ export interface ApplyMediaRuntimeEffectsInput {
 export interface ApplyMediaRuntimeEffectsResult {
   diagnostics: VerticalSliceRuntimeDiagnostic[];
   voiceHandle?: AudioHandle;
+}
+
+export interface DialogueVoiceAssetAvailabilityResult {
+  available: boolean;
+  diagnostics: VerticalSliceRuntimeDiagnostic[];
+  sourceRef?: string;
+}
+
+interface CommitDialogRevealResult {
+  diagnostics: VerticalSliceRuntimeDiagnostic[];
+  effects: MediaRuntimeEffect[];
+  hasVoiceBoundary: boolean;
 }
 
 export type VoiceAutoAdvanceSource = Extract<StoryPlayAdvanceSource, "auto" | "auto-next">;
@@ -232,6 +253,8 @@ export interface VerticalSliceRuntimeAdapterOptions {
   videoPort?: VideoPort;
   storyPlayTiming?: StoryPlayTimingPolicy;
   voiceSettings?: AdapterVoiceSettings;
+  dialogueBleepConfig?: DialogueBleepConfig;
+  dialogueBleepSettings?: AdapterDialogueBleepSettings;
   dialogRevealSettings?: AdapterDialogRevealSettings;
   assetResolver?: AssetResolver;
   onEnterTrial?: () => void;
@@ -240,6 +263,10 @@ export interface VerticalSliceRuntimeAdapterOptions {
 
 export interface AdapterVoiceSettings {
   locale: string;
+  volume: number;
+}
+
+export interface AdapterDialogueBleepSettings {
   volume: number;
 }
 
@@ -270,6 +297,7 @@ const initialMap = verticalSliceMaps[0] ?? createFallbackMap();
 const MAX_RUNTIME_DIAGNOSTICS = 50;
 const DEFAULT_TOAST_DURATION_MS = 2500;
 const DEFAULT_VOICE_SETTINGS: AdapterVoiceSettings = { locale: "zh", volume: 1 };
+const DEFAULT_DIALOGUE_BLEEP_SETTINGS: AdapterDialogueBleepSettings = { volume: 1 };
 const DEFAULT_DIALOG_REVEAL_SETTINGS: AdapterDialogRevealSettings = {
   textSpeed: createDefaultSettingsSnapshot().display.textSpeed
 };
@@ -331,6 +359,8 @@ export function useVerticalSliceRuntimeAdapter(
   const assetResolver = options.assetResolver;
   const storyPlayTiming = options.storyPlayTiming;
   const voiceSettings = options.voiceSettings ?? DEFAULT_VOICE_SETTINGS;
+  const dialogueBleepConfig = options.dialogueBleepConfig;
+  const dialogueBleepSettings = options.dialogueBleepSettings ?? DEFAULT_DIALOGUE_BLEEP_SETTINGS;
   const dialogRevealSettings = options.dialogRevealSettings ?? DEFAULT_DIALOG_REVEAL_SETTINGS;
   const onEnterTrial = options.onEnterTrial;
   const onEnterNavi = options.onEnterNavi;
@@ -363,6 +393,7 @@ export function useVerticalSliceRuntimeAdapter(
   const mediaRuntimeRef = useRef<MediaRuntime>({ state: createInitialMediaRuntimeState() });
   const uiRuntimeRef = useRef<UiRuntime>({ state: createInitialUiRuntimeState() });
   const dialogRevealRuntimeRef = useRef<DialogRevealRuntime>({ events: [], eventSequence: 0 });
+  const dialogueAudioRuntimeRef = useRef<DialogueAudioRuntimeState>({});
   const mediaHandlesRef = useRef<MediaHandleStore>({ bgm: {}, sfx: {}, oneShotSequence: 0 });
   const pendingMoviePlaybackRef = useRef<{ sourceRef: string; uri: string } | undefined>(undefined);
   const toastTimeoutsRef = useRef<Record<string, number>>({});
@@ -569,6 +600,8 @@ export function useVerticalSliceRuntimeAdapter(
       for (const timeout of Object.values(toastTimeoutsRef.current)) window.clearTimeout(timeout);
       toastTimeoutsRef.current = {};
       voiceAutoAdvanceGateControllerRef.current?.clear({ stopVoice: true });
+      mediaHandlesRef.current.dialogueBleep?.stop();
+      dialogueAudioRuntimeRef.current = {};
     };
   }, []);
 
@@ -619,6 +652,9 @@ export function useVerticalSliceRuntimeAdapter(
       eventSequence: current.eventSequence + events.length,
       visibleText: selectVisibleRevealText(state) ?? state.text
     }));
+    if (events.some((event) => event.type === "reveal-finish")) {
+      applyDialogueAudioLifecycleSignal({ type: "line-finish", lineKey: state.lineKey });
+    }
   }
 
   function advanceActiveDialogReveal() {
@@ -643,8 +679,26 @@ export function useVerticalSliceRuntimeAdapter(
     return true;
   }
 
-  function clearDialogRevealRuntime() {
+  function clearDialogRevealRuntime(reason = "dialog-reveal:clear") {
+    applyDialogueAudioLifecycleSignal({ type: "clear", reason });
     setDialogRevealRuntimeNow({ events: [], eventSequence: 0 });
+  }
+
+  function applyDialogueAudioLifecycleSignal(signal: DialogueAudioLifecycleSignal) {
+    const step = reduceDialogueAudioLifecycle(dialogueAudioRuntimeRef.current, signal);
+    dialogueAudioRuntimeRef.current = step.state;
+    if (step.effects.length === 0) return;
+    void applyMediaRuntimeEffects({
+      audioPort,
+      effects: step.effects,
+      handles: mediaHandlesRef.current,
+      resolver: ({ kind, sourceRef }) =>
+        resolveMediaSource({
+          kind,
+          sourceRef,
+          ...(assetResolver ? { assetResolver } : {})
+        })
+    }).then((result) => appendRuntimeDiagnostics(result.diagnostics));
   }
 
   function resetSlice() {
@@ -869,6 +923,9 @@ export function useVerticalSliceRuntimeAdapter(
     if (!canToggleStoryAutomation(storyRuntime)) return;
     if (storyPlay.mode === "skip") cancelStoryPlayHostSchedule();
     clearVoiceAutoAdvanceGate({ stopVoice: true });
+    if (storyPlay.mode !== "skip" && dialogRevealRuntimeRef.current.state?.status === "revealing") {
+      completeActiveDialogReveal();
+    }
     setStoryPlayNow((current) => toggleSkipStoryPlay(current));
     setLastAction("story:skip");
     setLastOutcome(storyPlay.mode === "skip" ? "manual" : "skip");
@@ -1072,7 +1129,7 @@ export function useVerticalSliceRuntimeAdapter(
           }
         }
       : storyStep.state;
-    commitDialogRevealForStoryStep({
+    const dialogueAudio = commitDialogRevealForStoryStep({
       active,
       dialogVisible: transaction.uiState.visible.dialog,
       pacing,
@@ -1106,15 +1163,13 @@ export function useVerticalSliceRuntimeAdapter(
         transactionDiagnostics: transaction.diagnostics,
         mediaDiagnostics: transaction.mediaDiagnostics,
         uiDiagnostics: transaction.uiDiagnostics
-      }).concat(movieDiagnostics)
+      }).concat(movieDiagnostics, dialogueAudio.diagnostics)
     );
     setMediaRuntimeNow({ state: transaction.mediaState });
     setUiRuntimeNow({ state: deriveUiRuntimeLifecycleState(nextUiStateFromCommands, nextStoryState) });
     const audioMediaEffects = transaction.mediaEffects.filter((effect) => effect.type !== "play-movie");
-    const voiceMediaEffects = deriveVoiceMediaEffects(storyStep.emittedRuntimeCommands, voiceSettings, pacing);
-    const hasVoiceBoundary = voiceMediaEffects.some((effect) => effect.type === "stop-voice");
-    const voiceBoundaryToken = hasVoiceBoundary ? beginVoiceBoundary() : undefined;
-    const audioEffects = [...audioMediaEffects, ...voiceMediaEffects];
+    const voiceBoundaryToken = dialogueAudio.hasVoiceBoundary ? beginVoiceBoundary() : undefined;
+    const audioEffects = [...audioMediaEffects, ...dialogueAudio.effects];
     if (audioEffects.length > 0) {
       const mediaEffectInput: ApplyMediaRuntimeEffectsInput = {
         audioPort,
@@ -1165,13 +1220,13 @@ export function useVerticalSliceRuntimeAdapter(
     runtimeCommands: RuntimeCommand[];
     storyPlayState: StoryPlayState;
     storyState: StoryRuntimeState;
-  }) {
+  }): CommitDialogRevealResult {
     const print = latestPrintCommand(runtimeCommands);
     if (!active || !print) {
       const reveal = dialogRevealRuntimeRef.current.state;
       const currentLine = selectCurrentStoryLine(storyState);
       if (runtimeCommands.length > 0 || (reveal && currentLine?.text !== reveal.text)) clearDialogRevealRuntime();
-      return;
+      return { diagnostics: [], effects: [], hasVoiceBoundary: false };
     }
 
     const currentLine = selectCurrentStoryLine(storyState);
@@ -1200,12 +1255,39 @@ export function useVerticalSliceRuntimeAdapter(
       durationMs: pacing === "skip" || !dialogVisible ? 0 : plan.revealDurationMs
     });
     const step = advanceDialogReveal(created, nowMs);
+    const speakerId = currentLine?.speaker ?? stringRuntimeParam(print, "speaker");
     setDialogRevealRuntimeNow((current) => ({
       state: step.state,
       events: [...current.events, ...step.events].slice(-MAX_DIALOG_REVEAL_EVENTS),
       eventSequence: current.eventSequence + step.events.length,
       visibleText: selectVisibleRevealText(step.state) ?? step.state.text
     }));
+    const textId = stringRuntimeParam(print, "textId");
+    const voiceAvailability = resolveDialogueVoiceAssetAvailability({
+      ...(textId ? { textId } : {}),
+      voiceSettings,
+      ...(assetResolver ? { assetResolver } : {})
+    });
+    const dialogueAudio = planDialogueLineAudio(dialogueAudioRuntimeRef.current, {
+      bleep: {
+        volume: dialogueBleepSettings.volume,
+        ...(dialogueBleepConfig ? { config: dialogueBleepConfig } : {})
+      },
+      dialogVisible,
+      lineKey: step.state.lineKey,
+      pacing,
+      revealStatus: step.state.status,
+      ...(speakerId ? { speakerId } : {}),
+      ...(textId ? { textId } : {}),
+      voice: voiceSettings,
+      voiceAssetAvailable: voiceAvailability.available
+    });
+    dialogueAudioRuntimeRef.current = dialogueAudio.state;
+    return {
+      diagnostics: voiceAvailability.diagnostics,
+      effects: dialogueAudio.effects,
+      hasVoiceBoundary: dialogueAudio.hasVoiceBoundary
+    };
   }
 
   function updatePixiPresentationTasks(tasks: PixiPresentationTaskSnapshot[]) {
@@ -1383,8 +1465,10 @@ export function useVerticalSliceRuntimeAdapter(
   function stopAllMediaHandles() {
     for (const handle of Object.values(mediaHandlesRef.current.bgm)) handle.stop();
     for (const handle of Object.values(mediaHandlesRef.current.sfx)) handle.stop();
+    mediaHandlesRef.current.dialogueBleep?.stop();
     mediaHandlesRef.current.voice?.stop();
     mediaHandlesRef.current = { bgm: {}, sfx: {}, oneShotSequence: mediaHandlesRef.current.oneShotSequence };
+    dialogueAudioRuntimeRef.current = {};
     pendingMoviePlaybackRef.current = undefined;
     videoPort.stop();
   }
@@ -1421,8 +1505,29 @@ export function collectVerticalSliceRuntimeDiagnostics({
   ];
 }
 
-export function createVoiceAssetId(textId: string, locale: string): string {
-  return `voice:${locale}:${textId}`;
+export function resolveDialogueVoiceAssetAvailability({
+  assetResolver,
+  textId,
+  voiceSettings
+}: {
+  assetResolver?: AssetResolver;
+  textId?: string;
+  voiceSettings: AdapterVoiceSettings;
+}): DialogueVoiceAssetAvailabilityResult {
+  if (!textId) return { available: false, diagnostics: [] };
+  const sourceRef = createVoiceAssetId(textId, voiceSettings.locale);
+  if (!assetResolver) return { available: false, diagnostics: [], sourceRef };
+
+  const resolved = assetResolver.resolve({ id: sourceRef, kind: "voice" });
+  if (resolved.uri) return { available: true, diagnostics: [], sourceRef };
+  if (resolved.diagnostic?.code === "asset-kind-mismatch") {
+    return {
+      available: false,
+      diagnostics: [toVerticalSliceAssetDiagnostic({ ...resolved.diagnostic, severity: "warning" })],
+      sourceRef
+    };
+  }
+  return { available: false, diagnostics: [], sourceRef };
 }
 
 export function createVoiceAutoAdvanceGateController({
@@ -1504,22 +1609,6 @@ export function createVoiceAutoAdvanceGateController({
       return false;
     }
   };
-}
-
-export function deriveVoiceMediaEffects(
-  runtimeCommands: RuntimeCommand[],
-  voiceSettings: AdapterVoiceSettings = DEFAULT_VOICE_SETTINGS,
-  pacing: StoryPlayPacing = "normal"
-): MediaRuntimeEffect[] {
-  return runtimeCommands.flatMap((command) => {
-    if (command.commandId !== "print") return [];
-    const stopVoice: MediaRuntimeEffect = { type: "stop-voice" };
-    if (pacing === "skip") return [stopVoice];
-    const textId = stringRuntimeParam(command, "textId");
-    if (!textId || voiceSettings.volume <= 0) return [stopVoice];
-    const sourceRef = createVoiceAssetId(textId, voiceSettings.locale);
-    return [stopVoice, { type: "play-voice" as const, key: sourceRef, textId, sourceRef, volume: voiceSettings.volume }];
-  });
 }
 
 export function createVerticalSliceInteractionContext({
@@ -1803,6 +1892,30 @@ export async function applyMediaRuntimeEffects({
         if (effect.fadeMs !== undefined) handle.fadeOutAndStop(effect.fadeMs);
         else handle.stop();
         delete handles.sfx[effect.key];
+        continue;
+      }
+
+      if (effect.type === "play-dialogue-bleep") {
+        handles.dialogueBleep?.stop();
+        delete handles.dialogueBleep;
+        const resolved = resolver({ sourceRef: effect.sourceRef, kind: "bleep" });
+        if (!resolved.uri) {
+          if (resolved.diagnostic) diagnostics.push({ ...resolved.diagnostic, severity: "warning" });
+          continue;
+        }
+        if (!audioPort) {
+          diagnostics.push(mediaPortError("AudioPort is not available for dialogue bleep playback."));
+          continue;
+        }
+        handles.dialogueBleep = audioPort.playDialogueBleep(effect.key, resolved.uri, {
+          ...(effect.volume !== undefined ? { volume: effect.volume } : {})
+        });
+        continue;
+      }
+
+      if (effect.type === "stop-dialogue-bleep") {
+        handles.dialogueBleep?.stop();
+        delete handles.dialogueBleep;
         continue;
       }
 

@@ -10,9 +10,16 @@ describe("harness content manifest", () => {
     const registry = createAssetRegistry(manifest);
 
     expect(manifest.version).toBe(2);
+    expect(manifest.audio?.dialogueBleep?.enabled).toBe(true);
+    expect(manifest.audio?.dialogueBleep?.speakerOverrides).toEqual({
+      Felix: { sourceRef: "bleep:dialogue-felix", gain: 0.55 },
+      Narrator: null
+    });
     expect(registry.diagnostics).toEqual([]);
     expect(registry.validateReferences()).toEqual([]);
     expect(registry.resolve({ id: "bg:harness", kind: "background" }).uri).toBe("/harness/backgrounds/harness.png");
+    expect(registry.resolve({ id: "bleep:dialogue-default", kind: "bleep" }).uri).toBe("/harness/media/bleep/dialogue-default.ogg");
+    expect(registry.resolve({ id: "bleep:dialogue-felix", kind: "bleep" }).uri).toBe("/harness/media/bleep/dialogue-felix.ogg");
     expect(registry.resolve({ id: "Ema", kind: "character-pack" }).uri).toBe("/harness/characters/Ema/character.json");
     expect(registry.resolve({ id: "model:academy-hall", kind: "glb" }).uri).toBe("/harness/models/academy-hall.gltf");
     expect(registry.resolve({ id: "texture:evidence:keycard-thumbnail", kind: "texture" }).uri).toBe("/harness/thumbnails/evidence-keycard.png");

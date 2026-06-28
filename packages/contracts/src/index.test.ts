@@ -46,6 +46,15 @@ describe("contracts", () => {
         { id: "Ema", kind: "character-pack", tags: ["placeholder"] },
         { id: "texture:evidence:keycard-icon", kind: "texture", tags: ["placeholder", "evidence"] }
       ],
+      audio: {
+        dialogueBleep: {
+          defaultSound: { sourceRef: "bleep:dialogue-default", gain: 0.45 },
+          speakerOverrides: {
+            Felix: { sourceRef: "bleep:dialogue-felix" },
+            Narrator: null
+          }
+        }
+      },
       uiAssets: [
         {
           id: "ui:title:bg",
@@ -89,6 +98,24 @@ describe("contracts", () => {
           optimizedUri: "assets/runtime/title-bg.webp",
           format: "webp",
           compression: ["webp"],
+          lods: [],
+          collisionProxyIds: []
+        },
+        {
+          id: "bleep:dialogue-default",
+          kind: "bleep",
+          optimizedUri: "assets/runtime/dialogue-default.ogg",
+          format: "ogg",
+          compression: [],
+          lods: [],
+          collisionProxyIds: []
+        },
+        {
+          id: "bleep:dialogue-felix",
+          kind: "bleep",
+          optimizedUri: "assets/runtime/dialogue-felix.ogg",
+          format: "ogg",
+          compression: [],
           lods: [],
           collisionProxyIds: []
         },
@@ -196,6 +223,13 @@ describe("contracts", () => {
       trials: []
     });
 
+    expect(manifest.audio?.dialogueBleep).toMatchObject({
+      enabled: true,
+      speakerOverrides: {
+        Felix: { sourceRef: "bleep:dialogue-felix", gain: 1 },
+        Narrator: null
+      }
+    });
     expect(manifest.maps[0]?.walkBounds?.min).toEqual([-3, 0, -4]);
     expect(manifest.maps[0]?.interactables[0]?.action.type).toBe("grant-evidence");
     expect(manifest.maps[0]?.interactables[1]?.action.type).toBe("start-trial");
@@ -691,6 +725,7 @@ describe("contracts", () => {
         masterVolume: 1,
         bgmVolume: 0.25,
         sfxVolume: 1,
+        bleepVolume: 1,
         voiceVolume: 1,
         uiVolume: 0.5,
         muted: false
@@ -699,6 +734,16 @@ describe("contracts", () => {
     });
     expect(() => SettingsSnapshotSchema.parse({ version: 1, placeholder: true })).toThrow();
     expect(() => SettingsSnapshotSchema.parse({ version: 1, sound: { masterVolume: 1.2 } })).toThrow();
+    expect(
+      SettingsSnapshotSchema.parse({
+        version: 1,
+        sound: { masterVolume: 0.5, bgmVolume: 0.2, sfxVolume: 0.6, voiceVolume: 0.8, uiVolume: 0.7, muted: false }
+      }).sound.bleepVolume
+    ).toBe(1);
+    expect(RuntimeAssetSchema.parse({ id: "bleep:sample", kind: "bleep", optimizedUri: "assets/sample.ogg", format: "ogg" })).toMatchObject({
+      id: "bleep:sample",
+      kind: "bleep"
+    });
 
     expect(
       SaveSlotSummarySchema.parse({

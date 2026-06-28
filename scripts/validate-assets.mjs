@@ -12,6 +12,7 @@ const {
 } = await import(pathToFileURL(join(repoRoot, "packages/contracts/src/index.ts")).href);
 const generatedPath = join(repoRoot, "apps/game/src/harness/generatedAssets.ts");
 const pixiFxAssetsPath = join(repoRoot, "packages/pixi-presenter/src/internal/fxAssets.ts");
+const bleepAssetsRoot = join(repoRoot, "apps/game/public/harness/media/bleep");
 const voiceAssetsRoot = join(repoRoot, "apps/game/public/harness/media/voice");
 const sourceRoots = ["apps/game/src", "packages", "scripts"].map((path) => join(repoRoot, path));
 const harnessReferenceFiles = [
@@ -20,7 +21,8 @@ const harnessReferenceFiles = [
   ...fixtureNaniFiles(join(repoRoot, "packages/nani-parser/fixtures"))
 ];
 const hardcodedAssetPattern = /(["'`])(?:\/harness\/|\.\/assets\/|\.\.\/assets\/|https?:\/\/|data:image\/|blob:)[^"'`]*\.(?:json|png|webp|avif|ktx2|ogg|mp3|mp4|webm|gltf|glb)\1/u;
-const assetIdPattern = /\b(?:bg|bgm|sfx|voice|video|model|texture|fx):[a-zA-Z0-9:_./-]+/gu;
+const assetIdPattern = /\b(?:bg|bgm|sfx|bleep|voice|video|model|texture|fx):[a-zA-Z0-9:_./-]+/gu;
+const bleepAssetIdPattern = /^[a-zA-Z0-9_-]+$/u;
 const voiceTextIdPattern = /^[a-zA-Z0-9_-]+$/u;
 const characterPackCommandPattern = /^\s*@(char|slide)\s+([^\s]+)/gmu;
 const allowedHardcodedFiles = new Set([
@@ -34,6 +36,7 @@ let failed = false;
 
 checkGeneratedAssets();
 checkHarnessFilesExist();
+checkHarnessBleepAssetLayout();
 checkHarnessVoiceAssetLayout();
 checkCharacterPacks();
 checkHarnessReferencesResolve();
@@ -71,6 +74,24 @@ function checkHarnessVoiceAssetLayout() {
     }
     if (!voiceTextIdPattern.test(textId)) {
       fail(`${toPosix(relative(repoRoot, filePath))} uses invalid voice textId '${textId}'. Use only letters, numbers, '_' and '-'.`);
+    }
+  }
+}
+
+function checkHarnessBleepAssetLayout() {
+  if (!existsSync(bleepAssetsRoot)) return;
+  for (const filePath of walkFiles(bleepAssetsRoot)) {
+    const rel = toPosix(relative(bleepAssetsRoot, filePath));
+    const parts = rel.split("/");
+    const filename = parts.at(-1) ?? "";
+    const ext = extname(filename);
+    const bleepId = filename.slice(0, -ext.length);
+    if (parts.length !== 1 || ext !== ".ogg") {
+      fail(`${toPosix(relative(repoRoot, filePath))} must use apps/game/public/harness/media/bleep/<bleepId>.ogg.`);
+      continue;
+    }
+    if (!bleepAssetIdPattern.test(bleepId)) {
+      fail(`${toPosix(relative(repoRoot, filePath))} uses invalid bleep id '${bleepId}'. Use only letters, numbers, '_' and '-'.`);
     }
   }
 }

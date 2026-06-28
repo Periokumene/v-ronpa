@@ -250,5 +250,6 @@ text. Current rules:
 - The marker is stripped before DOM dialog rendering, backlog storage, and
   search-visible text.
 - The runtime compiler forwards the id on the emitted `print` command so app
-  adapters can derive `voice:<locale>:<textId>`.
+  adapters can plan dialogue audio: resolved `voice:<locale>:<textId>` assets
+  win over configured dialogue bleep fallback.
 - `@print`, `@append`, and `@toast` do not interpret `|#...|` as metadata.

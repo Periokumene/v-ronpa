@@ -9,6 +9,7 @@ import {
   initializeGameSettings,
   loadGameSettings,
   settingsToDialogDisplaySettings,
+  settingsToDialogueBleepRuntimeSettings,
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings
 } from "./useGameSettingsAdapter";
@@ -41,6 +42,7 @@ describe("game settings adapter helpers", () => {
     expect(settings.display.textSize).toBe("large");
     expect(settings.display.textboxOpacity).toBe(0.75);
     expect(settings.sound.bgmVolume).toBe(0.25);
+    expect(settings.sound.bleepVolume).toBe(1);
     expect(JSON.parse(storage.getItem(GAME_SETTINGS_STORAGE_KEY) ?? "")).toEqual(settings);
   });
 
@@ -67,6 +69,7 @@ describe("game settings adapter helpers", () => {
 
     expect(settings.system.language).toBe("zh-TW");
     expect(settings.display.textSize).toBe("large");
+    expect(settings.sound.bleepVolume).toBe(1);
     expect(settings.sound.voiceVolume).toBe(0.8);
     expect(settings.automation.skipSpeed).toBe(0.9);
     expect(settings.sound).not.toHaveProperty("voiceInterruption");
@@ -147,6 +150,9 @@ describe("game settings adapter helpers", () => {
       locale: "zh",
       volume: 1
     });
+    expect(settingsToDialogueBleepRuntimeSettings(defaults)).toEqual({
+      volume: 1
+    });
 
     const fast = applySettingsPatch(defaults, { automation: { autoSpeed: 1, skipSpeed: 1 } });
     const timing = settingsToStoryPlayTimingPolicy(fast);
@@ -154,12 +160,15 @@ describe("game settings adapter helpers", () => {
     expect(timing.skipDelayMs).toBeLessThan(defaultStoryPlayTimingPolicy.skipDelayMs);
 
     const muted = applySettingsPatch(defaults, { sound: { masterVolume: 0.5, voiceVolume: 0.4, muted: true } });
+    const quietBleep = applySettingsPatch(defaults, { sound: { masterVolume: 0.5, bleepVolume: 0.4 } });
     const audibleJapanese = applySettingsPatch(defaults, {
       system: { language: "ja" },
       sound: { masterVolume: 0.5, voiceVolume: 0.4 }
     });
     const unsupportedVoiceLocale = applySettingsPatch(defaults, { system: { language: "ko" } });
     expect(settingsToVoiceRuntimeSettings(muted)).toEqual({ locale: "zh", volume: 0 });
+    expect(settingsToDialogueBleepRuntimeSettings(muted)).toEqual({ volume: 0 });
+    expect(settingsToDialogueBleepRuntimeSettings(quietBleep)).toEqual({ volume: 0.2 });
     expect(settingsToVoiceRuntimeSettings(audibleJapanese)).toEqual({ locale: "ja", volume: 0.2 });
     expect(settingsToVoiceRuntimeSettings(unsupportedVoiceLocale)).toEqual({ locale: "zh", volume: 1 });
   });

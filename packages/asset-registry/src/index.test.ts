@@ -4,7 +4,7 @@ import { createAssetRegistry, isRawAssetReference } from "./index";
 
 describe("asset registry", () => {
   it("resolves every runtime asset kind from ContentManifest.runtimeAssets", () => {
-    const manifest = manifestWithKinds(["character-pack", "background", "bgm", "sfx", "voice", "video", "glb", "texture", "fx"]);
+    const manifest = manifestWithKinds(["character-pack", "background", "bgm", "sfx", "bleep", "voice", "video", "glb", "texture", "fx"]);
     const registry = createAssetRegistry(manifest);
 
     expect(registry.diagnostics).toEqual([]);
@@ -57,8 +57,26 @@ describe("asset registry", () => {
     const manifest: ContentManifest = {
       ...baseManifest([
         runtimeAsset("texture:evidence:keycard-thumbnail", "texture"),
-        runtimeAsset("model:academy-hall", "glb")
+        runtimeAsset("model:academy-hall", "glb"),
+        runtimeAsset("bleep:dialogue-default", "bleep")
       ]),
+      audio: {
+        dialogueBleep: {
+          enabled: true,
+          defaultSound: { sourceRef: "bleep:dialogue-default", gain: 0.5 },
+          speakerOverrides: {
+            Felix: { sourceRef: "bleep:missing", gain: 1 },
+            Narrator: null,
+            Mira: { sourceRef: "sfx:wrong-kind", gain: 1 }
+          }
+        }
+      },
+      runtimeAssets: [
+        runtimeAsset("texture:evidence:keycard-thumbnail", "texture"),
+        runtimeAsset("model:academy-hall", "glb"),
+        runtimeAsset("bleep:dialogue-default", "bleep"),
+        runtimeAsset("sfx:wrong-kind", "sfx")
+      ],
       assets: [{ id: "model:academy-hall", kind: "glb", tags: [] }],
       uiAssets: [{ id: "ui:toolbar:icon", role: "toolbar-icon", assetId: "texture:evidence:keycard-thumbnail", slice: "stretch", tags: [] }],
       interactionStyles: [
@@ -92,7 +110,13 @@ describe("asset registry", () => {
       ]
     };
 
-    expect(createAssetRegistry(manifest).validateReferences()).toMatchObject([{ code: "asset-missing", id: "texture:missing" }]);
+    expect(createAssetRegistry(manifest).validateReferences()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "asset-missing", id: "bleep:missing", kind: "bleep" }),
+        expect.objectContaining({ code: "asset-kind-mismatch", id: "sfx:wrong-kind", kind: "bleep" }),
+        expect.objectContaining({ code: "asset-missing", id: "texture:missing" })
+      ])
+    );
   });
 
   it("detects raw asset reference syntax", () => {
@@ -123,7 +147,7 @@ function baseManifest(runtimeAssets: RuntimeAsset[]): ContentManifest {
 
 function runtimeAsset(id: string, kind: RuntimeAssetKind): RuntimeAsset {
   const format: RuntimeAssetFormat =
-    kind === "bgm" || kind === "sfx" || kind === "voice"
+    kind === "bgm" || kind === "sfx" || kind === "bleep" || kind === "voice"
       ? "ogg"
       : kind === "video"
         ? "mp4"

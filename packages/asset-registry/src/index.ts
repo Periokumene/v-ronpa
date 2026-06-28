@@ -155,6 +155,14 @@ export function validateManifestAssetReferences(
 export function collectManifestAssetReferences(manifest: ContentManifest): AssetRef[] {
   const refs: AssetRef[] = [...manifest.assets];
 
+  const dialogueBleep = manifest.audio?.dialogueBleep;
+  if (dialogueBleep?.defaultSound) {
+    refs.push({ id: dialogueBleep.defaultSound.sourceRef, kind: "bleep", tags: [] });
+  }
+  for (const sound of Object.values(dialogueBleep?.speakerOverrides ?? {})) {
+    if (sound) refs.push({ id: sound.sourceRef, kind: "bleep", tags: [] });
+  }
+
   for (const uiAsset of manifest.uiAssets) {
     refs.push({ id: uiAsset.assetId, kind: "texture", tags: uiAsset.tags });
   }

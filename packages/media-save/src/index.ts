@@ -43,6 +43,7 @@ export interface AudioHandle {
 export interface AudioPort {
   playBgm(id: string, uri: string, options?: { loop?: boolean; volume?: number }): AudioHandle;
   playSfx(id: string, uri: string, options?: { loop?: boolean; volume?: number }): AudioHandle;
+  playDialogueBleep(id: string, uri: string, options?: { volume?: number }): AudioHandle;
   playVoice(id: string, uri: string, options?: { volume?: number }): AudioHandle;
   stopAll(): void;
 }
@@ -228,6 +229,18 @@ export function createHowlerAudioPort(): AudioPort {
           html5: false
         }),
         { releaseOnEnd: !loop }
+      );
+    },
+    playDialogueBleep(id, uri, options) {
+      return register(
+        id,
+        new Howl({
+          src: [uri],
+          loop: true,
+          volume: options?.volume ?? 1,
+          html5: false
+        }),
+        { releaseOnEnd: false }
       );
     },
     playVoice(id, uri, options) {
