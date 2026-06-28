@@ -104,6 +104,10 @@ export function RuntimeMovieOverlaySurface({
   );
 }
 
+// Runtime surfaces are grouped by overlay scope. Style property order is:
+// placement, sizing, layout, spacing, chrome, typography.
+
+// Toast stack.
 const toastLayerStyle: CSSProperties = {
   position: "absolute",
   zIndex: 10,
@@ -124,6 +128,7 @@ const toastStyle: CSSProperties = {
   textAlign: "left"
 };
 
+// Blocking input prompt.
 const promptStyle: CSSProperties = {
   position: "absolute",
   zIndex: 11,
@@ -167,6 +172,7 @@ const promptButtonStyle: CSSProperties = {
   fontWeight: 700
 };
 
+// Full-playfield movie render surface.
 const movieOverlayStyle: CSSProperties = {
   position: "absolute",
   zIndex: 30,

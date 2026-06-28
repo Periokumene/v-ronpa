@@ -20,6 +20,24 @@ export interface VnDialogSurfaceProps {
   onCancel?: () => void;
 }
 
+const DEFAULT_DISPLAY_SETTINGS = {
+  textSize: "medium",
+  textboxOpacity: 0.84,
+  textSpeed: 0.5
+} as const satisfies VnDialogDisplaySettings;
+
+const TEXTBOX_OPACITY_LIMITS = {
+  primaryMin: 0.2,
+  secondaryMin: 0.18,
+  max: 1,
+  secondaryMultiplier: 0.92
+} as const;
+
+const TEXT_SPEED_TRANSITION_MS = {
+  max: 260,
+  range: 180
+} as const;
+
 export function VnDialogSurface({
   speaker,
   text,
@@ -36,9 +54,9 @@ export function VnDialogSurface({
   const speakerLabel = speaker ?? "旁白";
   const speakerId = useId();
   const textId = useId();
-  const textSize = displaySettings?.textSize ?? "medium";
-  const textSpeed = displaySettings?.textSpeed ?? 0.5;
-  const textboxOpacity = displaySettings?.textboxOpacity ?? 0.84;
+  const textSize = displaySettings?.textSize ?? DEFAULT_DISPLAY_SETTINGS.textSize;
+  const textSpeed = displaySettings?.textSpeed ?? DEFAULT_DISPLAY_SETTINGS.textSpeed;
+  const textboxOpacity = displaySettings?.textboxOpacity ?? DEFAULT_DISPLAY_SETTINGS.textboxOpacity;
 
   function selectChoice(index: number) {
     const choice = choices[index];
@@ -153,6 +171,10 @@ export function VnDialogSurface({
   );
 }
 
+// Render parameters are grouped by surface scope. Within each style, values flow
+// from placement to layout, then chrome, then text/effects.
+
+// Dialog shell.
 const rootStyle: CSSProperties = {
   position: "absolute",
   zIndex: 7,
@@ -172,8 +194,12 @@ const rootStyle: CSSProperties = {
 };
 
 function dialogRootStyle(textboxOpacity: number): CSSProperties {
-  const primaryOpacity = clamp(textboxOpacity, 0.2, 1);
-  const secondaryOpacity = clamp(textboxOpacity * 0.92, 0.18, 1);
+  const primaryOpacity = clamp(textboxOpacity, TEXTBOX_OPACITY_LIMITS.primaryMin, TEXTBOX_OPACITY_LIMITS.max);
+  const secondaryOpacity = clamp(
+    textboxOpacity * TEXTBOX_OPACITY_LIMITS.secondaryMultiplier,
+    TEXTBOX_OPACITY_LIMITS.secondaryMin,
+    TEXTBOX_OPACITY_LIMITS.max
+  );
   return {
     ...rootStyle,
     background: `linear-gradient(180deg, rgba(11, 16, 23, ${primaryOpacity}), rgba(13, 20, 31, ${secondaryOpacity}))`
@@ -187,6 +213,7 @@ const headerStyle: CSSProperties = {
   gap: 12
 };
 
+// Dialog identity and state.
 const speakerStyle: CSSProperties = {
   width: "fit-content",
   maxWidth: "min(48vw, 420px)",
@@ -208,6 +235,7 @@ const stateStyle: CSSProperties = {
   textTransform: "uppercase"
 };
 
+// Dialog text flow.
 const textStyle: CSSProperties = {
   maxWidth: 940,
   margin: 0,
@@ -220,10 +248,11 @@ function dialogTextStyle(textSize: VnDialogDisplaySettings["textSize"], textSpee
   return {
     ...textStyle,
     fontSize: textSize === "small" ? 15 : textSize === "large" ? 18 : 16,
-    transitionDuration: `${Math.round(260 - clamp(textSpeed, 0, 1) * 180)}ms`
+    transitionDuration: `${Math.round(TEXT_SPEED_TRANSITION_MS.max - clamp(textSpeed, 0, 1) * TEXT_SPEED_TRANSITION_MS.range)}ms`
   };
 }
 
+// Dialog actions.
 const choiceListStyle: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",

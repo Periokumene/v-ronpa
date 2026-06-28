@@ -483,6 +483,32 @@ function OverlayPanel({ children, onClose, testId, title }: { children: ReactNod
   );
 }
 
+// Interaction surface styles are grouped by effect area. Within each group,
+// declarations flow from placement to sizing, layout, spacing, chrome, and text.
+
+// Shared actions.
+const primaryButtonStyle: CSSProperties = {
+  border: "1px solid #ffd166",
+  borderRadius: 6,
+  background: "#ffd166",
+  color: "#111827",
+  fontWeight: 700
+};
+
+const secondaryButtonStyle: CSSProperties = {
+  border: "1px solid rgba(255,255,255,0.28)",
+  borderRadius: 6,
+  background: "rgba(8,13,18,0.78)",
+  color: "#f8fbff"
+};
+
+const iconButtonStyle: CSSProperties = {
+  width: 32,
+  height: 32,
+  borderRadius: 6
+};
+
+// Title surface.
 const titleRootStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
@@ -494,44 +520,286 @@ const titleRootStyle: CSSProperties = {
   color: "#f8fbff"
 };
 
-const titleContentStyle: CSSProperties = { display: "grid", gap: 20, maxWidth: 520 };
-const kickerStyle: CSSProperties = { margin: 0, color: "#6ee7d8", fontSize: 13, letterSpacing: 0 };
-const titleStyle: CSSProperties = { margin: 0, fontSize: 56, lineHeight: 1, letterSpacing: 0 };
-const titleActionsStyle: CSSProperties = { display: "grid", gap: 10, width: 260 };
-const primaryButtonStyle: CSSProperties = { borderRadius: 6, border: "1px solid #ffd166", background: "#ffd166", color: "#111827", fontWeight: 700 };
-const secondaryButtonStyle: CSSProperties = { borderRadius: 6, border: "1px solid rgba(255,255,255,0.28)", background: "rgba(8,13,18,0.78)", color: "#f8fbff" };
-const commandBarStyle: CSSProperties = { position: "absolute", zIndex: 10, top: 16, right: 16, display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" };
-const commandButtonStyle: CSSProperties = { borderRadius: 5, border: "1px solid rgba(255, 209, 102, 0.62)", background: "rgba(10,16,22,0.78)", color: "#fff4cf", fontSize: 12 };
-const activeCommandButtonStyle: CSSProperties = { ...commandButtonStyle, background: "rgba(255, 209, 102, 0.92)", color: "#111827" };
-const disabledCommandButtonStyle: CSSProperties = { ...commandButtonStyle, opacity: 0.42 };
-const tooltipStyle: CSSProperties = { padding: "4px 8px", borderRadius: 4, background: "#0f1720", color: "#fff", fontSize: 12 };
-const overlayHostStyle: CSSProperties = { position: "absolute", zIndex: 32, inset: 0, display: "grid", placeItems: "center", background: "rgba(2, 6, 10, 0.5)", border: "1px solid transparent" };
-const panelStyle: CSSProperties = { width: "min(920px, calc(100vw - 40px))", maxHeight: "min(720px, calc(100vh - 40px))", display: "grid", gap: 14, padding: 18, borderRadius: 8, border: "1px solid rgba(255,255,255,0.22)", background: "rgba(11, 16, 23, 0.94)", color: "#f8fbff", boxShadow: "0 24px 80px rgba(0,0,0,0.45)" };
-const panelHeaderStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 };
-const panelTitleStyle: CSSProperties = { margin: 0, fontSize: 24, letterSpacing: 0 };
-const iconButtonStyle: CSSProperties = { width: 32, height: 32, borderRadius: 6 };
-const scrollRootStyle: CSSProperties = { height: "min(480px, 62vh)", overflow: "hidden" };
-const scrollViewportStyle: CSSProperties = { width: "100%", height: "100%" };
-const scrollbarStyle: CSSProperties = { width: 8, background: "rgba(255,255,255,0.08)" };
-const scrollThumbStyle: CSSProperties = { borderRadius: 999, background: "rgba(255,255,255,0.32)" };
-const emptyStyle: CSSProperties = { margin: 0, color: "rgba(255,255,255,0.68)" };
-const settingsGroupsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, overflow: "auto", paddingRight: 4 };
-const settingsGroupStyle: CSSProperties = { display: "grid", alignContent: "start", gap: 10, padding: 12, border: "1px solid rgba(255,255,255,0.16)", borderRadius: 6, background: "rgba(255,255,255,0.05)" };
-const settingsGroupTitleStyle: CSSProperties = { margin: 0, color: "#ffd166", fontSize: 15, letterSpacing: 0 };
-const settingsControlStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(100px, 1fr) minmax(92px, 1.2fr) auto", alignItems: "center", gap: 8, color: "rgba(255,255,255,0.82)", fontSize: 13 };
-const settingsRangeStyle: CSSProperties = { width: "100%", minWidth: 92 };
-const settingsSelectStyle: CSSProperties = { minWidth: 120, borderRadius: 5, border: "1px solid rgba(255,255,255,0.24)", background: "#101821", color: "#f8fbff" };
-const settingsValueStyle: CSSProperties = { minWidth: 38, color: "#6ee7d8", textAlign: "right", fontSize: 12 };
-const settingsActionsStyle: CSSProperties = { display: "flex", justifyContent: "flex-end" };
-const listStyle: CSSProperties = { display: "grid", gap: 10, margin: 0, padding: 0, listStyle: "none" };
-const backlogItemStyle: CSSProperties = { display: "grid", gap: 4, padding: 12, borderRadius: 6, background: "rgba(255,255,255,0.07)" };
-const modeBadgeStyle: CSSProperties = { width: "fit-content", padding: "3px 8px", borderRadius: 999, background: "rgba(110,231,216,0.14)", color: "#6ee7d8", textTransform: "uppercase", fontSize: 12 };
-const slotGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 };
-const slotStyle: CSSProperties = { minHeight: 110, display: "grid", gap: 6, alignContent: "start", textAlign: "left", borderRadius: 6, border: "1px solid rgba(110,231,216,0.35)", background: "rgba(255,255,255,0.07)", color: "#f8fbff" };
-const disabledSlotStyle: CSSProperties = { ...slotStyle, opacity: 0.42 };
-const confirmOverlayStyle: CSSProperties = { position: "fixed", inset: 0, zIndex: 40, background: "rgba(0,0,0,0.46)" };
-const confirmContentStyle: CSSProperties = { position: "fixed", zIndex: 41, left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "min(420px, calc(100vw - 32px))", padding: 18, borderRadius: 8, border: "1px solid rgba(255,255,255,0.22)", background: "#101821", color: "#fff" };
-const confirmTitleStyle: CSSProperties = { margin: 0, fontSize: 20 };
-const confirmTextStyle: CSSProperties = { margin: "10px 0 0", color: "rgba(255,255,255,0.75)" };
-const confirmActionsStyle: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 };
-const pauseActionsStyle: CSSProperties = { display: "grid", gap: 10, width: "min(320px, 100%)" };
+const titleContentStyle: CSSProperties = {
+  maxWidth: 520,
+  display: "grid",
+  gap: 20
+};
+
+const kickerStyle: CSSProperties = {
+  margin: 0,
+  color: "#6ee7d8",
+  fontSize: 13,
+  letterSpacing: 0
+};
+
+const titleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 56,
+  lineHeight: 1,
+  letterSpacing: 0
+};
+
+const titleActionsStyle: CSSProperties = {
+  width: 260,
+  display: "grid",
+  gap: 10
+};
+
+// VN command bar.
+const commandBarStyle: CSSProperties = {
+  position: "absolute",
+  zIndex: 10,
+  top: 16,
+  right: 16,
+  display: "flex",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+  gap: 6
+};
+
+const commandButtonStyle: CSSProperties = {
+  border: "1px solid rgba(255, 209, 102, 0.62)",
+  borderRadius: 5,
+  background: "rgba(10,16,22,0.78)",
+  color: "#fff4cf",
+  fontSize: 12
+};
+
+const activeCommandButtonStyle: CSSProperties = {
+  ...commandButtonStyle,
+  background: "rgba(255, 209, 102, 0.92)",
+  color: "#111827"
+};
+
+const disabledCommandButtonStyle: CSSProperties = {
+  ...commandButtonStyle,
+  opacity: 0.42
+};
+
+const tooltipStyle: CSSProperties = {
+  padding: "4px 8px",
+  borderRadius: 4,
+  background: "#0f1720",
+  color: "#fff",
+  fontSize: 12
+};
+
+// Overlay host and shared panel.
+const overlayHostStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 32,
+  display: "grid",
+  placeItems: "center",
+  border: "1px solid transparent",
+  background: "rgba(2, 6, 10, 0.5)"
+};
+
+const panelStyle: CSSProperties = {
+  width: "min(920px, calc(100vw - 40px))",
+  maxHeight: "min(720px, calc(100vh - 40px))",
+  display: "grid",
+  gap: 14,
+  padding: 18,
+  border: "1px solid rgba(255,255,255,0.22)",
+  borderRadius: 8,
+  background: "rgba(11, 16, 23, 0.94)",
+  boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
+  color: "#f8fbff"
+};
+
+const panelHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12
+};
+
+const panelTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 24,
+  letterSpacing: 0
+};
+
+const scrollRootStyle: CSSProperties = {
+  height: "min(480px, 62vh)",
+  overflow: "hidden"
+};
+
+const scrollViewportStyle: CSSProperties = {
+  width: "100%",
+  height: "100%"
+};
+
+const scrollbarStyle: CSSProperties = {
+  width: 8,
+  background: "rgba(255,255,255,0.08)"
+};
+
+const scrollThumbStyle: CSSProperties = {
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.32)"
+};
+
+// Backlog overlay.
+const emptyStyle: CSSProperties = {
+  margin: 0,
+  color: "rgba(255,255,255,0.68)"
+};
+
+const listStyle: CSSProperties = {
+  display: "grid",
+  gap: 10,
+  margin: 0,
+  padding: 0,
+  listStyle: "none"
+};
+
+const backlogItemStyle: CSSProperties = {
+  display: "grid",
+  gap: 4,
+  padding: 12,
+  borderRadius: 6,
+  background: "rgba(255,255,255,0.07)"
+};
+
+// Settings overlay.
+const settingsGroupsStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 12,
+  overflow: "auto",
+  paddingRight: 4
+};
+
+const settingsGroupStyle: CSSProperties = {
+  display: "grid",
+  alignContent: "start",
+  gap: 10,
+  padding: 12,
+  border: "1px solid rgba(255,255,255,0.16)",
+  borderRadius: 6,
+  background: "rgba(255,255,255,0.05)"
+};
+
+const settingsGroupTitleStyle: CSSProperties = {
+  margin: 0,
+  color: "#ffd166",
+  fontSize: 15,
+  letterSpacing: 0
+};
+
+const settingsControlStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(100px, 1fr) minmax(92px, 1.2fr) auto",
+  alignItems: "center",
+  gap: 8,
+  color: "rgba(255,255,255,0.82)",
+  fontSize: 13
+};
+
+const settingsRangeStyle: CSSProperties = {
+  width: "100%",
+  minWidth: 92
+};
+
+const settingsSelectStyle: CSSProperties = {
+  minWidth: 120,
+  border: "1px solid rgba(255,255,255,0.24)",
+  borderRadius: 5,
+  background: "#101821",
+  color: "#f8fbff"
+};
+
+const settingsValueStyle: CSSProperties = {
+  minWidth: 38,
+  color: "#6ee7d8",
+  textAlign: "right",
+  fontSize: 12
+};
+
+const settingsActionsStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end"
+};
+
+// Save/load overlay.
+const modeBadgeStyle: CSSProperties = {
+  width: "fit-content",
+  padding: "3px 8px",
+  borderRadius: 999,
+  background: "rgba(110,231,216,0.14)",
+  color: "#6ee7d8",
+  textTransform: "uppercase",
+  fontSize: 12
+};
+
+const slotGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 10
+};
+
+const slotStyle: CSSProperties = {
+  minHeight: 110,
+  display: "grid",
+  alignContent: "start",
+  gap: 6,
+  border: "1px solid rgba(110,231,216,0.35)",
+  borderRadius: 6,
+  background: "rgba(255,255,255,0.07)",
+  color: "#f8fbff",
+  textAlign: "left"
+};
+
+const disabledSlotStyle: CSSProperties = {
+  ...slotStyle,
+  opacity: 0.42
+};
+
+// Load confirmation dialog.
+const confirmOverlayStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 40,
+  background: "rgba(0,0,0,0.46)"
+};
+
+const confirmContentStyle: CSSProperties = {
+  position: "fixed",
+  zIndex: 41,
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  width: "min(420px, calc(100vw - 32px))",
+  padding: 18,
+  border: "1px solid rgba(255,255,255,0.22)",
+  borderRadius: 8,
+  background: "#101821",
+  color: "#fff"
+};
+
+const confirmTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 20
+};
+
+const confirmTextStyle: CSSProperties = {
+  margin: "10px 0 0",
+  color: "rgba(255,255,255,0.75)"
+};
+
+const confirmActionsStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: 8,
+  marginTop: 18
+};
+
+// Pause overlay.
+const pauseActionsStyle: CSSProperties = {
+  width: "min(320px, 100%)",
+  display: "grid",
+  gap: 10
+};

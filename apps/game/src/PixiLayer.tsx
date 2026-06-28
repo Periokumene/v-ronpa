@@ -9,27 +9,34 @@ import {
   type PixiStageRenderHint
 } from "@v-ronpa/pixi-presenter";
 
+export interface PixiLayerProps {
+  // Render inputs.
+  snapshot: PixiStageSnapshot;
+  animate: boolean;
+  hints: PixiStageRenderHint[];
+  hintSequence: number;
+  presentationTasks?: PixiPresentationTaskSnapshot[];
+
+  // Host surface.
+  visible: boolean;
+  assetResolver?: PixiAssetResolver;
+
+  // Render side effects.
+  onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
+  onTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
+}
+
 export function PixiLayer({
+  snapshot,
   animate,
   hints,
   hintSequence,
-  onTasksChanged,
-  onDiagnostic,
   presentationTasks = [],
-  snapshot,
   visible,
-  assetResolver
-}: {
-  animate: boolean;
-  assetResolver?: PixiAssetResolver;
-  hints: PixiStageRenderHint[];
-  hintSequence: number;
-  onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
-  onTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
-  presentationTasks?: PixiPresentationTaskSnapshot[];
-  snapshot: PixiStageSnapshot;
-  visible: boolean;
-}) {
+  assetResolver,
+  onDiagnostic,
+  onTasksChanged
+}: PixiLayerProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const presenterRef = useRef<PixiPresenterPort | null>(null);
   const onTasksChangedRef = useRef<typeof onTasksChanged>(onTasksChanged);
@@ -71,13 +78,13 @@ export function PixiLayer({
     <div
       ref={hostRef}
       data-testid="pixi-layer"
-      data-pixi-background={snapshot.backgroundsById.MainBackground?.appearance ?? "none"}
       data-pixi-revision={String(snapshot.revision)}
-      data-pixi-actors={formatPixiStageActors(snapshot)}
       data-pixi-animate={String(animate)}
+      data-pixi-background={snapshot.backgroundsById.MainBackground?.appearance ?? "none"}
+      data-pixi-actors={formatPixiStageActors(snapshot)}
+      data-pixi-characters={formatPixiStageCharacters(snapshot)}
       data-pixi-hints={formatPixiHints(hints)}
       data-pixi-hint-sequence={String(hintSequence)}
-      data-pixi-characters={formatPixiStageCharacters(snapshot)}
       data-pixi-active-tasks={formatPixiPresentationTasks(presentationTasks)}
       className={visible ? "pixi-layer" : "pixi-layer pixi-layer-hidden"}
       aria-hidden={!visible}

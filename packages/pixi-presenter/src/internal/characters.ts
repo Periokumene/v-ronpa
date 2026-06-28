@@ -27,6 +27,17 @@ interface LoadedCharacterPack {
   compositions: LayeredCharacterCompositions;
 }
 
+interface CharacterRenderFrame {
+  anchorX: number;
+  anchorY: number;
+  stageScale: number;
+}
+
+interface LayerTextureSize {
+  width: number;
+  height: number;
+}
+
 export class CharacterSystem {
   private readonly packs = new Map<string, Promise<LoadedCharacterPack>>();
   private readonly metadata = new Map<string, Promise<LayeredCharacterLayerMetadata>>();
@@ -172,30 +183,12 @@ export class CharacterSystem {
     pack: LoadedCharacterPack,
     textures: Array<{ layer: ResolvedLayeredCharacterLayer; texture: Texture }>
   ): void {
-    const bounds = pack.character.renderSpace.defaultBounds;
-    const anchorX = (bounds.min[0] + bounds.max[0]) / 2;
-    const anchorY = bounds.min[1];
-    const viewportScale = this.options.height() / 540;
-    const stageScale = pack.character.renderSpace.stageScale * viewportScale;
+    const frame = characterRenderFrame(pack, this.options.height());
     content.sortableChildren = true;
 
     for (const { layer, texture } of textures) {
       const sprite = new Sprite(texture);
-      const { sprite: spriteMeta, localTransform, renderer } = layer.metadata;
-      sprite.anchor.set(spriteMeta.pivot.x, spriteMeta.pivot.y);
-      sprite.position.set(
-        (localTransform.position.x - anchorX) * stageScale,
-        -(localTransform.position.y - anchorY) * stageScale
-      );
-      const textureWidth = texture.width > 0 ? texture.width : spriteMeta.rect.width;
-      const textureHeight = texture.height > 0 ? texture.height : spriteMeta.rect.height;
-      const scaleX = (spriteMeta.rect.width / textureWidth) * localTransform.scale.x * stageScale / spriteMeta.pixelsPerUnit;
-      const scaleY = (spriteMeta.rect.height / textureHeight) * localTransform.scale.y * stageScale / spriteMeta.pixelsPerUnit;
-      sprite.scale.set(renderer.flipX ? -scaleX : scaleX, renderer.flipY ? -scaleY : scaleY);
-      sprite.rotation = -(localTransform.rotation.z * Math.PI) / 180;
-      sprite.tint = rgbToHex(renderer.color.r, renderer.color.g, renderer.color.b);
-      sprite.alpha = renderer.color.a;
-      sprite.zIndex = layer.metadata.drawOrder;
+      applyLayerRenderParameters(sprite, layer, texture, frame);
       content.addChild(sprite);
     }
   }
@@ -205,6 +198,52 @@ export class CharacterSystem {
     for (const child of previous) child.destroy({ children: true });
     container.addChild(content);
   }
+}
+
+// Render-affecting parameters are declared by scope: values shared by the full
+// character frame first, then per-layer texture and transform values.
+function characterRenderFrame(pack: LoadedCharacterPack, viewportHeight: number): CharacterRenderFrame {
+  const bounds = pack.character.renderSpace.defaultBounds;
+  const anchorX = (bounds.min[0] + bounds.max[0]) / 2;
+  const anchorY = bounds.min[1];
+  const viewportScale = viewportHeight / 540;
+  const stageScale = pack.character.renderSpace.stageScale * viewportScale;
+
+  return {
+    anchorX,
+    anchorY,
+    stageScale
+  };
+}
+
+function applyLayerRenderParameters(
+  sprite: Sprite,
+  layer: ResolvedLayeredCharacterLayer,
+  texture: Texture,
+  frame: CharacterRenderFrame
+): void {
+  const { localTransform, renderer, sprite: spriteMeta } = layer.metadata;
+  const textureSize = layerTextureSize(texture, spriteMeta.rect.width, spriteMeta.rect.height);
+  const scaleX = (spriteMeta.rect.width / textureSize.width) * localTransform.scale.x * frame.stageScale / spriteMeta.pixelsPerUnit;
+  const scaleY = (spriteMeta.rect.height / textureSize.height) * localTransform.scale.y * frame.stageScale / spriteMeta.pixelsPerUnit;
+
+  sprite.anchor.set(spriteMeta.pivot.x, spriteMeta.pivot.y);
+  sprite.position.set(
+    (localTransform.position.x - frame.anchorX) * frame.stageScale,
+    -(localTransform.position.y - frame.anchorY) * frame.stageScale
+  );
+  sprite.scale.set(renderer.flipX ? -scaleX : scaleX, renderer.flipY ? -scaleY : scaleY);
+  sprite.rotation = -(localTransform.rotation.z * Math.PI) / 180;
+  sprite.tint = rgbToHex(renderer.color.r, renderer.color.g, renderer.color.b);
+  sprite.alpha = renderer.color.a;
+  sprite.zIndex = layer.metadata.drawOrder;
+}
+
+function layerTextureSize(texture: Texture, fallbackWidth: number, fallbackHeight: number): LayerTextureSize {
+  return {
+    width: texture.width > 0 ? texture.width : fallbackWidth,
+    height: texture.height > 0 ? texture.height : fallbackHeight
+  };
 }
 
 async function fetchJson(uri: string): Promise<unknown> {
