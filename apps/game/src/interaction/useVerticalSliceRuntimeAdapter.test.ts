@@ -31,6 +31,7 @@ import {
   createVerticalSlicePresentationTransaction,
   createVerticalSliceRuntimeRestorePlan,
   resolveDialogueVoiceAssetAvailability,
+  resolvePresentationWaitAdvanceSource,
   resolveMediaSource,
   shouldAnimateStoryPlayPacing,
   syncRuntimeToastDismissalTimers,
@@ -1117,6 +1118,9 @@ describe("vertical slice runtime adapter helpers", () => {
     ).toBe(false);
     expect(shouldAnimateStoryPlayPacing("normal")).toBe(true);
     expect(shouldAnimateStoryPlayPacing("skip")).toBe(false);
+    expect(resolvePresentationWaitAdvanceSource("system", { mode: "manual" })).toBe("system");
+    expect(resolvePresentationWaitAdvanceSource("system", { mode: "skip" })).toBe("skip");
+    expect(resolvePresentationWaitAdvanceSource("manual", { mode: "skip" })).toBe("manual");
   });
 
   it("allows manual completion only for confirm-capable pause waits", () => {

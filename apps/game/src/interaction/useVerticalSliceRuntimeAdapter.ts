@@ -1326,6 +1326,7 @@ export function useVerticalSliceRuntimeAdapter(
     const currentStory = storyRuntimeRef.current;
     const wait = currentStory.state.presentationWait;
     if (!currentStory.active || !wait) return;
+    const advanceSource = resolvePresentationWaitAdvanceSource(source, storyPlayRef.current);
     const waitKey = presentationWaitKey(wait);
     if (completingWaitKeyRef.current === waitKey) return;
     completingWaitKeyRef.current = waitKey;
@@ -1345,7 +1346,7 @@ export function useVerticalSliceRuntimeAdapter(
     const step = advanceStoryPlay(storyPlayRef.current, {
       state: completed.state,
       script: compiled.script,
-      source
+      source: advanceSource
     });
     setStoryPlayNow(step.play);
     commitStoryTransaction({
@@ -1358,7 +1359,7 @@ export function useVerticalSliceRuntimeAdapter(
     if (step.story.state.ended) {
       closeStoryOverlay("story:end");
     } else {
-      setLastAction(source === "manual" ? "story:advance" : `story:${source}`);
+      setLastAction(advanceSource === "manual" ? "story:advance" : `story:${advanceSource}`);
       setLastOutcome(step.story.state.presentationWait ? "presentation-wait" : step.story.state.pendingChoices.length > 0 ? "choices" : "line");
     }
   }
@@ -1746,6 +1747,13 @@ export function createInitialVerticalSliceTrialRuntime(): TrialRuntime {
 
 export function shouldAnimateStoryPlayPacing(pacing: StoryPlayPacing): boolean {
   return pacing !== "skip";
+}
+
+export function resolvePresentationWaitAdvanceSource(
+  source: StoryPlayAdvanceSource,
+  storyPlay: Pick<StoryPlayState, "mode">
+): StoryPlayAdvanceSource {
+  return source === "system" && storyPlay.mode === "skip" ? "skip" : source;
 }
 
 function latestPrintCommand(commands: RuntimeCommand[]): RuntimeCommand | undefined {
