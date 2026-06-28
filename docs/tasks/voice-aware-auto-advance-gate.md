@@ -37,6 +37,15 @@ story-play AUTO / autoNext text minimum timer fires
 -> adapter requests the next StoryEngine step
 ```
 
+Playback failures use the same lifecycle boundary but do not take the post-voice
+delay:
+
+```text
+AudioHandle.finished resolves { reason: "failed" }
+-> current gate clears the voice wait
+-> if AUTO / autoNext is already pending, adapter requests the next StoryEngine step
+```
+
 ## Constraints
 
 - `story-play` remains a pure playback state machine that computes the text
@@ -50,8 +59,9 @@ story-play AUTO / autoNext text minimum timer fires
   advance the story.
 - SKIP never plays new voice, never waits for voice, and stops the active voice
   at each print boundary.
-- Muted voice, zero voice volume, missing assets, and playback failures do not
-  install a gate and do not block automation.
+- Muted voice, zero voice volume, and missing assets do not install a gate.
+  Playback failures resolve the installed gate with `failed` and do not block
+  automation.
 - No new settings field; the 500ms post-voice delay is app runtime policy.
 
 ## Allowed Paths
@@ -64,8 +74,12 @@ story-play AUTO / autoNext text minimum timer fires
 ## Contracts
 
 - `packages/media-save` extends `AudioHandle` with
-  `finished: Promise<{ reason: "ended" | "stopped" }>` for BGM, SFX, and voice
-  handles.
+  `finished: Promise<{ reason: "ended" | "stopped" | "failed" }>` for BGM,
+  SFX, and voice handles.
+- `AudioHandle.finished` is a terminal lifecycle contract: it must never reject,
+  must resolve at most once, must resolve `ended` only for natural one-shot
+  completion, must resolve `stopped` for explicit stop/replacement/stopAll, and
+  must resolve `failed` for asynchronous load/playback failures.
 - App media effects add a `stop-voice` boundary effect.
 - No `packages/contracts` schema or `.nani` IR change is introduced by this
   task.
@@ -76,11 +90,16 @@ story-play AUTO / autoNext text minimum timer fires
   - natural voice/SFX end resolves `finished` with `ended`;
   - `stop()`, `fadeOutAndStop()`, replacement by same id, and `stopAll()` resolve
     with `stopped`;
+  - asynchronous Howler `loaderror` and `playerror` resolve with `failed`;
   - repeated stop paths resolve only once.
 - AUTO gate:
   - voice ending before text minimum time does not advance early;
   - text minimum time expiring while voice is active waits for natural voice end;
   - natural voice end adds the fixed 500ms delay before advance;
+  - voice failure after text minimum time releases the pending AUTO / `autoNext`
+    advance immediately without the post-voice delay;
+  - voice failure before text minimum time clears the gate so the later
+    AUTO / `autoNext` request advances normally;
   - `autoNext` uses the same gate behavior.
 - No-block paths:
   - missing voice asset, play failure, muted or zero-volume voice do not block

@@ -17,7 +17,7 @@ import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ron
 import { advanceToNextStop, createInitialStoryState, storyRuntimeSnapshot } from "@v-ronpa/story-engine";
 import { verticalSliceScript } from "../harness/fixtures/verticalSlice";
 import type { VnOutputRouteTable } from "../vnOutputRoutes";
-import type { AudioHandle, AudioPort, VideoPort } from "@v-ronpa/media-save";
+import type { AudioHandle, AudioHandleFinishResult, AudioPort, VideoPort } from "@v-ronpa/media-save";
 import {
   applyMediaRuntimeEffects,
   canCompletePauseRuntimeWaitFromSource,
@@ -695,6 +695,88 @@ describe("vertical slice runtime adapter helpers", () => {
     }
   });
 
+  it("releases pending AUTO immediately when voice playback fails", async () => {
+    vi.useFakeTimers();
+    try {
+      const advances: string[] = [];
+      const { handle, resolve } = deferredAudioHandle("voice:zh:failed");
+      const controller = createVoiceAutoAdvanceGateController({
+        advance: (source) => advances.push(source),
+        clearTimeoutFn: clearTimeout,
+        setTimeoutFn: setTimeout,
+        stopVoice: viFn()
+      });
+
+      controller.install(handle);
+      expect(controller.request("auto")).toBe(false);
+
+      resolve({ reason: "failed" });
+      await Promise.resolve();
+
+      expect(advances).toEqual(["auto"]);
+      vi.advanceTimersByTime(POST_VOICE_AUTO_ADVANCE_DELAY_MS);
+      expect(advances).toEqual(["auto"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not install a stale wait when voice playback fails before AUTO asks to advance", async () => {
+    vi.useFakeTimers();
+    try {
+      const advances: string[] = [];
+      const { handle, resolve } = deferredAudioHandle("voice:zh:failed-before-auto");
+      const controller = createVoiceAutoAdvanceGateController({
+        advance: (source) => advances.push(source),
+        clearTimeoutFn: clearTimeout,
+        setTimeoutFn: setTimeout,
+        stopVoice: viFn()
+      });
+
+      controller.install(handle);
+      resolve({ reason: "failed" });
+      await Promise.resolve();
+
+      expect(advances).toEqual([]);
+      expect(controller.request("auto-next")).toBe(true);
+      vi.advanceTimersByTime(POST_VOICE_AUTO_ADVANCE_DELAY_MS);
+      expect(advances).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not release pending AUTO from stopped handles after failed handles clear their own gate", async () => {
+    vi.useFakeTimers();
+    try {
+      const advances: string[] = [];
+      const failed = deferredAudioHandle("voice:zh:failed");
+      const stopped = deferredAudioHandle("voice:zh:stopped-after-failed");
+      const controller = createVoiceAutoAdvanceGateController({
+        advance: (source) => advances.push(source),
+        clearTimeoutFn: clearTimeout,
+        setTimeoutFn: setTimeout,
+        stopVoice: viFn()
+      });
+
+      controller.install(failed.handle);
+      expect(controller.request("auto")).toBe(false);
+      failed.resolve({ reason: "failed" });
+      await Promise.resolve();
+      expect(advances).toEqual(["auto"]);
+
+      controller.install(stopped.handle);
+      expect(controller.request("auto")).toBe(false);
+      stopped.resolve({ reason: "stopped" });
+      await Promise.resolve();
+      vi.advanceTimersByTime(POST_VOICE_AUTO_ADVANCE_DELAY_MS);
+
+      expect(advances).toEqual(["auto"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("can apply movie effects through an attached VideoPort when used directly", async () => {
     const play = viFn(async () => undefined);
     const videoPort: VideoPort = {
@@ -891,13 +973,13 @@ function viFn<T extends (...args: any[]) => any>(implementation?: T): T & { call
   return Object.assign(fn as T, { calls });
 }
 
-function audioHandle(id: string, finished: Promise<{ reason: "ended" | "stopped" }> = Promise.resolve({ reason: "stopped" })): AudioHandle {
+function audioHandle(id: string, finished: Promise<AudioHandleFinishResult> = Promise.resolve({ reason: "stopped" })): AudioHandle {
   return { id, finished, stop: viFn(), fade: viFn(), fadeOutAndStop: viFn() };
 }
 
 function deferredAudioHandle(id: string) {
-  let resolve: (result: { reason: "ended" | "stopped" }) => void = () => {};
-  const finished = new Promise<{ reason: "ended" | "stopped" }>((next) => {
+  let resolve: (result: AudioHandleFinishResult) => void = () => {};
+  const finished = new Promise<AudioHandleFinishResult>((next) => {
     resolve = next;
   });
   return { handle: audioHandle(id, finished), resolve };

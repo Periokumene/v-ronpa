@@ -27,6 +27,9 @@ reference-derived sample route extracted only as data from the external
 `story-board - 副本` project. The current harness keeps its own `.nani` syntax
 and runtime path; the imported files are only audio fixtures named by textId.
 The real sample is exposed through the single vertical-slice choice 3 branch.
+The harness accepts `voiceSmoke=fast` to use deterministic ended voice handles
+and `voiceSmoke=fail` to use deterministic failed voice handles for AUTO gate
+debugging.
 
 | TextId range | Files | Scenario branch |
 |---|---:|---|

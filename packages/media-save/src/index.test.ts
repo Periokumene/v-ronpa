@@ -3,6 +3,7 @@ import { SaveDataSchema } from "@v-ronpa/contracts";
 import { createHowlerAudioPort, createMemorySavePort, createSaveMigrator, createSaveSlotSummary } from "./index";
 
 const howlerMock = vi.hoisted(() => {
+  const playImplementations: Array<() => void> = [];
   const instances: Array<{
     config: Record<string, unknown>;
     play: ReturnType<typeof vi.fn>;
@@ -10,30 +11,30 @@ const howlerMock = vi.hoisted(() => {
     fade: ReturnType<typeof vi.fn>;
     volume: ReturnType<typeof vi.fn>;
     once: ReturnType<typeof vi.fn>;
-    emit: (event: string) => void;
+    emit: (event: string, ...args: unknown[]) => void;
   }> = [];
   const Howl = vi.fn(function Howl(config: Record<string, unknown>) {
-    const callbacks: Record<string, Array<() => void>> = {};
+    const callbacks: Record<string, Array<(...args: unknown[]) => void>> = {};
     const instance = {
       config,
-      play: vi.fn(),
+      play: vi.fn(() => playImplementations.shift()?.()),
       stop: vi.fn(),
       fade: vi.fn(),
       volume: vi.fn(() => config.volume ?? 1),
-      once: vi.fn((event: string, callback: () => void) => {
+      once: vi.fn((event: string, callback: (...args: unknown[]) => void) => {
         callbacks[event] = [...(callbacks[event] ?? []), callback];
         return instance;
       }),
-      emit(event: string) {
+      emit(event: string, ...args: unknown[]) {
         const pending = callbacks[event] ?? [];
         callbacks[event] = [];
-        for (const callback of pending) callback();
+        for (const callback of pending) callback(...args);
       }
     };
     instances.push(instance);
     return instance;
   });
-  return { Howl, instances };
+  return { Howl, instances, playImplementations };
 });
 
 vi.mock("howler", () => ({ Howl: howlerMock.Howl }));
@@ -85,6 +86,7 @@ describe("media save contracts", () => {
   beforeEach(() => {
     howlerMock.Howl.mockClear();
     howlerMock.instances.length = 0;
+    howlerMock.playImplementations.length = 0;
   });
 
   afterEach(() => {
@@ -200,7 +202,8 @@ describe("media save contracts", () => {
     expect(howlerMock.instances[0]?.config).toMatchObject({ src: ["/door.ogg"], loop: false, volume: 0.6 });
     expect(howlerMock.instances[1]?.config).toMatchObject({ src: ["/rain.ogg"], loop: true, volume: 0.35 });
     expect(howlerMock.instances[0]?.once).toHaveBeenCalledWith("end", expect.any(Function));
-    expect(howlerMock.instances[1]?.once).not.toHaveBeenCalled();
+    expect(registeredHowlerEvents(0)).toEqual(["end", "loaderror", "playerror"]);
+    expect(registeredHowlerEvents(1)).toEqual(["loaderror", "playerror"]);
 
     howlerMock.instances[0]?.emit("end");
     port.stopAll();
@@ -216,6 +219,7 @@ describe("media save contracts", () => {
 
     expect(howlerMock.instances[0]?.config).toMatchObject({ src: ["/voice.ogg"], loop: false, volume: 0.5 });
     expect(howlerMock.instances[0]?.once).toHaveBeenCalledWith("end", expect.any(Function));
+    expect(registeredHowlerEvents(0)).toEqual(["end", "loaderror", "playerror"]);
 
     howlerMock.instances[0]?.emit("end");
     await expect(handle.finished).resolves.toEqual({ reason: "ended" });
@@ -276,4 +280,41 @@ describe("media save contracts", () => {
     expect(howlerMock.instances[1]?.stop).toHaveBeenCalledTimes(1);
     expect(howlerMock.instances[2]?.stop).toHaveBeenCalledTimes(1);
   });
+
+  it("resolves failed when Howler reports asynchronous load or play errors", async () => {
+    const port = createHowlerAudioPort();
+    const loadFailure = port.playVoice("voice:zh:missing", "/missing.ogg");
+    const playFailure = port.playBgm("bgm:locked", "/locked.ogg");
+
+    howlerMock.instances[0]?.emit("loaderror", 1, "missing asset");
+    howlerMock.instances[1]?.emit("playerror", 2, "autoplay denied");
+
+    await expect(loadFailure.finished).resolves.toEqual({ reason: "failed" });
+    await expect(playFailure.finished).resolves.toEqual({ reason: "failed" });
+
+    howlerMock.instances[0]?.emit("end");
+    loadFailure.stop();
+    playFailure.fadeOutAndStop(0);
+    port.stopAll();
+
+    expect(howlerMock.instances[0]?.stop).not.toHaveBeenCalled();
+    expect(howlerMock.instances[1]?.stop).not.toHaveBeenCalled();
+  });
+
+  it("returns a failed handle when Howler throws while starting playback", async () => {
+    howlerMock.playImplementations.push(() => {
+      throw new Error("playback blocked");
+    });
+    const port = createHowlerAudioPort();
+
+    const handle = port.playVoice("voice:zh:blocked", "/blocked.ogg");
+
+    expect(registeredHowlerEvents(0)).toEqual(["end", "loaderror", "playerror"]);
+    await expect(handle.finished).resolves.toEqual({ reason: "failed" });
+    expect(howlerMock.instances[0]?.stop).not.toHaveBeenCalled();
+  });
 });
+
+function registeredHowlerEvents(index: number): string[] {
+  return howlerMock.instances[index]?.once.mock.calls.map(([event]) => event as string) ?? [];
+}

@@ -26,7 +26,7 @@ export interface SaveMigrator {
   migrate(value: unknown): SaveMigrationResult;
 }
 
-export type AudioHandleFinishReason = "ended" | "stopped";
+export type AudioHandleFinishReason = "ended" | "stopped" | "failed";
 
 export interface AudioHandleFinishResult {
   reason: AudioHandleFinishReason;
@@ -154,7 +154,6 @@ export function createHowlerAudioPort(): AudioPort {
   function register(id: string, howl: Howl, options: { releaseOnEnd?: boolean } = {}): AudioHandle {
     const previous = handles.get(id);
     if (previous) previous.release("stopped");
-    howl.play();
     let released = false;
     let resolveFinished: (result: AudioHandleFinishResult) => void = () => {};
     const finished = new Promise<AudioHandleFinishResult>((resolve) => {
@@ -173,6 +172,13 @@ export function createHowlerAudioPort(): AudioPort {
       resolveFinished({ reason });
     }
     if (options.releaseOnEnd) howl.once("end", () => release("ended", false));
+    howl.once("loaderror", () => release("failed", false));
+    howl.once("playerror", () => release("failed", false));
+    try {
+      howl.play();
+    } catch {
+      release("failed", false);
+    }
     return {
       id,
       finished,

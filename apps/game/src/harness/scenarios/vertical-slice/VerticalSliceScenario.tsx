@@ -26,6 +26,7 @@ import { VnRuntimeDispatcher } from "../../../VnRuntimeDispatcher";
 import { harnessContentManifest } from "../../contentManifest";
 
 type DebugTabId = "runtime" | "inspector";
+type VoiceSmokeAudioMode = "fast" | "fail";
 const FAST_VOICE_SMOKE_DURATION_MS = 1500;
 
 export function VerticalSliceScenario() {
@@ -35,7 +36,10 @@ export function VerticalSliceScenario() {
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
-  const smokeAudioPort = useMemo(() => (shouldUseFastVoiceSmokeAudio() ? createFastVoiceSmokeAudioPort() : undefined), []);
+  const smokeAudioPort = useMemo(() => {
+    const mode = selectVoiceSmokeAudioMode();
+    return mode ? createVoiceSmokeAudioPort(mode) : undefined;
+  }, []);
   const enterTrialMode = useCallback(() => flow.send({ type: "ENTER_TRIAL" }), [flow.send]);
   const enterNaviMode = useCallback(() => flow.send({ type: "ENTER_NAVI" }), [flow.send]);
   const runtime = useVerticalSliceRuntimeAdapter(flow.mode, {
@@ -338,11 +342,12 @@ function displayStorySpeaker(speaker: string): string {
   return labels[speaker] ?? speaker;
 }
 
-function shouldUseFastVoiceSmokeAudio(): boolean {
-  return new URLSearchParams(window.location.search).get("voiceSmoke") === "fast";
+function selectVoiceSmokeAudioMode(): VoiceSmokeAudioMode | undefined {
+  const mode = new URLSearchParams(window.location.search).get("voiceSmoke");
+  return mode === "fast" || mode === "fail" ? mode : undefined;
 }
 
-function createFastVoiceSmokeAudioPort(): AudioPort {
+function createVoiceSmokeAudioPort(mode: VoiceSmokeAudioMode): AudioPort {
   const activeHandles = new Set<SmokeAudioHandle>();
 
   function register(handle: SmokeAudioHandle): AudioHandle {
@@ -362,7 +367,10 @@ function createFastVoiceSmokeAudioPort(): AudioPort {
     },
     playVoice(id) {
       const handle = createSmokeAudioHandle(id);
-      window.setTimeout(() => handle.finish("ended"), FAST_VOICE_SMOKE_DURATION_MS);
+      window.setTimeout(
+        () => handle.finish(mode === "fail" ? "failed" : "ended"),
+        mode === "fail" ? 20 : FAST_VOICE_SMOKE_DURATION_MS
+      );
       return register(handle);
     },
     stopAll() {

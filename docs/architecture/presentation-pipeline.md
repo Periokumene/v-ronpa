@@ -73,8 +73,10 @@ actual browser timer and map skip pacing to presentation choices such as
 disabled Pixi animation; renderer packages do not own AUTO/SKIP scheduling.
 Voice-aware AUTO is also app adapter policy: after the `story-play` text minimum
 timer fires, AUTO/`autoNext` may wait for the current `AudioHandle.finished`
-result to be `ended` plus a fixed 500ms post-voice delay. This gate must not move
-into StoryEngine, `story-play`, Pixi, or DOM rendering.
+result. Natural `ended` waits a fixed 500ms post-voice delay before advance;
+`failed` releases any pending AUTO/`autoNext` advance without that delay; and
+`stopped` only clears stale gates. This gate must not move into StoryEngine,
+`story-play`, Pixi, or DOM rendering.
 
 Pixi keeps a separate presentation clock inside `pixi-presenter`. Actor
 transitions, transient effects, and screen/weather fades may run after the app

@@ -139,7 +139,7 @@ submission remains a Trial UI action routed through `trial-director`.
   -> VN runtime transaction + route table
   -> routed RuntimeCommand consumption
   -> app commit derives voice:<locale>:<textId> from emitted print textId
-  -> AUTO/autoNext voice gate waits for AudioHandle.finished ended + 500ms
+  -> AUTO/autoNext voice gate handles AudioHandle.finished ended/stopped/failed
   -> app-created AssetRegistry resolves media/Pixi/R3F/UI asset ids
   -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events / AudioPort voice playback
   -> VnRuntimeDispatcher renders DOM dialog and Pixi snapshot
@@ -152,7 +152,9 @@ commands remain future tasks.
 
 AUTO voice waiting is app policy, not script semantics. `story-play` computes
 the minimum text stay time, while the app adapter waits for a successfully
-started voice handle to end naturally and then adds 500ms before advancing.
+started voice handle to report its terminal lifecycle. Natural `ended` adds
+500ms before advancing; `failed` releases any pending AUTO/`autoNext` advance
+without the post-voice delay; and explicit `stopped` only clears stale gates.
 Manual advance and SKIP do not wait for voice; missing, muted, zero-volume, or
 failed voice playback does not block automation.
 

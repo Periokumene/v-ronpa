@@ -1254,6 +1254,14 @@ export function createVoiceAutoAdvanceGateController({
     advance(pendingSource);
   }
 
+  function releaseFailedGate(token: number) {
+    const current = gate;
+    if (!current || current.token !== token) return;
+    const pendingSource = current.pendingSource;
+    clear();
+    if (pendingSource) advance(pendingSource);
+  }
+
   return {
     clear,
     install(handle) {
@@ -1263,11 +1271,17 @@ export function createVoiceAutoAdvanceGateController({
       void handle.finished.then(({ reason }) => {
         const current = gate;
         if (!current || current.token !== token) return;
-        if (reason !== "ended") {
-          clear();
-          return;
+        switch (reason) {
+          case "ended":
+            current.postDelayTimeout = setTimeoutFn(() => releaseReadyGate(token), postDelayMs);
+            return;
+          case "failed":
+            releaseFailedGate(token);
+            return;
+          case "stopped":
+            clear();
+            return;
         }
-        current.postDelayTimeout = setTimeoutFn(() => releaseReadyGate(token), postDelayMs);
       });
     },
     request(source) {

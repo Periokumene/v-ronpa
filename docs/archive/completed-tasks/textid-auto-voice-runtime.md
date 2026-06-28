@@ -15,11 +15,11 @@
 
 ## Status
 
-- State: `Review`
+- State: `Archived`
 - Owner: `TBD`
 - Created: `2026-06-28`
 - Updated: `2026-06-28`
-- Completed Commit: `TBD`
+- Completed Commit: `705c5a9a8ca4`
 - Archive Target: `docs/archive/completed-tasks/textid-auto-voice-runtime.md`
 
 ## Goal

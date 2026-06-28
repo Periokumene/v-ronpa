@@ -130,8 +130,12 @@ stay time. When that app-hosted timer reaches zero, the runtime adapter checks
 the current voice gate: if a voice handle was successfully started and remains
 audible, AUTO waits for `AudioHandle.finished` to resolve with `ended`, then
 waits the app policy delay of 500ms before requesting the next StoryEngine step.
-Stopped handles, missing assets, playback failures, muted or zero-volume voice,
-and SKIP pacing never block automatic advance.
+If the handle resolves with `failed`, the gate releases any already pending
+AUTO/`autoNext` request immediately and future automation requests are not
+blocked. If the handle resolves with `stopped`, the gate only clears itself so
+manual input, SKIP, choices, or a new print boundary cannot release stale
+automation. Missing assets, muted or zero-volume voice, and SKIP pacing never
+install a voice wait.
 
 Every emitted `print` is a voice boundary. A print without `textId` stops the
 previous active voice but does not install a new gate. Manual advance and choice,
