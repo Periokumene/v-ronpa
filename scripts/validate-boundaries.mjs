@@ -6,6 +6,7 @@ const root = process.cwd();
 const packageRoots = {
   "contracts": "packages/contracts",
   "asset-registry": "packages/asset-registry",
+  "layered-character": "packages/layered-character",
   "nani-parser": "packages/nani-parser",
   "nani-runtime-compiler": "packages/nani-runtime-compiler",
   "story-engine": "packages/story-engine",
@@ -24,6 +25,7 @@ const packageRoots = {
 const allowedWorkspaceDeps = {
   "contracts": [],
   "asset-registry": ["contracts"],
+  "layered-character": ["contracts"],
   "nani-parser": [],
   "nani-runtime-compiler": ["contracts", "nani-parser"],
   "story-engine": ["contracts"],
@@ -31,7 +33,7 @@ const allowedWorkspaceDeps = {
   "gameplay": ["contracts"],
   "navi-director": ["contracts", "gameplay"],
   "trial-director": ["contracts", "gameplay"],
-  "pixi-presenter": ["contracts"],
+  "pixi-presenter": ["contracts", "layered-character"],
   "r3f-adapter": ["contracts"],
   "ui-kit": ["contracts"],
   "media-save": ["contracts"],
@@ -69,6 +71,7 @@ const rendererAndBrowserAdapters = [
 const forbiddenExternalDeps = {
   "contracts": ["react", "react-dom", "@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
   "asset-registry": ["react", "react-dom", "@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
+  "layered-character": rendererAndBrowserAdapters,
   "nani-parser": rendererAndBrowserAdapters,
   "nani-runtime-compiler": rendererAndBrowserAdapters,
   "story-engine": rendererAndBrowserAdapters,

@@ -1,7 +1,6 @@
 import type {
   PixiActorSnapshot,
   PixiStageSnapshot,
-  PixiStageSlotId,
   PixiWeatherKind,
   RuntimeCommand,
   RuntimeValue,
@@ -83,18 +82,16 @@ export interface NormalizedActorTransform {
 }
 
 export const MAIN_BACKGROUND_ID = "MainBackground";
-export const pixiStageSlots: PixiStageSlotId[] = ["left", "center", "right"];
 
 export function createInitialPixiStageSnapshot(): PixiStageSnapshot {
   return {
-    version: 2,
+    version: 3,
     revision: 0,
     backgroundsById: {},
     charactersById: {},
     actorOrder: [],
     weather: {},
-    screenFilters: {},
-    slots: {}
+    screenFilters: {}
   };
 }
 
@@ -261,6 +258,7 @@ function reduceBack(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiR
     id,
     kind: "background",
     appearance,
+    appearanceExpression: "",
     pose: stringParam(command, "pose") ?? actor?.pose,
     visible: transform.visible ?? actor?.visible ?? true,
     alpha: actor?.alpha ?? 1,
@@ -280,8 +278,7 @@ function reduceBack(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiR
     for (const actor of visibleBackgrounds) backgroundsById[actor.id] = updateActor(actor.id, actor);
     return withWaitTasks(command, changedSnapshot({
       ...snapshot,
-      backgroundsById,
-      background: backgroundsById[MAIN_BACKGROUND_ID]?.appearance ? { backgroundId: backgroundsById[MAIN_BACKGROUND_ID].appearance } : snapshot.background
+      backgroundsById
     }), "actor-transition", visibleBackgrounds.map((actor) => actor.id));
   }
   const actor: PixiActorSnapshot = {
@@ -290,8 +287,7 @@ function reduceBack(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiR
   return withWaitTasks(command, changedSnapshot({
     ...snapshot,
     backgroundsById: { ...snapshot.backgroundsById, [target]: actor },
-    actorOrder: ensureActorOrder(snapshot.actorOrder, target),
-    ...(target === MAIN_BACKGROUND_ID ? { background: { backgroundId: appearance } } : {})
+    actorOrder: ensureActorOrder(snapshot.actorOrder, target)
   }), "actor-transition", [target]);
 }
 
@@ -308,16 +304,16 @@ function reduceChar(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiR
     for (const actor of visibleActors) {
       charactersById[actor.id] = buildCharacterActor(snapshot, command, actor.id, transform, actor);
     }
-    return withWaitTasks(command, changedSnapshot(withLegacySlots({ ...snapshot, charactersById })), "actor-transition", visibleActors.map((actor) => actor.id));
+    return withWaitTasks(command, changedSnapshot({ ...snapshot, charactersById }), "actor-transition", visibleActors.map((actor) => actor.id));
   }
   const previous = snapshot.charactersById[target];
   const actor = buildCharacterActor(snapshot, command, target, transform, previous);
   return withWaitTasks(command, changedSnapshot(
-    withLegacySlots({
+    {
       ...snapshot,
       charactersById: { ...snapshot.charactersById, [target]: actor },
       actorOrder: ensureActorOrder(snapshot.actorOrder, target)
-    })
+    }
   ), "actor-transition", [target]);
 }
 
@@ -340,7 +336,7 @@ function reduceArrange(snapshot: PixiStageSnapshot, command: RuntimeCommand): Pi
     };
   });
 
-  return withWaitTasks(command, changedSnapshot(withLegacySlots({ ...snapshot, charactersById })), "actor-transition", visibleActors.map((actor) => actor.id));
+  return withWaitTasks(command, changedSnapshot({ ...snapshot, charactersById }), "actor-transition", visibleActors.map((actor) => actor.id));
 }
 
 function reduceHideChars(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
@@ -350,7 +346,7 @@ function reduceHideChars(snapshot: PixiStageSnapshot, command: RuntimeCommand): 
       { ...actor, visible: false, transition: timingTransition(command) }
     ])
   );
-  return withWaitTasks(command, changedSnapshot(withLegacySlots({ ...snapshot, charactersById })), "actor-transition", Object.keys(snapshot.charactersById));
+  return withWaitTasks(command, changedSnapshot({ ...snapshot, charactersById }), "actor-transition", Object.keys(snapshot.charactersById));
 }
 
 function reduceSlide(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
@@ -369,7 +365,7 @@ function reduceSlide(snapshot: PixiStageSnapshot, command: RuntimeCommand): Pixi
   };
   const nextActor: PixiActorSnapshot = {
     ...actor,
-    appearance: stringParam(command, "appearance") ?? actor.appearance,
+    appearanceExpression: actor.kind === "character" ? stringParam(command, "appearanceExpression") ?? actor.appearanceExpression : actor.appearanceExpression,
     visible: booleanParam(command, "visible", true),
     transition,
     ...(nextPos ? { pos: nextPos } : {})
@@ -378,7 +374,7 @@ function reduceSlide(snapshot: PixiStageSnapshot, command: RuntimeCommand): Pixi
     actor.kind === "background"
       ? { ...snapshot, backgroundsById: { ...snapshot.backgroundsById, [target]: nextActor } }
       : { ...snapshot, charactersById: { ...snapshot.charactersById, [target]: nextActor } };
-  return withWaitTasks(command, changedSnapshot(withLegacySlots(next)), "actor-transition", [target]);
+  return withWaitTasks(command, changedSnapshot(next), "actor-transition", [target]);
 }
 
 function reduceBlur(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
@@ -542,7 +538,7 @@ function buildCharacterActor(
   return {
     id: target,
     kind: "character",
-    appearance: stringParam(command, "appearance") ?? previous?.appearance,
+    appearanceExpression: stringParam(command, "appearanceExpression") ?? "",
     pose: stringParam(command, "pose") ?? previous?.pose,
     visible: transform.visible ?? previous?.visible ?? true,
     alpha: previous?.alpha ?? 1,
@@ -609,29 +605,6 @@ function waitTask(
 ): StoryPresentationWaitTask[] {
   if (!booleanParam(command, "wait", false) || durationMsParam(command, 0) <= 0) return [];
   return [{ kind, target, revision }];
-}
-
-function withLegacySlots(snapshot: PixiStageSnapshot): PixiStageSnapshot {
-  const visible = snapshot.actorOrder
-    .map((id) => snapshot.charactersById[id])
-    .filter((actor): actor is PixiActorSnapshot => Boolean(actor?.visible));
-  const slots: PixiStageSnapshot["slots"] = {};
-  visible.forEach((actor) => {
-    const slot = legacySlotForActor(actor);
-    slots[slot] = {
-      slot,
-      characterId: actor.id,
-      ...(actor.appearance ? { portraitId: actor.appearance } : {})
-    };
-  });
-  return { ...snapshot, slots };
-}
-
-function legacySlotForActor(actor: PixiActorSnapshot): PixiStageSlotId {
-  const x = actor.pos?.[0] ?? 0.5;
-  if (x < 0.38) return "left";
-  if (x > 0.62) return "right";
-  return "center";
 }
 
 function ensureActorOrder(order: string[], id: string): string[] {

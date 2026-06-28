@@ -48,10 +48,7 @@ debugging.
 | `bg:harness` | `background` | Default VN/Pixi background |
 | `bg:black` | `background` | High-contrast Pixi FX checks |
 | `bg:classroom` | `background` | Alternate VN/Pixi background |
-| `portrait:felix:neutral` | `portrait` | Felix neutral portrait |
-| `portrait:felix:concerned` | `portrait` | Felix concerned portrait |
-| `portrait:mira:neutral` | `portrait` | Mira neutral portrait |
-| `portrait:ren:neutral` | `portrait` | Ren neutral portrait |
+| `Ema` | `character-pack` | Layered character pack entry JSON |
 | `model:academy-hall` | `glb` | Navi academy hall model |
 | `model:classroom` | `glb` | Navi classroom model |
 | `model:props-case-file` | `glb` | Harness prop registration coverage |

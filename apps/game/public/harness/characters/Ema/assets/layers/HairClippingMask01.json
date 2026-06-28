@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/Head01/HairClippingMask01",
+  "drawOrder": 109,
+  "texture": {
+    "fileName": "HairClippingMask01.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 802,
+      "height": 913
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 1730,
+      "y": 4,
+      "width": 802,
+      "height": 913
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -0.27399997600000003,
+      "y": 23.34,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 0.3764706
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 8.02,
+      "y": 9.13
+    }
+  }
+}

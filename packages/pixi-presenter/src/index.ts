@@ -18,7 +18,6 @@ export {
   MAIN_BACKGROUND_ID,
   createInitialPixiStageSnapshot,
   normalizeActorTransformParams,
-  pixiStageSlots,
   reducePixiRuntimeCommand,
   resolvePixiActorTarget,
   type PixiRuntimeCommandDiagnostic,

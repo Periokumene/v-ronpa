@@ -54,7 +54,12 @@ timeline commands.
 #Start
 @set route:"intro"
 @back bg:harness effect:fade
-@char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
+@char Ema.Pensive1 pos:50
+@char Ema.Pensive1,ArmR3 pos:50
+@char Ema.Pensive1,ArmR3,ArmR4 pos:50
+@char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Mouth01>Mouth01_Smile_Open pos:50
+@char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Sweat01+Sweat01_01 pos:50
+@char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Sweat01+Sweat01_01,Angle01/Head01/Facial01/Sweat01- pos:50
 Felix.Neutral: This hallway is quiet.[< speed:0.8] We should check the case file.[>]
 Mira.Calm: Keep your voice down. The door still listens.[>]
 
@@ -63,7 +68,7 @@ Mira.Calm: Keep your voice down. The door still listens.[>]
 
 #InspectFile
 @gameplay grant-evidence id:evidence:keycard
-@shake actorId:character:felix intensity:0.35 duration:220
+@shake actorId:Ema intensity:0.35 duration:220
 Narrator: Evidence registered: keycard.[>]
 @goto #End
 
@@ -85,11 +90,15 @@ Mira.Calm: The keycard belongs to the west door.[>]
 
 #TrialOpening
 @set trialMood:"opening"
-@back bg:trial-room effect:fade
-@char idAndAppearance:character:felix.portrait:felix:serious pos:50,0
-@char idAndAppearance:character:mira.portrait:mira:calm pos:76,0
+@back bg:classroom effect:fade
+@char Ema.Pensive1 pos:50
+@char Ema.Pensive1,ArmR3 pos:76,0
+@char Ema.Pensive1,ArmR3,ArmR4 pos:76,0
+@char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Mouth01>Mouth01_Smile_Open pos:76,0
+@char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Sweat01+Sweat01_01 pos:76,0
+@char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Sweat01+Sweat01_01,Angle01/Head01/Facial01/Sweat01- pos:76,0
 Felix.Serious: The testimony starts before the evidence does.[>]
-@focus character:mira duration:420
+@focus Ema duration:420
 Mira.Calm: Then listen for the contradiction before naming it.[< speed:0.8][>]
 
 @choice "Press the question" goto:#PressQuestion
@@ -101,7 +110,7 @@ Narrator: The room turns toward Felix.[>]
 @goto #TrialEnd
 
 #ListenLonger
-@shake actorId:character:mira intensity:0.25 duration:180
+@shake actorId:Ema intensity:0.25 duration:180
 Felix.Serious: Waiting changes the rhythm of the room.[>]
 @goto #TrialEnd
 

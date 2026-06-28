@@ -60,7 +60,7 @@ export function pixiAssetLoadFailed(input: PixiAssetResolveInput, error: unknown
   return {
     source: "asset",
     code: "asset-load-failed",
-    severity: "warning",
+    severity: "error",
     assetId: input.id,
     kind: input.kind,
     message: `Pixi asset '${input.id}' (${input.kind}) failed to load: ${error instanceof Error ? error.message : String(error)}`

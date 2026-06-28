@@ -4,7 +4,7 @@
 
 - DOM/Radix/CSS Modules: dialog text, choices, menus, inventory, inspector, and
   accessibility-sensitive interactions.
-- Pixi: VN backgrounds, single-layer portraits, filters, particles, transitions,
+- Pixi: VN backgrounds, layered characters, filters, particles, transitions,
   camera-like 2D moves, debate text overlays, and truth-break effects.
 - R3F: 3D map exploration, trial round table, 3D camera focus, interaction
   hotspots, and future GLB scene content.
@@ -19,7 +19,7 @@ Pixi and R3F may load a URL only after the resolver returns it.
 Scripts use preset commands rather than renderer-specific instructions:
 
 ```nani
-@char idAndAppearance:hero.portrait:hero:neutral pos:50,0
+@char Ema.Pensive1,ArmR3 pos:50
 @shake actorId:hero power:0.4 time:0.28
 @flash color:#ffffff duration:160
 @focus target:witness duration:500
@@ -55,16 +55,24 @@ before React rendering. Saves store the snapshot and story/gameplay state, not
 the runtime command stream or presenter trace.
 
 Asset ids inside these commands are semantic ids. For example,
-`@back bg:harness` and `@char ... portrait:felix:neutral` write ids into the Pixi
-snapshot; Pixi then asks the injected resolver for `background` or `portrait`
-URLs. Scripts and reducers must not derive `/harness/...` paths from those ids.
+`@back bg:harness` writes a background asset id into the Pixi snapshot, while
+`@char Ema.Pensive1,ArmR3` writes character id `Ema` plus semantic
+`appearanceExpression`. Pixi then asks the injected resolver for the
+`background` or `character-pack` entry URL and loads pack-internal files itself.
+Scripts and reducers must not derive `/harness/...` paths from those ids.
+For layered characters, `packages/layered-character` is the only owner of token
+and expression semantics. Pixi first asks that pure package for the active layer
+refs, then loads only the active metadata and textures before atomically
+swapping the actor content. App code must not import the resolver or infer layer
+paths; it only declares the character-pack entry JSON in the manifest and
+injects the asset resolver.
 
 Expression params such as `duration:{flashDuration}` are preserved by the
 compiler, evaluated by StoryEngine against story variables, and should be
 resolved before app adapters consume emitted runtime commands.
 If a routed Pixi command reaches the reducer with missing or unsupported
 Pixi-consumable params, the reducer returns a diagnostic no-op instead of
-writing placeholder background, portrait, or keyword ids.
+writing placeholder background, character, or keyword ids.
 
 `story-play` sits above StoryEngine for playback control only. It decides when
 manual, AUTO, SKIP, or one-shot `autoNext` should request the next StoryEngine
@@ -107,7 +115,7 @@ statement. Debate rules, accepted evidence, and next-segment transitions live in
 
 First round:
 
-- single-layer placeholder portraits loaded through `AssetResolver`
+- layered character packs loaded through `AssetResolver`
 - manifest-backed background textures with visible fallback plates
 - snapshot-driven VN stage rendering
 - simple debate keyword overlay
@@ -115,8 +123,6 @@ First round:
 
 Later:
 
-- layered portraits
-- expression state
 - sprite sheets
 - Spine or Live2D adapter
 - custom filters and particle presets

@@ -23,20 +23,20 @@ const trialRuntimeScript = runtimeScript(
   [
     runtimeCommand("back", "scene", { appearance: "bg:court", effect: "fade" }, { source: "naninovel" }),
     runtimeCommand("char", "actor", {
-      target: "character:felix",
-      appearance: "portrait:felix:neutral",
+      target: "Ema",
+      appearanceExpression: "Pensive1,ArmR3",
       pos: [0.5, 0]
     }, { source: "naninovel" }),
     runtimeCommand("print", "text", { text: "The door was locked.", speaker: "Felix", autoNext: true }),
     runtimeCommand("trialkeyword", "ui", {
       keywordId: "kw:locked",
       text: "locked",
-      speakerId: "character:felix"
+      speakerId: "Ema"
     }),
     runtimeCommand("choice", "choice", { text: "Object with the keycard", goto: "#Object" }, { source: "naninovel" }),
     runtimeCommand("choice", "choice", { text: "Stay silent", goto: "#End" }, { source: "naninovel" }),
     runtimeCommand("set", "state", { key: "route", value: "objected" }, { source: "naninovel" }),
-    runtimeCommand("shake", "effect", { target: "character:felix", intensity: 0.5, duration: 300 }, { source: "naninovel" }),
+    runtimeCommand("shake", "effect", { target: "Ema", intensity: 0.5, duration: 300 }, { source: "naninovel" }),
     runtimeCommand("goto", "flow", { label: "#End" }, { source: "naninovel" }),
     runtimeCommand("end", "flow", {})
   ],
@@ -48,8 +48,8 @@ const vnStepperRuntimeScript = runtimeScript(
   [
     runtimeCommand("back", "scene", { appearance: "bg:harness", effect: "fade" }, { source: "naninovel" }),
     runtimeCommand("char", "actor", {
-      target: "character:felix",
-      appearance: "portrait:felix:neutral",
+      target: "Ema",
+      appearanceExpression: "",
       pos: [0.5, 0]
     }, { source: "naninovel" }),
     runtimeCommand("print", "text", {
@@ -266,8 +266,8 @@ describe("story engine", () => {
   it("stops on waitable presentation commands until the presenter reports completion", () => {
     const runtimeScript = runtimeScriptFixture("presentation-wait.nani", [
       runtimeCommand("char", "actor", {
-        target: "character:felix",
-        appearance: "portrait:felix:neutral",
+        target: "Ema",
+        appearanceExpression: "Pensive1",
         durationMs: 250,
         wait: true
       }, { source: "naninovel" }),
@@ -282,7 +282,7 @@ describe("story engine", () => {
       presentationWait: {
         commandId: "char",
         durationMs: 250,
-        target: "character:felix"
+        target: "Ema"
       },
       backlog: []
     });

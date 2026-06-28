@@ -4,12 +4,12 @@ import { VisualEffectScheduler } from "./effects";
 describe("visual effect scheduler", () => {
   it("ticks queued fade flash and shake effects to completion", () => {
     const scheduler = new VisualEffectScheduler();
-    const portrait = { alpha: 0, x: 0, y: 0 };
+    const target = { alpha: 0, x: 0, y: 0 };
     const flash = { alpha: 0.5, x: 0, y: 0 };
     const shaken = { alpha: 1, x: 0, y: 0 };
     let flashCompleted = false;
 
-    scheduler.enqueue({ kind: "fadeIn", durationMs: 100, target: portrait });
+    scheduler.enqueue({ kind: "fadeIn", durationMs: 100, target });
     scheduler.enqueue({
       kind: "flash",
       durationMs: 80,
@@ -23,14 +23,14 @@ describe("visual effect scheduler", () => {
     expect(scheduler.activeCount()).toBe(3);
     scheduler.tick(25);
 
-    expect(portrait.alpha).toBeGreaterThan(0);
+    expect(target.alpha).toBeGreaterThan(0);
     expect(flash.alpha).toBeLessThan(0.5);
     expect(shaken.x).not.toBe(0);
 
     scheduler.tick(100);
 
     expect(scheduler.activeCount()).toBe(0);
-    expect(portrait.alpha).toBe(1);
+    expect(target.alpha).toBe(1);
     expect(shaken.x).toBe(0);
     expect(shaken.y).toBe(0);
     expect(flashCompleted).toBe(true);

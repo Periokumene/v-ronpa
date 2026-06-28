@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/Shadow/Shadow_ArmR10",
+  "drawOrder": 4,
+  "texture": {
+    "fileName": "Shadow_ArmR10.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 191,
+      "height": 825
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 2300,
+      "y": 4407,
+      "width": 191,
+      "height": 825
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -0.6730002399999999,
+      "y": 19.0620003,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 1.91,
+      "y": 8.25
+    }
+  }
+}

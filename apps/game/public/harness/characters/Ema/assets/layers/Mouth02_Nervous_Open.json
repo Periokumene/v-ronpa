@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/Head02/Facial02/Mouth02/Mouth02_Nervous_Open",
+  "drawOrder": 10,
+  "texture": {
+    "fileName": "Mouth02_Nervous_Open.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 113,
+      "height": 40
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 2300,
+      "y": 5240,
+      "width": 113,
+      "height": 40
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -0.03700027600000001,
+      "y": 22.4609994,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 1.13,
+      "y": 0.4
+    }
+  }
+}

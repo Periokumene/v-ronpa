@@ -1,17 +1,28 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, extname, join, relative, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, extname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { collectHarnessRuntimeAssets, generateHarnessRuntimeAssetsModule } from "./generate-assets.mjs";
 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
+const {
+  LayeredCharacterCompositionsSchema,
+  LayeredCharacterDefinitionSchema,
+  LayeredCharacterLayerMetadataSchema,
+  LayeredCharacterLayersSchema
+} = await import(pathToFileURL(join(repoRoot, "packages/contracts/src/index.ts")).href);
 const generatedPath = join(repoRoot, "apps/game/src/harness/generatedAssets.ts");
 const pixiFxAssetsPath = join(repoRoot, "packages/pixi-presenter/src/internal/fxAssets.ts");
 const voiceAssetsRoot = join(repoRoot, "apps/game/public/harness/media/voice");
 const sourceRoots = ["apps/game/src", "packages", "scripts"].map((path) => join(repoRoot, path));
-const harnessReferenceFiles = ["apps/game/src/harness/fixtures/verticalSlice.ts"].map((path) => join(repoRoot, path));
-const hardcodedAssetPattern = /(["'`])(?:\/harness\/|\.\/assets\/|\.\.\/assets\/|https?:\/\/|data:image\/|blob:)[^"'`]*\.(?:png|webp|avif|ktx2|ogg|mp3|mp4|webm|gltf|glb)\1/u;
-const assetIdPattern = /\b(?:bg|portrait|bgm|sfx|voice|video|model|texture|fx):[a-zA-Z0-9:_./-]+/gu;
+const harnessReferenceFiles = [
+  join(repoRoot, "apps/game/src/harness/fixtures/verticalSlice.ts"),
+  join(repoRoot, "docs/nani/basic-p1-example.md"),
+  ...fixtureNaniFiles(join(repoRoot, "packages/nani-parser/fixtures"))
+];
+const hardcodedAssetPattern = /(["'`])(?:\/harness\/|\.\/assets\/|\.\.\/assets\/|https?:\/\/|data:image\/|blob:)[^"'`]*\.(?:json|png|webp|avif|ktx2|ogg|mp3|mp4|webm|gltf|glb)\1/u;
+const assetIdPattern = /\b(?:bg|bgm|sfx|voice|video|model|texture|fx):[a-zA-Z0-9:_./-]+/gu;
 const voiceTextIdPattern = /^[a-zA-Z0-9_-]+$/u;
+const characterPackCommandPattern = /^\s*@(char|slide)\s+([^\s]+)/gmu;
 const allowedHardcodedFiles = new Set([
   "apps/game/src/harness/generatedAssets.ts",
   "packages/pixi-presenter/src/internal/fxAssets.ts",
@@ -24,6 +35,7 @@ let failed = false;
 checkGeneratedAssets();
 checkHarnessFilesExist();
 checkHarnessVoiceAssetLayout();
+checkCharacterPacks();
 checkHarnessReferencesResolve();
 checkNoHardcodedRuntimeAssetPaths();
 
@@ -63,6 +75,39 @@ function checkHarnessVoiceAssetLayout() {
   }
 }
 
+function checkCharacterPacks() {
+  for (const asset of collectHarnessRuntimeAssets().filter((item) => item.kind === "character-pack")) {
+    const entryPath = join(repoRoot, "apps/game/public", asset.optimizedUri.replace(/^\//u, ""));
+    if (!existsSync(entryPath)) {
+      fail(`Character pack '${asset.id}' points to missing entry ${relative(repoRoot, entryPath)}.`);
+      continue;
+    }
+    const packRoot = dirname(entryPath);
+    try {
+      const character = LayeredCharacterDefinitionSchema.parse(readJsonFile(entryPath));
+      const layers = LayeredCharacterLayersSchema.parse(readJsonFile(join(packRoot, "layers.json")));
+      const compositions = LayeredCharacterCompositionsSchema.parse(readJsonFile(join(packRoot, "compositions.json")));
+      if (character.id !== asset.id) fail(`Character pack '${asset.id}' has mismatched character id '${character.id}'.`);
+      if (!compositions.tokens.Default || compositions.tokens.Default.length === 0) {
+        fail(`Character pack '${asset.id}' must define a non-empty Default composition token.`);
+      }
+      for (const [groupName, group] of Object.entries(layers.groups)) {
+        for (const [layerName, ref] of Object.entries(group.layers)) {
+          const texturePath = resolvePackPath(packRoot, ref.src);
+          const metadataPath = resolvePackPath(packRoot, ref.metadata);
+          if (!texturePath) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} uses out-of-pack texture path '${ref.src}'.`);
+          else if (!existsSync(texturePath)) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} texture is missing: ${ref.src}.`);
+          if (!metadataPath) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} uses out-of-pack metadata path '${ref.metadata}'.`);
+          else if (!existsSync(metadataPath)) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} metadata is missing: ${ref.metadata}.`);
+          else LayeredCharacterLayerMetadataSchema.parse(readJsonFile(metadataPath));
+        }
+      }
+    } catch (error) {
+      fail(`Character pack '${asset.id}' failed schema validation: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
 function checkHarnessReferencesResolve() {
   const knownAssetIds = collectRegisteredAssetIds();
   for (const filePath of harnessReferenceFiles) {
@@ -73,7 +118,32 @@ function checkHarnessReferencesResolve() {
         fail(`${toPosix(relative(repoRoot, filePath))} references undeclared runtime asset '${id}'.`);
       }
     }
+    for (const match of content.matchAll(characterPackCommandPattern)) {
+      const command = match[1];
+      const primary = match[2];
+      const id = characterPackIdForCommand(command, primary);
+      if (id && !knownAssetIds.has(id)) {
+        fail(`${toPosix(relative(repoRoot, filePath))} references undeclared character-pack asset '${id}' in @${command}.`);
+      }
+    }
   }
+}
+
+function characterPackIdForCommand(command, primary) {
+  if (!primary || primary === "*") return undefined;
+  const value = primary.startsWith("id:") ? primary.slice(3) : primary;
+  if (command === "slide" && !value.includes(".")) return undefined;
+  const id = value.split(/[.,]/u)[0];
+  return id && id !== "*" && !id.includes(":") ? id : undefined;
+}
+
+function readJsonFile(path) {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function resolvePackPath(packRoot, relativePath) {
+  const resolved = resolve(packRoot, relativePath);
+  return resolved === packRoot || resolved.startsWith(`${packRoot}${sep}`) ? resolved : undefined;
 }
 
 function collectRegisteredAssetIds() {
@@ -110,6 +180,13 @@ function walkFiles(root) {
     else if (extname(name)) output.push(absolutePath);
   }
   return output;
+}
+
+function fixtureNaniFiles(root) {
+  if (!existsSync(root)) return [];
+  return readdirSync(root)
+    .filter((name) => name.endsWith(".nani"))
+    .map((name) => join(root, name));
 }
 
 function shouldSkipDirectory(name) {

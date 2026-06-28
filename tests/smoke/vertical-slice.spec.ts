@@ -152,7 +152,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await advanceUntilChoices(page);
   await expect(page.getByTestId("vn-dialog-state")).toHaveText("等待选择");
   await expect(page.getByTestId("vertical-slice-pixi-background")).toHaveText("bg:harness");
-  await expect(page.getByTestId("vertical-slice-pixi-slots")).toContainText("center:character:felix/portrait:felix:neutral");
+  await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText("Ema/default@0.50,0.00");
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
   await expect(page.getByTestId("vn-command-backlog")).toBeEnabled();
@@ -203,7 +203,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("vn2d-overlay");
   await expect(page.getByTestId("vn-dialog-text")).toContainText(savedDialogExcerpt);
   await expect(page.getByTestId("vertical-slice-pixi-background")).toHaveText("bg:harness");
-  await expect(page.getByTestId("vertical-slice-pixi-slots")).toContainText("center:character:felix/portrait:felix:neutral");
+  await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText("Ema/default@0.50,0.00");
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
   await expectNoDocumentScroll(page);
   await page.screenshot({ path: "test-results/vertical-slice-vn-choice.png", fullPage: true });
@@ -241,6 +241,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 2 开始");
   await page.screenshot({ path: "test-results/vertical-slice-branch-b.png", fullPage: true });
   await advanceUntilText(page, "CHECKPOINT 01B-L1");
+  await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText("Ema/Pensive1,ArmR3@0.50,0.00");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/vertical-slice-snow-light.png", fullPage: true });
   await advanceUntilText(page, "CHECKPOINT 01B-L2");
@@ -253,6 +254,40 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/vertical-slice-snow-storm.png", fullPage: true });
   await page.screenshot({ path: "test-results/vertical-slice-snow-shader.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 02A");
+  await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText("Ema/default@0.50,0.00");
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: "test-results/vertical-slice-char-default-composition.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 02B");
+  await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText("Ema/Pensive1@0.50,0.00");
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: "test-results/vertical-slice-char-pensive-composite.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 02C");
+  await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText("Ema/Pensive1,ArmR3@0.50,0.00");
+  await advanceUntilText(page, "CHECKPOINT 02D");
+  await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText("Ema/Pensive1,ArmR3,ArmR4@0.50,0.00");
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: "test-results/vertical-slice-char-arm-override.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 02E");
+  await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText(
+    "Ema/Pensive1,ArmR4,Angle01/Head01/Facial01/Mouth01>Mouth01_Smile_Open@0.50,0.00"
+  );
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: "test-results/vertical-slice-char-atom-mouth-override.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 02F");
+  await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText(
+    "Ema/Pensive1,ArmR4,Angle01/Head01/Facial01/Sweat01+Sweat01_01@0.50,0.00"
+  );
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: "test-results/vertical-slice-char-atom-sweat-add.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 02G");
+  await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText(
+    "Ema/Pensive1,ArmR4,Angle01/Head01/Facial01/Sweat01+Sweat01_01,Angle01/Head01/Facial01/Sweat01-@0.50,0.00"
+  );
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: "test-results/vertical-slice-char-prefix-remove.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 02H");
+  await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText("Ema/Pensive1,ArmR3@0.50,0.00");
   await advanceUntilText(page, "CHECKPOINT 07B-L1");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/vertical-slice-glitch-light.png", fullPage: true });

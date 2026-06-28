@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/Head01/FacialLineDrawing01",
+  "drawOrder": 110,
+  "texture": {
+    "fileName": "FacialLineDrawing01.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 378,
+      "height": 421
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 3359,
+      "y": 3700,
+      "width": 378,
+      "height": 421
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -0.32800006000000004,
+      "y": 23.544,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 3.78,
+      "y": 4.21
+    }
+  }
+}

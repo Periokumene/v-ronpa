@@ -760,7 +760,7 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
   vRonpa(
     "charenter",
     "actor",
-    [param("character", "string"), param("portrait", "string"), param("slot", "string"), param("effect", "string")],
+    [param("character", "string"), param("appearanceExpression", "string"), param("effect", "string")],
     ["char-enter"],
     "stubbed"
   ),
@@ -784,7 +784,7 @@ export function getNaniCommandDefinition(id: string): NaniCommandDefinition | un
 }
 
 export const RuntimeAssetKindSchema = z.enum([
-  "portrait",
+  "character-pack",
   "background",
   "bgm",
   "sfx",
@@ -902,6 +902,7 @@ export const RuntimeAssetFormatSchema = z.enum([
   "glb",
   "gltf",
   "png",
+  "json",
   "webp",
   "avif",
   "ktx2",
@@ -951,6 +952,148 @@ export const RuntimeAssetSchema = z.object({
   tags: z.array(z.string()).default([])
 }).strict();
 export type RuntimeAsset = z.infer<typeof RuntimeAssetSchema>;
+
+export const LayeredCharacterObjectVector2Schema = z.object({
+  x: z.number(),
+  y: z.number()
+}).strict();
+export type LayeredCharacterObjectVector2 = z.infer<typeof LayeredCharacterObjectVector2Schema>;
+
+export const LayeredCharacterObjectVector3Schema = z.object({
+  x: z.number(),
+  y: z.number(),
+  z: z.number()
+}).strict();
+export type LayeredCharacterObjectVector3 = z.infer<typeof LayeredCharacterObjectVector3Schema>;
+
+export const LayeredCharacterVector2Schema = z.tuple([z.number(), z.number()]);
+export type LayeredCharacterVector2 = z.infer<typeof LayeredCharacterVector2Schema>;
+
+export const LayeredCharacterBoundsSchema = z.object({
+  min: LayeredCharacterVector2Schema,
+  max: LayeredCharacterVector2Schema
+}).strict().superRefine((bounds, ctx) => {
+  if (bounds.max[0] <= bounds.min[0]) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["max", 0],
+      message: "Layered character bounds max.x must be greater than min.x."
+    });
+  }
+  if (bounds.max[1] <= bounds.min[1]) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["max", 1],
+      message: "Layered character bounds max.y must be greater than min.y."
+    });
+  }
+});
+export type LayeredCharacterBounds = z.infer<typeof LayeredCharacterBoundsSchema>;
+
+export const LayeredCharacterRenderSpaceSchema = z.object({
+  stageScale: z.number().positive(),
+  defaultBounds: LayeredCharacterBoundsSchema
+}).strict();
+export type LayeredCharacterRenderSpace = z.infer<typeof LayeredCharacterRenderSpaceSchema>;
+
+export const LayeredCharacterDefinitionSchema = z.object({
+  id: IdSchema,
+  defaultComposition: z.array(z.string().min(1)).default([]),
+  renderSpace: LayeredCharacterRenderSpaceSchema
+}).strict();
+export type LayeredCharacterDefinition = z.infer<typeof LayeredCharacterDefinitionSchema>;
+
+const PackRelativePathSchema = z.string().min(1).refine((value) => isPackRelativePath(value), {
+  message: "Layered character layer paths must be pack-relative and may not use absolute URLs or parent directories."
+});
+
+export const LayeredCharacterLayerRefSchema = z.object({
+  src: PackRelativePathSchema,
+  metadata: PackRelativePathSchema
+}).strict();
+export type LayeredCharacterLayerRef = z.infer<typeof LayeredCharacterLayerRefSchema>;
+
+export const LayeredCharacterGroupSchema = z.object({
+  layers: z.record(z.string().min(1), LayeredCharacterLayerRefSchema)
+}).strict();
+export type LayeredCharacterGroup = z.infer<typeof LayeredCharacterGroupSchema>;
+
+export const LayeredCharacterLayersSchema = z.object({
+  groups: z.record(z.string().min(1), LayeredCharacterGroupSchema)
+}).strict();
+export type LayeredCharacterLayers = z.infer<typeof LayeredCharacterLayersSchema>;
+
+export const LayeredCharacterCompositionsSchema = z.object({
+  tokens: z.record(z.string().min(1), z.array(z.string().min(1)))
+}).strict();
+export type LayeredCharacterCompositions = z.infer<typeof LayeredCharacterCompositionsSchema>;
+
+export const LayeredCharacterTextureSizeSchema = z.object({
+  width: z.number().positive(),
+  height: z.number().positive()
+}).strict();
+export type LayeredCharacterTextureSize = z.infer<typeof LayeredCharacterTextureSizeSchema>;
+
+export const LayeredCharacterTextureSchema = z.object({
+  fileName: z.string().min(1),
+  mimeType: z.string().min(1),
+  size: LayeredCharacterTextureSizeSchema
+}).strict();
+export type LayeredCharacterTexture = z.infer<typeof LayeredCharacterTextureSchema>;
+
+export const LayeredCharacterRectSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive(),
+  height: z.number().positive()
+}).strict();
+export type LayeredCharacterRect = z.infer<typeof LayeredCharacterRectSchema>;
+
+export const LayeredCharacterSpriteSchema = z.object({
+  rect: LayeredCharacterRectSchema,
+  pivot: LayeredCharacterObjectVector2Schema,
+  pixelsPerUnit: z.number().positive()
+}).strict();
+export type LayeredCharacterSprite = z.infer<typeof LayeredCharacterSpriteSchema>;
+
+export const LayeredCharacterTransformSchema = z.object({
+  position: LayeredCharacterObjectVector3Schema,
+  scale: LayeredCharacterObjectVector3Schema,
+  rotation: LayeredCharacterObjectVector3Schema
+}).strict();
+export type LayeredCharacterTransform = z.infer<typeof LayeredCharacterTransformSchema>;
+
+export const LayeredCharacterRendererSchema = z.object({
+  color: z.object({
+    r: z.number().min(0).max(1),
+    g: z.number().min(0).max(1),
+    b: z.number().min(0).max(1),
+    a: z.number().min(0).max(1)
+  }).strict(),
+  flipX: z.boolean(),
+  flipY: z.boolean(),
+  size: LayeredCharacterObjectVector2Schema.optional()
+}).strict();
+export type LayeredCharacterRenderer = z.infer<typeof LayeredCharacterRendererSchema>;
+
+export const LayeredCharacterLayerMetadataSchema = z.object({
+  sourcePath: z.string().min(1),
+  drawOrder: z.number(),
+  texture: LayeredCharacterTextureSchema,
+  sprite: LayeredCharacterSpriteSchema,
+  localTransform: LayeredCharacterTransformSchema,
+  renderer: LayeredCharacterRendererSchema
+}).strict();
+export type LayeredCharacterLayerMetadata = z.infer<typeof LayeredCharacterLayerMetadataSchema>;
+
+function isPackRelativePath(value: string): boolean {
+  return (
+    !/^[a-zA-Z][a-zA-Z\d+.-]*:/u.test(value) &&
+    !value.startsWith("/") &&
+    !value.startsWith("\\") &&
+    !value.split(/[\\/]/u).includes("..")
+  );
+}
 
 export const ItemCategorySchema = z.enum(["gift", "tool"]);
 export type ItemCategory = z.infer<typeof ItemCategorySchema>;
@@ -1037,9 +1180,6 @@ export const WorldMapDefSchema = z.object({
 });
 export type WorldMapDef = z.infer<typeof WorldMapDefSchema>;
 
-export const PixiStageSlotIdSchema = z.enum(["left", "center", "right"]);
-export type PixiStageSlotId = z.infer<typeof PixiStageSlotIdSchema>;
-
 export const PixiActorKindSchema = z.enum(["background", "character"]);
 export type PixiActorKind = z.infer<typeof PixiActorKindSchema>;
 
@@ -1074,6 +1214,7 @@ export const PixiActorSnapshotSchema = z.object({
   id: IdSchema,
   kind: PixiActorKindSchema,
   appearance: IdSchema.optional(),
+  appearanceExpression: z.string().default(""),
   pose: z.string().optional(),
   visible: z.boolean().default(true),
   pos: PixiVector2Schema.optional(),
@@ -1086,6 +1227,21 @@ export const PixiActorSnapshotSchema = z.object({
   filters: PixiActorFilterSnapshotSchema,
   look: z.string().optional(),
   transition: PixiActorTransitionSnapshotSchema
+}).superRefine((actor, ctx) => {
+  if (actor.kind === "character" && actor.appearance !== undefined) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["appearance"],
+      message: "Character actors use appearanceExpression, not appearance."
+    });
+  }
+  if (actor.kind === "background" && actor.appearanceExpression) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["appearanceExpression"],
+      message: "Background actors use appearance, not appearanceExpression."
+    });
+  }
 });
 export type PixiActorSnapshot = z.infer<typeof PixiActorSnapshotSchema>;
 
@@ -1137,49 +1293,15 @@ export const PixiScreenFiltersSnapshotSchema = z
   .default({});
 export type PixiScreenFiltersSnapshot = z.infer<typeof PixiScreenFiltersSnapshotSchema>;
 
-export const PixiStageBackgroundSnapshotSchema = z.object({
-  backgroundId: IdSchema
-});
-export type PixiStageBackgroundSnapshot = z.infer<typeof PixiStageBackgroundSnapshotSchema>;
-
-export const PixiStagePortraitSlotSnapshotSchema = z.object({
-  slot: PixiStageSlotIdSchema,
-  characterId: IdSchema,
-  portraitId: IdSchema.optional()
-});
-export type PixiStagePortraitSlotSnapshot = z.infer<typeof PixiStagePortraitSlotSnapshotSchema>;
-
-export const PixiStageSlotsSnapshotSchema = z
-  .object({
-    left: PixiStagePortraitSlotSnapshotSchema.optional(),
-    center: PixiStagePortraitSlotSnapshotSchema.optional(),
-    right: PixiStagePortraitSlotSnapshotSchema.optional()
-  })
-  .default({})
-  .superRefine((slots, ctx) => {
-    for (const slot of PixiStageSlotIdSchema.options) {
-      if (slots[slot] && slots[slot].slot !== slot) {
-        ctx.addIssue({
-          code: "custom",
-          path: [slot, "slot"],
-          message: `Pixi stage slot key '${slot}' must match the portrait slot value.`
-        });
-      }
-    }
-  });
-export type PixiStageSlotsSnapshot = z.infer<typeof PixiStageSlotsSnapshotSchema>;
-
 export const PixiStageSnapshotSchema = z.object({
-  version: z.literal(2),
+  version: z.literal(3),
   revision: z.number().int().nonnegative().default(0),
   backgroundsById: z.record(IdSchema, PixiActorSnapshotSchema).default({}),
   charactersById: z.record(IdSchema, PixiActorSnapshotSchema).default({}),
   actorOrder: z.array(IdSchema).default([]),
   weather: z.partialRecord(PixiWeatherKindSchema, PixiWeatherSnapshotSchema).default({}),
-  screenFilters: PixiScreenFiltersSnapshotSchema,
-  background: PixiStageBackgroundSnapshotSchema.optional(),
-  slots: PixiStageSlotsSnapshotSchema
-});
+  screenFilters: PixiScreenFiltersSnapshotSchema
+}).strict();
 export type PixiStageSnapshot = z.infer<typeof PixiStageSnapshotSchema>;
 
 export const TrialKeywordSchema = z.object({

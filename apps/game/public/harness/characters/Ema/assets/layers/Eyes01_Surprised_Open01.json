@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/Head01/Facial01/Eyes01/Eyes01_Surprised_Open01",
+  "drawOrder": 67,
+  "texture": {
+    "fileName": "Eyes01_Surprised_Open01.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 448,
+      "height": 245
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 3815,
+      "y": 1620,
+      "width": 448,
+      "height": 245
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -0.32199994,
+      "y": 23.580000599999998,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 4.48,
+      "y": 2.45
+    }
+  }
+}

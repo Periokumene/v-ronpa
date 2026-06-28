@@ -154,8 +154,8 @@ export const verticalSliceMaps: WorldMapDef[] = [
 export const verticalSliceScript = `#Start
 @set route:"intro"
 @back bg:harness effect:fade time:0.15
-@char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
-Narrator: CHECKPOINT 00 - baseline。视觉小说联调剧本：这是测试入口，不是剧情样例。请先确认背景和 Felix 中央立绘可见。[>]
+@char Ema pos:50
+Narrator: CHECKPOINT 00 - baseline。视觉小说联调剧本：这是测试入口，不是剧情样例。请先确认背景和 Ema 默认 layered character 可见。[>]
 Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command showcase；分支 2 保持完整 Pixi 命令视觉验收。
 @choice "临时选项：应被 clearChoice 清除" id:temp-clear goto:#TemporaryChoiceShouldNotAppear
 @clearChoice temp-clear
@@ -165,9 +165,7 @@ Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command sh
 
 #VoiceTextIdAudioValidation
 @back bg:harness effect:fade time:0.15
-@char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
-@char idAndAppearance:character:mira.portrait:mira:neutral pos:24,0
-@char idAndAppearance:character:ren.portrait:ren:neutral pos:76,0
+@char Ema.Pensive1,ArmR3 pos:50
 Narrator: CHECKPOINT VOICE REAL 00 - 真实 textId-音频验证。下面是一条连续支线：每条角色台词都应按 textId 自动播放对应 voice，并停止上一条 voice。
 Narrator: 夜里的牢房被帘子隔成一间临时密室。艾玛、雪莉和玛格围着一台拆开的旧广播装置，谁都没有先碰那个红色开关。
 Ema: 如果把证据广播出去，外面的人就会知道这里发生了什么。|#0102Adv03_Ema001|
@@ -247,10 +245,9 @@ Narrator: CHECKPOINT 00B - runtime state。分支 2 开始：右侧 Runtime 面�
 Narrator: CHECKPOINT 01A - rain only。背景为 bg:harness，画面前景应出现清晰、持续下落的斜向雨线；此处不叠加 blur、bokeh 或 sun。
 @rain power:0 time:0.1
 @back bg:black effect:fade time:0.12
-@char idAndAppearance:character:felix.portrait:felix:neutral pos:36,0
-@char idAndAppearance:character:mira.portrait:mira:neutral pos:68,0
+@char Ema.Pensive1,ArmR3 pos:50
 @snow power:0.55 time:0.1 xSpeed:-0.1 ySpeed:0.75 density:0.85 flakeScale:1 sway:0.45 fog:0.18 noise:0.012 seed:11
-Narrator: CHECKPOINT 01B-L1 - snow light。黑底与双立绘用于检查参数映射和轻雾染色：低档也应有明确雪粒、可见下落重力与轻微冷色雾。
+Narrator: CHECKPOINT 01B-L1 - snow light。黑底与 Ema layered character 用于检查参数映射和轻雾染色：低档也应有明确雪粒、可见下落重力与轻微冷色雾。
 @snow power:0.78 time:0.1 xSpeed:-0.18 ySpeed:0.95 density:1.25 flakeScale:1.22 sway:0.78 fog:0.3 noise:0.024 seed:12
 Narrator: CHECKPOINT 01B-L2 - snow medium。相比 L1，雪点数量、尺寸、下落速度和横向摆动都应明显增强；立绘应出现更清楚的冷雾染色。
 @snow power:0.92 time:0.1 xSpeed:-0.25 ySpeed:1.15 density:1.6 flakeScale:1.48 sway:1.02 fog:0.42 noise:0.036 seed:13
@@ -262,26 +259,38 @@ Narrator: CHECKPOINT 01B-L4 - snow storm。黑底压力档：大雪、强重力�
 @sun power:0.3 time:0.2 pos:12,88 scale:1.1,1.1,1
 @blur actorId:MainBackground power:0.12 time:0.2
 Narrator: CHECKPOINT 01C - sun + blur。右上应出现柔和光束，背景轻微虚化；雨雪此时应已关闭。
-@char idAndAppearance:character:felix.portrait:felix:neutral pos:50,0
-@char idAndAppearance:character:mira.portrait:mira:neutral pos:78,0
-@char idAndAppearance:character:ren.portrait:ren:neutral pos:22,0
-Narrator: CHECKPOINT 02 - char。Felix、Mira、Ren 三个 actor 均应可见；所有立绘都应通过 ContentManifest 解析。
-@arrange ren.18,felix.50,mira.82 look! time:0.25
-Narrator: CHECKPOINT 03 - arrange。三名角色应重新排到左、中、右；右侧 Pixi Slots 应显示 left/center/right。
+@blur actorId:MainBackground power:0 time:0.12
+@char Ema pos:50
+Narrator: CHECKPOINT 02A - char default composition。Ema 应回到 Default 展开结果；右侧 Pixi Chars 应显示 Ema/default。
+@char Ema.Pensive1 pos:50
+Narrator: CHECKPOINT 02B - char composite token。Pensive1 应从 Default 重新展开并替换 Head1 表情组，表现为沉思眼睛与嘴型。
+@char Ema.Pensive1,ArmR3 pos:50
+Narrator: CHECKPOINT 02C - char composite + arm。Ema 应以 Pensive1 + ArmR3 layered expression 可见；角色包应通过 ContentManifest 的 character-pack 入口解析。
+@char Ema.Pensive1,ArmR3,ArmR4 pos:50
+Narrator: CHECKPOINT 02D - char override order。ArmR4 写在 ArmR3 之后，应覆盖同组右臂，右侧 Pixi Chars 应保留完整表达式 Pensive1,ArmR3,ArmR4。
+@char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Mouth01>Mouth01_Smile_Open pos:50
+Narrator: CHECKPOINT 02E - char atom override。Pensive1 composite 展开后，原子 Group>Layer 应只替换 Mouth01 为 Smile_Open，眼睛和右臂保持上一表达式指定的沉思与 ArmR4。
+@char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Sweat01+Sweat01_01 pos:50
+Narrator: CHECKPOINT 02F - char atom add。Group+Layer 应在 Pensive1 基础上追加 Sweat01_01，形成局部新增图层差分。
+@char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Sweat01+Sweat01_01,Angle01/Head01/Facial01/Sweat01- pos:50
+Narrator: CHECKPOINT 02G - char prefix remove。相同 expression 内先追加汗滴再用 Group- 关闭，最终应回到无汗滴的 Pensive1 + ArmR4。
+@char Ema.Pensive1,ArmR3 pos:50
+Narrator: CHECKPOINT 02H - char reset absolute。重新指定 Pensive1 + ArmR3 应证明每次 @char 都是绝对外观，不继承前面的 Mouth 或 Sweat 差分。
+@arrange Ema.50 look! time:0.25
+Narrator: CHECKPOINT 03 - arrange。Ema 应保持中央位置；右侧 Pixi Chars 应显示 Ema/Pensive1,ArmR3。
 @flash color:#8fd3ff duration:160
 Narrator: CHECKPOINT 04 - flash。刚才应看到一次蓝白色短闪光；下一次 advance 会触发 Felix 的 wait! slide，滑动中再次 advance 应立即完成动画并进入 CHECKPOINT 05。
-@slide character:felix.portrait:felix:neutral from:38,0 to:50,0 time:0.8 easing:easeOut wait!
-Narrator: CHECKPOINT 05 - slide + wait。Felix 应从偏左滑回中央；本句应在滑动等待结束后出现。
-@shake actorId:character:ren power:0.36 time:0.08 count:4 deltaPower:0.06 hor! ver!
-Narrator: CHECKPOINT 06 - shake。Ren 或其 fallback 应进行水平和垂直抖动。
-@bokeh focus:character:felix dist:10 power:0.55 time:0.2
+@slide Ema.Pensive1,ArmR3 from:38,0 to:50,0 time:0.8 easing:easeOut wait!
+Narrator: CHECKPOINT 05 - slide + wait。Ema 应从偏左滑回中央；本句应在滑动等待结束后出现。
+@shake actorId:Ema power:0.36 time:0.08 count:4 deltaPower:0.06 hor! ver!
+Narrator: CHECKPOINT 06 - shake。Ema 或其 fallback 应进行水平和垂直抖动。
+@bokeh focus:Ema dist:10 power:0.55 time:0.2
 Narrator: CHECKPOINT 07 - bokeh only。画面应进入明显景深/柔焦状态，并出现柔和圆形光斑；下一步会先关闭 bokeh 再测试 glitch。
 @bokeh power:0 time:0.15
 @back bg:black effect:fade time:0.12
-@char idAndAppearance:character:felix.portrait:felix:neutral pos:36,0
-@char idAndAppearance:character:mira.portrait:mira:neutral pos:68,0
+@char Ema.Pensive1,ArmR3 pos:50
 @glitch power:0.35 time:1 blockJump:0.45 burstJump:0.1 pixelScatter:0.35 colorNoise:0.12 speed:0.8 seed:41
-Narrator: CHECKPOINT 07B-L1 - glitch light。黑底与多名立绘用于检查轻微 Morton 地址跳变；应只有少量块错位，人物边缘仍稳定可辨。
+Narrator: CHECKPOINT 07B-L1 - glitch light。黑底与 layered character 用于检查轻微 Morton 地址跳变；应只有少量块错位，人物边缘仍稳定可辨。
 @glitch power:0.6 time:1 blockJump:0.9 burstJump:0.35 pixelScatter:0.75 colorNoise:0.35 speed:1 seed:42
 Narrator: CHECKPOINT 07B-L2 - glitch medium。相比 L1 应出现更明显 block jump 与少量随机色替换，画面不能全白或全黑。
 @glitch power:0.82 time:1 blockJump:1.25 burstJump:0.75 pixelScatter:1.2 colorNoise:0.68 speed:1.25 seed:43
@@ -300,13 +309,13 @@ Narrator: CHECKPOINT 08D - glitchFilter off cleanup。持久 glitchFilter 已关
 @back bg:classroom effect:fade time:0.2
 @snow power:0.85 time:0.2 xSpeed:-0.18 ySpeed:0.85 density:1.35 flakeScale:1.18 sway:0.82 fog:0.32 noise:0.03 seed:29
 @rain power:0.85 time:0.2 xSpeed:0.5 ySpeed:5
-@char idAndAppearance:character:mira.portrait:mira:neutral pos:24,0
-@arrange ren.18,felix.50,mira.82 look! time:0.2
-Narrator: CHECKPOINT 09 - rain + snow coexist。背景切到 bg:classroom，雨雪应同时清晰存在；三名角色不应被天气层遮没。
+@char Ema.Pensive1,ArmR3 pos:24,0
+@arrange Ema.24 look! time:0.2
+Narrator: CHECKPOINT 09 - rain + snow coexist。背景切到 bg:classroom，雨雪应同时清晰存在；Ema 不应被天气层遮没。
 @flash color:#ffffff duration:120
-@slide character:mira.portrait:mira:neutral from:15,0 to:24,0 time:0.25 easing:easeOut
+@slide Ema.Pensive1,ArmR3 from:15,0 to:24,0 time:0.25 easing:easeOut
 @shake actorId:stage power:0.2 time:0.07 count:3 hor! ver!
-Narrator: CHECKPOINT 10 - white flash、Mira slide、stage shake。应看到白闪，Mira 从更左侧滑入，随后整个 Pixi stage 轻微抖动；下一步 cleanup 会连续 wait! 关闭 screen/weather 效果。
+Narrator: CHECKPOINT 10 - white flash、Ema slide、stage shake。应看到白闪，Ema 从更左侧滑入，随后整个 Pixi stage 轻微抖动；下一步 cleanup 会连续 wait! 关闭 screen/weather 效果。
 @bokeh power:0 time:0.2
 @blur actorId:MainBackground power:0 time:0.2 wait!
 @rain power:0 time:0.2 wait!

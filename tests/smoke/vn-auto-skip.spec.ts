@@ -13,7 +13,7 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
   await page.getByTestId("title-new-game").click();
   await startWitnessStory(page);
 
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("请选择测试路径");
+  await advanceUntilText(page, "请选择测试路径", 2);
   await advanceUntilChoices(page);
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("vn-command-skip")).toHaveAttribute("aria-pressed", "false");
@@ -71,11 +71,11 @@ test("VN wait! resumes from Pixi task completion and manual continue settles the
   await advanceUntilChoices(page);
   await page.getByTestId("vn-dialog-choice-1").click();
   await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 2 开始");
-  await advanceUntilText(page, "CHECKPOINT 04", 12);
+  await advanceUntilText(page, "CHECKPOINT 04", 24);
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
 
   await page.getByTestId("vn-dialog-advance").click();
-  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toContainText("actor-transition:character:felix", { timeout: 1_000 });
+  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toContainText("actor-transition:Ema", { timeout: 1_000 });
   await page.getByTestId("vn-dialog-advance").click();
 
   await expect(page.getByTestId("vn-dialog-text")).toContainText(/CHECKPOINT 0[56]/, { timeout: 2_000 });

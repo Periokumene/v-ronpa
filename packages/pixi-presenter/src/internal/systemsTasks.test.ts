@@ -1,14 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Assets, Container, Rectangle, Texture, TilingSprite, type Filter, type Ticker } from "pixi.js";
+import { Assets, Container, Rectangle, Sprite, Texture, TilingSprite, type Filter, type Ticker } from "pixi.js";
 import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "@v-ronpa/contracts";
 import { createInitialPixiStageSnapshot } from "../stageSnapshot";
 import { ActorSystem, FilterSystem, RootFilterStack, TransientEffectSystem, TweenSystem, WeatherSystem } from "./systems";
 import { PresentationTaskController } from "./presentationTasks";
 import type { PixiAssetResolver, PixiPresenterDiagnostic } from "./assetResolver";
+import { CharacterSystem } from "./characters";
 
 describe("pixi presentation task system integration", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("creates and completes an actor transition task", () => {
@@ -41,13 +43,15 @@ describe("pixi presentation task system integration", () => {
     expect(tasks.snapshot()).toEqual([]);
   });
 
-  it("loads background and portrait textures through an injected asset resolver", () => {
+  it("loads backgrounds through ActorSystem and character packs through CharacterSystem", async () => {
     const load = vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
+    const fetch = installCharacterPackFetch();
     const resolverCalls: unknown[] = [];
     const { actors } = createSystems({
       assetResolver: {
         resolve(input) {
           resolverCalls.push(input);
+          if (input.kind === "character-pack") return { uri: characterPackUri() };
           return { uri: `/resolved/${input.id}.png` };
         }
       }
@@ -55,18 +59,26 @@ describe("pixi presentation task system integration", () => {
 
     actors.reconcile(stageWithActors(
       backgroundActor({ durationMs: 0 }),
-      [characterActor("character:felix", "portrait:felix:neutral")]
+      [characterActor("Ema", "Pensive1")]
     ), false);
 
     expect(resolverCalls).toEqual([
       { id: "bg:test", kind: "background" },
-      { id: "portrait:felix:neutral", kind: "portrait" }
+      { id: "Ema", kind: "character-pack" }
     ]);
     expect(load).toHaveBeenCalledWith("/resolved/bg:test.png");
-    expect(load).toHaveBeenCalledWith("/resolved/portrait:felix:neutral.png");
+    await waitFor(() => load.mock.calls.some(([uri]) => String(uri) === "https://assets.test/characters/Ema/layers/Body.png"));
+    expect(load).toHaveBeenCalledWith("https://assets.test/characters/Ema/layers/Body.png");
+    expect(load).toHaveBeenCalledWith("https://assets.test/characters/Ema/layers/FacePensive.png");
+    expect(fetch).toHaveBeenCalledWith(characterPackUri());
+    expect(fetch).toHaveBeenCalledWith("https://assets.test/characters/Ema/layers.json");
+    expect(fetch).toHaveBeenCalledWith("https://assets.test/characters/Ema/compositions.json");
+    expect(fetch).toHaveBeenCalledWith("https://assets.test/characters/Ema/metadata/Body.json");
+    expect(fetch).toHaveBeenCalledWith("https://assets.test/characters/Ema/metadata/FacePensive.json");
+    expect(fetch).not.toHaveBeenCalledWith("https://assets.test/characters/Ema/metadata/FaceNormal.json");
   });
 
-  it("emits diagnostics for missing background and portrait assets while keeping fallbacks", () => {
+  it("emits diagnostics for missing background and character-pack assets while keeping fallbacks", () => {
     const load = vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
     const diagnostics: PixiPresenterDiagnostic[] = [];
     const { actors } = createSystems({
@@ -80,7 +92,7 @@ describe("pixi presentation task system integration", () => {
 
     actors.reconcile(stageWithActors(
       backgroundActor({ durationMs: 0 }),
-      [characterActor("character:felix", "portrait:felix:neutral")]
+      [characterActor("Ema", "Pensive1")]
     ), false);
 
     expect(load).not.toHaveBeenCalled();
@@ -97,11 +109,180 @@ describe("pixi presentation task system integration", () => {
         source: "asset",
         code: "asset-missing",
         severity: "error",
-        assetId: "portrait:felix:neutral",
-        kind: "portrait",
-        message: "portrait:felix:neutral missing"
+        assetId: "Ema",
+        kind: "character-pack",
+        message: "Ema missing"
       }
     ]);
+  });
+
+  it("atomically replaces layered character content after every active texture resolves", async () => {
+    installCharacterPackFetch();
+    const textureLoads = new Map<string, Deferred<Texture>>();
+    vi.spyOn(Assets, "load").mockImplementation((uri) => {
+      const deferred = createDeferred<Texture>();
+      textureLoads.set(String(uri), deferred);
+      return deferred.promise as never;
+    });
+    const container = new Container({ label: "actor:Ema" });
+    const stale = new Container({ label: "stale-character" });
+    container.addChild(stale);
+    const system = new CharacterSystem({
+      width: () => 960,
+      height: () => 540,
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      }
+    });
+
+    system.render(container, characterActor("Ema", "Pensive1"), 1, () => true);
+
+    await waitFor(() => textureLoads.has("https://assets.test/characters/Ema/layers/Body.png"));
+    await waitFor(() => textureLoads.has("https://assets.test/characters/Ema/layers/FacePensive.png"));
+    textureLoads.get("https://assets.test/characters/Ema/layers/Body.png")?.resolve(Texture.EMPTY);
+    await flushPromises();
+    expect(container.children).toEqual([stale]);
+
+    textureLoads.get("https://assets.test/characters/Ema/layers/FacePensive.png")?.resolve(Texture.EMPTY);
+    await waitFor(() => container.children[0]?.label === "layered-character:Ema:1");
+
+    const content = container.children[0] as Container;
+    expect(content.children.map((child) => child.zIndex)).toEqual([1, 10]);
+    const body = content.children[0] as Sprite;
+    const face = content.children[1] as Sprite;
+    expect(body.position.x).toBe(0);
+    expect(body.position.y).toBe(-10);
+    expect(face.position.x).toBe(5);
+    expect(face.position.y).toBe(-20);
+    expect(face.anchor.x).toBe(0.25);
+    expect(face.anchor.y).toBe(0.75);
+    expect(face.scale.x).toBeLessThan(0);
+    expect(face.scale.y).toBeGreaterThan(0);
+    expect(face.rotation).toBeCloseTo(-Math.PI / 2);
+    expect(face.tint).toBe(0x804020);
+    expect(face.alpha).toBe(0.5);
+  });
+
+  it("does not require inactive metadata for layers overridden by the current expression", async () => {
+    const fetch = installCharacterPackFetch({ includeInactiveMetadata: false });
+    vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
+    const diagnostics: PixiPresenterDiagnostic[] = [];
+    const container = new Container({ label: "actor:Ema" });
+    const system = new CharacterSystem({
+      width: () => 960,
+      height: () => 540,
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      },
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic)
+    });
+
+    system.render(container, characterActor("Ema", "Pensive1"), 1, () => true);
+
+    await waitFor(() => container.children[0]?.label === "layered-character:Ema:1");
+
+    expect(fetch).not.toHaveBeenCalledWith("https://assets.test/characters/Ema/metadata/FaceNormal.json");
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("diagnoses failed active texture loads with character expression and asset path", async () => {
+    installCharacterPackFetch();
+    vi.spyOn(Assets, "load").mockImplementation((uri) => {
+      if (String(uri).endsWith("/FacePensive.png")) return Promise.reject(new Error("network failed")) as never;
+      return Promise.resolve(Texture.EMPTY) as never;
+    });
+    const diagnostics: PixiPresenterDiagnostic[] = [];
+    const container = new Container({ label: "actor:Ema" });
+    container.addChild(new Container({ label: "stale-character" }));
+    const system = new CharacterSystem({
+      width: () => 960,
+      height: () => 540,
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      },
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic)
+    });
+
+    system.render(container, characterActor("Ema", "Pensive1"), 1, () => true);
+
+    await waitFor(() => diagnostics.length > 0 && container.children[0]?.label === "empty-character:Ema");
+
+    expect(diagnostics[0]).toMatchObject({
+      code: "asset-load-failed",
+      severity: "error",
+      assetId: "Ema",
+      kind: "character-pack"
+    });
+    expect(diagnostics[0]?.message).toContain("Pensive1");
+    expect(diagnostics[0]?.message).toContain("FacePensive.png");
+  });
+
+  it("rejects character packs with out-of-pack layer paths before loading textures", async () => {
+    installCharacterPackFetch({
+      mutatePack(pack) {
+        pack.layers.groups.Face.layers.FacePensive.src = "https://evil.test/FacePensive.png";
+      }
+    });
+    const load = vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
+    const diagnostics: PixiPresenterDiagnostic[] = [];
+    const container = new Container({ label: "actor:Ema" });
+    const system = new CharacterSystem({
+      width: () => 960,
+      height: () => 540,
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      },
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic)
+    });
+
+    system.render(container, characterActor("Ema", "Pensive1"), 1, () => true);
+
+    await waitFor(() => diagnostics.length > 0 && container.children[0]?.label === "empty-character:Ema");
+
+    expect(load).not.toHaveBeenCalled();
+    expect(diagnostics[0]).toMatchObject({ code: "asset-load-failed", severity: "error", assetId: "Ema" });
+    expect(diagnostics[0]?.message).toContain("pack-relative");
+  });
+
+  it("does not cache failed texture promises permanently", async () => {
+    installCharacterPackFetch();
+    let faceAttempts = 0;
+    vi.spyOn(Assets, "load").mockImplementation((uri) => {
+      if (String(uri).endsWith("/FacePensive.png")) {
+        faceAttempts += 1;
+        if (faceAttempts === 1) return Promise.reject(new Error("temporary 404")) as never;
+      }
+      return Promise.resolve(Texture.EMPTY) as never;
+    });
+    const diagnostics: PixiPresenterDiagnostic[] = [];
+    const container = new Container({ label: "actor:Ema" });
+    const system = new CharacterSystem({
+      width: () => 960,
+      height: () => 540,
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      },
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic)
+    });
+
+    system.render(container, characterActor("Ema", "Pensive1"), 1, () => true);
+    await waitFor(() => container.children[0]?.label === "empty-character:Ema");
+
+    system.render(container, characterActor("Ema", "Pensive1"), 2, () => true);
+    await waitFor(() => container.children[0]?.label === "layered-character:Ema:2");
+
+    expect(faceAttempts).toBe(2);
+    expect(diagnostics).toHaveLength(1);
   });
 
 
@@ -409,6 +590,7 @@ function backgroundActor({ durationMs, wait = false }: { durationMs: number; wai
     id: "MainBackground",
     kind: "background",
     appearance: "bg:test",
+    appearanceExpression: "",
     visible: true,
     alpha: 1,
     z: 0,
@@ -417,11 +599,11 @@ function backgroundActor({ durationMs, wait = false }: { durationMs: number; wai
   };
 }
 
-function characterActor(id: string, appearance: string): PixiActorSnapshot {
+function characterActor(id: string, appearanceExpression: string): PixiActorSnapshot {
   return {
     id,
     kind: "character",
-    appearance,
+    appearanceExpression,
     visible: true,
     alpha: 1,
     z: 0,
@@ -474,4 +656,152 @@ function findWeatherContainer(root: Container, kind: string): Container | undefi
     if (weather) return weather;
   }
   return undefined;
+}
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve(value: T): void;
+  reject(error: unknown): void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function waitFor(assertion: () => void | boolean): Promise<void> {
+  let lastError: unknown;
+  for (let index = 0; index < 20; index += 1) {
+    try {
+      const passed = assertion();
+      if (passed === false) throw new Error("waitFor predicate returned false");
+      return;
+    } catch (error) {
+      lastError = error;
+      await flushPromises();
+    }
+  }
+  throw lastError;
+}
+
+async function flushPromises(): Promise<void> {
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function characterPackUri(): string {
+  return "https://assets.test/characters/Ema/character.json";
+}
+
+function installCharacterPackFetch(options: {
+  includeInactiveMetadata?: boolean;
+  mutatePack?: (pack: ReturnType<typeof characterPackFixture>) => void;
+} = {}) {
+  const pack = characterPackFixture();
+  options.mutatePack?.(pack);
+  const responses: Record<string, unknown> = {
+    [characterPackUri()]: pack.character,
+    "https://assets.test/characters/Ema/layers.json": pack.layers,
+    "https://assets.test/characters/Ema/compositions.json": pack.compositions,
+    "https://assets.test/characters/Ema/metadata/Body.json": pack.metadata.Body,
+    "https://assets.test/characters/Ema/metadata/FacePensive.json": pack.metadata.FacePensive
+  };
+  if (options.includeInactiveMetadata !== false) {
+    responses["https://assets.test/characters/Ema/metadata/FaceNormal.json"] = pack.metadata.FaceNormal;
+  }
+  const fetch = vi.fn(async (input: string | URL | Request) => {
+    const uri = String(input);
+    const body = responses[uri];
+    if (body === undefined) {
+      return {
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+        json: async () => ({})
+      } as Response;
+    }
+    return {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => body
+    } as Response;
+  });
+  vi.stubGlobal("fetch", fetch);
+  return fetch;
+}
+
+function characterPackFixture() {
+  return {
+    character: {
+      id: "Ema",
+      defaultComposition: ["Default"],
+      renderSpace: { stageScale: 10, defaultBounds: { min: [-1, 0], max: [1, 4] } }
+    },
+    layers: {
+      groups: {
+        Body: { layers: { Body: { src: "layers/Body.png", metadata: "metadata/Body.json" } } },
+        Face: {
+          layers: {
+            FaceNormal: { src: "layers/FaceNormal.png", metadata: "metadata/FaceNormal.json" },
+            FacePensive: { src: "layers/FacePensive.png", metadata: "metadata/FacePensive.json" }
+          }
+        }
+      }
+    },
+    compositions: {
+      tokens: {
+        Default: ["Body>Body", "Face>FaceNormal"],
+        Pensive1: ["Face>FacePensive"]
+      }
+    },
+    metadata: {
+      Body: layerMetadata("Body", 1, { x: 0, y: 1, z: 0 }),
+      FaceNormal: layerMetadata("FaceNormal", 10, { x: 0, y: 2, z: 0 }),
+      FacePensive: layerMetadata("FacePensive", 10, { x: 0.5, y: 2, z: 0 }, {
+        pivot: { x: 0.25, y: 0.75 },
+        rotationZ: 90,
+        color: { r: 0.5, g: 0.25, b: 0.125, a: 0.5 },
+        flipX: true
+      })
+    }
+  };
+}
+
+function layerMetadata(
+  name: string,
+  drawOrder: number,
+  position: { x: number; y: number; z: number },
+  options: {
+    pivot?: { x: number; y: number };
+    rotationZ?: number;
+    color?: { r: number; g: number; b: number; a: number };
+    flipX?: boolean;
+  } = {}
+) {
+  return {
+    sourcePath: `Ema/${name}`,
+    drawOrder,
+    texture: { fileName: `${name}.png`, mimeType: "image/png", size: { width: 100, height: 200 } },
+    sprite: {
+      rect: { x: 0, y: 0, width: 100, height: 200 },
+      pivot: options.pivot ?? { x: 0.5, y: 0.5 },
+      pixelsPerUnit: 100
+    },
+    localTransform: {
+      position,
+      scale: { x: 1, y: 1, z: 1 },
+      rotation: { x: 0, y: 0, z: options.rotationZ ?? 0 }
+    },
+    renderer: {
+      color: options.color ?? { r: 1, g: 1, b: 1, a: 1 },
+      flipX: options.flipX ?? false,
+      flipY: false
+    }
+  };
 }

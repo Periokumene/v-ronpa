@@ -1,0 +1,56 @@
+{
+  "sourcePath": "Ema/Angle01/Head01/Facial01/Mouth01/Mouth01_Confused_Middle",
+  "drawOrder": 34,
+  "texture": {
+    "fileName": "Mouth01_Confused_Middle.png",
+    "mimeType": "image/png",
+    "size": {
+      "width": 105,
+      "height": 50
+    }
+  },
+  "sprite": {
+    "rect": {
+      "x": 2387,
+      "y": 8045,
+      "width": 105,
+      "height": 50
+    },
+    "pivot": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "pixelsPerUnit": 100
+  },
+  "localTransform": {
+    "position": {
+      "x": -0.1270000456,
+      "y": 22.4789988,
+      "z": 0
+    },
+    "scale": {
+      "x": 0.6,
+      "y": 0.6,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false,
+    "size": {
+      "x": 1.05,
+      "y": 0.5
+    }
+  }
+}

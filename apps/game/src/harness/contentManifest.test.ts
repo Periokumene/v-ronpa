@@ -13,7 +13,7 @@ describe("harness content manifest", () => {
     expect(registry.diagnostics).toEqual([]);
     expect(registry.validateReferences()).toEqual([]);
     expect(registry.resolve({ id: "bg:harness", kind: "background" }).uri).toBe("/harness/backgrounds/harness.png");
-    expect(registry.resolve({ id: "portrait:ren:neutral", kind: "portrait" }).uri).toBe("/harness/portraits/ren-neutral.png");
+    expect(registry.resolve({ id: "Ema", kind: "character-pack" }).uri).toBe("/harness/characters/Ema/character.json");
     expect(registry.resolve({ id: "model:academy-hall", kind: "glb" }).uri).toBe("/harness/models/academy-hall.gltf");
     expect(registry.resolve({ id: "texture:evidence:keycard-thumbnail", kind: "texture" }).uri).toBe("/harness/thumbnails/evidence-keycard.png");
     expect(registry.resolve({ id: "voice:zh:voice_validation_0001", kind: "voice" }).uri).toBe("/harness/media/voice/zh/voice_validation_0001.ogg");

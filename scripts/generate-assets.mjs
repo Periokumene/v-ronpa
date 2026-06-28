@@ -8,7 +8,6 @@ const outputPath = join(repoRoot, "apps/game/src/harness/generatedAssets.ts");
 
 const kindByDirectory = new Map([
   ["backgrounds", "background"],
-  ["portraits", "portrait"],
   ["media/bgm", "bgm"],
   ["media/sfx", "sfx"],
   ["media/video", "video"],
@@ -19,6 +18,7 @@ const kindByDirectory = new Map([
 const formatByExtension = new Map([
   [".gltf", "gltf"],
   [".glb", "glb"],
+  [".json", "json"],
   [".png", "png"],
   [".webp", "webp"],
   [".avif", "avif"],
@@ -80,6 +80,7 @@ export function collectHarnessRuntimeAssets() {
 function kindForRelativePath(rel) {
   const parts = rel.split("/");
   if (parts[0] === "media" && parts[1] === "voice") return parts.length === 4 ? "voice" : undefined;
+  if (/^characters\/[^/]+\/character\.json$/u.test(rel)) return "character-pack";
   const withoutFile = rel.split("/").slice(0, -1).join("/");
   return kindByDirectory.get(withoutFile);
 }
@@ -87,17 +88,13 @@ function kindForRelativePath(rel) {
 function idForRelativePath(rel, kind) {
   const override = idOverrides.get(rel);
   if (override) return override;
+  if (kind === "character-pack") return rel.split("/")[1];
   const name = rel.split("/").at(-1).replace(extname(rel), "");
   if (kind === "voice") {
     const locale = rel.split("/").at(2);
     return `voice:${locale}:${name}`;
   }
   if (kind === "background") return `bg:${name}`;
-  if (kind === "portrait") {
-    const [character, ...expressionParts] = name.split("-");
-    const expression = expressionParts.join("-");
-    return `portrait:${character}:${expression}`;
-  }
   if (kind === "bgm") return `bgm:${name}`;
   if (kind === "sfx") return `sfx:${name}`;
   if (kind === "video") return `video:${name}`;

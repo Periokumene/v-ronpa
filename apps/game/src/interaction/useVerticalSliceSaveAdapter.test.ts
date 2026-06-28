@@ -37,9 +37,11 @@ describe("vertical slice save adapter", () => {
       version: 2,
       mode: "navi",
       pixiStage: {
-        version: 2,
+        version: 3,
         revision: 1,
-        background: { backgroundId: "bg:harness" }
+        backgroundsById: {
+          MainBackground: { appearance: "bg:harness" }
+        }
       },
       inventory: { items: { "gift:coffee": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"] }

@@ -10,6 +10,9 @@ import {
   InputActionStateSchema,
   InteractionCapabilitySnapshotSchema,
   InteractionStyleProfileSchema,
+  LayeredCharacterDefinitionSchema,
+  LayeredCharacterLayerRefSchema,
+  LayeredCharacterLayerMetadataSchema,
   NaniCommandDefinitionSchema,
   NaniCommandExecutionSchema,
   NaniCommandStatusSchema,
@@ -40,7 +43,7 @@ describe("contracts", () => {
     const manifest = ContentManifestSchema.parse({
       version: 2,
       assets: [
-        { id: "portrait:hero:neutral", kind: "portrait", tags: ["placeholder"] },
+        { id: "Ema", kind: "character-pack", tags: ["placeholder"] },
         { id: "texture:evidence:keycard-icon", kind: "texture", tags: ["placeholder", "evidence"] }
       ],
       uiAssets: [
@@ -62,12 +65,12 @@ describe("contracts", () => {
       ],
       runtimeAssets: [
         {
-          id: "portrait:hero:neutral",
-          kind: "portrait",
-          sourceUri: "assets/source/hero.psd",
-          optimizedUri: "assets/runtime/hero.webp",
-          format: "webp",
-          compression: ["webp"],
+          id: "Ema",
+          kind: "character-pack",
+          sourceUri: "assets/source/characters/Ema/character.json",
+          optimizedUri: "assets/runtime/characters/Ema/character.json",
+          format: "json",
+          compression: [],
           lods: [],
           collisionProxyIds: []
         },
@@ -228,7 +231,7 @@ describe("contracts", () => {
 
   it("validates Pixi stage snapshots without command history or renderer runtime", () => {
     const snapshot = PixiStageSnapshotSchema.parse({
-      version: 2,
+      version: 3,
       revision: 3,
       backgroundsById: {
         MainBackground: {
@@ -238,10 +241,10 @@ describe("contracts", () => {
         }
       },
       charactersById: {
-        "character:felix": {
-          id: "character:felix",
+        Ema: {
+          id: "Ema",
           kind: "character",
-          appearance: "portrait:felix:neutral",
+          appearanceExpression: "Pensive1,ArmR3",
           pos: [0.5, 0],
           visible: true,
           transition: {
@@ -252,7 +255,7 @@ describe("contracts", () => {
           }
         }
       },
-      actorOrder: ["MainBackground", "character:felix"],
+      actorOrder: ["MainBackground", "Ema"],
       weather: {
         rain: {
           kind: "rain",
@@ -262,24 +265,16 @@ describe("contracts", () => {
       },
       screenFilters: {
         bokeh: {
-          focus: "character:felix",
+          focus: "Ema",
           dist: 0.3,
           power: 0.75,
           transition: { durationMs: 200 }
-        }
-      },
-      background: { backgroundId: "bg:harness" },
-      slots: {
-        center: {
-          slot: "center",
-          characterId: "character:felix",
-          portraitId: "portrait:felix:neutral"
         }
       }
     });
 
     expect(snapshot).toMatchObject({
-      version: 2,
+      version: 3,
       revision: 3,
       backgroundsById: {
         MainBackground: {
@@ -292,10 +287,10 @@ describe("contracts", () => {
         }
       },
       charactersById: {
-        "character:felix": {
-          id: "character:felix",
+        Ema: {
+          id: "Ema",
           kind: "character",
-          appearance: "portrait:felix:neutral",
+          appearanceExpression: "Pensive1,ArmR3",
           pos: [0.5, 0],
           transition: {
             name: "slide",
@@ -306,7 +301,7 @@ describe("contracts", () => {
           visible: true
         }
       },
-      actorOrder: ["MainBackground", "character:felix"],
+      actorOrder: ["MainBackground", "Ema"],
       weather: {
         rain: {
           kind: "rain",
@@ -316,27 +311,33 @@ describe("contracts", () => {
       },
       screenFilters: {
         bokeh: {
-          focus: "character:felix",
+          focus: "Ema",
           dist: 0.3,
           power: 0.75,
           transition: { durationMs: 200, lazy: false, wait: false }
-        }
-      },
-      background: { backgroundId: "bg:harness" },
-      slots: {
-        center: {
-          slot: "center",
-          characterId: "character:felix",
-          portraitId: "portrait:felix:neutral"
         }
       }
     });
     expect(snapshot).not.toHaveProperty("commands");
     expect(snapshot).not.toHaveProperty("displayObjects");
+    expect(snapshot).not.toHaveProperty("background");
+    expect(snapshot).not.toHaveProperty("slots");
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 2,
+        version: 3,
         slots: { left: { slot: "right", characterId: "character:mira" } }
+      })
+    ).toThrow();
+    expect(() =>
+      PixiStageSnapshotSchema.parse({
+        version: 3,
+        charactersById: {
+          Ema: {
+            id: "Ema",
+            kind: "character",
+            appearance: "portrait:ema:neutral"
+          }
+        }
       })
     ).toThrow();
   });
@@ -348,7 +349,7 @@ describe("contracts", () => {
     );
 
     const snapshot = PixiStageSnapshotSchema.parse({
-      version: 2,
+      version: 3,
       weather: {
         snow: {
           kind: "snow",
@@ -378,7 +379,7 @@ describe("contracts", () => {
     });
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 2,
+        version: 3,
         weather: { snow: { kind: "snow", density: -1, transition: { durationMs: 0 } } }
       })
     ).toThrow();
@@ -395,7 +396,7 @@ describe("contracts", () => {
     );
 
     const snapshot = PixiStageSnapshotSchema.parse({
-      version: 2,
+      version: 3,
       screenFilters: {
         glitch: {
           power: 0.4,
@@ -583,14 +584,65 @@ describe("contracts", () => {
 
     expect(
       RuntimeAssetSchema.parse({
-        id: "texture:portrait:felix",
+        id: "texture:character:Ema",
         kind: "texture",
-        optimizedUri: "/assets/portrait-felix.webp",
+        optimizedUri: "/assets/characters/Ema/atlas.webp",
         format: "webp",
         compression: ["webp"],
         textureBudget: { maxSizePx: 2048, maxBytes: 1048576 }
       })
     ).toMatchObject({ collisionProxyIds: [], lods: [] });
+  });
+
+  it("validates layered character metadata color ranges", () => {
+    const metadata = {
+      sourcePath: "Ema/Body",
+      drawOrder: 10,
+      texture: { fileName: "Body.png", mimeType: "image/png", size: { width: 100, height: 200 } },
+      sprite: { rect: { x: 0, y: 0, width: 100, height: 200 }, pivot: { x: 0.5, y: 0.5 }, pixelsPerUnit: 100 },
+      localTransform: {
+        position: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        rotation: { x: 0, y: 0, z: 0 }
+      },
+      renderer: { color: { r: 1, g: 0.5, b: 0, a: 0.75 }, flipX: false, flipY: false }
+    };
+
+    expect(LayeredCharacterLayerMetadataSchema.parse(metadata).renderer.color.a).toBe(0.75);
+    expect(() =>
+      LayeredCharacterLayerMetadataSchema.parse({
+        ...metadata,
+        renderer: { ...metadata.renderer, color: { ...metadata.renderer.color, a: 1.2 } }
+      })
+    ).toThrow();
+  });
+
+  it("validates layered character pack-relative paths and render bounds", () => {
+    expect(
+      LayeredCharacterLayerRefSchema.parse({
+        src: "assets/layers/Body.png",
+        metadata: "assets/layers/Body.json"
+      })
+    ).toMatchObject({ src: "assets/layers/Body.png" });
+    expect(() =>
+      LayeredCharacterLayerRefSchema.parse({
+        src: "https://assets.test/Body.png",
+        metadata: "assets/layers/Body.json"
+      })
+    ).toThrow();
+    expect(() =>
+      LayeredCharacterLayerRefSchema.parse({
+        src: "../shared/Body.png",
+        metadata: "assets/layers/Body.json"
+      })
+    ).toThrow();
+    expect(() =>
+      LayeredCharacterDefinitionSchema.parse({
+        id: "Ema",
+        defaultComposition: ["Default"],
+        renderSpace: { stageScale: 1, defaultBounds: { min: [2, 0], max: [1, 4] } }
+      })
+    ).toThrow();
   });
 
   it("validates game interaction shell contracts", () => {
@@ -930,7 +982,7 @@ describe("contracts", () => {
         ended: false
       },
       pixiStage: {
-        version: 2,
+        version: 3,
         revision: 2,
         backgroundsById: {
           MainBackground: {
@@ -940,20 +992,16 @@ describe("contracts", () => {
           }
         },
         charactersById: {
-          "character:felix": {
-            id: "character:felix",
+          Ema: {
+            id: "Ema",
             kind: "character",
-            appearance: "portrait:felix:neutral",
+            appearanceExpression: "Pensive1,ArmR3",
             pos: [0.5, 0]
           }
         },
-        actorOrder: ["MainBackground", "character:felix"],
+        actorOrder: ["MainBackground", "Ema"],
         weather: {},
-        screenFilters: {},
-        background: { backgroundId: "bg:harness" },
-        slots: {
-          center: { slot: "center", characterId: "character:felix", portraitId: "portrait:felix:neutral" }
-        }
+        screenFilters: {}
       },
       inventory: { items: { "gift:coffee": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"] },
@@ -961,7 +1009,8 @@ describe("contracts", () => {
     });
 
     expect(save.version).toBe(2);
-    expect(save.pixiStage.background?.backgroundId).toBe("bg:harness");
+    expect(save.pixiStage.backgroundsById.MainBackground?.appearance).toBe("bg:harness");
+    expect(save.pixiStage.charactersById.Ema?.appearanceExpression).toBe("Pensive1,ArmR3");
     expect(save).not.toHaveProperty("summary");
   });
 
@@ -1000,7 +1049,7 @@ describe("contracts", () => {
         ended: false,
         emittedRuntimeCommands: []
       },
-      pixiStage: { version: 2, revision: 0, backgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {}, slots: {} },
+      pixiStage: { version: 3, revision: 0, backgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
       inventory: { items: {} },
       evidence: { ownedEvidenceIds: [] },
       characters: {}

@@ -546,11 +546,11 @@ function normalizeBackCommand(command: CommandShape): NormalizedCommandParams {
 }
 
 function normalizeCharCommand(command: CommandShape): NormalizedCommandParams {
-  const named = splitNamedString(runtimeCommandValue(command.primary) ?? runtimeParam(command, "idAndAppearance"));
+  const named = splitNamedAppearanceExpression(runtimeCommandValue(command.primary) ?? runtimeParam(command, "idAndAppearance"));
   return {
     params: compactParams({
       target: runtimeParam(command, "id") ?? named.id,
-      appearance: runtimeParam(command, "appearance") ?? named.value,
+      appearanceExpression: named.value ?? "",
       pose: runtimeParam(command, "pose"),
       transition: runtimeParam(command, "via"),
       transitionParams: runtimeParam(command, "params"),
@@ -562,7 +562,6 @@ function normalizeCharCommand(command: CommandShape): NormalizedCommandParams {
     consumesParams: [
       "idAndAppearance",
       "id",
-      "appearance",
       "pose",
       "via",
       "params",
@@ -602,13 +601,13 @@ function normalizeHideCharsCommand(command: CommandShape): NormalizedCommandPara
 }
 
 function normalizeSlideCommand(command: CommandShape): NormalizedCommandParams {
-  const named = splitNamedString(runtimeCommandValue(command.primary) ?? runtimeParam(command, "idAndAppearance"));
+  const named = splitNamedAppearanceExpression(runtimeCommandValue(command.primary) ?? runtimeParam(command, "idAndAppearance"));
   return {
     params: compactParams({
       target: named.id,
-      appearance: named.value,
-      from: runtimeParam(command, "from"),
-      to: runtimeParam(command, "to"),
+      appearanceExpression: named.value,
+      from: scenePositionRuntimeParam(command, "from"),
+      to: scenePositionRuntimeParam(command, "to"),
       visible: runtimeParam(command, "visible"),
       ...normalizeTimingParams(command)
     }),
@@ -735,7 +734,7 @@ function normalizeWeatherCommand(command: CommandShape, kind: string): Normalize
 
 function normalizeActorTransformParams(command: CommandShape): Record<string, RuntimeValue | undefined> {
   return {
-    pos: runtimeParam(command, "pos"),
+    pos: scenePositionRuntimeParam(command, "pos"),
     position: runtimeParam(command, "position"),
     rotation: runtimeParam(command, "rotation"),
     scale: runtimeParam(command, "scale"),
@@ -760,6 +759,37 @@ function splitNamedString(value: RuntimeValue | undefined): { id?: RuntimeValue;
   const dot = value.indexOf(".");
   if (dot < 0) return { id: value };
   return { id: value.slice(0, dot), value: value.slice(dot + 1) };
+}
+
+function splitNamedAppearanceExpression(value: RuntimeValue | undefined): { id?: RuntimeValue; value?: RuntimeValue } {
+  if (value === undefined) return {};
+  if (Array.isArray(value)) {
+    const [first, ...rest] = value;
+    if (typeof first !== "string") return { id: value };
+    const named = splitNamedString(first);
+    if (typeof named.id !== "string") return { id: value };
+    if (typeof named.value !== "string") return { id: named.id };
+    const expressions = [named.value, ...rest.map(stringRuntimeValue)].filter((item): item is string => Boolean(item));
+    return {
+      id: named.id,
+      value: expressions.join(",")
+    };
+  }
+  return splitNamedString(value);
+}
+
+function stringRuntimeValue(value: RuntimeValue): string | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return undefined;
+}
+
+function scenePositionRuntimeParam(command: CommandShape, key: string): RuntimeValue | undefined {
+  const value = runtimeParam(command, key);
+  if (value === undefined) return undefined;
+  if (typeof value === "number") return [value, 0];
+  if (value && !Array.isArray(value) && typeof value === "object" && value.type === "expression") return [value, 0];
+  return value;
 }
 
 function durationMsValue(value: RuntimeValue | undefined): RuntimeValue | undefined {
@@ -910,6 +940,7 @@ function allowsDynamicAssignmentParam(definition: NaniCommandDefinition): boolea
 function isCompatibleCommandValue(value: NaniValue, officialType: string): boolean {
   const normalized = officialType.toLowerCase();
   if (normalized.includes("list")) {
+    if (normalized === "decimal list" && (value.type === "number" || value.type === "expression")) return true;
     if (value.type !== "list") return normalized.startsWith("named ");
     const itemType = normalized.includes("decimal") ? "decimal" : normalized.includes("boolean") ? "boolean" : "string";
     return value.value.every((item) => isCompatibleCommandValue(item, itemType));

@@ -1,10 +1,8 @@
 import type { RuntimeCommand, RuntimeValue } from "@v-ronpa/contracts";
-import type { PortraitSlot } from "./portraits";
 
-export interface PresenterTracePortrait {
+export interface PresenterTraceCharacter {
   characterId: string;
-  portraitId?: string;
-  slot: PortraitSlot;
+  appearanceExpression: string;
 }
 
 export interface PresenterTracePerform {
@@ -16,7 +14,7 @@ export interface PresenterTracePerform {
 
 export interface PresenterTrace {
   backgroundId?: string;
-  portraits: PresenterTracePortrait[];
+  characters: PresenterTraceCharacter[];
   commands: RuntimeCommand[];
   activePerforms: PresenterTracePerform[];
 }
@@ -29,7 +27,7 @@ export interface PresenterTraceRecorder {
 
 export function createPresenterTraceRecorder(): PresenterTraceRecorder {
   const trace: PresenterTrace = {
-    portraits: [],
+    characters: [],
     commands: [],
     activePerforms: []
   };
@@ -46,15 +44,11 @@ export function createPresenterTraceRecorder(): PresenterTraceRecorder {
       if (command.commandId === "char") {
         const characterId = stringParam(command, "target");
         if (!characterId) return undefined;
-        const slot = legacySlotForPos(command);
-        trace.portraits = trace.portraits.filter((portrait) => portrait.slot !== slot);
-        const portrait: PresenterTracePortrait = {
+        trace.characters = trace.characters.filter((character) => character.characterId !== characterId);
+        trace.characters.push({
           characterId,
-          slot
-        };
-        const portraitId = stringParam(command, "appearance");
-        if (portraitId) portrait.portraitId = portraitId;
-        trace.portraits.push(portrait);
+          appearanceExpression: stringParam(command, "appearanceExpression") ?? ""
+        });
       }
 
       if (command.commandId === "shake" || command.commandId === "flash" || command.commandId === "focus") {
@@ -73,7 +67,7 @@ export function createPresenterTraceRecorder(): PresenterTraceRecorder {
     },
     getTrace() {
       const current: PresenterTrace = {
-        portraits: [...trace.portraits],
+        characters: [...trace.characters],
         commands: [...trace.commands],
         activePerforms: [...trace.activePerforms]
       };
@@ -82,19 +76,11 @@ export function createPresenterTraceRecorder(): PresenterTraceRecorder {
     },
     clear() {
       delete trace.backgroundId;
-      trace.portraits = [];
+      trace.characters = [];
       trace.commands = [];
       trace.activePerforms = [];
     }
   };
-}
-
-function legacySlotForPos(command: RuntimeCommand): PortraitSlot {
-  const pos = vectorParam(command, "pos");
-  const x = pos?.[0] ?? 0.5;
-  if (x < 0.38) return "left";
-  if (x > 0.62) return "right";
-  return "center";
 }
 
 function stringParam(command: RuntimeCommand, key: string): string | undefined {
@@ -105,12 +91,6 @@ function stringParam(command: RuntimeCommand, key: string): string | undefined {
 function numberParam(command: RuntimeCommand, key: string): number | undefined {
   const value = scalarValue(command.params[key]);
   return typeof value === "number" ? value : undefined;
-}
-
-function vectorParam(command: RuntimeCommand, key: string): number[] | undefined {
-  const value = command.params[key];
-  if (Array.isArray(value)) return value.map(scalarValue).filter((item): item is number => typeof item === "number");
-  return undefined;
 }
 
 function scalarValue(value: RuntimeValue | undefined): string | number | boolean | undefined {

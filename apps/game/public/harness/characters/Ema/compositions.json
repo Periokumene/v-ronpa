@@ -1,0 +1,268 @@
+{
+  "tokens": {
+    "ArmR1": [
+      "Angle01/ArmR>ArmR01",
+      "Angle01/Shadow-"
+    ],
+    "ArmR2-1": [
+      "Angle01/ArmR>ArmR02_01",
+      "Angle01/Shadow-"
+    ],
+    "ArmR2-2": [
+      "Angle01/ArmR>ArmR02_02",
+      "Angle01/Shadow-"
+    ],
+    "ArmR3": [
+      "Angle01/ArmR>ArmR03",
+      "Angle01/Shadow-"
+    ],
+    "ArmR4": [
+      "Angle01/ArmR>ArmR04",
+      "Angle01/Shadow-"
+    ],
+    "ArmR5": [
+      "Angle01/ArmR>ArmR05",
+      "Angle01/Shadow-"
+    ],
+    "ArmR6": [
+      "Angle01/ArmR>ArmR06",
+      "Angle01/Shadow-"
+    ],
+    "ArmR7": [
+      "Angle01/ArmR>ArmR07",
+      "Angle01/Shadow-"
+    ],
+    "ArmR8": [
+      "Angle01/ArmR>ArmR08",
+      "Angle01/Shadow-"
+    ],
+    "ArmR9": [
+      "Angle01/ArmR>ArmR09",
+      "Angle01/Shadow-"
+    ],
+    "ArmR10": [
+      "Angle01/ArmR>ArmR10",
+      "Angle01/Shadow>Shadow_ArmR10"
+    ],
+    "ArmR11": [
+      "Angle01/ArmR>ArmR11",
+      "Angle01/Shadow-"
+    ],
+    "ArmR12": [
+      "Angle01/ArmR>ArmR12",
+      "Angle01/Shadow>Shadow_ArmR12"
+    ],
+    "ArmR13": [
+      "Angle01/ArmR>ArmR13",
+      "Angle01/Shadow>Shadow_ArmR13"
+    ],
+    "ArmL1": [
+      "Angle01/ArmL>ArmL01"
+    ],
+    "ArmL2": [
+      "Angle01/ArmL>ArmL02"
+    ],
+    "ArmL3": [
+      "Angle01/ArmL>ArmL03"
+    ],
+    "ArmL4": [
+      "Angle01/ArmL>ArmL04"
+    ],
+    "ArmL5": [
+      "Angle01/ArmL>ArmL05"
+    ],
+    "ArmL6": [
+      "Angle01/ArmL>ArmL06"
+    ],
+    "ArmL7": [
+      "Angle01/ArmL>ArmL07"
+    ],
+    "ArmL8": [
+      "Angle01/ArmL>ArmL08"
+    ],
+    "ArmL9": [
+      "Angle01/ArmL>ArmL09"
+    ],
+    "ArmL10": [
+      "Angle01/ArmL>ArmL10"
+    ],
+    "ArmL11": [
+      "Angle01/ArmL>ArmL11"
+    ],
+    "ArmL12": [
+      "Angle01/ArmL>ArmL12"
+    ],
+    "ArmL13": [
+      "Angle01/ArmL>ArmL13"
+    ],
+    "ArmL14": [
+      "Angle01/ArmL>ArmL14"
+    ],
+    "ArmL15": [
+      "Angle01/ArmL>ArmL15"
+    ],
+    "ArmL16": [
+      "Angle01/ArmL>ArmL16"
+    ],
+    "Head1": [
+      "Angle01/Head02-",
+      "Angle01/Head01+FacialLineDrawing01",
+      "Angle01/Head01+HairClippingMask01",
+      "Angle01/Head01+HeadBase01"
+    ],
+    "Head2": [
+      "Angle01/Head01-",
+      "Angle01/Head02+FacialLineDrawing02",
+      "Angle01/Head02+HairClippingMask02",
+      "Angle01/Head02+HeadBase02"
+    ],
+    "Pale1-1": [
+      "Angle01/Head01/Facial01/Pale01>Pale01_01"
+    ],
+    "Pale1-2": [
+      "Angle01/Head01/Facial01/Pale01>Pale01_02"
+    ],
+    "Pale1-3": [
+      "Angle01/Head01/Facial01/Pale01>Pale01_03"
+    ],
+    "Pale1-Off": [
+      "Angle01/Head01/Facial01/Pale01-"
+    ],
+    "Pale2-1": [
+      "Angle01/Head02/Facial02/Pale02>Pale02_01"
+    ],
+    "Pale2-2": [
+      "Angle01/Head02/Facial02/Pale02>Pale02_02"
+    ],
+    "Pale2-3": [
+      "Angle01/Head02/Facial02/Pale02>Pale02_03"
+    ],
+    "Pale2-Off": [
+      "Angle01/Head02/Facial02/Pale02-"
+    ],
+    "Sweat1-1": [
+      "Angle01/Head01/Facial01/Sweat01>Sweat01_01"
+    ],
+    "Sweat1-Off": [
+      "Angle01/Head01/Facial01/Sweat01-"
+    ],
+    "Sweat2-1": [
+      "Angle01/Head02/Facial02/Sweat02>Sweat02_01"
+    ],
+    "Sweat2-Off": [
+      "Angle01/Head02/Facial02/Sweat02-"
+    ],
+    "Cheeks1-Normal": [
+      "Angle01/Head01/Facial01/Cheeks01>Cheeks01_Normal"
+    ],
+    "Cheeks1-Flushed": [
+      "Angle01/Head01/Facial01/Cheeks01>Cheeks01_Flushed"
+    ],
+    "Cheeks1-Off": [
+      "Angle01/Head01/Facial01/Cheeks01-"
+    ],
+    "Cheeks2-Normal": [
+      "Angle01/Head02/Facial02/Cheeks02>Cheeks02_Normal"
+    ],
+    "Cheeks2-Off": [
+      "Angle01/Head02/Facial02/Cheeks02-"
+    ],
+    "Normal1": [
+      "Head1",
+      "Pale1-Off",
+      "Sweat1-Off",
+      "Cheeks1-Normal",
+      "Angle01/Head01/Facial01/Eyes01>Eyes01_Normal_Open01",
+      "Angle01/Head01/Facial01/Mouth01>Mouth01_Normal_Closed"
+    ],
+    "Smile1": [
+      "Head1",
+      "Pale1-Off",
+      "Sweat1-Off",
+      "Cheeks1-Normal",
+      "Angle01/Head01/Facial01/Eyes01>Eyes01_Smile_Closed01",
+      "Angle01/Head01/Facial01/Mouth01>Mouth01_Smile_Open"
+    ],
+    "Angry1": [
+      "Head1",
+      "Pale1-Off",
+      "Sweat1-Off",
+      "Cheeks1-Normal",
+      "Angle01/Head01/Facial01/Eyes01>Eyes01_Angry_Open01",
+      "Angle01/Head01/Facial01/Mouth01>Mouth01_Angry_Open"
+    ],
+    "Pensive1": [
+      "Head1",
+      "Pale1-Off",
+      "Sweat1-Off",
+      "Cheeks1-Normal",
+      "Angle01/Head01/Facial01/Eyes01>Eyes01_Pensive_Open01",
+      "Angle01/Head01/Facial01/Mouth01>Mouth01_Pensive_Open"
+    ],
+    "Cry1": [
+      "Head1",
+      "Pale1-Off",
+      "Sweat1-Off",
+      "Cheeks1-Normal",
+      "Angle01/Head01/Facial01/Eyes01>Eyes01_Cry_Lifeless01",
+      "Angle01/Head01/Facial01/Mouth01>Mouth01_Cry_Open"
+    ],
+    "Flushed1": [
+      "Head1",
+      "Pale1-Off",
+      "Sweat1-Off",
+      "Cheeks1-Flushed",
+      "Angle01/Head01/Facial01/Eyes01>Eyes01_Flushed_Open01",
+      "Angle01/Head01/Facial01/Mouth01>Mouth01_Flushed_Middle"
+    ],
+    "Surprised1": [
+      "Head1",
+      "Pale1-Off",
+      "Sweat1-1",
+      "Cheeks1-Normal",
+      "Angle01/Head01/Facial01/Eyes01>Eyes01_Surprised_Open01",
+      "Angle01/Head01/Facial01/Mouth01>Mouth01_Surprised_Open"
+    ],
+    "Fearful1": [
+      "Head1",
+      "Pale1-1",
+      "Sweat1-Off",
+      "Cheeks1-Off",
+      "Angle01/Head01/Facial01/Eyes01>Eyes01_Fearful_Open01",
+      "Angle01/Head01/Facial01/Mouth01>Mouth01_Fearful_Open"
+    ],
+    "Determined2": [
+      "Head2",
+      "Pale2-Off",
+      "Sweat2-Off",
+      "Cheeks2-Normal",
+      "Angle01/Head02/Facial02/Eyes02>Eyes02_Determined_Open",
+      "Angle01/Head02/Facial02/Mouth02>Mouth02_Determined_Closed"
+    ],
+    "Default": [
+      "Angle01>Body",
+      "Normal1"
+    ],
+    "Smile": [
+      "Smile1"
+    ],
+    "Angry": [
+      "Angry1"
+    ],
+    "Pensive": [
+      "Pensive1"
+    ],
+    "Cry": [
+      "Cry1"
+    ],
+    "Flushed": [
+      "Flushed1"
+    ],
+    "Surprised": [
+      "Surprised1"
+    ],
+    "Fearful": [
+      "Fearful1"
+    ]
+  }
+}

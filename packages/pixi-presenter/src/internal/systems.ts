@@ -18,8 +18,8 @@ import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "
 import type { PixiStageRenderHint } from "../stageSnapshot";
 import { getBuiltInPixiFxTexture } from "./fxAssets";
 import type { PixiPresentationTaskHandle, PresentationTaskController } from "./presentationTasks";
-import { calculatePortraitLayout, formatFallbackPortraitLabel } from "./portraits";
 import { pixiAssetLoadFailed, resolvePixiAsset, type PixiAssetResolver, type PixiPresenterDiagnostic } from "./assetResolver";
+import { CharacterSystem } from "./characters";
 
 export interface PixiPresenterSystemsOptions {
   root: Container;
@@ -354,6 +354,7 @@ export class ActorSystem {
   private readonly backgroundLayer = new Container({ label: "backgrounds" });
   private readonly characterLayer = new Container({ label: "characters" });
   private readonly actors = new Map<string, ActorRecord>();
+  private readonly characters: CharacterSystem;
 
   constructor(
     private readonly options: PixiPresenterSystemsOptions,
@@ -361,6 +362,7 @@ export class ActorSystem {
     private readonly tweens: TweenSystem,
     private readonly tasks: PresentationTaskController
   ) {
+    this.characters = new CharacterSystem(options);
     this.backgroundLayer.zIndex = 0;
     this.characterLayer.zIndex = 10;
     options.root.sortableChildren = true;
@@ -393,15 +395,19 @@ export class ActorSystem {
   private upsert(actor: PixiActorSnapshot, animate: boolean, revision: number): void {
     const record = this.ensure(actor);
     const previous = record.actor;
-    const contentKey = `${actor.kind}:${actor.appearance ?? "missing"}:${actor.pose ?? ""}`;
+    const contentKey = actor.kind === "character"
+      ? `${actor.kind}:${actor.id}:${actor.appearanceExpression}:${actor.pose ?? ""}`
+      : `${actor.kind}:${actor.appearance ?? "missing"}:${actor.pose ?? ""}`;
     const shouldAnimate = animate && actor.transition.durationMs > 0;
     const transition = shouldAnimate ? this.createActorTransitionScheduler(actor, revision) : undefined;
     const filtersChanged = !sameActorFilters(actor.filters, previous.filters);
     let contentAlphaAnimated = false;
     if (record.contentKey !== contentKey) {
       record.contentGeneration += 1;
-      record.container.removeChildren();
-      if (actor.kind === "background") this.drawBackground(record, actor);
+      if (actor.kind === "background") {
+        for (const child of record.container.removeChildren()) child.destroy({ children: true });
+        this.drawBackground(record, actor);
+      }
       else this.drawCharacter(record, actor);
       record.contentKey = contentKey;
       const targetAlpha = actor.visible ? actor.alpha : 0;
@@ -536,59 +542,8 @@ export class ActorSystem {
   }
 
   private drawCharacter(record: ActorRecord, actor: PixiActorSnapshot): void {
-    const container = record.container;
     const contentGeneration = record.contentGeneration;
-    const width = this.options.width();
-    const height = this.options.height();
-    const layout = calculatePortraitLayout(width, height, nearestSlot(actor.pos?.[0] ?? 0.5));
-    const group = new Container({ label: actor.appearance ?? actor.id });
-    const portraitId = actor.appearance;
-    const portraitUrl = portraitId ? resolvePixiAsset(this.options.assetResolver, { id: portraitId, kind: "portrait" }, this.options.onDiagnostic) : undefined;
-    const fallback = this.createFallbackCharacter(actor, layout.maxWidth, layout.maxHeight, Boolean(portraitUrl));
-    group.addChild(fallback);
-    if (portraitId && portraitUrl) {
-      const sprite = new Sprite(Texture.EMPTY);
-      sprite.anchor.set(0.5, 1);
-      sprite.visible = false;
-      group.addChild(sprite);
-      void Assets.load<Texture>(portraitUrl)
-        .then((texture) => {
-          if (!sprite.parent || record.contentGeneration !== contentGeneration) return;
-          sprite.texture = texture;
-          fitSprite(sprite, texture, layout.maxWidth, layout.maxHeight);
-          sprite.visible = true;
-          fallback.visible = false;
-        })
-        .catch((error) => {
-          this.options.onDiagnostic?.(pixiAssetLoadFailed({ id: portraitId, kind: "portrait" }, error));
-          fallback.visible = true;
-        });
-    } else {
-      fallback.visible = true;
-    }
-    const name = new Text({ text: actor.id.replace(/^character:/, ""), style: { fill: 0xffffff, fontSize: 14, fontWeight: "700" } });
-    name.anchor.set(0.5, 0);
-    name.y = 10;
-    group.addChild(name);
-    container.addChild(group);
-  }
-
-  private createFallbackCharacter(actor: PixiActorSnapshot, maxWidth: number, maxHeight: number, loadingPortrait: boolean): Container {
-    const bodyWidth = Math.min(170, maxWidth);
-    const bodyHeight = Math.min(300, maxHeight);
-    const fallback = new Container({ label: `fallback:${actor.id}` });
-    const body = new Graphics()
-      .roundRect(-bodyWidth / 2, -bodyHeight, bodyWidth, bodyHeight, 18)
-      .fill({ color: colorFromId(actor.id), alpha: loadingPortrait ? 0.42 : 0.94 })
-      .stroke({ color: 0xffd166, width: 3, alpha: loadingPortrait ? 0.34 : 0.76 });
-    const missing = new Text({
-      text: loadingPortrait ? actor.id.replace(/^character:/, "") : formatFallbackPortraitLabel(actor.id, actor.appearance),
-      style: { align: "center", fill: 0xfff2c2, fontSize: 13, fontWeight: "700", lineHeight: 17, wordWrap: true, wordWrapWidth: bodyWidth - 20 }
-    });
-    missing.anchor.set(0.5);
-    missing.y = -bodyHeight * 0.34;
-    fallback.addChild(body, missing);
-    return fallback;
+    this.characters.render(record.container, actor, contentGeneration, () => record.contentGeneration === contentGeneration);
   }
 
   private applyTransform(
@@ -1247,12 +1202,6 @@ function backgroundStyleFromId(id: string): { color: number; alpha: number; stro
   return { color: colorFromId(id), alpha: 0.78, strokeAlpha: 0.28 };
 }
 
-function nearestSlot(x: number): "left" | "center" | "right" {
-  if (x < 0.38) return "left";
-  if (x > 0.62) return "right";
-  return "center";
-}
-
 function sameVector2(left: [number, number] | undefined, right: [number, number] | undefined): boolean {
   if (!left && !right) return true;
   if (!left || !right) return false;
@@ -1261,14 +1210,6 @@ function sameVector2(left: [number, number] | undefined, right: [number, number]
 
 function sameActorFilters(left: PixiActorSnapshot["filters"], right: PixiActorSnapshot["filters"]): boolean {
   return Math.abs((left.blur ?? 0) - (right.blur ?? 0)) < 0.0001 && Math.abs((left.bokeh ?? 0) - (right.bokeh ?? 0)) < 0.0001;
-}
-
-function fitSprite(sprite: Sprite, texture: Texture, maxWidth: number, maxHeight: number): void {
-  const textureWidth = Math.max(1, texture.width);
-  const textureHeight = Math.max(1, texture.height);
-  const scale = Math.min(maxWidth / textureWidth, maxHeight / textureHeight);
-  sprite.width = textureWidth * scale;
-  sprite.height = textureHeight * scale;
 }
 
 function fitBackgroundSprite(sprite: Sprite, texture: Texture, width: number, height: number): void {
