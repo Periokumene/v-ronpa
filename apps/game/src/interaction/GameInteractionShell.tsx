@@ -65,6 +65,7 @@ export function GameInteractionShell({
       ? selectCurrentStoryLine(runtime.storyRuntime.state)
       : undefined;
   const speaker = currentLine?.speaker && formatStorySpeaker ? formatStorySpeaker(currentLine.speaker) : currentLine?.speaker;
+  const dialogText = runtime.dialogRevealRuntime.visibleText ?? currentLine?.text;
 
   return (
     <>
@@ -72,7 +73,7 @@ export function GameInteractionShell({
       {currentLine ? (
         <VnDialogSurface
           {...(speaker ? { speaker } : {})}
-          text={currentLine.text}
+          text={dialogText ?? currentLine.text}
           choices={runtime.storyRuntime.state.pendingChoices}
           {...(dialogDisplay ? { displaySettings: dialogDisplay } : {})}
           ended={runtime.storyRuntime.state.ended}

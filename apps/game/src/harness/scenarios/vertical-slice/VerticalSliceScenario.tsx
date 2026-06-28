@@ -35,6 +35,7 @@ export function VerticalSliceScenario() {
   const assetRegistry = useMemo(() => createAssetRegistry(harnessContentManifest), []);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
+  const dialogRevealSettings = useMemo(() => ({ textSpeed: dialogDisplay.textSpeed }), [dialogDisplay.textSpeed]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
   const smokeAudioPort = useMemo(() => {
     const mode = selectVoiceSmokeAudioMode();
@@ -45,6 +46,7 @@ export function VerticalSliceScenario() {
   const runtime = useVerticalSliceRuntimeAdapter(flow.mode, {
     ...(smokeAudioPort ? { audioPort: smokeAudioPort } : {}),
     assetResolver: assetRegistry,
+    dialogRevealSettings,
     storyPlayTiming,
     voiceSettings,
     onEnterTrial: enterTrialMode,

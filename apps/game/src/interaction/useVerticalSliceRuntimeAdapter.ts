@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AssetRegistryDiagnostic, AssetResolver } from "@v-ronpa/asset-registry";
-import type {
-  GameInteractionContext,
-  GameUiAction,
-  NaviInteractionSensorReport,
-  NaviRuntimeState,
-  PlayerPose,
-  PixiStageSnapshot,
-  RuntimeCommand,
-  SaveData,
-  GameplayEvent,
-  TrialDefinition,
-  TrialRuntimeState,
-  WorldMapDef
+import {
+  createDefaultSettingsSnapshot,
+  type GameInteractionContext,
+  type GameUiAction,
+  type NaviInteractionSensorReport,
+  type NaviRuntimeState,
+  type PlayerPose,
+  type PixiStageSnapshot,
+  type RuntimeCommand,
+  type SaveData,
+  type GameplayEvent,
+  type TrialDefinition,
+  type TrialRuntimeState,
+  type WorldMapDef
 } from "@v-ronpa/contracts";
 import { applyGameplayEvent, createGameplayState, type ExplorationOutcome, type GameplayState } from "@v-ronpa/gameplay";
 import { parseScenario, type Diagnostic as ParserDiagnostic } from "@v-ronpa/nani-parser";
@@ -32,6 +33,7 @@ import {
 import type { FirstPersonInteractRequest } from "@v-ronpa/r3f-adapter";
 import {
   createInitialStoryState,
+  selectCurrentStoryLine,
   storyReducer,
   type StoryStepperDiagnostic,
   type StoryStepperResult,
@@ -90,6 +92,23 @@ import {
   type UiRuntimeDiagnostic,
   type UiRuntimeState
 } from "../uiRuntime";
+import {
+  advanceDialogReveal,
+  completeDialogReveal,
+  countDialogRevealUnits,
+  createDialogLinePacingPlan,
+  createDialogRevealState,
+  selectVisibleRevealText,
+  type DialogRevealEvent,
+  type DialogRevealState
+} from "./dialogRevealRuntime";
+import {
+  createDialogPlaybackSchedulePlan,
+  selectDialogPlaybackAdvanceRequest,
+  selectDialogPlaybackAdvanceGate,
+  shouldDriveDialogReveal,
+  type DialogPlaybackScheduleSource
+} from "./dialogPlaybackGate";
 
 export type PosePresetId = "spawn" | "notebook" | "keycard" | "door" | "hall-door" | "witness" | "trial-stand" | "empty";
 
@@ -119,6 +138,13 @@ export interface MediaRuntime {
 
 export interface UiRuntime {
   state: UiRuntimeState;
+}
+
+export interface DialogRevealRuntime {
+  state?: DialogRevealState;
+  visibleText?: string;
+  events: DialogRevealEvent[];
+  eventSequence: number;
 }
 
 export interface TrialRuntime {
@@ -206,6 +232,7 @@ export interface VerticalSliceRuntimeAdapterOptions {
   videoPort?: VideoPort;
   storyPlayTiming?: StoryPlayTimingPolicy;
   voiceSettings?: AdapterVoiceSettings;
+  dialogRevealSettings?: AdapterDialogRevealSettings;
   assetResolver?: AssetResolver;
   onEnterTrial?: () => void;
   onEnterNavi?: () => void;
@@ -214,6 +241,10 @@ export interface VerticalSliceRuntimeAdapterOptions {
 export interface AdapterVoiceSettings {
   locale: string;
   volume: number;
+}
+
+export interface AdapterDialogRevealSettings {
+  textSpeed: number;
 }
 
 export interface VerticalSlicePresentationTransactionInput {
@@ -239,6 +270,11 @@ const initialMap = verticalSliceMaps[0] ?? createFallbackMap();
 const MAX_RUNTIME_DIAGNOSTICS = 50;
 const DEFAULT_TOAST_DURATION_MS = 2500;
 const DEFAULT_VOICE_SETTINGS: AdapterVoiceSettings = { locale: "zh", volume: 1 };
+const DEFAULT_DIALOG_REVEAL_SETTINGS: AdapterDialogRevealSettings = {
+  textSpeed: createDefaultSettingsSnapshot().display.textSpeed
+};
+const DIALOG_REVEAL_TICK_INTERVAL_MS = 16;
+const MAX_DIALOG_REVEAL_EVENTS = 50;
 export const POST_VOICE_AUTO_ADVANCE_DELAY_MS = 500;
 
 export interface SyncRuntimeToastDismissalTimersInput {
@@ -295,6 +331,7 @@ export function useVerticalSliceRuntimeAdapter(
   const assetResolver = options.assetResolver;
   const storyPlayTiming = options.storyPlayTiming;
   const voiceSettings = options.voiceSettings ?? DEFAULT_VOICE_SETTINGS;
+  const dialogRevealSettings = options.dialogRevealSettings ?? DEFAULT_DIALOG_REVEAL_SETTINGS;
   const onEnterTrial = options.onEnterTrial;
   const onEnterNavi = options.onEnterNavi;
   const [navi, setNavi] = useState<NaviRuntimeState>(() => ({
@@ -311,6 +348,10 @@ export function useVerticalSliceRuntimeAdapter(
   const [pixiStageRuntime, setPixiStageRuntime] = useState<PixiStageRuntime>(() => createInitialPixiStageRuntime());
   const [mediaRuntime, setMediaRuntime] = useState<MediaRuntime>(() => ({ state: createInitialMediaRuntimeState() }));
   const [uiRuntime, setUiRuntime] = useState<UiRuntime>(() => ({ state: createInitialUiRuntimeState() }));
+  const [dialogRevealRuntime, setDialogRevealRuntime] = useState<DialogRevealRuntime>(() => ({
+    events: [],
+    eventSequence: 0
+  }));
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<VerticalSliceRuntimeDiagnostic[]>(() => initialRuntimeDiagnostics);
   const [lastRuntimeCommandCount, setLastRuntimeCommandCount] = useState(0);
   const [lastOutcome, setLastOutcome] = useState("spawn");
@@ -321,6 +362,7 @@ export function useVerticalSliceRuntimeAdapter(
   const pixiStageRuntimeRef = useRef<PixiStageRuntime>(createInitialPixiStageRuntime());
   const mediaRuntimeRef = useRef<MediaRuntime>({ state: createInitialMediaRuntimeState() });
   const uiRuntimeRef = useRef<UiRuntime>({ state: createInitialUiRuntimeState() });
+  const dialogRevealRuntimeRef = useRef<DialogRevealRuntime>({ events: [], eventSequence: 0 });
   const mediaHandlesRef = useRef<MediaHandleStore>({ bgm: {}, sfx: {}, oneShotSequence: 0 });
   const pendingMoviePlaybackRef = useRef<{ sourceRef: string; uri: string } | undefined>(undefined);
   const toastTimeoutsRef = useRef<Record<string, number>>({});
@@ -380,6 +422,10 @@ export function useVerticalSliceRuntimeAdapter(
   }, [uiRuntime]);
 
   useEffect(() => {
+    dialogRevealRuntimeRef.current = dialogRevealRuntime;
+  }, [dialogRevealRuntime]);
+
+  useEffect(() => {
     const key = storyRuntime.state.presentationWait ? presentationWaitKey(storyRuntime.state.presentationWait) : undefined;
     if (key !== completingWaitKeyRef.current) completingWaitKeyRef.current = undefined;
   }, [storyRuntime.state.presentationWait]);
@@ -412,6 +458,12 @@ export function useVerticalSliceRuntimeAdapter(
     const resolved = typeof next === "function" ? next(uiRuntimeRef.current) : next;
     uiRuntimeRef.current = resolved;
     setUiRuntime(resolved);
+  }
+
+  function setDialogRevealRuntimeNow(next: DialogRevealRuntime | ((current: DialogRevealRuntime) => DialogRevealRuntime)) {
+    const resolved = typeof next === "function" ? next(dialogRevealRuntimeRef.current) : next;
+    dialogRevealRuntimeRef.current = resolved;
+    setDialogRevealRuntime(resolved);
   }
 
   const appendRuntimeDiagnostics = useCallback((diagnostics: VerticalSliceRuntimeDiagnostic[]) => {
@@ -448,16 +500,29 @@ export function useVerticalSliceRuntimeAdapter(
 
   useEffect(() => {
     if (!storyRuntime.active) return;
-    if (storyPlaySchedule.type === "idle") return;
-    const delayMs = storyPlaySchedule.type === "wait" ? storyPlaySchedule.delayMs : 0;
+    const plan = createDialogPlaybackSchedulePlan({
+      schedule: storyPlaySchedule,
+      reveal: dialogRevealRuntimeRef.current.state,
+      nowMs: readRuntimeNowMs()
+    });
+    if (plan.type === "idle") return;
+    storyPlayHostRef.current = { active: storyRuntime.active, schedule: storyPlaySchedule };
     const scheduled = storyPlaySchedule;
+    const source = plan.source;
     const timeout = window.setTimeout(() => {
       const currentHost = storyPlayHostRef.current;
       if (!currentHost.active || currentHost.schedule !== scheduled) return;
-      if (getVoiceAutoAdvanceGateController().request(scheduled.source)) advanceStory(scheduled.source);
-    }, delayMs);
+      requestDialogPlaybackScheduleAdvance(source);
+    }, plan.delayMs);
     return () => window.clearTimeout(timeout);
-  }, [storyPlaySchedule, storyRuntime.active]);
+  }, [dialogRevealRuntime.state?.lineKey, dialogRevealRuntime.state?.status, storyPlaySchedule, storyRuntime.active]);
+
+  useEffect(() => {
+    const reveal = dialogRevealRuntime.state;
+    if (!shouldDriveDialogReveal({ active: storyRuntime.active, reveal })) return;
+    const interval = window.setInterval(() => advanceActiveDialogReveal(), DIALOG_REVEAL_TICK_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, [dialogRevealRuntime.state?.lineKey, dialogRevealRuntime.state?.status, storyRuntime.active]);
 
   useEffect(() => {
     const wait = storyRuntime.state.presentationWait;
@@ -538,9 +603,54 @@ export function useVerticalSliceRuntimeAdapter(
     getVoiceAutoAdvanceGateController().clear(options);
   }
 
+  function requestDialogPlaybackScheduleAdvance(source: DialogPlaybackScheduleSource): boolean {
+    const revealGate = selectDialogPlaybackAdvanceGate({ source, reveal: dialogRevealRuntimeRef.current.state });
+    const voiceReady = revealGate.ready ? getVoiceAutoAdvanceGateController().request(source) : false;
+    const request = selectDialogPlaybackAdvanceRequest({ revealGate, voiceReady });
+    if (request.type === "blocked") return false;
+    advanceStory(request.source);
+    return true;
+  }
+
+  function appendDialogRevealEvents(state: DialogRevealState, events: DialogRevealEvent[]) {
+    setDialogRevealRuntimeNow((current) => ({
+      state,
+      events: events.length > 0 ? [...current.events, ...events].slice(-MAX_DIALOG_REVEAL_EVENTS) : current.events,
+      eventSequence: current.eventSequence + events.length,
+      visibleText: selectVisibleRevealText(state) ?? state.text
+    }));
+  }
+
+  function advanceActiveDialogReveal() {
+    const reveal = dialogRevealRuntimeRef.current.state;
+    if (!reveal || reveal.status === "complete") return;
+    const step = advanceDialogReveal(reveal, readRuntimeNowMs());
+    if (
+      step.events.length === 0 &&
+      step.state.status === reveal.status &&
+      step.state.visibleUnitCount === reveal.visibleUnitCount
+    ) {
+      return;
+    }
+    appendDialogRevealEvents(step.state, step.events);
+  }
+
+  function completeActiveDialogReveal(): boolean {
+    const reveal = dialogRevealRuntimeRef.current.state;
+    if (!reveal || reveal.status === "complete") return false;
+    const step = completeDialogReveal(reveal, readRuntimeNowMs());
+    appendDialogRevealEvents(step.state, step.events);
+    return true;
+  }
+
+  function clearDialogRevealRuntime() {
+    setDialogRevealRuntimeNow({ events: [], eventSequence: 0 });
+  }
+
   function resetSlice() {
     cancelStoryPlayHostSchedule();
     clearVoiceAutoAdvanceGate();
+    clearDialogRevealRuntime();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     const spawnPose: PlayerPose = { position: initialMap.spawn, yaw: 0, pitch: 0 };
@@ -631,6 +741,7 @@ export function useVerticalSliceRuntimeAdapter(
   }
 
   function startStoryOverlay() {
+    clearDialogRevealRuntime();
     setTrialRuntime(createInitialVerticalSliceTrialRuntime());
     const initial = createInitialStoryState(compiled.script);
     const step = advanceStoryPlay(createInitialStoryPlayState(), {
@@ -643,6 +754,7 @@ export function useVerticalSliceRuntimeAdapter(
     setStoryPlayNow(step.play);
     commitStoryTransaction({
       storyStep: step.story,
+      storyPlayState: step.play,
       previousPixiStage: initialPixiStage,
       active: true,
       pacing: step.intent.pacing,
@@ -651,6 +763,23 @@ export function useVerticalSliceRuntimeAdapter(
   }
 
   function advanceStory(source: StoryPlayAdvanceSource = "manual") {
+    if (dialogRevealRuntimeRef.current.state?.status === "revealing") {
+      if (source === "manual") {
+        cancelStoryPlayHostSchedule();
+        setStoryPlayNow((current) => stopStoryPlayAutomation(current, "manual-takeover"));
+        completeActiveDialogReveal();
+        setLastAction("dialog:reveal-complete");
+        setLastOutcome("line-complete");
+      } else if (source === "skip") {
+        cancelStoryPlayHostSchedule();
+        clearVoiceAutoAdvanceGate({ stopVoice: true });
+        completeActiveDialogReveal();
+        setLastAction("story:skip");
+        setLastOutcome("line-complete");
+      }
+      return;
+    }
+
     if (source === "manual" || source === "skip") {
       cancelStoryPlayHostSchedule();
       if (canStoryAdvanceFromSource(storyRuntimeRef.current, source)) clearVoiceAutoAdvanceGate({ stopVoice: true });
@@ -686,6 +815,7 @@ export function useVerticalSliceRuntimeAdapter(
     setStoryPlayNow(step.play);
     commitStoryTransaction({
       storyStep: step.story,
+      storyPlayState: step.play,
       previousPixiStage: pixiStageRuntime.snapshot,
       active: !nextStory.ended,
       pacing: step.intent.pacing
@@ -711,6 +841,7 @@ export function useVerticalSliceRuntimeAdapter(
     setStoryPlayNow(step.play);
     commitStoryTransaction({
       storyStep: step.story,
+      storyPlayState: step.play,
       previousPixiStage: pixiStageRuntime.snapshot,
       active: !nextStory.ended,
       pacing: step.intent.pacing
@@ -765,6 +896,7 @@ export function useVerticalSliceRuntimeAdapter(
     setStoryPlayNow(step.play);
     commitStoryTransaction({
       storyStep: step.story,
+      storyPlayState: step.play,
       previousPixiStage: pixiStageRuntimeRef.current.snapshot,
       active: !step.story.state.ended,
       pacing: step.intent.pacing
@@ -786,6 +918,7 @@ export function useVerticalSliceRuntimeAdapter(
   function startTrial(outcome: Extract<ExplorationOutcome, { type: "start-trial" }>) {
     cancelStoryPlayHostSchedule();
     clearVoiceAutoAdvanceGate({ stopVoice: true });
+    clearDialogRevealRuntime();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     setStoryRuntimeNow((current) => ({ ...current, active: false }));
@@ -858,6 +991,7 @@ export function useVerticalSliceRuntimeAdapter(
   function closeStoryOverlay(action = "dialog:cancel") {
     cancelStoryPlayHostSchedule();
     clearVoiceAutoAdvanceGate();
+    clearDialogRevealRuntime();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
@@ -874,6 +1008,7 @@ export function useVerticalSliceRuntimeAdapter(
   function restoreFromSave(save: Pick<SaveData, "mode" | "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters" | "trial">) {
     cancelStoryPlayHostSchedule();
     clearVoiceAutoAdvanceGate();
+    clearDialogRevealRuntime();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     const plan = createVerticalSliceRuntimeRestorePlan(save, compiled.script);
@@ -899,12 +1034,14 @@ export function useVerticalSliceRuntimeAdapter(
 
   function commitStoryTransaction({
     storyStep,
+    storyPlayState,
     previousPixiStage,
     active,
     pacing = "normal",
     forcePixiCommit = false
   }: {
     storyStep: StoryStepperResult;
+    storyPlayState: StoryPlayState;
     previousPixiStage: PixiStageSnapshot;
     active: boolean;
     pacing?: StoryPlayPacing;
@@ -935,6 +1072,14 @@ export function useVerticalSliceRuntimeAdapter(
           }
         }
       : storyStep.state;
+    commitDialogRevealForStoryStep({
+      active,
+      dialogVisible: transaction.uiState.visible.dialog,
+      pacing,
+      storyPlayState,
+      storyState: nextStoryState,
+      runtimeCommands: storyStep.emittedRuntimeCommands
+    });
     let sawMovieEffect = false;
     let pendingMoviePlayback: { sourceRef: string; uri: string } | undefined;
     const movieDiagnostics: VerticalSliceRuntimeDiagnostic[] = [];
@@ -1006,6 +1151,63 @@ export function useVerticalSliceRuntimeAdapter(
     setStoryRuntimeNow(nextStoryRuntime);
   }
 
+  function commitDialogRevealForStoryStep({
+    active,
+    dialogVisible,
+    pacing,
+    runtimeCommands,
+    storyPlayState,
+    storyState
+  }: {
+    active: boolean;
+    dialogVisible: boolean;
+    pacing: StoryPlayPacing;
+    runtimeCommands: RuntimeCommand[];
+    storyPlayState: StoryPlayState;
+    storyState: StoryRuntimeState;
+  }) {
+    const print = latestPrintCommand(runtimeCommands);
+    if (!active || !print) {
+      const reveal = dialogRevealRuntimeRef.current.state;
+      const currentLine = selectCurrentStoryLine(storyState);
+      if (runtimeCommands.length > 0 || (reveal && currentLine?.text !== reveal.text)) clearDialogRevealRuntime();
+      return;
+    }
+
+    const currentLine = selectCurrentStoryLine(storyState);
+    const text = currentLine?.text ?? stringRuntimeParam(print, "text") ?? "";
+    const nowMs = readRuntimeNowMs();
+    const schedule = selectStoryPlaySchedule(storyPlayState, storyState, {
+      active,
+      hostReadyForAuto: true,
+      ...(storyPlayTiming ? { timing: storyPlayTiming } : {})
+    });
+    const totalDelayMs =
+      schedule.type === "wait" && (schedule.source === "auto" || schedule.source === "auto-next")
+        ? schedule.delayMs
+        : undefined;
+    const scriptSpeed = numberRuntimeParam(print, "speed");
+    const plan = createDialogLinePacingPlan({
+      unitCount: countDialogRevealUnits(text),
+      textSpeed: dialogRevealSettings.textSpeed,
+      ...(scriptSpeed !== undefined ? { scriptSpeed } : {}),
+      ...(totalDelayMs !== undefined ? { totalDelayMs } : {})
+    });
+    const created = createDialogRevealState({
+      lineKey: createDialogRevealLineKey(storyState, print),
+      text,
+      startedAtMs: nowMs,
+      durationMs: pacing === "skip" || !dialogVisible ? 0 : plan.revealDurationMs
+    });
+    const step = advanceDialogReveal(created, nowMs);
+    setDialogRevealRuntimeNow((current) => ({
+      state: step.state,
+      events: [...current.events, ...step.events].slice(-MAX_DIALOG_REVEAL_EVENTS),
+      eventSequence: current.eventSequence + step.events.length,
+      visibleText: selectVisibleRevealText(step.state) ?? step.state.text
+    }));
+  }
+
   function updatePixiPresentationTasks(tasks: PixiPresentationTaskSnapshot[]) {
     setPixiStageRuntimeNow((current) => ({
       ...current,
@@ -1066,6 +1268,7 @@ export function useVerticalSliceRuntimeAdapter(
     setStoryPlayNow(step.play);
     commitStoryTransaction({
       storyStep: step.story,
+      storyPlayState: step.play,
       previousPixiStage: pixiStageRuntimeRef.current.snapshot,
       active: !step.story.state.ended,
       pacing: step.intent.pacing
@@ -1099,6 +1302,7 @@ export function useVerticalSliceRuntimeAdapter(
     setStoryPlayNow(step.play);
     commitStoryTransaction({
       storyStep: step.story,
+      storyPlayState: step.play,
       previousPixiStage: pixiStageRuntimeRef.current.snapshot,
       active: !step.story.state.ended,
       pacing: step.intent.pacing
@@ -1135,6 +1339,7 @@ export function useVerticalSliceRuntimeAdapter(
     chooseStory,
     closeStoryOverlay,
     confirmFocusedInteraction,
+    dialogRevealRuntime,
     firstPersonBridge,
     gameplay,
     interactionContext,
@@ -1454,6 +1659,20 @@ export function shouldAnimateStoryPlayPacing(pacing: StoryPlayPacing): boolean {
   return pacing !== "skip";
 }
 
+function latestPrintCommand(commands: RuntimeCommand[]): RuntimeCommand | undefined {
+  for (let index = commands.length - 1; index >= 0; index -= 1) {
+    const command = commands[index];
+    if (command?.commandId === "print") return command;
+  }
+  return undefined;
+}
+
+function createDialogRevealLineKey(storyState: StoryRuntimeState, command: RuntimeCommand): string {
+  const loc = command.loc;
+  const source = loc ? `${loc.scriptPath}:${loc.line}:${loc.column}` : `${storyState.currentScriptPath}:${storyState.instructionPointer}`;
+  return `${source}:${storyState.backlog.length}`;
+}
+
 function presentationWaitKey(wait: NonNullable<StoryRuntimeState["presentationWait"]>): string {
   const tasks = (wait.expectedTasks ?? []).map(presentationWaitTaskKey).join("|");
   return `${wait.commandIndex ?? "unknown"}:${wait.commandId}:${wait.stageRevision ?? "none"}:${tasks}`;
@@ -1647,6 +1866,15 @@ function mediaPortError(message: string): VerticalSliceRuntimeDiagnostic {
 function stringRuntimeParam(command: RuntimeCommand, key: string): string | undefined {
   const value = command.params[key];
   return typeof value === "string" ? value : undefined;
+}
+
+function numberRuntimeParam(command: RuntimeCommand, key: string): number | undefined {
+  const value = command.params[key];
+  return typeof value === "number" ? value : undefined;
+}
+
+function readRuntimeNowMs(): number {
+  return globalThis.performance?.now?.() ?? Date.now();
 }
 
 function createSensorReportFromRequest(request: FirstPersonInteractRequest | undefined): NaviInteractionSensorReport | undefined {

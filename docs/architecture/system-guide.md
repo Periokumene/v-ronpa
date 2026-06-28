@@ -100,8 +100,8 @@ Settings are app-owned user preferences, not save data and not media-save
 payloads. `packages/contracts` declares the versioned `SettingsSnapshot`;
 `apps/game` owns the canonical settings adapter and localStorage persistence;
 `ui-kit` renders controlled controls only. Runtime consumers receive narrow
-derived values such as `StoryPlayTimingPolicy` and VN dialog display props
-instead of the full settings snapshot.
+derived values such as `StoryPlayTimingPolicy`, VN dialog display props, and
+dialog reveal text speed instead of the full settings snapshot.
 Voice runtime settings follow the same pattern: the app derives locale and
 volume from settings and passes only those narrow values to the runtime adapter.
 

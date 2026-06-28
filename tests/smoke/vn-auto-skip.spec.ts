@@ -13,7 +13,8 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
   await page.getByTestId("title-new-game").click();
   await startWitnessStory(page);
 
-  await advanceUntilText(page, "请选择测试路径", 2);
+  await expectManualAdvanceCompletesRevealBeforeStoryStep(page);
+  await advanceUntilText(page, "请选择测试路径", 3);
   await advanceUntilChoices(page);
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("vn-command-skip")).toHaveAttribute("aria-pressed", "false");
@@ -57,6 +58,24 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
   expect(consoleErrors).toEqual([]);
 });
 
+test("VN opening autoNext completes reveal without manual input", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && !isExpectedPointerLockError(message.text())) consoleErrors.push(message.text());
+  });
+
+  await page.addInitScript(() => localStorage.removeItem("v-ronpa:settings:v1"));
+  await page.goto("/?scenario=vertical-slice");
+  await page.getByTestId("title-new-game").click();
+  await startWitnessStory(page);
+
+  const observed = await observeOpeningAutoNext(page);
+  expect(observed.sawCompletedFirstLine).toBe(true);
+  expect(observed.sawSecondLine).toBe(true);
+  await expect(page.getByTestId("vertical-slice-last-action")).toHaveText("story:auto-next");
+  expect(consoleErrors).toEqual([]);
+});
+
 test("VN wait! resumes from Pixi task completion and manual continue settles the task", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
@@ -71,7 +90,7 @@ test("VN wait! resumes from Pixi task completion and manual continue settles the
   await advanceUntilChoices(page);
   await page.getByTestId("vn-dialog-choice-1").click();
   await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 2 开始");
-  await advanceUntilText(page, "CHECKPOINT 04", 24);
+  await advanceUntilText(page, "CHECKPOINT 04", 80);
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
 
   await page.getByTestId("vn-dialog-advance").click();
@@ -104,10 +123,8 @@ test("VN AUTO voice gate advances branch 3 without returning to the baseline che
 
   await page.getByTestId("vn-dialog-choice-2").click();
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT VOICE REAL 00");
-  await page.getByTestId("vn-dialog-advance").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("夜里的牢房");
-  await page.getByTestId("vn-dialog-advance").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("如果把证据广播出去");
+  await advanceUntilText(page, "夜里的牢房", 4);
+  await advanceUntilText(page, "如果把证据广播出去", 4);
 
   await page.getByTestId("vn-command-auto").click();
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "true");
@@ -128,20 +145,61 @@ async function startWitnessStory(page: Page) {
 
 async function advanceUntilText(page: Page, text: string, maxSteps: number) {
   for (let attempt = 0; attempt < maxSteps; attempt += 1) {
-    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) return;
+    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) {
+      await waitForDialogTextToSettle(page);
+      return;
+    }
     await page.getByTestId("vn-dialog-advance").click();
+    await page.waitForTimeout(120);
   }
 
   await expect(page.getByTestId("vn-dialog-text")).toContainText(text);
+  await waitForDialogTextToSettle(page);
 }
 
 async function advanceUntilChoices(page: Page) {
-  for (let attempt = 0; attempt < 12; attempt += 1) {
+  for (let attempt = 0; attempt < 24; attempt += 1) {
     if ((await page.getByTestId("vn-dialog-choices").count()) > 0) return;
     await page.getByTestId("vn-dialog-advance").click();
+    await page.waitForTimeout(120);
   }
 
   await expect(page.getByTestId("vn-dialog-choices")).toBeVisible();
+}
+
+async function expectManualAdvanceCompletesRevealBeforeStoryStep(page: Page) {
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT 00", { timeout: 2_000 });
+  await page.getByTestId("vn-dialog-advance").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("请先确认背景");
+  await expect(page.getByTestId("vn-dialog-text")).not.toContainText("请选择测试路径");
+}
+
+async function observeOpeningAutoNext(page: Page) {
+  const deadline = Date.now() + 10_000;
+  let sawCompletedFirstLine = false;
+  let sawSecondLine = false;
+
+  while (Date.now() < deadline) {
+    const text = (await page.getByTestId("vn-dialog-text").textContent()) ?? "";
+    if (text.includes("layered character 可见。")) sawCompletedFirstLine = true;
+    if (text.includes("请选择测试路径")) {
+      sawSecondLine = true;
+      break;
+    }
+    await page.waitForTimeout(100);
+  }
+
+  return { sawCompletedFirstLine, sawSecondLine };
+}
+
+async function waitForDialogTextToSettle(page: Page) {
+  let previous = (await page.getByTestId("vn-dialog-text").textContent()) ?? "";
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await page.waitForTimeout(120);
+    const current = (await page.getByTestId("vn-dialog-text").textContent()) ?? "";
+    if (current === previous) return;
+    previous = current;
+  }
 }
 
 function isExpectedPointerLockError(text: string): boolean {
