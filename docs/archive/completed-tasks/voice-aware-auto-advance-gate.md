@@ -15,11 +15,12 @@
 
 ## Status
 
-- State: `Review`
+- State: `Archived`
 - Owner: `TBD`
 - Created: `2026-06-28`
 - Updated: `2026-06-28`
-- Completed Commit: `TBD`
+- Completed Commit: `f2d14ae04012`
+- Archive Target: `docs/archive/completed-tasks/voice-aware-auto-advance-gate.md`
 
 ## Goal
 
