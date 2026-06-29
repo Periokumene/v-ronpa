@@ -10,6 +10,9 @@ export type {
   ParseScenarioInput,
   ParseScenarioResult,
   ParserPort,
+  RichTextDocumentIR,
+  RichTextRunIR,
+  RichTextRunStyleIR,
   ScenarioIR,
   ScriptDependency,
   SourceLocation,
@@ -24,6 +27,9 @@ import type {
   NaniValue,
   ParseScenarioInput,
   ParseScenarioResult,
+  RichTextDocumentIR,
+  RichTextRunIR,
+  RichTextRunStyleIR,
   ScenarioIR,
   SourceLocation,
   StatementIR,
@@ -41,6 +47,45 @@ const commandAssetKinds: Record<string, string> = {
 
 const textIdPattern = /\|#([^|]*)\|/gu;
 const textIdValuePattern = /^[a-zA-Z0-9_-]+$/u;
+const richTextCommandIds = new Set(["print", "append", "choice", "toast"]);
+const richTextIdPattern = /^[a-zA-Z0-9:_./-]+$/u;
+const safeColorPattern = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/u;
+const safeNamedColors = new Set([
+  "black",
+  "white",
+  "red",
+  "green",
+  "blue",
+  "yellow",
+  "cyan",
+  "magenta",
+  "gray",
+  "grey",
+  "orange",
+  "purple",
+  "pink",
+  "brown"
+]);
+const fontSizeScaleByHtmlSize: Record<number, number> = {
+  1: 0.75,
+  2: 0.875,
+  3: 1,
+  4: 1.125,
+  5: 1.25,
+  6: 1.5,
+  7: 1.75
+};
+
+interface RichTextParseResult {
+  document: RichTextDocumentIR;
+  diagnostics: string[];
+}
+
+interface ActiveRichTextTag {
+  name: string;
+  start: number;
+  style: RichTextRunStyleIR;
+}
 
 export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
   const diagnostics: Diagnostic[] = [];
@@ -75,6 +120,7 @@ export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
 
     if (trimmed.startsWith("@")) {
       const command = parseCommand(trimmed.slice(1), loc);
+      attachCommandRichText(command, diagnostics);
       collectCommandMetadata(command, assets, dependencies);
       statements.push(command);
       return;
@@ -96,6 +142,245 @@ export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
     },
     diagnostics
   };
+}
+
+export function parseRichText(source: string): RichTextParseResult {
+  const output: string[] = [];
+  const runs: RichTextRunIR[] = [];
+  const stack: ActiveRichTextTag[] = [];
+  const diagnostics: string[] = [];
+
+  function fallback(message: string): RichTextParseResult {
+    return {
+      document: { text: decodeRichTextEntities(source), runs: [] },
+      diagnostics: [message]
+    };
+  }
+
+  let i = 0;
+  while (i < source.length) {
+    const char = source[i] ?? "";
+
+    if (char === "&") {
+      const entity = readRichTextEntity(source, i);
+      if (entity) {
+        output.push(entity.value);
+        i = entity.end;
+        continue;
+      }
+    }
+
+    if (char !== "<") {
+      const unit = Array.from(source.slice(i, i + 2))[0] ?? char;
+      output.push(unit);
+      i += unit.length;
+      continue;
+    }
+
+    const close = source.indexOf(">", i + 1);
+    if (close < 0) return fallback("Unclosed rich text tag.");
+
+    const rawTag = source.slice(i + 1, close).trim();
+    if (!rawTag) return fallback("Empty rich text tag is unsupported.");
+
+    const selfClosing = rawTag.endsWith("/");
+    const tagSource = selfClosing ? rawTag.slice(0, -1).trim() : rawTag;
+    const lowerTagSource = tagSource.toLowerCase();
+    if (lowerTagSource === "br" || lowerTagSource === "br/") {
+      output.push("\n");
+      i = close + 1;
+      continue;
+    }
+
+    if (tagSource.startsWith("/")) {
+      const closeName = tagSource.slice(1).trim().toLowerCase();
+      const expected = canonicalRichTextTagName(closeName);
+      const active = stack.pop();
+      if (!expected || !active || active.name !== expected) {
+        return fallback(`Mismatched rich text closing tag: ${tagSource}.`);
+      }
+      const end = output.length;
+      if (end > active.start) runs.push({ start: active.start, end, style: active.style });
+      i = close + 1;
+      continue;
+    }
+
+    const parsedTag = parseRichTextOpenTag(tagSource);
+    if (parsedTag.diagnostic) return fallback(parsedTag.diagnostic);
+    if (!parsedTag.name || !parsedTag.style) return fallback(`Unsupported rich text tag: ${tagSource}.`);
+    if (selfClosing) return fallback(`Self-closing rich text tag is unsupported: ${tagSource}.`);
+
+    stack.push({ name: parsedTag.name, start: output.length, style: parsedTag.style });
+    i = close + 1;
+  }
+
+  if (stack.length > 0) return fallback(`Unclosed rich text tag: ${stack.at(-1)?.name ?? "unknown"}.`);
+
+  return { document: { text: output.join(""), runs }, diagnostics };
+}
+
+function readRichTextEntity(source: string, start: number): { value: string; end: number } | undefined {
+  const semicolon = source.indexOf(";", start + 1);
+  if (semicolon < 0) return undefined;
+  const entity = source.slice(start + 1, semicolon);
+  const value = richTextEntityValue(entity);
+  return value === undefined ? undefined : { value, end: semicolon + 1 };
+}
+
+function decodeRichTextEntities(source: string): string {
+  let output = "";
+  let i = 0;
+  while (i < source.length) {
+    const entity = source[i] === "&" ? readRichTextEntity(source, i) : undefined;
+    if (entity) {
+      output += entity.value;
+      i = entity.end;
+      continue;
+    }
+    output += source[i] ?? "";
+    i += 1;
+  }
+  return output;
+}
+
+function richTextEntityValue(entity: string): string | undefined {
+  switch (entity) {
+    case "nbsp":
+      return "\u00a0";
+    case "lt":
+      return "<";
+    case "gt":
+      return ">";
+    case "amp":
+      return "&";
+    case "quot":
+      return "\"";
+    default:
+      return undefined;
+  }
+}
+
+function parseRichTextOpenTag(source: string): { name?: string; style?: RichTextRunStyleIR; diagnostic?: string } {
+  const match = source.match(/^([a-zA-Z][a-zA-Z0-9_-]*)([\s\S]*)$/u);
+  if (!match) return { diagnostic: `Unsupported rich text tag: ${source}.` };
+  const rawName = (match[1] ?? "").toLowerCase();
+  const attrSource = (match[2] ?? "").trim();
+  const name = canonicalRichTextTagName(rawName);
+  if (!name) return { diagnostic: `Unsupported rich text tag: ${rawName}.` };
+  if (name !== "font" && attrSource.length > 0) return { diagnostic: `Rich text tag '${rawName}' does not accept attributes.` };
+
+  switch (name) {
+    case "b":
+      return { name, style: { bold: true } };
+    case "i":
+      return { name, style: { italic: true } };
+    case "u":
+      return { name, style: { underline: true } };
+    case "s":
+      return { name, style: { strike: true } };
+    case "mark":
+      return { name, style: { markColor: "default" } };
+    case "small":
+      return { name, style: { sizeScale: 0.85 } };
+    case "big":
+      return { name, style: { sizeScale: 1.15 } };
+    case "sub":
+      return { name, style: { verticalAlign: "sub" } };
+    case "sup":
+      return { name, style: { verticalAlign: "sup" } };
+    case "font":
+      return parseFontRichTextTag(attrSource);
+    default:
+      return { diagnostic: `Unsupported rich text tag: ${rawName}.` };
+  }
+}
+
+function canonicalRichTextTagName(name: string): string | undefined {
+  switch (name.toLowerCase()) {
+    case "b":
+    case "strong":
+      return "b";
+    case "i":
+    case "em":
+      return "i";
+    case "u":
+      return "u";
+    case "s":
+    case "strike":
+    case "del":
+      return "s";
+    case "mark":
+    case "small":
+    case "big":
+    case "sub":
+    case "sup":
+    case "font":
+      return name.toLowerCase();
+    default:
+      return undefined;
+  }
+}
+
+function parseFontRichTextTag(attrSource: string): { name?: string; style?: RichTextRunStyleIR; diagnostic?: string } {
+  const parsedAttrs = parseRichTextAttributes(attrSource, new Set(["color", "size", "face"]));
+  if (parsedAttrs.diagnostic) return { diagnostic: parsedAttrs.diagnostic };
+  const attrs = parsedAttrs.attrs;
+  const style: RichTextRunStyleIR = {};
+  const color = attrs.get("color");
+  const size = attrs.get("size");
+  const face = attrs.get("face");
+
+  if (color !== undefined) {
+    if (!isSafeRichTextColor(color)) return { diagnostic: `Invalid rich text font color: ${color}.` };
+    style.color = color;
+  }
+
+  if (size !== undefined) {
+    const sizeScale = htmlFontSizeScale(size);
+    if (sizeScale === undefined) return { diagnostic: `Invalid rich text font size: ${size}.` };
+    style.sizeScale = sizeScale;
+  }
+
+  if (face !== undefined) {
+    if (!richTextIdPattern.test(face) || !face.startsWith("font:")) return { diagnostic: `Invalid rich text font face: ${face}.` };
+    style.fontId = face;
+  }
+
+  if (Object.keys(style).length === 0) return { diagnostic: "Rich text font tag requires color, size, or face." };
+  return { name: "font", style };
+}
+
+function parseRichTextAttributes(source: string, allowedKeys: Set<string>): { attrs: Map<string, string>; diagnostic?: string } {
+  const attrs = new Map<string, string>();
+  let i = 0;
+  while (i < source.length) {
+    while (/\s/u.test(source[i] ?? "")) i += 1;
+    if (i >= source.length) break;
+    const match = /^([a-zA-Z][a-zA-Z0-9_-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/u.exec(source.slice(i));
+    if (!match) return { attrs, diagnostic: `Invalid rich text attribute syntax: ${source.slice(i).trim()}.` };
+    const key = match[1]?.toLowerCase();
+    const value = match[2] ?? match[3] ?? match[4];
+    if (!key || value === undefined) return { attrs, diagnostic: `Invalid rich text attribute syntax: ${source.slice(i).trim()}.` };
+    if (!allowedKeys.has(key)) return { attrs, diagnostic: `Unsupported rich text font attribute: ${key}.` };
+    if (attrs.has(key)) return { attrs, diagnostic: `Duplicate rich text font attribute: ${key}.` };
+    attrs.set(key, value);
+    i += match[0].length;
+  }
+  return { attrs };
+}
+
+function isSafeRichTextColor(value: string): boolean {
+  return safeColorPattern.test(value) || safeNamedColors.has(value.toLowerCase());
+}
+
+function htmlFontSizeScale(value: string): number | undefined {
+  const numeric = Number(value);
+  if (/^[1-7]$/u.test(value)) return fontSizeScaleByHtmlSize[numeric];
+  if (/^[+-][1-6]$/u.test(value)) {
+    const adjusted = Math.min(7, Math.max(1, 3 + numeric));
+    return fontSizeScaleByHtmlSize[adjusted];
+  }
+  return undefined;
 }
 
 function firstNonWhitespaceColumn(raw: string): number {
@@ -122,6 +407,11 @@ function parseText(line: string, loc: SourceLocation, diagnostics: Diagnostic[])
       Object.assign(printParams, token.command.params);
     }
   }
+  const rawText = tokens.filter((token) => token.kind === "text").map((token) => token.text).join("");
+  const richText = parseRichText(rawText);
+  for (const message of richText.diagnostics) {
+    diagnostics.push({ severity: "warning", message, loc });
+  }
 
   const statement: TextIR = {
     kind: "text",
@@ -131,8 +421,13 @@ function parseText(line: string, loc: SourceLocation, diagnostics: Diagnostic[])
   if (speaker) statement.speaker = speaker;
   if (appearance) statement.appearance = appearance;
   if (textIdResult.textId) statement.textId = textIdResult.textId;
+  if (shouldAttachRichText(rawText, richText.document)) statement.richText = richText.document;
   if (Object.keys(printParams).length > 0) statement.printParams = printParams;
   return statement;
+}
+
+function shouldAttachRichText(source: string, document: RichTextDocumentIR): boolean {
+  return document.runs.length > 0 || document.text !== source;
 }
 
 function splitSpeaker(value: string): [string | undefined, string | undefined] {
@@ -280,6 +575,31 @@ function parseCommand(source: string, loc: SourceLocation): CommandIR {
   if (condition) command.condition = condition;
   if (unless) command.unless = unless;
   return command;
+}
+
+function attachCommandRichText(command: CommandIR, diagnostics: Diagnostic[]): void {
+  if (!richTextCommandIds.has(command.commandId)) return;
+  const primary = command.primary;
+  const primaryResult = primary?.type === "string" ? parseRichText(primary.value) : undefined;
+  if (primaryResult) {
+    for (const message of primaryResult.diagnostics) diagnostics.push({ severity: "warning", message, loc: command.loc });
+    if (primary?.type === "string" && shouldAttachRichText(primary.value, primaryResult.document)) command.richTextPrimary = primaryResult.document;
+  }
+
+  const richTextParams: Record<string, RichTextDocumentIR> = {};
+  for (const [key, value] of Object.entries(command.params)) {
+    if (value.type !== "string" || !isRichTextCommandParam(command.commandId, key)) continue;
+    const result = parseRichText(value.value);
+    for (const message of result.diagnostics) diagnostics.push({ severity: "warning", message, loc: command.loc });
+    if (shouldAttachRichText(value.value, result.document)) richTextParams[key] = result.document;
+  }
+  if (Object.keys(richTextParams).length > 0) command.richTextParams = richTextParams;
+}
+
+function isRichTextCommandParam(commandId: string, key: string): boolean {
+  if (commandId === "print" || commandId === "append" || commandId === "toast") return key === "text";
+  if (commandId === "choice") return key === "choiceSummary" || key === "text";
+  return false;
 }
 
 function splitCommandParts(source: string): string[] {

@@ -1,5 +1,11 @@
 export { DialogBox } from "./surfaces/DialogBox";
 export {
+  RichTextRenderer,
+  richTextFontCssVariableName,
+  richTextFontFamilyValue,
+} from "./surfaces/RichTextRenderer";
+export type { RichTextRendererProps } from "./surfaces/RichTextRenderer";
+export {
   GameOverlayHost,
   PauseMenuOverlay,
   ReadOnlyBacklogOverlay,

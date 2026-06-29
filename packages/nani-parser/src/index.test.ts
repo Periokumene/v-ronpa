@@ -219,6 +219,77 @@ describe("nani parser", () => {
     });
   });
 
+  it("parses first-pass HTML rich text for dialogue and text commands", () => {
+    const result = parseScenario({
+      sourceText: [
+        'Felix: <b>Bold</b> and <font color="#ff5577" size="+1" face="font:serif">danger</font><br>next &lt;tag&gt;[>]',
+        '@choice "<mark>Inspect</mark>" goto:#Inspect',
+        '@toast "<small>Saved&nbsp;now</small>"',
+        "#Inspect"
+      ].join("\n"),
+      scriptPath: "rich-text.nani"
+    });
+    const line = result.scenario.statements[0] as TextIR;
+    const choice = result.scenario.statements[1] as CommandIR;
+    const toast = result.scenario.statements[2] as CommandIR;
+
+    expect(result.diagnostics).toEqual([]);
+    expect(line.richText).toMatchObject({
+      text: "Bold and danger\nnext <tag>",
+      runs: [
+        { start: 0, end: 4, style: { bold: true } },
+        { start: 9, end: 15, style: { color: "#ff5577", sizeScale: 1.125, fontId: "font:serif" } }
+      ]
+    });
+    expect(choice.richTextPrimary).toMatchObject({
+      text: "Inspect",
+      runs: [{ start: 0, end: 7, style: { markColor: "default" } }]
+    });
+    expect(toast.richTextPrimary).toMatchObject({
+      text: "Saved\u00a0now",
+      runs: [{ start: 0, end: 9, style: { sizeScale: 0.85 } }]
+    });
+  });
+
+  it("keeps unsupported rich text tags visible and reports diagnostics", () => {
+    const result = parseScenario({
+      sourceText: 'Mira: <color=#f00>No TMP alias</color>\n@toast "<font face=\\"Georgia\\">Raw font</font>"',
+      scriptPath: "rich-text-errors.nani"
+    });
+
+    expect(result.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+      "Unsupported rich text tag: color.",
+      "Invalid rich text font face: Georgia."
+    ]);
+    expect((result.scenario.statements[0] as TextIR).richText).toBeUndefined();
+    expect(((result.scenario.statements[0] as TextIR).tokens[0] as { text: string }).text).toBe("<color=#f00>No TMP alias</color>");
+    expect((result.scenario.statements[1] as CommandIR).richTextPrimary).toBeUndefined();
+  });
+
+  it("keeps rich text tags with unsupported attributes visible and reports diagnostics", () => {
+    const result = parseScenario({
+      sourceText: [
+        'Mira: <b class="loud">Bold</b>',
+        '@toast "<font color=\\"red\\" onclick=\\"bad\\">Warn</font>"',
+        '@print "<font color=\\"red\\" color=\\"blue\\">Duplicate</font>"',
+        '@append "<font color=\\"red\\" broken>Broken</font>"'
+      ].join("\n"),
+      scriptPath: "rich-text-attributes.nani"
+    });
+
+    expect(result.diagnostics.map((diagnostic) => diagnostic.message)).toEqual([
+      "Rich text tag 'b' does not accept attributes.",
+      "Unsupported rich text font attribute: onclick.",
+      "Duplicate rich text font attribute: color.",
+      "Invalid rich text attribute syntax: broken."
+    ]);
+    expect((result.scenario.statements[0] as TextIR).richText).toBeUndefined();
+    expect(((result.scenario.statements[0] as TextIR).tokens[0] as { text: string }).text).toBe('<b class="loud">Bold</b>');
+    expect((result.scenario.statements[1] as CommandIR).richTextPrimary).toBeUndefined();
+    expect((result.scenario.statements[2] as CommandIR).richTextPrimary).toBeUndefined();
+    expect((result.scenario.statements[3] as CommandIR).richTextPrimary).toBeUndefined();
+  });
+
   it("collects layered character pack references from char and slide commands", () => {
     const result = parseScenario({
       sourceText: [

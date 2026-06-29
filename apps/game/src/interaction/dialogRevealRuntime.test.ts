@@ -4,6 +4,7 @@ import {
   completeDialogReveal,
   createDialogLinePacingPlan,
   createDialogRevealState,
+  selectVisibleRevealRichText,
   selectVisibleRevealText
 } from "./dialogRevealRuntime";
 
@@ -86,6 +87,32 @@ describe("dialog reveal runtime", () => {
     expect(selectVisibleRevealText(later.state)).toBe("AB");
     expect(selectVisibleRevealText(finished.state)).toBe("ABCD");
     expect(finished.events.at(-1)).toEqual(expect.objectContaining({ type: "reveal-finish" }));
+  });
+
+  it("clips rich text runs to the visible reveal text", () => {
+    const state = createDialogRevealState({
+      lineKey: "line:rich",
+      text: "Bold mark",
+      startedAtMs: 0,
+      durationMs: 100
+    });
+    const revealed = advanceDialogReveal(state, 50).state;
+
+    expect(
+      selectVisibleRevealRichText(
+        {
+          text: "Bold mark",
+          runs: [
+            { start: 0, end: 4, style: { bold: true } },
+            { start: 5, end: 9, style: { markColor: "default" } }
+          ]
+        },
+        revealed
+      )
+    ).toEqual({
+      text: "Bold",
+      runs: [{ start: 0, end: 4, style: { bold: true } }]
+    });
   });
 
   it("keeps reveal duration inside the AUTO line budget ratio", () => {

@@ -1,4 +1,4 @@
-import type { RuntimeCommand, RuntimeValue, StoryRuntimeSnapshot } from "@v-ronpa/contracts";
+import type { RichTextDocument, RuntimeCommand, RuntimeValue, StoryRuntimeSnapshot } from "@v-ronpa/contracts";
 
 export const RUNTIME_UI_GROUPS = ["dialog", "commandBar", "toastLayer"] as const;
 export type RuntimeUiGroup = (typeof RUNTIME_UI_GROUPS)[number];
@@ -6,6 +6,7 @@ export type RuntimeUiGroup = (typeof RUNTIME_UI_GROUPS)[number];
 export interface RuntimeToast {
   id: string;
   text: string;
+  richText?: RichTextDocument;
   durationMs?: number;
 }
 
@@ -152,11 +153,19 @@ function reduceToastCommand(state: UiRuntimeState, command: RuntimeCommand): UiR
         {
           id: `toast:${++toastSequence}`,
           text,
+          ...(command.richText ? { richText: cloneRichText(command.richText) } : {}),
           ...(durationMs !== undefined ? { durationMs } : {})
         }
       ]
     },
     diagnostics: []
+  };
+}
+
+function cloneRichText(document: RichTextDocument): RichTextDocument {
+  return {
+    text: document.text,
+    runs: document.runs.map((run) => ({ start: run.start, end: run.end, style: { ...run.style } }))
   };
 }
 

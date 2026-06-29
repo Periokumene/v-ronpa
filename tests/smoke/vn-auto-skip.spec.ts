@@ -142,7 +142,7 @@ async function startWitnessStory(page: Page) {
 }
 
 async function chooseAutomationSmokeBranch(page: Page) {
-  await page.getByTestId("vn-dialog-choice-3").click();
+  await page.getByRole("button", { name: /VN 自动化短路径/u }).click();
   await expect(page.getByTestId("vertical-slice-route")).toHaveText("automation-smoke");
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT AUTO 00");
 }

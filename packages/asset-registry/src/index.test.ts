@@ -4,7 +4,7 @@ import { createAssetRegistry, isRawAssetReference } from "./index";
 
 describe("asset registry", () => {
   it("resolves every runtime asset kind from ContentManifest.runtimeAssets", () => {
-    const manifest = manifestWithKinds(["character-pack", "background", "bgm", "sfx", "bleep", "voice", "video", "glb", "texture", "fx"]);
+    const manifest = manifestWithKinds(["character-pack", "background", "bgm", "sfx", "bleep", "voice", "video", "font", "glb", "texture", "fx"]);
     const registry = createAssetRegistry(manifest);
 
     expect(registry.diagnostics).toEqual([]);
@@ -58,7 +58,8 @@ describe("asset registry", () => {
       ...baseManifest([
         runtimeAsset("texture:evidence:keycard-thumbnail", "texture"),
         runtimeAsset("model:academy-hall", "glb"),
-        runtimeAsset("bleep:dialogue-default", "bleep")
+        runtimeAsset("bleep:dialogue-default", "bleep"),
+        runtimeAsset("font:serif-regular", "font")
       ]),
       audio: {
         dialogueBleep: {
@@ -75,7 +76,13 @@ describe("asset registry", () => {
         runtimeAsset("texture:evidence:keycard-thumbnail", "texture"),
         runtimeAsset("model:academy-hall", "glb"),
         runtimeAsset("bleep:dialogue-default", "bleep"),
-        runtimeAsset("sfx:wrong-kind", "sfx")
+        runtimeAsset("sfx:wrong-kind", "sfx"),
+        runtimeAsset("font:serif-regular", "font")
+      ],
+      fonts: [
+        { id: "font:serif", family: "Serif", sourceRef: "font:serif-regular", weight: "400", style: "normal" },
+        { id: "font:missing", family: "Missing", sourceRef: "font:missing", weight: "400", style: "normal" },
+        { id: "font:wrong-kind", family: "Wrong", sourceRef: "sfx:wrong-kind", weight: "400", style: "normal" }
       ],
       assets: [{ id: "model:academy-hall", kind: "glb", tags: [] }],
       uiAssets: [{ id: "ui:toolbar:icon", role: "toolbar-icon", assetId: "texture:evidence:keycard-thumbnail", slice: "stretch", tags: [] }],
@@ -114,6 +121,8 @@ describe("asset registry", () => {
       expect.arrayContaining([
         expect.objectContaining({ code: "asset-missing", id: "bleep:missing", kind: "bleep" }),
         expect.objectContaining({ code: "asset-kind-mismatch", id: "sfx:wrong-kind", kind: "bleep" }),
+        expect.objectContaining({ code: "asset-missing", id: "font:missing", kind: "font" }),
+        expect.objectContaining({ code: "asset-kind-mismatch", id: "sfx:wrong-kind", kind: "font" }),
         expect.objectContaining({ code: "asset-missing", id: "texture:missing" })
       ])
     );
@@ -134,6 +143,7 @@ function baseManifest(runtimeAssets: RuntimeAsset[]): ContentManifest {
   return {
     version: 2,
     assets: [],
+    fonts: [],
     runtimeAssets,
     uiAssets: [],
     interactionStyles: [],
@@ -155,7 +165,9 @@ function runtimeAsset(id: string, kind: RuntimeAssetKind): RuntimeAsset {
           ? "gltf"
           : kind === "character-pack"
             ? "json"
-            : "png";
+            : kind === "font"
+              ? "woff2"
+              : "png";
   return {
     id,
     kind,

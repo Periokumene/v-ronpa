@@ -120,7 +120,6 @@ describe("story engine", () => {
             "speaker": "Felix",
             "text": "The door was locked.",
           },
-          "formats": {},
           "printerId": "default",
           "visible": true,
         },
@@ -232,7 +231,6 @@ describe("story engine", () => {
       "choice",
       "clearbacklog",
       "clearchoice",
-      "format",
       "glitch",
       "glitchfilter",
       "goto",
@@ -362,10 +360,9 @@ describe("story engine", () => {
     expect(result.emittedRuntimeCommands).toEqual([]);
   });
 
-  it("keeps current text separate from backlog for append, resetText, clearBacklog, format, and showPrinter", () => {
+  it("keeps current text separate from backlog for append, resetText, clearBacklog, and showPrinter", () => {
     const runtimeScript = runtimeScriptFixture("text-state.nani", [
       runtimeCommand("append", "text", { text: "Draft" }),
-      runtimeCommand("format", "text", { templates: ["alert.red", "soft:blue"] }),
       runtimeCommand("showprinter", "text", { printerId: "say" }),
       runtimeCommand("resettext", "text", {}),
       runtimeCommand("append", "text", { text: "Fresh" }),
@@ -378,9 +375,6 @@ describe("story engine", () => {
     state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
     expect(selectCurrentStoryLine(state)).toEqual({ text: "Draft" });
     expect(state.backlog).toEqual([]);
-
-    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
-    expect(state.text?.formats).toEqual({ alert: "red", soft: "blue" });
 
     state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
     expect(state.text?.printerId).toBe("say");
@@ -401,6 +395,48 @@ describe("story engine", () => {
 
     state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
     expect(state.backlog).toEqual([{ speaker: "Mira", text: "After clear." }]);
+  });
+
+  it("stores rich text snapshots for print, append, backlog, and choices", () => {
+    const runtimeScript = runtimeScriptFixture("rich-story.nani", [
+      runtimeCommand(
+        "print",
+        "text",
+        { speaker: "Felix", text: "Bold", autoNext: false },
+        { richText: { text: "Bold", runs: [{ start: 0, end: 4, style: { bold: true } }] } }
+      ),
+      runtimeCommand(
+        "append",
+        "text",
+        { text: " marked" },
+        { richText: { text: " marked", runs: [{ start: 1, end: 7, style: { markColor: "default" } }] } }
+      ),
+      runtimeCommand("choice", "choice", { text: "Inspect", goto: "#Inspect" }, { richText: { text: "Inspect", runs: [{ start: 0, end: 7, style: { italic: true } }] } })
+    ]);
+
+    let state = createInitialStoryState(runtimeScript);
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(state.text?.current?.richText).toEqual({ text: "Bold", runs: [{ start: 0, end: 4, style: { bold: true } }] });
+    expect(state.backlog.at(-1)?.richText).toEqual({ text: "Bold", runs: [{ start: 0, end: 4, style: { bold: true } }] });
+
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(selectCurrentStoryLine(state)).toEqual({
+      speaker: "Felix",
+      text: "Bold marked",
+      richText: {
+        text: "Bold marked",
+        runs: [
+          { start: 0, end: 4, style: { bold: true } },
+          { start: 5, end: 11, style: { markColor: "default" } }
+        ]
+      }
+    });
+
+    state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
+    expect(state.pendingChoices[0]).toMatchObject({
+      text: "Inspect",
+      richText: { text: "Inspect", runs: [{ start: 0, end: 7, style: { italic: true } }] }
+    });
   });
 
   it("emits print textId for app adapters without persisting it into current text or backlog", () => {
@@ -762,6 +798,7 @@ function runtimeCommand(
     status?: NaniCommandStatus;
     condition?: RuntimeCommand["condition"];
     unless?: RuntimeCommand["unless"];
+    richText?: RuntimeCommand["richText"];
   } = {}
 ): RuntimeCommand {
   return {
@@ -771,6 +808,7 @@ function runtimeCommand(
     source: options.source ?? "v-ronpa",
     status: options.status ?? "implemented",
     params,
+    ...(options.richText ? { richText: options.richText } : {}),
     ...(options.condition ? { condition: options.condition } : {}),
     ...(options.unless ? { unless: options.unless } : {}),
     loc: {

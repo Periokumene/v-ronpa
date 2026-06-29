@@ -24,11 +24,11 @@ files.
 - `id`: stable content id such as `bg:harness`, `Ema`, or
   `video:validation-intro`.
 - `kind`: runtime family, including `character-pack`, `background`, `bgm`,
-  `sfx`, `voice`, `video`, `glb`, `texture`, and `fx`.
+  `sfx`, `bleep`, `voice`, `video`, `font`, `glb`, `texture`, and `fx`.
 - `sourceUri`: optional authoring source for traceability.
 - `optimizedUri`: app-loadable file emitted by the asset pipeline.
-- `format`: `json`, `glb`, `gltf`, `webp`, `png`, `ogg`, `mp4`, and related runtime
-  formats.
+- `format`: `json`, `glb`, `gltf`, `webp`, `png`, `woff`, `woff2`, `ttf`,
+  `otf`, `ogg`, `mp4`, and related runtime formats.
 - `compression`, `lods`, `textureBudget`, and `collisionProxyIds`: production
   metadata used by future build and review gates.
 
@@ -57,6 +57,8 @@ Harness assets use a convention-plus-override generator:
 
 - `pnpm generate:assets` scans `apps/game/public/harness/**` and writes
   `apps/game/src/harness/generatedAssets.ts`.
+- Font fixtures live under `apps/game/public/harness/fonts/*.{woff,woff2,ttf,otf}`;
+  the generator emits ids as `font:<file-name-without-extension>`.
 - Voice validation assets live under
   `apps/game/public/harness/media/voice/<locale>/*.ogg`; the generator emits
   ids as `voice:<locale>:<file-name-without-extension>`, for example
@@ -65,8 +67,9 @@ Harness assets use a convention-plus-override generator:
   letters, numbers, `_`, and `-`. `pnpm validate:assets` rejects nested voice
   files or path-like text ids under `media/voice`.
 - `pnpm validate:assets` dry-runs the generator, checks generated files exist,
-  checks manifest references resolve through `AssetRegistry`, and rejects
-  hardcoded runtime asset paths in source.
+  checks manifest font references and script-authored rich text `font:*` ids
+  resolve through the same manifest path, and rejects hardcoded runtime asset
+  paths in source.
 
 Generated asset files and the Pixi built-in FX manifest are allowed to contain
 runtime URLs because they are asset registration sources. Runtime adapters,
@@ -91,6 +94,10 @@ it through adapter props:
 - dialogue reveal bleep resolves `bleep:*` ids declared by
   `ContentManifest.audio.dialogueBleep` through the same registry before
   calling `AudioPort.playDialogueBleep`.
+- rich text font faces resolve `ContentManifest.fonts[*].sourceRef` to
+  `RuntimeAsset.kind === "font"` before app code emits controlled `@font-face`
+  CSS. Script-authored rich text stores only `fontId`, not raw CSS family names
+  or URLs.
 - Pixi resolves backgrounds, character-pack entry JSON, and FX ids before
   loading textures.
 - Shader-only Pixi effects may have no FX texture entry. The rain shader path is

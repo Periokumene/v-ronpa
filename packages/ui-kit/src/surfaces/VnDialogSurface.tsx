@@ -1,6 +1,7 @@
-import type { StoryChoiceOption } from "@v-ronpa/contracts";
+import type { RichTextDocument, StoryChoiceOption } from "@v-ronpa/contracts";
 import { useId } from "react";
 import type { CSSProperties, KeyboardEvent } from "react";
+import { RichTextRenderer } from "./RichTextRenderer";
 
 export interface VnDialogDisplaySettings {
   textSize: "small" | "medium" | "large";
@@ -11,6 +12,7 @@ export interface VnDialogDisplaySettings {
 export interface VnDialogSurfaceProps {
   speaker?: string;
   text: string;
+  richText?: RichTextDocument;
   choices?: StoryChoiceOption[];
   displaySettings?: VnDialogDisplaySettings;
   ended?: boolean;
@@ -41,6 +43,7 @@ const TEXT_SPEED_TRANSITION_MS = {
 export function VnDialogSurface({
   speaker,
   text,
+  richText,
   choices = [],
   displaySettings,
   ended = false,
@@ -127,7 +130,7 @@ export function VnDialogSurface({
       </div>
 
       <p data-testid="vn-dialog-text" id={textId} style={dialogTextStyle(textSize, textSpeed)}>
-        {text}
+        <RichTextRenderer document={richText} fallbackText={text} />
       </p>
 
       {hasChoices && (
@@ -140,7 +143,7 @@ export function VnDialogSurface({
               style={choiceButtonStyle}
               type="button"
             >
-              {choice.text}
+              <RichTextRenderer document={choice.richText} fallbackText={choice.text} />
             </button>
           ))}
         </div>
@@ -241,7 +244,8 @@ const textStyle: CSSProperties = {
   margin: 0,
   color: "#f7fbff",
   fontSize: 16,
-  lineHeight: 1.55
+  lineHeight: 1.55,
+  whiteSpace: "pre-wrap"
 };
 
 function dialogTextStyle(textSize: VnDialogDisplaySettings["textSize"], textSpeed: number): CSSProperties {
@@ -274,7 +278,8 @@ const controlButtonStyle: CSSProperties = {
 const choiceButtonStyle: CSSProperties = {
   ...controlButtonStyle,
   borderColor: "rgba(110, 231, 216, 0.42)",
-  background: "rgba(22, 34, 45, 0.86)"
+  background: "rgba(22, 34, 45, 0.86)",
+  whiteSpace: "pre-wrap"
 };
 
 const disabledButtonStyle: CSSProperties = {

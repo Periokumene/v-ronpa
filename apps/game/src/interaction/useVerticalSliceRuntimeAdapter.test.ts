@@ -76,6 +76,71 @@ describe("vertical slice runtime adapter helpers", () => {
     ]);
   });
 
+  it("keeps the vertical-slice rich text showcase covering the full first-pass markup set", () => {
+    for (const sample of [
+      "<b>",
+      "<strong>",
+      "<i>",
+      "<em>",
+      "<u>",
+      "<s>",
+      "<strike>",
+      "<del>",
+      "<mark>",
+      "<small>",
+      "<big>",
+      "<sub>",
+      "<sup>",
+      "<br>",
+      "<font color='red'>",
+      "<font color='#ff5577'>",
+      "<font size='1'>",
+      "<font size='7'>",
+      "<font size='-1'>",
+      "<font size='+1'>",
+      "<font face='font:serif'>",
+      "&nbsp;",
+      "&lt;",
+      "&gt;",
+      "&amp;",
+      "&quot;"
+    ]) {
+      expect(verticalSliceScript).toContain(sample);
+    }
+
+    const parsed = parseScenario({ sourceText: verticalSliceScript, scriptPath: "harness/vertical-slice.nani" });
+    const compiled = compileRuntimeScript(parsed.scenario);
+    expect(parsed.diagnostics).toEqual([]);
+    expect(compiled.diagnostics).toEqual([]);
+
+    const entityCommand = compiled.script.commands.find((command) => String(command.params.text ?? "").includes("CHECKPOINT RICH 01"));
+    expect(entityCommand?.params.text).toContain("A\u00a0B");
+    expect(entityCommand?.params.text).toContain("&");
+    expect(entityCommand?.params.text).toContain("\"quote\"");
+
+    const richCommands = compiled.script.commands.filter((command) => command.richText);
+    expect(richCommands.map((command) => command.commandId)).toEqual(expect.arrayContaining(["print", "append", "toast", "choice"]));
+    const styles = richCommands.flatMap((command) => command.richText?.runs.map((run) => run.style) ?? []);
+    expect(styles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ bold: true }),
+      expect.objectContaining({ italic: true }),
+      expect.objectContaining({ underline: true }),
+      expect.objectContaining({ strike: true }),
+      expect.objectContaining({ markColor: "default" }),
+      expect.objectContaining({ sizeScale: 0.85 }),
+      expect.objectContaining({ sizeScale: 1.15 }),
+      expect.objectContaining({ sizeScale: 0.75 }),
+      expect.objectContaining({ sizeScale: 1.75 }),
+      expect.objectContaining({ sizeScale: 0.875 }),
+      expect.objectContaining({ sizeScale: 1.125 }),
+      expect.objectContaining({ verticalAlign: "sub" }),
+      expect.objectContaining({ verticalAlign: "sup" }),
+      expect.objectContaining({ color: "red" }),
+      expect.objectContaining({ color: "#ff5577" }),
+      expect.objectContaining({ fontId: "font:serif" })
+    ]));
+  });
+
   it("extracts a small GameInteractionContext from vertical slice runtime state", () => {
     const runtimeScript = compileScenario("Felix: Hello.\n- Choice A", "context-test.nani");
     const storyRuntime: StoryRuntime = {
@@ -1214,6 +1279,7 @@ function manifestWithAssets(runtimeAssets: RuntimeAsset[]): ContentManifest {
   return {
     version: 2 as const,
     assets: [],
+    fonts: [],
     runtimeAssets,
     uiAssets: [],
     interactionStyles: [],

@@ -68,6 +68,19 @@ describe("UI runtime", () => {
     expect(dismissToast(result.state, "toast:1").toasts).toEqual([]);
   });
 
+  it("copies toast rich text snapshots from runtime commands", () => {
+    const result = reduceUiRuntimeCommand(
+      createInitialUiRuntimeState(),
+      runtimeCommand("toast", "ui", { text: "Saved" }, { richText: { text: "Saved", runs: [{ start: 0, end: 5, style: { bold: true } }] } })
+    );
+
+    expect(result.state.toasts[0]).toMatchObject({
+      id: expect.stringMatching(/^toast:/u),
+      text: "Saved",
+      richText: { text: "Saved", runs: [{ start: 0, end: 5, style: { bold: true } }] }
+    });
+  });
+
   it("derives input prompt from runtimeWait and clears it only when the wait clears", () => {
     const waiting = deriveUiRuntimeLifecycleState(createInitialUiRuntimeState(), storySnapshot({
       runtimeWait: {
@@ -113,7 +126,12 @@ function storySnapshot(overrides: Partial<StoryRuntimeSnapshot> = {}): StoryRunt
   };
 }
 
-function runtimeCommand(commandId: string, category: NaniCommandCategory, params: Record<string, RuntimeValue>): RuntimeCommand {
+function runtimeCommand(
+  commandId: string,
+  category: NaniCommandCategory,
+  params: Record<string, RuntimeValue>,
+  options: { richText?: RuntimeCommand["richText"] } = {}
+): RuntimeCommand {
   return {
     commandId,
     canonicalName: commandId,
@@ -121,6 +139,7 @@ function runtimeCommand(commandId: string, category: NaniCommandCategory, params
     source: "v-ronpa",
     status: "implemented",
     params,
+    ...(options.richText ? { richText: options.richText } : {}),
     loc: { scriptPath: "ui-runtime-test.nani", line: 1, column: 1, raw: `@${commandId}` }
   };
 }

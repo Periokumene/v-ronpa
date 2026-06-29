@@ -123,6 +123,18 @@ export const harnessRuntimeAssets = [
       ]
     },
     {
+      "id": "font:rich-serif",
+      "kind": "font",
+      "optimizedUri": "/harness/fonts/rich-serif.ttf",
+      "format": "ttf",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
       "id": "model:academy-hall",
       "kind": "glb",
       "optimizedUri": "/harness/models/academy-hall.gltf",

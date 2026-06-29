@@ -9,6 +9,7 @@ import {
   type NaviRuntimeState,
   type PlayerPose,
   type PixiStageSnapshot,
+  type RichTextDocument,
   type RuntimeCommand,
   type SaveData,
   type GameplayEvent,
@@ -99,6 +100,7 @@ import {
   countDialogRevealUnits,
   createDialogLinePacingPlan,
   createDialogRevealState,
+  selectVisibleRevealRichText,
   selectVisibleRevealText,
   type DialogRevealEvent,
   type DialogRevealState
@@ -151,6 +153,7 @@ export interface UiRuntime {
 export interface DialogRevealRuntime {
   state?: DialogRevealState;
   visibleText?: string;
+  visibleRichText?: RichTextDocument | undefined;
   events: DialogRevealEvent[];
   eventSequence: number;
 }
@@ -646,11 +649,13 @@ export function useVerticalSliceRuntimeAdapter(
   }
 
   function appendDialogRevealEvents(state: DialogRevealState, events: DialogRevealEvent[]) {
+    const richText = selectCurrentStoryLine(storyRuntimeRef.current.state)?.richText;
     setDialogRevealRuntimeNow((current) => ({
       state,
       events: events.length > 0 ? [...current.events, ...events].slice(-MAX_DIALOG_REVEAL_EVENTS) : current.events,
       eventSequence: current.eventSequence + events.length,
-      visibleText: selectVisibleRevealText(state) ?? state.text
+      visibleText: selectVisibleRevealText(state) ?? state.text,
+      visibleRichText: selectVisibleRevealRichText(richText, state)
     }));
     if (events.some((event) => event.type === "reveal-finish")) {
       applyDialogueAudioLifecycleSignal({ type: "line-finish", lineKey: state.lineKey });
@@ -1260,7 +1265,8 @@ export function useVerticalSliceRuntimeAdapter(
       state: step.state,
       events: [...current.events, ...step.events].slice(-MAX_DIALOG_REVEAL_EVENTS),
       eventSequence: current.eventSequence + step.events.length,
-      visibleText: selectVisibleRevealText(step.state) ?? step.state.text
+      visibleText: selectVisibleRevealText(step.state) ?? step.state.text,
+      visibleRichText: selectVisibleRevealRichText(currentLine?.richText, step.state)
     }));
     const textId = stringRuntimeParam(print, "textId");
     const voiceAvailability = resolveDialogueVoiceAssetAvailability({

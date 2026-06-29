@@ -2,6 +2,7 @@ import type {
   RuntimeCommand,
   RuntimeScript,
   RuntimeValue,
+  RichTextDocument,
   StoryBacklogEntry,
   StoryChoiceOption,
   StoryRuntimeSnapshot,
@@ -50,6 +51,7 @@ export interface AdvanceToNextStopOptions {
 export interface CurrentStoryLine {
   speaker?: string;
   text: string;
+  richText?: RichTextDocument;
 }
 
 export type StoryEvent =
@@ -84,7 +86,6 @@ const CONTROL_COMMAND_IDS = new Set([
   "clearbacklog",
   "clearchoice",
   "end",
-  "format",
   "goto",
   "input",
   "resettext",
@@ -266,7 +267,7 @@ export function chooseStoryOption(state: StoryRuntimeState, script: RuntimeScrip
 export function selectCurrentStoryLine(state: StoryRuntimeState): CurrentStoryLine | undefined {
   const latest = state.text?.current ?? state.backlog.at(-1);
   if (!latest) return undefined;
-  return latest.speaker ? { speaker: latest.speaker, text: latest.text } : { text: latest.text };
+  return compactStoryTextLine(latest);
 }
 
 export function storyReducer(state: StoryRuntimeState, event: StoryEvent): StoryStepperResult {
@@ -446,8 +447,6 @@ function executeCommand(
       return { state: executeResetText(advancedState), diagnostics: [], emittedRuntimeCommands: [] };
     case "clearbacklog":
       return { state: { ...advancedState, backlog: [] }, diagnostics: [], emittedRuntimeCommands: [] };
-    case "format":
-      return { state: executeFormat(advancedState, resolved.command), diagnostics: [], emittedRuntimeCommands: [] };
     case "showprinter":
       return { state: executeShowPrinter(advancedState, resolved.command), diagnostics: [], emittedRuntimeCommands: [] };
     case "wait":
@@ -562,15 +561,16 @@ function executePrint(state: StoryRuntimeState, command: RuntimeCommand): StoryR
   const text = stringParam(command, "text") ?? "";
   const speaker = stringParam(command, "speaker");
   const printerId = stringParam(command, "printerId") ?? state.text?.printerId ?? "default";
-  const backlogEntry: BacklogEntry = speaker ? { speaker, text } : { text };
+  const richText = command.richText ? cloneRichText(command.richText) : undefined;
+  const current = compactStoryTextLine({ speaker, text, richText });
+  const backlogEntry: BacklogEntry = current;
 
   return {
     ...state,
     text: {
       printerId,
       visible: true,
-      current: speaker ? { speaker, text } : { text },
-      formats: { ...(state.text?.formats ?? {}) }
+      current
     },
     backlog: [...state.backlog, backlogEntry]
   };
@@ -580,13 +580,14 @@ function executeAppend(state: StoryRuntimeState, command: RuntimeCommand): Story
   const text = stringParam(command, "text") ?? "";
   const current = state.text?.current;
   const speaker = current?.speaker ?? stringParam(command, "speaker");
+  const nextText = `${current?.text ?? ""}${text}`;
+  const richText = appendRichText(current?.richText, current?.text ?? "", command.richText, text);
   return {
     ...state,
     text: {
       printerId: stringParam(command, "printerId") ?? state.text?.printerId ?? "default",
       visible: state.text?.visible ?? true,
-      current: speaker ? { speaker, text: `${current?.text ?? ""}${text}` } : { text: `${current?.text ?? ""}${text}` },
-      formats: { ...(state.text?.formats ?? {}) }
+      current: compactStoryTextLine({ speaker, text: nextText, richText })
     }
   };
 }
@@ -596,23 +597,7 @@ function executeResetText(state: StoryRuntimeState): StoryRuntimeState {
     ...state,
     text: {
       printerId: state.text?.printerId ?? "default",
-      visible: state.text?.visible ?? true,
-      formats: { ...(state.text?.formats ?? {}) }
-    }
-  };
-}
-
-function executeFormat(state: StoryRuntimeState, command: RuntimeCommand): StoryRuntimeState {
-  const formats = { ...(state.text?.formats ?? {}) };
-  const templates = command.params.templates;
-  for (const [key, value] of formatTemplatesFromValue(templates)) formats[key] = value;
-  return {
-    ...state,
-    text: {
-      printerId: stringParam(command, "printerId") ?? state.text?.printerId ?? "default",
-      visible: state.text?.visible ?? true,
-      ...(state.text?.current ? { current: { ...state.text.current } } : {}),
-      formats
+      visible: state.text?.visible ?? true
     }
   };
 }
@@ -623,8 +608,7 @@ function executeShowPrinter(state: StoryRuntimeState, command: RuntimeCommand): 
     text: {
       printerId: stringParam(command, "printerId") ?? state.text?.printerId ?? "default",
       visible: true,
-      ...(state.text?.current ? { current: { ...state.text.current } } : {}),
-      formats: { ...(state.text?.formats ?? {}) }
+      ...(state.text?.current ? { current: cloneStoryTextLine(state.text.current) } : {})
     }
   };
 }
@@ -695,6 +679,7 @@ function executeChoice(state: StoryRuntimeState, command: RuntimeCommand): Story
   const choice: StoryChoiceOption = {
     text,
     enabled,
+    ...(command.richText ? { richText: cloneRichText(command.richText) } : {}),
     ...(goto ? { goto } : {}),
     ...(id ? { id } : {}),
     ...(setExpression ? { setExpression } : {})
@@ -821,8 +806,52 @@ function cloneTextState(text: NonNullable<StoryRuntimeState["text"]>): NonNullab
   return {
     printerId: text.printerId,
     visible: text.visible,
-    ...(text.current ? { current: { ...text.current } } : {}),
-    formats: { ...text.formats }
+    ...(text.current ? { current: cloneStoryTextLine(text.current) } : {})
+  };
+}
+
+function compactStoryTextLine(line: { speaker?: string | undefined; text: string; richText?: RichTextDocument | undefined }): {
+  speaker?: string;
+  text: string;
+  richText?: RichTextDocument;
+} {
+  return {
+    ...(line.speaker ? { speaker: line.speaker } : {}),
+    text: line.text,
+    ...(line.richText ? { richText: cloneRichText(line.richText) } : {})
+  };
+}
+
+function cloneStoryTextLine(line: { speaker?: string | undefined; text: string; richText?: RichTextDocument | undefined }): {
+  speaker?: string;
+  text: string;
+  richText?: RichTextDocument;
+} {
+  return compactStoryTextLine(line);
+}
+
+function cloneRichText(document: RichTextDocument): RichTextDocument {
+  return {
+    text: document.text,
+    runs: document.runs.map((run) => ({ start: run.start, end: run.end, style: { ...run.style } }))
+  };
+}
+
+function appendRichText(
+  currentRichText: RichTextDocument | undefined,
+  currentText: string,
+  appendedRichText: RichTextDocument | undefined,
+  appendedText: string
+): RichTextDocument | undefined {
+  if (!currentRichText && !appendedRichText) return undefined;
+  const offset = Array.from(currentText).length;
+  const nextText = `${currentText}${appendedText}`;
+  return {
+    text: nextText,
+    runs: [
+      ...(currentRichText?.runs.map((run) => ({ start: run.start, end: run.end, style: { ...run.style } })) ?? []),
+      ...(appendedRichText?.runs.map((run) => ({ start: run.start + offset, end: run.end + offset, style: { ...run.style } })) ?? [])
+    ]
   };
 }
 
@@ -860,17 +889,6 @@ function coerceInputValue(
     if (normalized === "false") return { value: false };
   }
   return { diagnostic: createDiagnostic("input-validation", `Input value ${String(value)} is not a valid boolean.`, "warning") };
-}
-
-function formatTemplatesFromValue(value: RuntimeValue | undefined): Array<[string, string]> {
-  if (value === undefined) return [];
-  if (Array.isArray(value)) return value.flatMap(formatTemplatesFromValue);
-  if (typeof value !== "string") return [];
-  const colon = value.indexOf(":");
-  const dot = value.indexOf(".");
-  const splitAt = colon >= 0 ? colon : dot;
-  if (splitAt < 0) return [[value, value]];
-  return [[value.slice(0, splitAt), value.slice(splitAt + 1)]];
 }
 
 function applySetExpression(state: StoryRuntimeState, expression: string): StoryRuntimeState {

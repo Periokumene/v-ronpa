@@ -85,6 +85,9 @@ release mechanism.
   params with defaults.
 - `children` means the catalog marks the command as child-block capable. This
   baseline does not parse nested command blocks yet.
+- First-pass rich text is carried as `RuntimeCommand.richText` beside ordinary
+  string `params.text`. Downstream systems must consume the compiled document
+  and must not re-parse markup in StoryEngine, ui-kit, or app save adapters.
 - `showUI` / `hideUI` are implemented as a V-Ronpa runtime UI subset. Supported
   targets are `dialog`, `commandBar`, and `toastLayer`; no-target commands apply
   to those three targets only. `hud`, debug/harness UI, shell overlays,
@@ -116,7 +119,7 @@ release mechanism.
 | `endIf` | `endif` | flow | none | no | stubbed |
 | `enterDialogue` | `enterdialogue` | text | none | no | stubbed |
 | `exitDialogue` | `exitdialogue` | text | `destroy:boolean` | no | stubbed |
-| `format` | `format` | text | `templates:named string list`, `printer:string` | no | implemented |
+| `format` | `format` | text | `templates:named string list`, `printer:string` | no | stubbed |
 | `glitch` | `glitch` | effect | `time:decimal`, `power:decimal`, `wait:boolean` | no | implemented |
 | `gosub` | `gosub` | flow | `path:string` | no | stubbed |
 | `goto` | `goto` | flow | `path:string`, `reset:string list`, `hold:boolean`, `release:boolean` | no | implemented |
@@ -257,3 +260,27 @@ text. Current rules:
   adapters can plan dialogue audio: resolved `voice:<locale>:<textId>` assets
   win over configured dialogue bleep fallback.
 - `@print`, `@append`, and `@toast` do not interpret `|#...|` as metadata.
+
+## Rich Text Markup
+
+First-pass rich text uses classic HTML-style tags in dialogue text and static
+string arguments for `@print`, `@append`, `@choice`, and `@toast`. The compiler
+emits plain `params.text` plus optional top-level `richText` with serializable
+ranges. Backlog, current text, pending choices, and saves keep that snapshot;
+toast remains transient UI state.
+
+Supported tags are `b/strong`, `i/em`, `u`, `s/strike/del`, `mark`,
+`small/big`, `sub/sup`, `br`, and `font` with safe `color`, bounded `size`, or
+registered `face` values. Supported entities are `&nbsp;`, `&lt;`, `&gt;`,
+`&amp;`, and `&quot;`.
+
+`font face` values must be registered font ids such as
+`<font face='font:serif'>... </font>`. `ContentManifest.fonts` maps those ids to
+font runtime assets. Renderer code uses the id to select a controlled CSS
+variable; scripts cannot inject raw CSS font families, URLs, or `style`
+attributes.
+
+Attributes are intentionally strict in the first pass. Non-`font` tags do not
+accept attributes, and `font` accepts only `color`, `size`, and `face`. Unknown,
+duplicate, malformed, unsupported, or unclosed rich text markup is kept visible
+as source text and reported as a parser diagnostic.
