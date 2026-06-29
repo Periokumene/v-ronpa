@@ -466,6 +466,24 @@ describe("pixi presentation task system integration", () => {
     expect(tasks.snapshot()).toEqual([]);
   });
 
+  it("renders rain through the shader renderer instead of legacy tiling sprites", () => {
+    const { root, weather } = createSystems();
+    weather.reconcile(stageWithWeather(weatherSnapshot({ power: 0.9, durationMs: 0 }), 1), false);
+
+    const rain = findWeatherContainer(root, "rain");
+    expect(rain).toBeDefined();
+    expect(rain?.children.some((child) => child instanceof TilingSprite)).toBe(false);
+    const shader = rain?.children.find((child): child is Container => child instanceof Container && child.label === "weather:rain:shader");
+    expect(shader).toBeDefined();
+    const nearSurface = shader?.children[0] as Sprite | undefined;
+    const filter = nearSurface?.filters?.[0] as { resources: { rainUniforms: { uniforms: Record<string, number | number[]> } } } | undefined;
+    const uniforms = filter?.resources.rainUniforms.uniforms;
+    expect(uniforms?.uRainFrameSize).toEqual(expect.arrayContaining([expect.any(Number), 1]));
+    expect((uniforms?.uRainFrameSize as number[] | undefined)?.[0]).toBeGreaterThan(1);
+    expect((uniforms?.uGuideResolution as number[] | undefined)?.[0]).toBeGreaterThan(960);
+    expect(uniforms?.uGuideResolution).toEqual(expect.arrayContaining([expect.any(Number), 540]));
+  });
+
   it("renders snow through a shader overlay instead of legacy tiling sprites", () => {
     const { root, weather } = createSystems();
     weather.reconcile(stageWithWeather(snowWeatherSnapshot({ power: 0.9, durationMs: 0 }), 1), false);
@@ -625,15 +643,15 @@ function stageWithWeathers(weather: PixiStageSnapshot["weather"], revision: numb
   };
 }
 
-function weatherSnapshot({ power, durationMs }: { power: number; durationMs: number }): PixiWeatherSnapshot {
+function weatherSnapshot({ power, durationMs }: { power: number; durationMs: number }): Extract<PixiWeatherSnapshot, { kind: "rain" }> {
   return {
     kind: "rain",
-    power,
+    commandParams: { power, wind: -1, hue: 215, tint: 0.55 },
     transition: { durationMs, lazy: false, wait: false }
   };
 }
 
-function snowWeatherSnapshot({ power, durationMs }: { power: number; durationMs: number }): PixiWeatherSnapshot {
+function snowWeatherSnapshot({ power, durationMs }: { power: number; durationMs: number }): Extract<PixiWeatherSnapshot, { kind: "snow" }> {
   return {
     kind: "snow",
     power,

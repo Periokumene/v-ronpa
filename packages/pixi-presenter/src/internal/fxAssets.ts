@@ -6,7 +6,6 @@ export type PixiFxAssetId =
   | "noise"
   | "blue-noise"
   | "bokeh-disc"
-  | "rain-streak"
   | "godray-mask"
   | "glitch-scanline"
   | "chromatic-noise"
@@ -18,7 +17,6 @@ const assetUris: Record<PixiFxAssetId, string> = {
   "noise": new URL("./assets/fx/noise.png", import.meta.url).href,
   "blue-noise": new URL("./assets/fx/blue-noise.png", import.meta.url).href,
   "bokeh-disc": new URL("./assets/fx/bokeh-disc.png", import.meta.url).href,
-  "rain-streak": new URL("./assets/fx/rain-streak.png", import.meta.url).href,
   "godray-mask": new URL("./assets/fx/godray-mask.png", import.meta.url).href,
   "glitch-scanline": new URL("./assets/fx/glitch-scanline.png", import.meta.url).href,
   "chromatic-noise": new URL("./assets/fx/chromatic-noise.png", import.meta.url).href,
@@ -33,7 +31,6 @@ export const builtInPixiFxRuntimeAssets: RuntimeAsset[] = [
   runtimeFxAsset("noise", assetUris.noise),
   runtimeFxAsset("blue-noise", assetUris["blue-noise"]),
   runtimeFxAsset("bokeh-disc", assetUris["bokeh-disc"]),
-  runtimeFxAsset("rain-streak", assetUris["rain-streak"]),
   runtimeFxAsset("godray-mask", assetUris["godray-mask"]),
   runtimeFxAsset("glitch-scanline", assetUris["glitch-scanline"]),
   runtimeFxAsset("chromatic-noise", assetUris["chromatic-noise"]),

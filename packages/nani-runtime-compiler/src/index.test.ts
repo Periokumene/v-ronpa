@@ -65,17 +65,36 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands[1]?.params).not.toHaveProperty("duration");
   });
 
-  it("normalizes shader snow params while leaving them snow-specific", () => {
+  it("normalizes shader weather params while leaving rain and snow controls separate", () => {
     const { scenario } = parseScenario({
       sourceText: [
+        "@rain power:0.75 wind:0.4 hue:390 tint:1.2 time:0.3 easing:linear wait!",
         "@snow power:1 density:1.5 flakeScale:1.2 xSpeed:-0.3 ySpeed:0.8 sway:0.9 fog:0.25 noise:0.02 seed:42 time:0.2 wait!",
-        "@rain legacy power:1 density:1.5"
+        "@rain legacy power:1 xSpeed:1 density:1.5"
       ].join("\n"),
       scriptPath: "snow-shader.nani"
     });
     const result = compileRuntimeScript(scenario);
 
     expect(result.script.commands[0]).toEqual(
+      expect.objectContaining({
+        commandId: "rain",
+        params: {
+          kind: "rain",
+          power: 0.75,
+          wind: 0.4,
+          hue: 390,
+          tint: 1.2,
+          durationMs: 300,
+          easing: "linear",
+          lazy: false,
+          wait: true
+        }
+      })
+    );
+    expect(result.script.commands[0]?.params).not.toHaveProperty("xSpeed");
+    expect(result.script.commands[0]?.params).not.toHaveProperty("rainSettings");
+    expect(result.script.commands[1]).toEqual(
       expect.objectContaining({
         commandId: "snow",
         params: {
@@ -95,13 +114,76 @@ describe("nani runtime compiler", () => {
         }
       })
     );
-    expect(result.script.commands[1]?.params).not.toHaveProperty("density");
+    expect(result.script.commands[2]?.params).not.toHaveProperty("density");
+    expect(result.script.commands[2]?.params).not.toHaveProperty("xSpeed");
+    expect(result.diagnostics).toContainEqual({
+      code: "invalid-command-param",
+      message: "@rain does not declare parameter xSpeed; commandCatalog is the authority.",
+      severity: "warning"
+    });
     expect(result.diagnostics).toContainEqual({
       code: "invalid-command-param",
       message: "@rain does not declare parameter density; commandCatalog is the authority.",
       severity: "warning"
     });
     expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+  });
+
+  it("compiles rain power and tint showcase commands without exposing internal settings", () => {
+    const { scenario } = parseScenario({
+      sourceText: [
+        "@rain power:0.2 wind:0 hue:215 tint:0.55 time:0.1",
+        "@rain power:0.35 wind:0 hue:215 tint:0.55 time:0.1 easing:linear",
+        "@rain power:0.5 wind:0 hue:215 tint:0.55 time:0.1",
+        "@rain power:0.75 wind:0 hue:215 tint:0.55 time:0.1 easing:linear",
+        "@rain power:1 wind:0 hue:215 tint:0.55 time:0.1",
+        "@rain power:0.7 wind:0 hue:170 tint:1.25 time:0.1",
+        "@rain power:0.7 wind:0 hue:300 tint:1.65 time:0.1",
+        "@rain power:0.7 wind:0 hue:45 tint:1.65 time:0.1"
+      ].join("\n"),
+      scriptPath: "rain-showcase.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.script.commands.map((command) => command.commandId)).toEqual([
+      "rain",
+      "rain",
+      "rain",
+      "rain",
+      "rain",
+      "rain",
+      "rain",
+      "rain"
+    ]);
+    expect(result.script.commands[0]?.params).toMatchObject({ kind: "rain", power: 0.2, wind: 0, hue: 215, tint: 0.55 });
+    expect(result.script.commands[1]?.params).toMatchObject({
+      kind: "rain",
+      power: 0.35,
+      wind: 0,
+      hue: 215,
+      tint: 0.55,
+      easing: "linear"
+    });
+    expect(result.script.commands[2]?.params).toMatchObject({ kind: "rain", power: 0.5, wind: 0, hue: 215, tint: 0.55 });
+    expect(result.script.commands[3]?.params).toMatchObject({
+      kind: "rain",
+      power: 0.75,
+      wind: 0,
+      hue: 215,
+      tint: 0.55,
+      easing: "linear"
+    });
+    expect(result.script.commands[4]?.params).toMatchObject({ kind: "rain", power: 1, wind: 0, hue: 215, tint: 0.55 });
+    expect(result.script.commands[5]?.params).toMatchObject({ kind: "rain", power: 0.7, wind: 0, hue: 170, tint: 1.25 });
+    expect(result.script.commands[6]?.params).toMatchObject({ kind: "rain", power: 0.7, wind: 0, hue: 300, tint: 1.65 });
+    expect(result.script.commands[7]?.params).toMatchObject({ kind: "rain", power: 0.7, wind: 0, hue: 45, tint: 1.65 });
+    for (const command of result.script.commands) {
+      expect(command.params).toMatchObject({ durationMs: 100, lazy: false, wait: false });
+      expect(command.params).not.toHaveProperty("rainSettings");
+      expect(command.params).not.toHaveProperty("xSpeed");
+      expect(command.params).not.toHaveProperty("density");
+    }
   });
 
   it("normalizes shader glitch params while preserving unknown-param diagnostics", () => {

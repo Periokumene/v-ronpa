@@ -274,7 +274,7 @@ describe("vertical slice runtime adapter helpers", () => {
       })
     ).snapshot;
     const save = {
-      version: 2 as const,
+      version: 3 as const,
       savedAt: "2026-06-20T00:00:00.000Z",
       mode: "navi" as const,
       navi: {
@@ -320,7 +320,7 @@ describe("vertical slice runtime adapter helpers", () => {
   it("restores saved Trial runtime state when a save was captured in trial mode", () => {
     const runtimeScript = compileScenario("Felix: Restore trial.", "restore-trial-test.nani");
     const save = {
-      version: 2 as const,
+      version: 3 as const,
       savedAt: "2026-06-20T00:00:00.000Z",
       mode: "trial" as const,
       story: storyRuntimeSnapshot(createInitialStoryState(runtimeScript)),
@@ -1070,7 +1070,7 @@ describe("vertical slice runtime adapter helpers", () => {
   it("clears transient runtimeWait during restore with a diagnostic", () => {
     const runtimeScript = compileScenario("Felix: Restore wait.", "restore-runtime-wait-test.nani");
     const save = {
-      version: 2 as const,
+      version: 3 as const,
       savedAt: "2026-06-20T00:00:00.000Z",
       mode: "navi" as const,
       story: {

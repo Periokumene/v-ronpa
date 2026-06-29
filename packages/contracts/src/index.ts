@@ -424,6 +424,16 @@ const particleParams = [
   param("wait", "boolean")
 ];
 
+const rainShaderParams = [
+  param("power", "decimal"),
+  param("wind", "decimal"),
+  param("hue", "decimal"),
+  param("tint", "decimal"),
+  param("time", "decimal"),
+  param("easing", "string"),
+  param("wait", "boolean")
+];
+
 const snowShaderParams = [
   param("power", "decimal"),
   param("time", "decimal"),
@@ -620,17 +630,7 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
   ]),
   official("processInput", "ui", [param("inputEnabled", "boolean"), param("set", "named boolean list")]),
   official("purgeRollback", "state"),
-  official("rain", "effect", [
-    param("power", "decimal"),
-    param("time", "decimal"),
-    param("xSpeed", "decimal"),
-    param("ySpeed", "decimal"),
-    param("pos", "decimal list"),
-    param("position", "decimal list"),
-    param("rotation", "decimal list"),
-    param("scale", "decimal list"),
-    param("wait", "boolean")
-  ]),
+  official("rain", "effect", rainShaderParams),
   official("random", "flow", [param("weight", "decimal list")], true),
   official("remove", "actor", [param("actorIds", "string list")]),
   official("resetState", "state", [param("exclude", "string list"), param("only", "string list")]),
@@ -1276,8 +1276,23 @@ export type PixiActorSnapshot = z.infer<typeof PixiActorSnapshotSchema>;
 export const PixiWeatherKindSchema = z.enum(["rain", "snow", "sun"]);
 export type PixiWeatherKind = z.infer<typeof PixiWeatherKindSchema>;
 
-export const PixiWeatherSnapshotSchema = z.object({
-  kind: PixiWeatherKindSchema,
+export const PixiRainCommandParamsSchema = z.object({
+  power: z.number().min(0).max(1).default(1),
+  wind: z.number().min(-1).max(1).default(-1),
+  hue: z.number().min(0).max(360).default(215),
+  tint: z.number().min(0).max(2).default(0.55)
+}).strict();
+export type PixiRainCommandParams = z.infer<typeof PixiRainCommandParamsSchema>;
+
+export const PixiRainWeatherSnapshotSchema = z.object({
+  kind: z.literal("rain"),
+  commandParams: PixiRainCommandParamsSchema,
+  transition: PixiActorTransitionSnapshotSchema
+}).strict();
+export type PixiRainWeatherSnapshot = z.infer<typeof PixiRainWeatherSnapshotSchema>;
+
+export const PixiSnowWeatherSnapshotSchema = z.object({
+  kind: z.literal("snow"),
   power: z.number().nonnegative().default(0),
   xSpeed: z.number().optional(),
   ySpeed: z.number().optional(),
@@ -1292,8 +1307,36 @@ export const PixiWeatherSnapshotSchema = z.object({
   rotation: PixiVector3Schema.optional(),
   scale: PixiVector3Schema.optional(),
   transition: PixiActorTransitionSnapshotSchema
-});
+}).strict();
+export type PixiSnowWeatherSnapshot = z.infer<typeof PixiSnowWeatherSnapshotSchema>;
+
+export const PixiSunWeatherSnapshotSchema = z.object({
+  kind: z.literal("sun"),
+  power: z.number().nonnegative().default(0),
+  pos: PixiVector2Schema.optional(),
+  position: PixiVector3Schema.optional(),
+  rotation: PixiVector3Schema.optional(),
+  scale: PixiVector3Schema.optional(),
+  transition: PixiActorTransitionSnapshotSchema
+}).strict();
+export type PixiSunWeatherSnapshot = z.infer<typeof PixiSunWeatherSnapshotSchema>;
+
+export const PixiWeatherSnapshotSchema = z.discriminatedUnion("kind", [
+  PixiRainWeatherSnapshotSchema,
+  PixiSnowWeatherSnapshotSchema,
+  PixiSunWeatherSnapshotSchema
+]);
 export type PixiWeatherSnapshot = z.infer<typeof PixiWeatherSnapshotSchema>;
+
+export const PixiWeatherSnapshotMapSchema = z
+  .object({
+    rain: PixiRainWeatherSnapshotSchema.optional(),
+    snow: PixiSnowWeatherSnapshotSchema.optional(),
+    sun: PixiSunWeatherSnapshotSchema.optional()
+  })
+  .strict()
+  .default({});
+export type PixiWeatherSnapshotMap = z.infer<typeof PixiWeatherSnapshotMapSchema>;
 
 export const PixiScreenFiltersSnapshotSchema = z
   .object({
@@ -1322,12 +1365,12 @@ export const PixiScreenFiltersSnapshotSchema = z
 export type PixiScreenFiltersSnapshot = z.infer<typeof PixiScreenFiltersSnapshotSchema>;
 
 export const PixiStageSnapshotSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
   revision: z.number().int().nonnegative().default(0),
   backgroundsById: z.record(IdSchema, PixiActorSnapshotSchema).default({}),
   charactersById: z.record(IdSchema, PixiActorSnapshotSchema).default({}),
   actorOrder: z.array(IdSchema).default([]),
-  weather: z.partialRecord(PixiWeatherKindSchema, PixiWeatherSnapshotSchema).default({}),
+  weather: PixiWeatherSnapshotMapSchema,
   screenFilters: PixiScreenFiltersSnapshotSchema
 }).strict();
 export type PixiStageSnapshot = z.infer<typeof PixiStageSnapshotSchema>;
@@ -1660,7 +1703,7 @@ export const TrialRuntimeStateSchema = z.object({
 export type TrialRuntimeState = z.infer<typeof TrialRuntimeStateSchema>;
 
 export const SaveDataSchema = z.object({
-  version: z.literal(2),
+  version: z.literal(3),
   savedAt: z.string(),
   mode: GameModeSchema,
   navi: NaviRuntimeStateSchema.optional(),
