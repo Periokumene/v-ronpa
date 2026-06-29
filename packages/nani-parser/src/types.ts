@@ -47,7 +47,9 @@ export interface CommandIR {
   commandId: string;
   args: CommandArgIR[];
   primary?: NaniValue;
+  richTextPrimary?: RichTextDocumentIR;
   params: Record<string, NaniValue>;
+  richTextParams?: Record<string, RichTextDocumentIR>;
   flags: Record<string, boolean>;
   inlineIndex?: number;
   children?: StatementIR[];
@@ -68,12 +70,36 @@ export interface TextTokenInlineCommand {
 
 export type TextToken = TextTokenText | TextTokenInlineCommand;
 
+export interface RichTextRunStyleIR {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
+  color?: string;
+  markColor?: string;
+  sizeScale?: number;
+  fontId?: string;
+  verticalAlign?: "sub" | "sup";
+}
+
+export interface RichTextRunIR {
+  start: number;
+  end: number;
+  style: RichTextRunStyleIR;
+}
+
+export interface RichTextDocumentIR {
+  text: string;
+  runs: RichTextRunIR[];
+}
+
 export interface TextIR {
   kind: "text";
   speaker?: string;
   appearance?: string;
   textId?: string;
   tokens: TextToken[];
+  richText?: RichTextDocumentIR;
   printParams?: Record<string, NaniValue>;
   loc: SourceLocation;
 }

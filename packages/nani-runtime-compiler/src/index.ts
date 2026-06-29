@@ -1,12 +1,13 @@
 import {
   getNaniCommandDefinition,
+  type RichTextDocument,
   type NaniCommandDefinition,
   type NaniCommandParamSpec,
   type RuntimeCommand,
   type RuntimeScript,
   type RuntimeValue
 } from "@v-ronpa/contracts";
-import type { CommandIR, NaniValue, ScenarioIR, StatementIR, TextIR } from "@v-ronpa/nani-parser";
+import type { CommandIR, NaniValue, RichTextDocumentIR, ScenarioIR, StatementIR, TextIR } from "@v-ronpa/nani-parser";
 
 export type RuntimeCompilerDiagnosticCode =
   | "unknown-command"
@@ -79,7 +80,7 @@ function compileStatement(
 }
 
 function compileText(statement: TextIR): RuntimeCommand {
-  const text = statement.tokens.filter((token) => token.kind === "text").map((token) => token.text).join("");
+  const text = statement.richText?.text ?? statement.tokens.filter((token) => token.kind === "text").map((token) => token.text).join("");
   const autoNext = statement.tokens.some((token) => token.kind === "inline-command" && token.command.commandId === ">");
   const params: Record<string, RuntimeValue> = {
     text,
@@ -97,6 +98,7 @@ function compileText(statement: TextIR): RuntimeCommand {
     source: "v-ronpa",
     status: "implemented",
     params,
+    ...(statement.richText ? { richText: richTextDocument(statement.richText) } : {}),
     loc: statement.loc,
     sourceCommand: {
       rawCommandId: "text",
@@ -130,6 +132,8 @@ function compileCommand(command: CommandIR, diagnostics: RuntimeCompilerDiagnost
   if (validationDiagnostics.some((diagnostic) => diagnostic.severity === "error")) return undefined;
 
   const normalized = normalizeCommandParams(shape, definition);
+  const richText = richTextForCommand(command, definition.id);
+  if (richText) normalized.params.text = richText.text;
   diagnostics.push(...diagnoseUnsupportedImplementedParams(shape, definition, normalized.consumesParams));
   diagnostics.push(...diagnoseExecutionBoundaryParams(shape, definition));
 
@@ -147,10 +151,28 @@ function compileCommand(command: CommandIR, diagnostics: RuntimeCompilerDiagnost
     source: definition.source,
     status: definition.status,
     params: normalized.params,
+    ...(richText ? { richText: richTextDocument(richText) } : {}),
     ...(shape.condition ? { condition: { type: "expression" as const, source: shape.condition.source } } : {}),
     ...(shape.unless ? { unless: { type: "expression" as const, source: shape.unless.source } } : {}),
     loc: command.loc,
     sourceCommand
+  };
+}
+
+function richTextForCommand(command: CommandIR, commandId: string): RichTextDocumentIR | undefined {
+  if (command.richTextPrimary && (commandId === "print" || commandId === "append" || commandId === "choice" || commandId === "toast")) {
+    return command.richTextPrimary;
+  }
+  if (!command.richTextParams) return undefined;
+  if (commandId === "print" || commandId === "append" || commandId === "toast") return command.richTextParams.text;
+  if (commandId === "choice") return command.richTextParams.choiceSummary ?? command.richTextParams.text;
+  return undefined;
+}
+
+function richTextDocument(document: RichTextDocumentIR): RichTextDocument {
+  return {
+    text: document.text,
+    runs: document.runs.map((run) => ({ start: run.start, end: run.end, style: { ...run.style } }))
   };
 }
 

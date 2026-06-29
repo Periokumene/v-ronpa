@@ -43,6 +43,38 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands[2]?.params).toMatchObject({ text: "Zero", speaker: "Ren", speed: 0, autoNext: true });
   });
 
+  it("compiles rich text to plain text params with top-level richText", () => {
+    const { scenario } = parseScenario({
+      sourceText: [
+        'Felix: <strong>Stop</strong> <font color="red" face="font:serif">there</font>[>]',
+        '@print "<em>Printed</em>" author:Narrator',
+        '@append "<u> joined</u>"',
+        '@choice "<mark>Inspect</mark>" goto:#Inspect',
+        '@toast "<small>Saved</small>"'
+      ].join("\n"),
+      scriptPath: "rich-compile.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.script.commands[0]).toMatchObject({
+      commandId: "print",
+      params: { text: "Stop there", speaker: "Felix", autoNext: true },
+      richText: {
+        text: "Stop there",
+        runs: [
+          { start: 0, end: 4, style: { bold: true } },
+          { start: 5, end: 10, style: { color: "red", fontId: "font:serif" } }
+        ]
+      }
+    });
+    expect(result.script.commands[1]).toMatchObject({ commandId: "print", params: { text: "Printed", speaker: "Narrator", autoNext: false } });
+    expect(result.script.commands[1]?.richText).toMatchObject({ text: "Printed", runs: [{ start: 0, end: 7, style: { italic: true } }] });
+    expect(result.script.commands[2]).toMatchObject({ commandId: "append", params: { text: " joined" } });
+    expect(result.script.commands[3]).toMatchObject({ commandId: "choice", params: { text: "Inspect", goto: "#Inspect" } });
+    expect(result.script.commands[4]).toMatchObject({ commandId: "toast", params: { text: "Saved" } });
+  });
+
   it("normalizes visual runtime params without producing downstream command shapes", () => {
     const { scenario } = parseScenario({
       sourceText: ["@back bg:harness effect:fade", "@flash color:#fff duration:120"].join("\n"),
@@ -461,7 +493,6 @@ describe("nani runtime compiler", () => {
         "@append \" continued\"",
         "@resetText default",
         "@clearBacklog",
-        "@format warning:\"red\"",
         "@showPrinter default time:0.2",
         "@showUI dialog time:0.1",
         "@hideUI commandBar time:0.1",
@@ -484,7 +515,6 @@ describe("nani runtime compiler", () => {
       "append",
       "resettext",
       "clearbacklog",
-      "format",
       "showprinter",
       "showui",
       "hideui",
@@ -498,29 +528,29 @@ describe("nani runtime compiler", () => {
       "stopbgm",
       "movie"
     ]);
-    expect(result.script.commands[4]?.params).toMatchObject({ printerId: "default", durationMs: 200 });
-    expect(result.script.commands[5]?.params).toMatchObject({ target: "dialog", visible: true, durationMs: 100 });
-    expect(result.script.commands[6]?.params).toMatchObject({ target: "commandBar", visible: false, durationMs: 100 });
-    expect(result.script.commands[8]?.params).toEqual({ waitMode: "i5" });
-    expect(result.script.commands[9]?.params).toEqual({
+    expect(result.script.commands[3]?.params).toMatchObject({ printerId: "default", durationMs: 200 });
+    expect(result.script.commands[4]?.params).toMatchObject({ target: "dialog", visible: true, durationMs: 100 });
+    expect(result.script.commands[5]?.params).toMatchObject({ target: "commandBar", visible: false, durationMs: 100 });
+    expect(result.script.commands[7]?.params).toEqual({ waitMode: "i5" });
+    expect(result.script.commands[8]?.params).toEqual({
       variableName: "playerName",
       valueType: "string",
       summary: "Name?",
       defaultValue: "Felix"
     });
-    expect(result.script.commands[10]?.params).toMatchObject({
+    expect(result.script.commands[9]?.params).toMatchObject({
       bgmPath: "bgm:validation-main",
       group: "music",
       volume: 0.45,
       fadeMs: 200
     });
-    expect(result.script.commands[11]?.params).toMatchObject({
+    expect(result.script.commands[10]?.params).toMatchObject({
       sfxPath: "sfx:rain-inside-car-loop",
       group: "rain",
       loop: true,
       volume: 0.35
     });
-    expect(result.script.commands[15]?.params).toEqual({
+    expect(result.script.commands[14]?.params).toEqual({
       moviePath: "video:validation-intro",
       block: true
     });

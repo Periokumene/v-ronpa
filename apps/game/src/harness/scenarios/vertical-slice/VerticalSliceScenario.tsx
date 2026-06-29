@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ButtonHTMLAttributes } from "react";
+import { useCallback, useEffect, useMemo, useState, type ButtonHTMLAttributes } from "react";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
@@ -24,6 +24,7 @@ import {
 } from "../../../interaction/useVerticalSliceRuntimeAdapter";
 import { useVerticalSliceSaveAdapter } from "../../../interaction/useVerticalSliceSaveAdapter";
 import { VnRuntimeDispatcher } from "../../../VnRuntimeDispatcher";
+import { createRichTextFontCss } from "../../../richTextFonts";
 import { harnessContentManifest } from "../../contentManifest";
 
 type DebugTabId = "runtime" | "inspector";
@@ -34,6 +35,7 @@ export function VerticalSliceScenario() {
   const flow = useGameFlowActor();
   const settings = useGameSettingsAdapter();
   const assetRegistry = useMemo(() => createAssetRegistry(harnessContentManifest), []);
+  const richTextFontCss = useMemo(() => createRichTextFontCss(harnessContentManifest, assetRegistry), [assetRegistry]);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
   const dialogRevealSettings = useMemo(() => ({ textSpeed: dialogDisplay.textSpeed }), [dialogDisplay.textSpeed]);
@@ -56,12 +58,46 @@ export function VerticalSliceScenario() {
     onEnterTrial: enterTrialMode,
     onEnterNavi: enterNaviMode
   });
+  useEffect(() => {
+    for (const diagnostic of richTextFontCss.diagnostics) {
+      runtime.observeAssetDiagnostic({
+        code: diagnostic.code,
+        severity: diagnostic.severity,
+        message: diagnostic.message,
+        assetId: diagnostic.sourceRef,
+        kind: "font"
+      });
+    }
+  }, [richTextFontCss.diagnostics, runtime.observeAssetDiagnostic]);
+  useEffect(() => {
+    if (typeof document === "undefined" || !document.fonts) return;
+    let cancelled = false;
+    for (const font of harnessContentManifest.fonts) {
+      void document.fonts
+        .load(`${font.style} ${font.weight} 16px ${fontLoadFamily(font.family)}`)
+        .then(() => undefined)
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          runtime.observeAssetDiagnostic({
+            code: "font-load-failed",
+            severity: "warning",
+            message: `Font '${font.id}' failed to load: ${error instanceof Error ? error.message : String(error)}`,
+            assetId: font.sourceRef,
+            kind: "font"
+          });
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [runtime.observeAssetDiagnostic]);
   const save = useVerticalSliceSaveAdapter(runtime);
   const overlayPages = useOverlayPageAdapters({ flow, runtime, save, settings });
   const [activeDebugTab, setActiveDebugTab] = useState<DebugTabId>("runtime");
 
   return (
     <main className="app-shell app-shell-harness">
+      {richTextFontCss.cssText ? <style data-testid="rich-text-font-faces">{richTextFontCss.cssText}</style> : null}
       <section className="playfield" data-testid="playfield">
         <GameInteractionShell dialogDisplay={dialogDisplay} flow={flow} formatStorySpeaker={displayStorySpeaker} overlayPages={overlayPages} runtime={runtime}>
           <div className="scene-stack" data-testid="vertical-slice-shell">
@@ -347,6 +383,10 @@ function displayStorySpeaker(speaker: string): string {
     Narrator: "旁白"
   };
   return labels[speaker] ?? speaker;
+}
+
+function fontLoadFamily(family: string): string {
+  return `"${family.replace(/\\/gu, "\\\\").replace(/"/gu, "\\\"")}"`;
 }
 
 function selectVoiceSmokeAudioMode(): VoiceSmokeAudioMode | undefined {

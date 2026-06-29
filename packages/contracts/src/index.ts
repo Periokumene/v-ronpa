@@ -266,7 +266,6 @@ const officialCommandStatuses: Partial<Record<string, NaniCommandStatus>> = {
   choice: "implemented",
   clearbacklog: "implemented",
   clearchoice: "implemented",
-  format: "implemented",
   input: "implemented",
   glitch: "implemented",
   glitchfilter: "implemented",
@@ -313,7 +312,6 @@ const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
   clearbacklog: "story-control",
   clearchoice: "story-control",
   end: "story-control",
-  format: "story-control",
   gameplay: "gameplay",
   goto: "story-control",
   hideui: "ui-output",
@@ -791,6 +789,7 @@ export const RuntimeAssetKindSchema = z.enum([
   "bleep",
   "voice",
   "video",
+  "font",
   "glb",
   "texture",
   "fx"
@@ -806,6 +805,93 @@ export type AssetRef = z.infer<typeof AssetRefSchema>;
 
 export const RuntimeExpressionSchema = z.object({ type: z.literal("expression"), source: z.string() }).strict();
 export type RuntimeExpression = z.infer<typeof RuntimeExpressionSchema>;
+
+export const RichTextVerticalAlignSchema = z.enum(["sub", "sup"]);
+export type RichTextVerticalAlign = z.infer<typeof RichTextVerticalAlignSchema>;
+
+export const RichTextRunStyleSchema = z
+  .object({
+    bold: z.boolean().optional(),
+    italic: z.boolean().optional(),
+    underline: z.boolean().optional(),
+    strike: z.boolean().optional(),
+    color: z.string().optional(),
+    markColor: z.string().optional(),
+    sizeScale: z.number().positive().optional(),
+    fontId: IdSchema.optional(),
+    verticalAlign: RichTextVerticalAlignSchema.optional()
+  })
+  .strict();
+export type RichTextRunStyle = z.infer<typeof RichTextRunStyleSchema>;
+
+export const RichTextRunSchema = z
+  .object({
+    start: z.number().int().nonnegative(),
+    end: z.number().int().nonnegative(),
+    style: RichTextRunStyleSchema
+  })
+  .strict()
+  .superRefine((run, ctx) => {
+    if (run.end <= run.start) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["end"],
+        message: "Rich text run end must be greater than start."
+      });
+    }
+    if (Object.keys(run.style).length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["style"],
+        message: "Rich text run style must contain at least one property."
+      });
+    }
+  });
+export type RichTextRun = z.infer<typeof RichTextRunSchema>;
+
+export const RichTextDocumentSchema = z
+  .object({
+    text: z.string(),
+    runs: z.array(RichTextRunSchema).default([])
+  })
+  .strict()
+  .superRefine((document, ctx) => {
+    const textLength = Array.from(document.text).length;
+    for (const [index, run] of document.runs.entries()) {
+      if (run.end > textLength) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["runs", index, "end"],
+          message: "Rich text run end must not exceed document text length."
+        });
+      }
+    }
+  });
+export type RichTextDocument = z.infer<typeof RichTextDocumentSchema>;
+
+function addRichTextPlainTextConsistencyIssue(
+  ctx: z.RefinementCtx,
+  richText: { text: string } | undefined,
+  plainText: unknown,
+  path: (string | number)[]
+): void {
+  if (!richText) return;
+  if (typeof plainText !== "string") {
+    ctx.addIssue({
+      code: "custom",
+      path,
+      message: "Rich text requires a matching plain text string."
+    });
+    return;
+  }
+  if (richText.text !== plainText) {
+    ctx.addIssue({
+      code: "custom",
+      path,
+      message: "Rich text text must match plain text."
+    });
+  }
+}
 
 export const RuntimeValueSchema: z.ZodType<string | number | boolean | RuntimeValue[] | RuntimeExpression> =
   z.lazy(() =>
@@ -839,10 +925,14 @@ export const RuntimeCommandSchema = z
     params: z.record(z.string(), RuntimeValueSchema).default({}),
     condition: RuntimeExpressionSchema.optional(),
     unless: RuntimeExpressionSchema.optional(),
+    richText: RichTextDocumentSchema.optional(),
     loc: SourceLocationSchema,
     sourceCommand: RuntimeSourceCommandSchema.optional()
   })
-  .strict();
+  .strict()
+  .superRefine((command, ctx) => {
+    addRichTextPlainTextConsistencyIssue(ctx, command.richText, command.params.text, ["richText", "text"]);
+  });
 export type RuntimeCommand = z.infer<typeof RuntimeCommandSchema>;
 
 export const ScriptDependencySchema = z
@@ -907,6 +997,10 @@ export const RuntimeAssetFormatSchema = z.enum([
   "webp",
   "avif",
   "ktx2",
+  "woff",
+  "woff2",
+  "ttf",
+  "otf",
   "mp3",
   "ogg",
   "mp4",
@@ -980,6 +1074,18 @@ export const ContentAudioConfigSchema = z.object({
 }).strict();
 export type ContentAudioConfigInput = z.input<typeof ContentAudioConfigSchema>;
 export type ContentAudioConfig = z.infer<typeof ContentAudioConfigSchema>;
+
+export const FontFaceDefinitionSchema = z
+  .object({
+    id: IdSchema,
+    family: z.string().min(1),
+    sourceRef: IdSchema,
+    weight: z.string().min(1).default("400"),
+    style: z.enum(["normal", "italic", "oblique"]).default("normal")
+  })
+  .strict();
+export type FontFaceDefinitionInput = z.input<typeof FontFaceDefinitionSchema>;
+export type FontFaceDefinition = z.infer<typeof FontFaceDefinitionSchema>;
 
 export const LayeredCharacterObjectVector2Schema = z.object({
   x: z.number(),
@@ -1399,16 +1505,22 @@ export type StoryScalar = z.infer<typeof StoryScalarSchema>;
 
 export const StoryBacklogEntrySchema = z.object({
   speaker: z.string().optional(),
-  text: z.string()
+  text: z.string(),
+  richText: RichTextDocumentSchema.optional()
+}).superRefine((entry, ctx) => {
+  addRichTextPlainTextConsistencyIssue(ctx, entry.richText, entry.text, ["richText", "text"]);
 });
 export type StoryBacklogEntry = z.infer<typeof StoryBacklogEntrySchema>;
 
 export const StoryChoiceOptionSchema = z.object({
   text: z.string(),
+  richText: RichTextDocumentSchema.optional(),
   goto: z.string().optional(),
   id: z.string().optional(),
   enabled: z.boolean().default(true),
   setExpression: z.string().optional()
+}).superRefine((choice, ctx) => {
+  addRichTextPlainTextConsistencyIssue(ctx, choice.richText, choice.text, ["richText", "text"]);
 });
 export type StoryChoiceOption = z.infer<typeof StoryChoiceOptionSchema>;
 
@@ -1439,17 +1551,18 @@ export const StoryRuntimeWaitSchema = z.discriminatedUnion("kind", [
 ]);
 export type StoryRuntimeWait = z.infer<typeof StoryRuntimeWaitSchema>;
 
+const StoryTextCurrentSchema = z.object({
+  speaker: z.string().optional(),
+  text: z.string(),
+  richText: RichTextDocumentSchema.optional()
+}).superRefine((line, ctx) => {
+  addRichTextPlainTextConsistencyIssue(ctx, line.richText, line.text, ["richText", "text"]);
+});
+
 export const StoryTextStateSchema = z.object({
   printerId: z.string().default("default"),
   visible: z.boolean().default(true),
-  current: z
-    .object({
-      speaker: z.string().optional(),
-      text: z.string(),
-      formatId: z.string().optional()
-    })
-    .optional(),
-  formats: z.record(z.string(), z.string()).default({})
+  current: StoryTextCurrentSchema.optional()
 });
 export type StoryTextState = z.infer<typeof StoryTextStateSchema>;
 
@@ -1677,6 +1790,7 @@ export const ContentManifestSchema = z.object({
   version: z.literal(2),
   assets: z.array(AssetRefSchema).default([]),
   audio: ContentAudioConfigSchema.optional(),
+  fonts: z.array(FontFaceDefinitionSchema).default([]),
   uiAssets: z.array(UiAssetRefSchema).default([]),
   interactionStyles: z.array(InteractionStyleProfileSchema).default([]),
   runtimeAssets: z.array(RuntimeAssetSchema).default([]),

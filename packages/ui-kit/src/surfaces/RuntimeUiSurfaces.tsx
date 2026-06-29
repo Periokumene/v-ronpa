@@ -1,8 +1,11 @@
 import { useState, type CSSProperties, type FormEvent } from "react";
+import type { RichTextDocument } from "@v-ronpa/contracts";
+import { RichTextRenderer } from "./RichTextRenderer";
 
 export interface RuntimeToastView {
   id: string;
   text: string;
+  richText?: RichTextDocument;
 }
 
 export interface RuntimeToastLayerProps {
@@ -17,7 +20,7 @@ export function RuntimeToastLayer({ onDismiss, toasts, visible = true }: Runtime
     <div aria-live="polite" data-testid="runtime-toast-layer" style={toastLayerStyle}>
       {toasts.map((toast) => (
         <button data-testid="runtime-toast" key={toast.id} onClick={() => onDismiss?.(toast.id)} style={toastStyle} type="button">
-          {toast.text}
+          <RichTextRenderer document={toast.richText} fallbackText={toast.text} />
         </button>
       ))}
     </div>
@@ -125,7 +128,8 @@ const toastStyle: CSSProperties = {
   borderRadius: 6,
   background: "rgba(14, 22, 32, 0.92)",
   color: "#f7fbff",
-  textAlign: "left"
+  textAlign: "left",
+  whiteSpace: "pre-wrap"
 };
 
 // Blocking input prompt.

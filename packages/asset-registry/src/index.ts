@@ -163,6 +163,10 @@ export function collectManifestAssetReferences(manifest: ContentManifest): Asset
     if (sound) refs.push({ id: sound.sourceRef, kind: "bleep", tags: [] });
   }
 
+  for (const font of manifest.fonts) {
+    refs.push({ id: font.sourceRef, kind: "font", tags: [] });
+  }
+
   for (const uiAsset of manifest.uiAssets) {
     refs.push({ id: uiAsset.assetId, kind: "texture", tags: uiAsset.tags });
   }
@@ -192,6 +196,7 @@ function createEmptyManifest(): ContentManifest {
   return {
     version: 2,
     assets: [],
+    fonts: [],
     uiAssets: [],
     interactionStyles: [],
     runtimeAssets: [],

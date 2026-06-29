@@ -70,6 +70,8 @@ P1 text supports:
 - speaker ID, for example `Felix:`
 - speaker appearance, for example `Felix.Neutral:`
 - plain text tokens
+- first-pass rich text markup in visible text, lowered to serializable
+  `plainText + runs` by the runtime compiler
 - inline commands such as `[>]` and `[< speed:0.8]`
 - print parameter extraction from inline `<` commands
 
@@ -153,6 +155,32 @@ is stable:
 - external script dependency modeling for cross-file jumps or calls
 
 Any P2 change that alters `packages/nani-parser/src/types.ts` requires a CCR.
+
+## 3.1 Rich Text First Pass
+
+The first rich text pass intentionally uses classic HTML-style `<...>` markup,
+not Naninovel inline `[...]` command syntax and not the full TextMeshPro rich
+text set. Supported tags are:
+
+| Tag | Output style |
+|---|---|
+| `<b>`, `<strong>` | bold |
+| `<i>`, `<em>` | italic |
+| `<u>` | underline |
+| `<s>`, `<strike>`, `<del>` | strike |
+| `<mark>` | default mark highlight |
+| `<small>`, `<big>` | bounded size scale |
+| `<sub>`, `<sup>` | vertical alignment |
+| `<br>` | newline in plain text |
+| `<font color='...'>` | safe color token |
+| `<font size='1..7'>`, `<font size='+/-N'>` | bounded HTML-style size scale |
+| `<font face='font:...'>` | registered manifest font id |
+
+Supported entities are `&nbsp;`, `&lt;`, `&gt;`, `&amp;`, and `&quot;`.
+Attributes are a whitelist: non-`font` tags accept none, while `font` accepts
+only `color`, `size`, and `face`. Unknown tags, unsupported attributes, invalid
+values, and unclosed tags are shown as source text with parser diagnostics
+instead of producing partial rich style state.
 
 ## 4. P3 / Future
 

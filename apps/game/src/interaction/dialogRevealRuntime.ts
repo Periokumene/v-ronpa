@@ -1,3 +1,5 @@
+import type { RichTextDocument } from "@v-ronpa/contracts";
+
 export type DialogRevealStatus = "revealing" | "complete";
 
 export type DialogRevealEvent =
@@ -112,6 +114,28 @@ export function selectVisibleRevealText(state: DialogRevealState | undefined): s
   if (!state) return undefined;
   if (state.status === "complete") return state.text;
   return state.units.slice(0, state.visibleUnitCount).join("");
+}
+
+export function selectVisibleRevealRichText(
+  document: RichTextDocument | undefined,
+  state: DialogRevealState | undefined
+): RichTextDocument | undefined {
+  if (!document) return undefined;
+  if (!state) return document;
+  if (document.text !== state.text) return undefined;
+  const text = selectVisibleRevealText(state) ?? state.text;
+  const visibleLength = Array.from(text).length;
+  return {
+    text,
+    runs: document.runs
+      .filter((run) => run.start < visibleLength)
+      .map((run) => ({
+        start: run.start,
+        end: Math.min(run.end, visibleLength),
+        style: { ...run.style }
+      }))
+      .filter((run) => run.end > run.start)
+  };
 }
 
 export function countDialogRevealUnits(text: string): number {

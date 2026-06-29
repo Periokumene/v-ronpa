@@ -21,6 +21,7 @@ import {
   NaviInteractionViewSchema,
   NaviRuntimeStateSchema,
   PixiStageSnapshotSchema,
+  RichTextDocumentSchema,
   RuntimeAssetSchema,
   RuntimeCommandSchema,
   RuntimeScriptSchema,
@@ -55,6 +56,7 @@ describe("contracts", () => {
           }
         }
       },
+      fonts: [{ id: "font:serif", family: "Serif", sourceRef: "font:serif-regular", weight: "400", style: "normal" }],
       uiAssets: [
         {
           id: "ui:title:bg",
@@ -115,6 +117,15 @@ describe("contracts", () => {
           kind: "bleep",
           optimizedUri: "assets/runtime/dialogue-felix.ogg",
           format: "ogg",
+          compression: [],
+          lods: [],
+          collisionProxyIds: []
+        },
+        {
+          id: "font:serif-regular",
+          kind: "font",
+          optimizedUri: "assets/runtime/serif.woff2",
+          format: "woff2",
           compression: [],
           lods: [],
           collisionProxyIds: []
@@ -237,7 +248,89 @@ describe("contracts", () => {
     expect(manifest.evidence[0]?.shortLabel).toBe("Keycard");
     expect(manifest.input?.bindings[1]?.action).toBe("fire-truth-bullet");
     expect(manifest.uiAssets[0]?.role).toBe("title-background");
+    expect(manifest.fonts[0]).toMatchObject({ id: "font:serif", sourceRef: "font:serif-regular" });
     expect(manifest.interactionStyles[0]?.assets[0]?.slice).toBe("nine-slice");
+  });
+
+  it("validates rich text documents and font runtime assets", () => {
+    expect(
+      RichTextDocumentSchema.parse({
+        text: "Warning",
+        runs: [{ start: 0, end: 7, style: { bold: true, color: "#ff5577", fontId: "font:serif" } }]
+      })
+    ).toMatchObject({ text: "Warning" });
+    expect(() =>
+      RichTextDocumentSchema.parse({
+        text: "Short",
+        runs: [{ start: 0, end: 6, style: { bold: true } }]
+      })
+    ).toThrow();
+    expect(RuntimeAssetSchema.parse({ id: "font:serif-regular", kind: "font", optimizedUri: "assets/serif.woff2", format: "woff2" })).toMatchObject({
+      kind: "font",
+      format: "woff2"
+    });
+  });
+
+  it("keeps rich text snapshots aligned with their plain text fields", () => {
+    const loc = { scriptPath: "rich.nani", line: 1, column: 1, raw: "@print" };
+
+    expect(
+      RuntimeCommandSchema.parse({
+        commandId: "print",
+        canonicalName: "print",
+        category: "text",
+        source: "v-ronpa",
+        status: "implemented",
+        params: { text: "Warning" },
+        richText: { text: "Warning", runs: [{ start: 0, end: 7, style: { bold: true } }] },
+        loc
+      }).richText?.text
+    ).toBe("Warning");
+    expect(() =>
+      RuntimeCommandSchema.parse({
+        commandId: "print",
+        canonicalName: "print",
+        category: "text",
+        source: "v-ronpa",
+        status: "implemented",
+        params: { text: "Warning" },
+        richText: { text: "Mismatch", runs: [] },
+        loc
+      })
+    ).toThrow();
+    expect(() =>
+      RuntimeCommandSchema.parse({
+        commandId: "print",
+        canonicalName: "print",
+        category: "text",
+        source: "v-ronpa",
+        status: "implemented",
+        params: { text: { type: "expression", source: "speakerLine" } },
+        richText: { text: "Expression", runs: [] },
+        loc
+      })
+    ).toThrow();
+
+    expect(
+      StoryRuntimeSnapshotSchema.parse({
+        currentScriptPath: "rich.nani",
+        instructionPointer: 1,
+        backlog: [{ speaker: "Felix", text: "Old save stays plain." }],
+        pendingChoices: [{ text: "Inspect", richText: { text: "Inspect", runs: [{ start: 0, end: 7, style: { italic: true } }] } }],
+        text: {
+          current: { speaker: "Felix", text: "Line", richText: { text: "Line", runs: [{ start: 0, end: 4, style: { underline: true } }] } }
+        }
+      }).pendingChoices[0]?.richText?.text
+    ).toBe("Inspect");
+    expect(() =>
+      StoryRuntimeSnapshotSchema.parse({
+        currentScriptPath: "rich.nani",
+        instructionPointer: 1,
+        backlog: [{ text: "Line", richText: { text: "Mismatch", runs: [] } }],
+        pendingChoices: [],
+        text: { current: { text: "Line" } }
+      })
+    ).toThrow();
   });
 
   it("validates trial debate branches", () => {
@@ -836,13 +929,20 @@ describe("contracts", () => {
 
     expect(
       StoryTextStateSchema.parse({
-        current: { speaker: "Mira", text: "Current line.", formatId: "warning" }
+        current: {
+          speaker: "Mira",
+          text: "Current line.",
+          richText: { text: "Current line.", runs: [{ start: 0, end: 7, style: { bold: true } }] }
+        }
       })
     ).toMatchObject({
       printerId: "default",
       visible: true,
-      current: { speaker: "Mira", text: "Current line.", formatId: "warning" },
-      formats: {}
+      current: {
+        speaker: "Mira",
+        text: "Current line.",
+        richText: { text: "Current line.", runs: [{ start: 0, end: 7, style: { bold: true } }] }
+      }
     });
 
     expect(

@@ -162,6 +162,7 @@ Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command sh
 @choice "分支1：主交互流程验证入口" goto:#MainInteractionFlow
 @choice "分支2：完整 Pixi 命令视觉验收" goto:#PixiCommandShowcase
 @choice "分支3：真实 textId-音频验证" goto:#VoiceTextIdAudioValidation
+@choice "分支4：首轮富文本标签验收" goto:#RichTextShowcase
 
 #VoiceTextIdAudioValidation
 @back bg:harness effect:fade time:0.15
@@ -195,11 +196,26 @@ Margo: 那就请你活到下一次。主角缺席的话，故事会很难收场�
 Sherry: 先离开这里。故事以后再写。|#0102Adv04_Sherry004|
 @end
 
+#RichTextShowcase
+@set route:"rich-text"
+@clearBacklog
+@showPrinter default
+@showUI dialog
+@showUI commandBar visible:true
+Narrator: CHECKPOINT RICH 00 - dialogue 支持 <b>粗体</b>、<i>斜体</i>、<u>下划线</u>、<s>删除线</s>、<mark>标记</mark> 与实体 &lt;tag&gt;。
+Narrator: CHECKPOINT RICH 01 - 别名支持 <strong>strong</strong> / <em>em</em> / <strike>strike</strike> / <del>del</del>，实体支持 A&nbsp;B、&amp; 与 &quot;quote&quot;。
+Narrator: CHECKPOINT RICH 02 - 字号 <small>small</small> / <big>big</big> / <font size='1'>size 1</font> / <font size='7'>size 7</font> / <font size='-1'>-1</font> / <font size='+1'>+1</font>。
+Narrator: CHECKPOINT RICH 03 - 上下标 H<sub>2</sub>O / x<sup>2</sup>，以及<br>显式换行应在同一个对话框中渲染。
+@print "<font color='red'>CHECKPOINT RICH 04 named color</font> + <font color='#ff5577'><b>hex color + bold</b></font> - @print 中颜色与粗体应生效。" author:Narrator
+@append " <font size='+1'>@append 追加段落字号变大</font>，但不继承上一段颜色。"
+@toast "<mark>CHECKPOINT RICH TOAST</mark> <small>toast 使用同一 renderer，且不进入存档。</small>" appearance:info time:2
+Narrator: CHECKPOINT RICH 05 - font face 使用 <font face='font:serif'>注册 font id</font>，Backlog 应保留前述富文本快照，加载失败时应回退默认字体。
+@choice "<b><font color='#ffd166'>富文本 choice</font></b> - 回到入口" goto:#Start
+
 #MainInteractionFlow
 @set route:"return"
 @clearBacklog
 @showPrinter default
-@format checkpoint:"accent"
 @hideUI dialog
 @hideUI commandBar
 @toast "CHECKPOINT MAIN 01A - hideUI。VN dialog 与 command bar 应隐藏；右上 toast 应出现；调试侧栏应保持可见。"

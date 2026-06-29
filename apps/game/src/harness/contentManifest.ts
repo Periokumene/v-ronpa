@@ -16,9 +16,21 @@ const harnessContentManifestInput = {
     }
   },
   assets: [],
+  fonts: [
+    {
+      id: "font:serif",
+      family: "V Ronpa Rich Serif",
+      sourceRef: "font:rich-serif",
+      weight: "400",
+      style: "normal"
+    }
+  ],
   uiAssets: [],
   interactionStyles: [],
-  runtimeAssets: [...harnessRuntimeAssets, ...builtInPixiFxRuntimeAssets],
+  runtimeAssets: [
+    ...harnessRuntimeAssets,
+    ...builtInPixiFxRuntimeAssets
+  ],
   collisionProxies: [],
   input: defaultHarnessInputBindings,
   maps: verticalSliceMaps,

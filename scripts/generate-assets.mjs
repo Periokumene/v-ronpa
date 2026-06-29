@@ -12,6 +12,7 @@ const kindByDirectory = new Map([
   ["media/bgm", "bgm"],
   ["media/sfx", "sfx"],
   ["media/video", "video"],
+  ["fonts", "font"],
   ["models", "glb"],
   ["thumbnails", "texture"]
 ]);
@@ -24,6 +25,10 @@ const formatByExtension = new Map([
   [".webp", "webp"],
   [".avif", "avif"],
   [".ktx2", "ktx2"],
+  [".woff", "woff"],
+  [".woff2", "woff2"],
+  [".ttf", "ttf"],
+  [".otf", "otf"],
   [".mp3", "mp3"],
   [".ogg", "ogg"],
   [".mp4", "mp4"],
@@ -101,6 +106,7 @@ function idForRelativePath(rel, kind) {
   if (kind === "sfx") return `sfx:${name}`;
   if (kind === "video") return `video:${name}`;
   if (kind === "glb") return `model:${name}`;
+  if (kind === "font") return `font:${name}`;
   return `texture:${name}`;
 }
 

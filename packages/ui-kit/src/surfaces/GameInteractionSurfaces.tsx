@@ -12,6 +12,7 @@ import type {
   StoryBacklogEntry
 } from "@v-ronpa/contracts";
 import type { CSSProperties, ReactNode } from "react";
+import { RichTextRenderer } from "./RichTextRenderer";
 
 export interface TitleSurfaceProps {
   capabilities: InteractionCapabilitySnapshot;
@@ -123,7 +124,9 @@ export function ReadOnlyBacklogOverlay({ entries, onClose }: ReadOnlyBacklogOver
               {entries.map((entry, index) => (
                 <li data-testid={`backlog-entry-${index}`} key={`${entry.speaker ?? "narrator"}-${index}`} style={backlogItemStyle}>
                   <strong>{entry.speaker ?? "Narrator"}</strong>
-                  <span>{entry.text}</span>
+                  <span style={backlogTextStyle}>
+                    <RichTextRenderer document={entry.richText} fallbackText={entry.text} />
+                  </span>
                 </li>
               ))}
             </ol>
@@ -668,6 +671,10 @@ const backlogItemStyle: CSSProperties = {
   padding: 12,
   borderRadius: 6,
   background: "rgba(255,255,255,0.07)"
+};
+
+const backlogTextStyle: CSSProperties = {
+  whiteSpace: "pre-wrap"
 };
 
 // Settings overlay.
