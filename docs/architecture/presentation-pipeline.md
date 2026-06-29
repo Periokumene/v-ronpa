@@ -106,6 +106,15 @@ Save/load persists the terminal `PixiStageSnapshot` only. Active
 objects are not saved. Restoring or resetting renders the terminal snapshot with
 animation disabled and clears the presenter task list.
 
+Weather snapshots are per-kind state records rather than a shared particle bag.
+`@rain` is the only script/save entry point for rain and stores
+`weather.rain = { kind: "rain", commandParams, transition }`, where
+`commandParams` contains only `power`, `wind`, `hue`, and `tint`. Pixi resolves
+those public params through hardcoded rain presets into internal `rainSettings`
+before updating shader uniforms. Direct `rainSettings` coercion is limited to
+Pixi helper/tests and must not become active stage state, script syntax, save
+data, or app UI without a separate contract change.
+
 `trial-keyword` is a visual anchor for overlays and subtitles. It may carry
 debug metadata, but it is not the rule source for which evidence breaks which
 statement. Debate rules, accepted evidence, and next-segment transitions live in

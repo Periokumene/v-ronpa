@@ -28,7 +28,7 @@ describe("VN runtime presentation transaction", () => {
     expect(advanced.state.backlog).toEqual([{ speaker: "Felix", text: "Hello." }]);
     expect(advanced.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "char", "print"]);
     expect(transaction.pixiStage).toMatchObject({
-      version: 3,
+      version: 4,
       revision: 2,
       backgroundsById: {
         MainBackground: {

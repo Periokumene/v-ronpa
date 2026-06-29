@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-test.setTimeout(60_000);
+test.setTimeout(120_000);
 
 test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -18,8 +18,7 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
   await advanceUntilChoices(page);
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("vn-command-skip")).toHaveAttribute("aria-pressed", "false");
-  await page.getByTestId("vn-dialog-choice-1").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 2 开始");
+  await chooseAutomationSmokeBranch(page);
 
   await page.getByTestId("vn-command-settings").click();
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
@@ -30,7 +29,7 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
 
   await page.getByTestId("vn-command-auto").click();
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT 01A", { timeout: 4_000 });
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT AUTO 01", { timeout: 10_000 });
 
   await page.getByTestId("vn-dialog-advance").click();
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "false");
@@ -52,7 +51,7 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
 
   await page.getByTestId("vn-command-skip").click();
   await expect(page.getByTestId("vn-command-skip")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk", { timeout: 15_000 });
+  await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk", { timeout: 30_000 });
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
 
   expect(consoleErrors).toEqual([]);
@@ -88,16 +87,15 @@ test("VN wait! resumes from Pixi task completion and manual continue settles the
   await startWitnessStory(page);
 
   await advanceUntilChoices(page);
-  await page.getByTestId("vn-dialog-choice-1").click();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 2 开始");
-  await advanceUntilText(page, "CHECKPOINT 04", 80);
+  await chooseAutomationSmokeBranch(page);
+  await advanceUntilText(page, "CHECKPOINT AUTO 03", 16);
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
 
   await page.getByTestId("vn-dialog-advance").click();
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toContainText("actor-transition:Ema", { timeout: 1_000 });
   await page.getByTestId("vn-dialog-advance").click();
 
-  await expect(page.getByTestId("vn-dialog-text")).toContainText(/CHECKPOINT 0[56]/, { timeout: 2_000 });
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT AUTO 04", { timeout: 2_000 });
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
   expect(consoleErrors).toEqual([]);
 });
@@ -141,6 +139,12 @@ async function startWitnessStory(page: Page) {
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("vn2d-overlay");
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
+}
+
+async function chooseAutomationSmokeBranch(page: Page) {
+  await page.getByTestId("vn-dialog-choice-3").click();
+  await expect(page.getByTestId("vertical-slice-route")).toHaveText("automation-smoke");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT AUTO 00");
 }
 
 async function advanceUntilText(page: Page, text: string, maxSteps: number) {

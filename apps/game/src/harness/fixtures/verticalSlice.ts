@@ -162,6 +162,7 @@ Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command sh
 @choice "分支1：主交互流程验证入口" goto:#MainInteractionFlow
 @choice "分支2：完整 Pixi 命令视觉验收" goto:#PixiCommandShowcase
 @choice "分支3：真实 textId-音频验证" goto:#VoiceTextIdAudioValidation
+@choice "分支4：VN 自动化短路径" goto:#AutomationSmokeShowcase
 
 #VoiceTextIdAudioValidation
 @back bg:harness effect:fade time:0.15
@@ -244,9 +245,14 @@ Narrator: CHECKPOINT MAIN 07 - goto complete。显式 @goto 已跳到完成标�
 @gameplay grant-evidence id:evidence:keycard
 Narrator: CHECKPOINT 00B - runtime state。分支 2 开始：右侧 Runtime 面板的 route 应为 classroom，evidence 应包含 evidence:keycard。
 @back bg:harness effect:fade time:0.2
-@rain power:1 time:0.1 xSpeed:-1.4 ySpeed:7
-Narrator: CHECKPOINT 01A - rain only。背景为 bg:harness，画面前景应出现清晰、持续下落的斜向雨线；此处不叠加 blur、bokeh 或 sun。
-@rain power:0 time:0.1
+@rain power:0.5 wind:-1 hue:215 tint:0.55 time:0.1
+Narrator: CHECKPOINT 01A-L1 - rain half power left。背景为 bg:harness，画面前景应出现较轻、持续下落并向左倾斜的雨线；用于检查 power:0.5 与默认蓝色 tint。
+@rain power:0.75 wind:0 hue:170 tint:1.1 time:0.1 easing:linear
+Narrator: CHECKPOINT 01A-L2 - rain neutral cyan。雨势应比 L1 更密，横向风接近 0，雨色应带更明显青色染色；用于检查 wind/hue/tint 参数映射。
+@rain power:1 wind:1 hue:300 tint:1.65 time:0.1
+Narrator: CHECKPOINT 01A-L3 - rain full right magenta。雨势应为最高档，前景雨线持续运动且改为向右风偏，并带更强紫红染色；用于检查 power:1、正 wind 和高 tint。
+@rain power:0 time:0.1 wait!
+Narrator: CHECKPOINT 01A-OFF - rain cleanup。雨应已关闭，背景保持 bg:harness；本句出现代表 rain power:0 wait! 的 weather-transition 已完成。
 @back bg:black effect:fade time:0.12
 @char Ema.Pensive1,ArmR3 pos:50
 @snow power:0.55 time:0.1 xSpeed:-0.1 ySpeed:0.75 density:0.85 flakeScale:1 sway:0.45 fog:0.18 noise:0.012 seed:11
@@ -311,7 +317,7 @@ Narrator: CHECKPOINT 08C - glitchFilter + pulse。持久 glitchFilter 底噪上�
 Narrator: CHECKPOINT 08D - glitchFilter off cleanup。持久 glitchFilter 已关闭；画面应回到稳定黑底，无 Morton 残留，后续雨雪不应被污染。
 @back bg:classroom effect:fade time:0.2
 @snow power:0.85 time:0.2 xSpeed:-0.18 ySpeed:0.85 density:1.35 flakeScale:1.18 sway:0.82 fog:0.32 noise:0.03 seed:29
-@rain power:0.85 time:0.2 xSpeed:0.5 ySpeed:5
+@rain power:0.85 wind:0.35 hue:215 tint:0.55 time:0.2
 @char Ema.Pensive1,ArmR3 pos:24,0
 @arrange Ema.24 look! time:0.2
 Narrator: CHECKPOINT 09 - rain + snow coexist。背景切到 bg:classroom，雨雪应同时清晰存在；Ema 不应被天气层遮没。
@@ -327,4 +333,20 @@ Narrator: CHECKPOINT 10 - white flash、Ema slide、stage shake。应看到白�
 Narrator: CHECKPOINT 11 - cleanup + consecutive wait。bokeh、blur、rain、snow、sun 均应被移除，画面恢复清晰稳定；本句出现代表连续 cleanup wait 已全部完成，背景保持 bg:classroom。
 @hideChars time:0.2 wait!
 Narrator: CHECKPOINT 12 - hideChars + wait。角色应已隐藏；本句出现后覆盖层即将结束。
+@end
+
+#AutomationSmokeShowcase
+@set route:"automation-smoke"
+@back bg:harness effect:fade time:0.05
+@char Ema pos:50
+Narrator: CHECKPOINT AUTO 00 - automation smoke。此分支只验证 VN AUTO、SKIP、overlay stop 与 wait! 续行，不进入完整 Pixi 命令长链路。
+Narrator: CHECKPOINT AUTO 01 - auto target。AUTO 应能从 AUTO 00 自动推进到本句；打开任意覆盖层应停止 AUTO。
+Narrator: CHECKPOINT AUTO 02A - overlay stop backlog。此句为 backlog 覆盖层停止 AUTO 的短路径缓冲。
+Narrator: CHECKPOINT AUTO 02B - overlay stop save。此句为 save 覆盖层停止 AUTO 的短路径缓冲。
+Narrator: CHECKPOINT AUTO 02C - overlay stop load。此句为 load 覆盖层停止 AUTO 的短路径缓冲。
+Narrator: CHECKPOINT AUTO 02D - overlay stop settings。此句为 settings 覆盖层停止 AUTO 的短路径缓冲。
+Narrator: CHECKPOINT AUTO 03 - wait setup。下一次手动继续会触发 Ema 的 wait! slide；再次继续应立即完成等待并进入 AUTO 04。
+@slide Ema from:42,0 to:50,0 time:0.8 easing:easeOut wait!
+Narrator: CHECKPOINT AUTO 04 - wait complete。出现本句代表 wait! slide 已恢复剧情，Pixi task 应回到 empty。
+Narrator: CHECKPOINT AUTO 05 - skip tail。SKIP 应能快速结束这个短分支并回到 Navi 探索。
 @end`;

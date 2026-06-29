@@ -406,6 +406,7 @@ function normalizeCommandParams(command: CommandShape, definition: NaniCommandDe
     case "glitchfilter":
       return normalizeGlitchFilterCommand(command);
     case "rain":
+      return normalizeRainCommand(command);
     case "snow":
     case "sun":
       return normalizeWeatherCommand(command, definition.id);
@@ -703,6 +704,20 @@ function normalizeGlitchFilterCommand(command: CommandShape): NormalizedCommandP
   };
 }
 
+function normalizeRainCommand(command: CommandShape): NormalizedCommandParams {
+  return {
+    params: compactParams({
+      kind: "rain",
+      power: runtimeParam(command, "power") ?? 1,
+      wind: runtimeParam(command, "wind"),
+      hue: runtimeParam(command, "hue"),
+      tint: runtimeParam(command, "tint"),
+      ...normalizeTimingParams(command)
+    }),
+    consumesParams: ["power", "wind", "hue", "tint", "time", "easing", "wait"]
+  };
+}
+
 function normalizeWeatherCommand(command: CommandShape, kind: string): NormalizedCommandParams {
   const snowShaderParams =
     kind === "snow"
@@ -729,7 +744,7 @@ function normalizeWeatherCommand(command: CommandShape, kind: string): Normalize
       scale: runtimeParam(command, "scale"),
       ...normalizeTimingParams(command)
     }),
-    consumesParams: ["power", "time", "xSpeed", "ySpeed", ...snowShaderConsumes, "pos", "position", "rotation", "scale", "wait"]
+    consumesParams: ["power", "time", "easing", "xSpeed", "ySpeed", ...snowShaderConsumes, "pos", "position", "rotation", "scale", "wait"]
   };
 }
 

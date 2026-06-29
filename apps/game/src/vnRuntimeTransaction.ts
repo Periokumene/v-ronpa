@@ -47,7 +47,7 @@ export interface VnRuntimePresentationTransaction {
 }
 
 export interface VnRuntimeTransactionDiagnostic {
-  code: "unresolved-runtime-expression" | "unsupported-pixi-command" | "unsupported-pixi-params";
+  code: "unresolved-runtime-expression" | "unsupported-pixi-command" | "unsupported-pixi-params" | "normalized-pixi-params";
   message: string;
   commandId: string;
 }

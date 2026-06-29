@@ -7,24 +7,27 @@ import {
   Graphics,
   GlProgram,
   Rectangle,
+  type Renderer,
   Sprite,
   Text,
   Texture,
-  TilingSprite,
   type Ticker
 } from "pixi.js";
 import { GodrayFilter, KawaseBlurFilter } from "pixi-filters";
-import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "@v-ronpa/contracts";
+import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherKind, PixiWeatherSnapshot } from "@v-ronpa/contracts";
 import type { PixiStageRenderHint } from "../stageSnapshot";
 import { getBuiltInPixiFxTexture } from "./fxAssets";
 import type { PixiPresentationTaskHandle, PresentationTaskController } from "./presentationTasks";
 import { pixiAssetLoadFailed, resolvePixiAsset, type PixiAssetResolver, type PixiPresenterDiagnostic } from "./assetResolver";
 import { CharacterSystem } from "./characters";
+import { RainShaderRenderer } from "./rain/RainShaderRenderer";
+import { resolveRainSettingsFromCommandParams } from "./rain/settings";
 
 export interface PixiPresenterSystemsOptions {
   root: Container;
   width: () => number;
   height: () => number;
+  renderer?: Renderer;
   assetResolver?: PixiAssetResolver;
   onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
 }
@@ -40,10 +43,11 @@ interface WeatherRecord {
   snapshot: PixiWeatherSnapshot;
   container: Container;
   particles: WeatherParticle[];
+  rainShader?: RainShaderRenderer;
   snowShader?: SnowShaderRecord;
 }
 
-type WeatherParticle = Sprite | TilingSprite;
+type WeatherParticle = Sprite;
 
 interface SnowShaderRecord {
   surface: Graphics;
@@ -644,8 +648,9 @@ export class WeatherSystem {
         .filter((hint): hint is Extract<PixiStageRenderHint, { type: "weather-remove" }> => hint.type === "weather-remove")
         .map((hint) => [hint.kind, hint])
     );
-    for (const [kind, weather] of Object.entries(snapshot.weather)) {
-      if (weather.power <= 0) {
+    for (const [kind, weather] of Object.entries(snapshot.weather) as Array<[PixiWeatherKind, PixiWeatherSnapshot | undefined]>) {
+      if (!weather) continue;
+      if (weatherPower(weather) <= 0) {
         this.remove(kind);
         continue;
       }
@@ -669,17 +674,17 @@ export class WeatherSystem {
         record.snowShader.uniforms.uTime += Math.max(0, ticker.deltaMS) / 1000;
         continue;
       }
-      const speedY = record.snapshot.ySpeed ?? (record.snapshot.kind === "snow" ? 0.45 : 6);
-      const speedX = record.snapshot.xSpeed ?? (record.snapshot.kind === "rain" ? -1.6 : 0.25);
+      if (record.rainShader) {
+        record.rainShader.resize(width, height);
+        record.rainShader.tick(this.options.renderer);
+        continue;
+      }
+      const speedY = weatherSpeedY(record.snapshot);
+      const speedX = weatherSpeedX(record.snapshot);
       for (const particle of record.particles) {
-        if (particle instanceof TilingSprite) {
-          particle.tilePosition.x += speedX * ticker.deltaMS * 0.05;
-          particle.tilePosition.y += speedY * ticker.deltaMS * 0.05;
-          continue;
-        }
         particle.x += speedX * ticker.deltaMS * 0.06;
         particle.y += speedY * ticker.deltaMS * 0.06;
-        particle.rotation += (record.snapshot.kind === "snow" ? 0.002 : 0) * ticker.deltaMS;
+        particle.rotation += record.snapshot.kind === "snow" ? 0.002 * ticker.deltaMS : 0;
         if (particle.y > height + 80 || particle.x < -80 || particle.x > width + 80) {
           particle.x = Math.random() * width;
           particle.y = -Math.random() * 80;
@@ -705,7 +710,7 @@ export class WeatherSystem {
       this.populate(record);
     }
     record.snapshot = snapshot;
-    const targetAlpha = clamp01(snapshot.power);
+    const targetAlpha = clamp01(weatherPower(snapshot));
     const shouldAnimate = animate && snapshot.transition.durationMs > 0 && (isNew || Math.abs(record.container.alpha - targetAlpha) > 0.001);
     if (shouldAnimate) {
       let handle: TweenHandle | undefined;
@@ -738,25 +743,27 @@ export class WeatherSystem {
     if (kind === "sun") {
       record.container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
     }
-    record.container.filters = kind === "sun" ? [this.filters.createSunFilter(snapshot.power)] : null;
+    record.container.filters = kind === "sun" ? [this.filters.createSunFilter(weatherPower(snapshot))] : null;
     this.applyParticleStyle(record);
   }
 
   private populate(record: WeatherRecord): void {
+    if (record.snapshot.kind === "rain") {
+      this.populateRainShader(record);
+      return;
+    }
     if (record.snapshot.kind === "snow") {
       this.populateSnowShader(record);
       return;
     }
-    const count = record.snapshot.kind === "rain" ? 3 : 1;
+    const count = 1;
     const texture = createWeatherTexture(record.snapshot.kind);
     const width = this.options.width();
     const height = this.options.height();
     for (let i = 0; i < count; i += 1) {
       const particle = createWeatherParticle(record.snapshot.kind, texture, width, height, i);
-      if (!(particle instanceof TilingSprite)) {
-        particle.x = Math.random() * width;
-        particle.y = Math.random() * height;
-      }
+      particle.x = Math.random() * width;
+      particle.y = Math.random() * height;
       record.container.addChild(particle);
       record.particles.push(particle);
     }
@@ -764,35 +771,22 @@ export class WeatherSystem {
   }
 
   private applyParticleStyle(record: WeatherRecord): void {
+    if (record.snapshot.kind === "rain") {
+      record.rainShader?.updateSettings(resolveRainSettingsFromCommandParams(record.snapshot.commandParams));
+      record.rainShader?.resize(this.options.width(), this.options.height());
+      return;
+    }
     if (record.snapshot.kind === "snow") {
       this.updateSnowShaderUniforms(record);
       return;
     }
-    const power = clamp01(record.snapshot.power);
+    const power = clamp01(weatherPower(record.snapshot));
     const externalScale = record.snapshot.scale?.[0] ?? 1;
-    const activeCount =
-      record.snapshot.kind === "sun"
-        ? record.particles.length
-        : Math.max(1, Math.round(record.particles.length * power));
+    const activeCount = record.particles.length;
     record.particles.forEach((particle, index) => {
       particle.visible = index < activeCount;
-      if (record.snapshot.kind === "rain") {
-        particle.alpha = 0.24 + power * (index === 0 ? 0.24 : 0.18);
-        particle.rotation = -0.04;
-        if (particle instanceof TilingSprite) {
-          particle.width = this.options.width() + 520;
-          particle.height = this.options.height() + 520;
-          particle.x = -260;
-          particle.y = -260;
-          particle.tileScale.set((0.42 + index * 0.13) * externalScale);
-          particle.tileRotation = -0.08;
-        } else {
-          particle.scale.set((0.42 + (index % 5) * 0.045) * externalScale);
-        }
-      } else {
-        particle.alpha = 0.26 + power * 0.36;
-        particle.scale.set(2.4 * externalScale);
-      }
+      particle.alpha = 0.26 + power * 0.36;
+      particle.scale.set(2.4 * externalScale);
     });
   }
 
@@ -833,10 +827,22 @@ export class WeatherSystem {
     const record = this.records.get(kind);
     if (!record) return;
     if (cancelTasks) this.tasks.cancelTarget(kind);
+    record.rainShader?.destroy();
     record.snowShader?.filter.destroy();
     record.container.removeFromParent();
     record.container.destroy({ children: true });
     this.records.delete(kind);
+  }
+
+  private populateRainShader(record: WeatherRecord): void {
+    if (record.snapshot.kind !== "rain") return;
+    const rainShader = new RainShaderRenderer(
+      resolveRainSettingsFromCommandParams(record.snapshot.commandParams),
+      this.options.width(),
+      this.options.height()
+    );
+    record.rainShader = rainShader;
+    record.container.addChild(rainShader.container);
   }
 
   private populateSnowShader(record: WeatherRecord): void {
@@ -871,6 +877,7 @@ export class WeatherSystem {
   private updateSnowShaderUniforms(record: WeatherRecord): void {
     const shader = record.snowShader;
     if (!shader) return;
+    if (record.snapshot.kind !== "snow") return;
     const snapshot = record.snapshot;
     const uniforms = shader.uniforms;
     uniforms.uPower = clamp01(snapshot.power);
@@ -1227,24 +1234,32 @@ function createWeatherContainer(kind: string): Container {
 }
 
 function createWeatherTexture(kind: string): Texture {
-  if (kind === "rain") return getBuiltInPixiFxTexture("rain-streak");
+  void kind;
   return getBuiltInPixiFxTexture("godray-mask");
 }
 
 function createWeatherParticle(kind: string, texture: Texture, width: number, height: number, index: number): WeatherParticle {
-  if (kind === "rain") {
-    const margin = 520;
-    return new TilingSprite({
-      texture,
-      width: width + margin,
-      height: height + margin,
-      tilePosition: { x: index * 97, y: index * 131 },
-      tileScale: { x: 1, y: 1 }
-    });
-  }
+  void kind;
+  void width;
+  void height;
+  void index;
   const sprite = new Sprite(texture);
   sprite.anchor.set(0.5);
   return sprite;
+}
+
+function weatherPower(snapshot: PixiWeatherSnapshot): number {
+  return snapshot.kind === "rain" ? snapshot.commandParams.power : snapshot.power;
+}
+
+function weatherSpeedX(snapshot: PixiWeatherSnapshot): number {
+  if (snapshot.kind === "snow") return snapshot.xSpeed ?? 0.25;
+  return 0.25;
+}
+
+function weatherSpeedY(snapshot: PixiWeatherSnapshot): number {
+  if (snapshot.kind === "snow") return snapshot.ySpeed ?? 0.45;
+  return 6;
 }
 
 function createSnowShaderFilter(width: number, height: number): { filter: SnowShaderFilter; uniforms: SnowShaderUniformValues } {

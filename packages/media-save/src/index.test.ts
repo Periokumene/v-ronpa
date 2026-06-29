@@ -40,7 +40,7 @@ const howlerMock = vi.hoisted(() => {
 vi.mock("howler", () => ({ Howl: howlerMock.Howl }));
 
 const baseSave = SaveDataSchema.parse({
-  version: 2 as const,
+  version: 3 as const,
   savedAt: "2026-06-14T00:00:00.000Z",
   mode: "navi" as const,
   story: {
@@ -52,7 +52,7 @@ const baseSave = SaveDataSchema.parse({
     ended: false
   },
   pixiStage: {
-    version: 3 as const,
+    version: 4 as const,
     revision: 2,
     backgroundsById: {
       MainBackground: {
@@ -91,7 +91,7 @@ describe("media save contracts", () => {
 
   it("validates saves through the versioned migrator boundary", () => {
     const result = createSaveMigrator().migrate({
-      version: 2,
+      version: 3,
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "trial",
       story: {
@@ -103,7 +103,7 @@ describe("media save contracts", () => {
         ended: false
       },
       pixiStage: {
-        version: 3,
+        version: 4,
         revision: 0,
         backgroundsById: {},
         charactersById: {},
@@ -125,10 +125,20 @@ describe("media save contracts", () => {
     expect(result).toMatchObject({
       migrated: false,
       data: {
-        version: 2,
+        version: 3,
         trial: { keywordStates: {} }
       }
     });
+  });
+
+  it("rejects old save versions instead of migrating them", () => {
+    expect(() =>
+      createSaveMigrator().migrate({
+        ...baseSave,
+        version: 2,
+        pixiStage: { ...baseSave.pixiStage, version: 3 }
+      })
+    ).toThrow();
   });
 
   it("derives text slot summaries from save data", () => {

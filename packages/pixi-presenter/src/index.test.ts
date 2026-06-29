@@ -5,6 +5,7 @@ import {
   createPixiPresenter,
   reducePixiRuntimeCommand
 } from "./index";
+import { resolveRainSettingsFromCommandParams } from "./internal/rain/settings";
 
 describe("pixi presenter port", () => {
   it("queues snapshot reconciliation before mount without requiring Pixi memory behavior", () => {
@@ -35,7 +36,7 @@ describe("pixi presenter port", () => {
 
     expect(withBackground).toMatchObject({
       snapshot: {
-        version: 3,
+        version: 4,
         revision: 1,
         backgroundsById: {
           MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness", visible: true }
@@ -47,7 +48,7 @@ describe("pixi presenter port", () => {
     });
     expect(withBackground.snapshot).not.toHaveProperty("background");
     expect(withCharacter.snapshot).toMatchObject({
-      version: 3,
+      version: 4,
       revision: 2,
       backgroundsById: {
         MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness" }
@@ -203,7 +204,7 @@ describe("pixi presenter port", () => {
     ).snapshot;
 
     expect(replacedCenter).toMatchObject({
-      version: 3,
+      version: 4,
       revision: 5,
       charactersById: {
         Ren: {
@@ -236,7 +237,7 @@ describe("pixi presenter port", () => {
     const second = reducePixiRuntimeCommand(first, runtimeCommand("back", "scene", { appearance: "bg:harness" })).snapshot;
 
     expect(second).toMatchObject({
-      version: 3,
+      version: 4,
       revision: 2,
       backgroundsById: {
         MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness" }
@@ -400,8 +401,12 @@ describe("pixi presenter port", () => {
 
     const rain = reducePixiRuntimeCommand(
       withActor.snapshot,
-      runtimeCommand("rain", "effect", { power: 0.6, durationMs: 300, wait: true })
+      runtimeCommand("rain", "effect", { power: 0.6, wind: -0.25, hue: 205, tint: 0.8, durationMs: 300, wait: true })
     );
+    expect(rain.snapshot.weather.rain).toMatchObject({
+      kind: "rain",
+      commandParams: { power: 0.6, wind: -0.25, hue: 205, tint: 0.8 }
+    });
     expect(rain.waitTasks).toEqual([{ kind: "weather-transition", target: "rain", revision: rain.snapshot.revision }]);
 
     const rainOff = reducePixiRuntimeCommand(
@@ -467,6 +472,39 @@ describe("pixi presenter port", () => {
     expect(noRain.weather).not.toHaveProperty("rain");
   });
 
+  it("normalizes rain command params before saving and resolves power presets internally", () => {
+    const normalized = reducePixiRuntimeCommand(
+      createInitialPixiStageSnapshot(),
+      runtimeCommand("rain", "effect", { power: 1.4, wind: -2, hue: 725, tint: 3 })
+    );
+
+    expect(normalized.snapshot.weather.rain).toMatchObject({
+      kind: "rain",
+      commandParams: { power: 1, wind: -1, hue: 5, tint: 2 }
+    });
+    expect(normalized.snapshot.weather.rain).not.toHaveProperty("rainSettings");
+    expect(normalized.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+      "normalized-pixi-params",
+      "normalized-pixi-params",
+      "normalized-pixi-params",
+      "normalized-pixi-params"
+    ]);
+
+    const zero = resolveRainSettingsFromCommandParams({ power: 0, wind: -1, hue: 215, tint: 0.55 });
+    const weak = resolveRainSettingsFromCommandParams({ power: 0.2, wind: -1, hue: 215, tint: 0.55 });
+    const medium = resolveRainSettingsFromCommandParams({ power: 0.5, wind: -1, hue: 215, tint: 0.55 });
+    const full = resolveRainSettingsFromCommandParams({ power: 1, wind: -1, hue: 215, tint: 0.55 });
+    expect(zero.rainBase).toEqual(weak.rainBase);
+    expect(zero.globalRain.midRain.bands.map((band) => Number(band.density.toFixed(3)))).toEqual([0, 0, 0]);
+    expect(zero.rainTrackSelection).toMatchObject({ minActive: 0, maxActive: 0 });
+    expect(weak.rainBase).toMatchObject({ speedPerFrame: 0.119, length: 0.256, width: 1.25, strength: 0.54 });
+    expect(weak.globalRain.midRain.bands.map((band) => Number(band.density.toFixed(3)))).toEqual([0.83, 0.87, 0.67]);
+    expect(medium.rainBase.strength).toBeCloseTo(0.73);
+    expect(medium.globalRain.midRain.speedPerFrame).toBeCloseTo(0.334);
+    expect(full.rainBase).toMatchObject({ speedPerFrame: 0.178, length: 0.278, width: 1.4, strength: 0.82 });
+    expect(full.globalRain.midRain.bands.map((band) => Number(band.density.toFixed(3)))).toEqual([2, 1.06, 0.95]);
+  });
+
   it("preserves shader snow controls and removes weather kinds independently", () => {
     let stage = createInitialPixiStageSnapshot();
     stage = reducePixiRuntimeCommand(stage, runtimeCommand("rain", "effect", { power: 0.7, durationMs: 120 })).snapshot;
@@ -487,7 +525,7 @@ describe("pixi presenter port", () => {
       })
     );
 
-    expect(withSnow.snapshot.weather.rain).toMatchObject({ kind: "rain", power: 0.7 });
+    expect(withSnow.snapshot.weather.rain).toMatchObject({ kind: "rain", commandParams: { power: 0.7 } });
     expect(withSnow.snapshot.weather.snow).toMatchObject({
       kind: "snow",
       power: 0.9,

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-test.setTimeout(180_000);
+test.setTimeout(300_000);
 
 test("vertical slice connects Navi exploration, gameplay state, VN dialog, and branch outcomes", async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -240,6 +240,23 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vertical-slice-evidence")).toContainText("evidence:keycard");
   await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 2 开始");
   await page.screenshot({ path: "test-results/vertical-slice-branch-b.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 01A-L1");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/vertical-slice-rain-half-left.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 01A-L2");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/vertical-slice-rain-neutral-cyan.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 01A-L3");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/vertical-slice-rain-full-right-magenta.png", fullPage: true });
+  const rainMotionBefore = await page.getByTestId("pixi-layer").screenshot();
+  await page.waitForTimeout(350);
+  const rainMotionAfter = await page.getByTestId("pixi-layer").screenshot();
+  expect(rainMotionBefore.length).toBeGreaterThan(0);
+  expect(changedByteCount(rainMotionBefore, rainMotionAfter)).toBeGreaterThan(100);
+  await advanceUntilText(page, "CHECKPOINT 01A-OFF");
+  await page.waitForTimeout(150);
+  await page.screenshot({ path: "test-results/vertical-slice-rain-cleanup.png", fullPage: true });
   await advanceUntilText(page, "CHECKPOINT 01B-L1");
   await expect(page.getByTestId("vertical-slice-pixi-characters")).toContainText("Ema/Pensive1,ArmR3@0.50,0.00");
   await page.waitForTimeout(250);
@@ -426,6 +443,16 @@ async function waitForDialogTextToSettle(page: Page) {
     if (current === previous) return;
     previous = current;
   }
+}
+
+function changedByteCount(left: Buffer, right: Buffer, threshold = 0): number {
+  const byteCount = Math.min(left.length, right.length);
+  let changed = 0;
+  for (let index = 0; index < byteCount; index += 1) {
+    const delta = Math.abs(left[index] - right[index]);
+    if (delta > threshold) changed += 1;
+  }
+  return changed;
 }
 
 async function expectKeyNeverFocuses(page: Page, key: string, activeTestId: string) {

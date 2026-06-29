@@ -111,6 +111,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
       root: stageRoot,
       width: size.width,
       height: size.height,
+      renderer: app.renderer,
       ...(options.assetResolver ? { assetResolver: options.assetResolver } : {}),
       ...(options.onDiagnostic ? { onDiagnostic: options.onDiagnostic } : {})
     };

@@ -93,6 +93,9 @@ it through adapter props:
   calling `AudioPort.playDialogueBleep`.
 - Pixi resolves backgrounds, character-pack entry JSON, and FX ids before
   loading textures.
+- Shader-only Pixi effects may have no FX texture entry. The rain shader path is
+  driven by `rainCommandParams` and internal `rainSettings`; it must not keep a
+  legacy `rain-streak` texture in the manifest.
 - Character-pack runtime assets point only to `character.json`. Pixi resolves
   that entry, loads sibling `layers.json` and `compositions.json`, then uses the
   pure layered-character resolver to determine the current active layers before

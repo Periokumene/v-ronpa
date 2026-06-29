@@ -33,7 +33,7 @@ export function createVerticalSliceSaveData({
   const { runtimeWait: _runtimeWait, ...saveableStory } = storySnapshot;
   void _runtimeWait;
   const data: SaveData = {
-    version: 2,
+    version: 3,
     savedAt,
     mode,
     navi,

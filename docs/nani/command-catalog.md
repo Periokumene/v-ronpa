@@ -138,7 +138,7 @@ release mechanism.
 | `printer` | `printer` | text | `idAndAppearance:named string`, `default:boolean`, `hideOther:boolean`, `anchor:boolean`, `pos:decimal list`, actor transform params | no | stubbed |
 | `processInput` | `processinput` | ui | `inputEnabled:boolean`, `set:named boolean list` | no | stubbed |
 | `purgeRollback` | `purgerollback` | state | none | no | stubbed |
-| `rain` | `rain` | effect | `power:decimal`, `time:decimal`, `xSpeed:decimal`, `ySpeed:decimal`, `pos:decimal list`, `position:decimal list`, `rotation:decimal list`, `scale:decimal list`, `wait:boolean` | no | implemented |
+| `rain` | `rain` | effect | `power:decimal`, `wind:decimal`, `hue:decimal`, `tint:decimal`, `time:decimal`, `easing:string`, `wait:boolean` | no | implemented |
 | `random` | `random` | flow | `weight:decimal list` | yes | stubbed |
 | `remove` | `remove` | actor | `actorIds:string list` | no | stubbed |
 | `resetState` | `resetstate` | state | `exclude:string list`, `only:string list` | no | stubbed |
@@ -184,17 +184,21 @@ Shared shorthand:
   `tint:string`, `easing:string`, `time:decimal`, `lazy:boolean`,
   `wait:boolean`.
 - Layered characters use `@char Character.Expression` as the only appearance
-  syntax. The runtime stores `appearanceExpression` in `PixiStageSnapshot v3`;
+  syntax. The runtime stores `appearanceExpression` in `PixiStageSnapshot`;
   `appearance:` remains a cataloged Naninovel actor parameter but is not consumed
   by layered `@char`. Use `@slide`, `@arrange`, and `@hideChars` for
   transform-only changes. `@slide Character.Expression` updates appearance,
   while `@slide Character` is transform-only and does not create a
   `character-pack` resource reference.
+- `rain params`: `power:decimal`, `wind:decimal`, `hue:decimal`,
+  `tint:decimal`, `time:decimal`, `easing:string`, `wait:boolean`.
+  Runtime and saves store only `rainCommandParams` plus transition timing;
+  interpolated `rainSettings` and shader uniforms remain Pixi runtime state.
 - `audio params`: `volume:decimal`, `loop:boolean`, `fade:decimal`,
   `group:string`, `time:decimal`, `wait:boolean`.
-- `particle params`: `power:decimal`, `time:decimal`, `pos:decimal list`,
-  `position:decimal list`, `rotation:decimal list`, `scale:decimal list`,
-  `wait:boolean`.
+- `particle params`: for `snow` and `sun`, `power:decimal`, `time:decimal`,
+  `pos:decimal list`, `position:decimal list`, `rotation:decimal list`,
+  `scale:decimal list`, `wait:boolean`.
 
 ## V-Ronpa Project Commands
 

@@ -34,10 +34,10 @@ describe("vertical slice save adapter", () => {
     });
 
     expect(save).toMatchObject({
-      version: 2,
+      version: 3,
       mode: "navi",
       pixiStage: {
-        version: 3,
+        version: 4,
         revision: 1,
         backgroundsById: {
           MainBackground: { appearance: "bg:harness" }
