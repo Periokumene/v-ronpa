@@ -31,7 +31,7 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT AUTO 01", { timeout: 10_000 });
 
-  await page.getByTestId("vn-dialog-advance").click();
+  await advanceVn(page);
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "false");
 
   for (const overlay of [
@@ -91,9 +91,9 @@ test("VN wait! resumes from Pixi task completion and manual continue settles the
   await advanceUntilText(page, "CHECKPOINT AUTO 03", 16);
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
 
-  await page.getByTestId("vn-dialog-advance").click();
+  await advanceVn(page);
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toContainText("actor-transition:Ema", { timeout: 1_000 });
-  await page.getByTestId("vn-dialog-advance").click();
+  await advanceVn(page);
 
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT AUTO 04", { timeout: 2_000 });
   await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
@@ -119,7 +119,7 @@ test("VN AUTO voice gate advances branch 3 without returning to the baseline che
   await page.getByTestId("settings-overlay-close").click();
   await expect(page.getByTestId("settings-overlay")).toBeHidden();
 
-  await page.getByTestId("vn-dialog-choice-2").click();
+  await page.getByTestId("vn-choice-2").click();
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT VOICE REAL 00");
   await advanceUntilText(page, "夜里的牢房", 4);
   await advanceUntilText(page, "如果把证据广播出去", 4);
@@ -153,7 +153,7 @@ async function advanceUntilText(page: Page, text: string, maxSteps: number) {
       await waitForDialogTextToSettle(page);
       return;
     }
-    await page.getByTestId("vn-dialog-advance").click();
+    await advanceVn(page);
     await page.waitForTimeout(120);
   }
 
@@ -163,19 +163,25 @@ async function advanceUntilText(page: Page, text: string, maxSteps: number) {
 
 async function advanceUntilChoices(page: Page) {
   for (let attempt = 0; attempt < 24; attempt += 1) {
-    if ((await page.getByTestId("vn-dialog-choices").count()) > 0) return;
-    await page.getByTestId("vn-dialog-advance").click();
+    if ((await page.getByTestId("vn-choice-overlay").count()) > 0) return;
+    await advanceVn(page);
     await page.waitForTimeout(120);
   }
 
-  await expect(page.getByTestId("vn-dialog-choices")).toBeVisible();
+  await expect(page.getByTestId("vn-choice-overlay")).toBeVisible();
 }
 
 async function expectManualAdvanceCompletesRevealBeforeStoryStep(page: Page) {
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT 00", { timeout: 2_000 });
-  await page.getByTestId("vn-dialog-advance").click();
+  await advanceVn(page);
   await expect(page.getByTestId("vn-dialog-text")).toContainText("请先确认背景");
   await expect(page.getByTestId("vn-dialog-text")).not.toContainText("请选择测试路径");
+}
+
+async function advanceVn(page: Page) {
+  const hitPlane = page.getByTestId("vn-advance-hit-plane");
+  await expect(hitPlane).toBeVisible({ timeout: 5_000 });
+  await hitPlane.click();
 }
 
 async function observeOpeningAutoNext(page: Page) {

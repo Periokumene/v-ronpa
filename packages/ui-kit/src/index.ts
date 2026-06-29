@@ -21,6 +21,7 @@ export {
   RuntimeToastLayer
 } from "./surfaces/RuntimeUiSurfaces";
 export { ScenarioTabs } from "./surfaces/ScenarioTabs";
+export { VnChoiceOverlay } from "./surfaces/VnChoiceOverlay";
 export { VnDialogSurface } from "./surfaces/VnDialogSurface";
 export type {
   GameOverlayHostProps,
@@ -38,4 +39,5 @@ export type {
   RuntimeToastLayerProps,
   RuntimeToastView
 } from "./surfaces/RuntimeUiSurfaces";
-export type { VnDialogDisplaySettings, VnDialogSurfaceProps } from "./surfaces/VnDialogSurface";
+export type { VnChoiceOverlayProps } from "./surfaces/VnChoiceOverlay";
+export type { VnDialogDisplaySettings, VnDialogState, VnDialogSurfaceProps } from "./surfaces/VnDialogSurface";

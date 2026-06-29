@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type CSSProperties, type ReactNode } from "react";
+import type { GameMode, NaviSubstate } from "@v-ronpa/contracts";
 import { selectCurrentStoryLine } from "@v-ronpa/story-engine";
 import {
   GameOverlayHost,
@@ -6,6 +7,7 @@ import {
   RuntimeMovieOverlaySurface,
   RuntimeToastLayer,
   TitleSurface,
+  VnChoiceOverlay,
   VnCommandBar,
   VnDialogSurface,
   type VnDialogDisplaySettings
@@ -17,6 +19,43 @@ import type { useVerticalSliceRuntimeAdapter } from "./useVerticalSliceRuntimeAd
 type GameFlowAdapter = ReturnType<typeof useGameFlowActor>;
 type OverlayPageAdapters = ReturnType<typeof useOverlayPageAdapters>;
 type VerticalSliceRuntimeAdapter = ReturnType<typeof useVerticalSliceRuntimeAdapter>;
+
+const VN_SHELL_LAYER_Z_INDEX = {
+  advanceHitPlane: 6
+} as const;
+
+export interface VnAdvanceHitPlaneInput {
+  flowMode: GameMode;
+  hasActiveOverlay: boolean;
+  hasInputPrompt: boolean;
+  hasMovieOverlay: boolean;
+  naviSubstate?: NaviSubstate;
+  storyActive: boolean;
+  storyEnded: boolean;
+  storyHasChoices: boolean;
+}
+
+export function shouldRenderVnAdvanceHitPlane({
+  flowMode,
+  hasActiveOverlay,
+  hasInputPrompt,
+  hasMovieOverlay,
+  naviSubstate,
+  storyActive,
+  storyEnded,
+  storyHasChoices
+}: VnAdvanceHitPlaneInput): boolean {
+  return (
+    flowMode === "navi" &&
+    naviSubstate === "vn2d-overlay" &&
+    storyActive &&
+    !storyEnded &&
+    !storyHasChoices &&
+    !hasActiveOverlay &&
+    !hasInputPrompt &&
+    !hasMovieOverlay
+  );
+}
 
 export function GameInteractionShell({
   children,
@@ -49,16 +88,28 @@ export function GameInteractionShell({
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      if (flow.activeOverlay) {
+        event.preventDefault();
+        flow.closeTopOverlay();
+        return;
+      }
       if (flow.mode === "title") return;
-      if (runtime.storyRuntime.active) return;
+      if (runtime.uiRuntime.state.inputPrompt || runtime.uiRuntime.state.movieOverlay) return;
+
       event.preventDefault();
-      if (flow.activeOverlay) flow.closeTopOverlay();
-      else overlayPages.dispatchUiAction("open-pause-menu");
+      overlayPages.dispatchUiAction("open-pause-menu");
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [flow.activeOverlay, flow.closeTopOverlay, flow.mode, overlayPages, runtime.storyRuntime.active]);
+  }, [
+    flow.activeOverlay,
+    flow.closeTopOverlay,
+    flow.mode,
+    overlayPages,
+    runtime.uiRuntime.state.inputPrompt,
+    runtime.uiRuntime.state.movieOverlay
+  ]);
 
   const currentLine =
     runtime.storyRuntime.active && flow.mode !== "title" && runtime.uiRuntime.state.visible.dialog
@@ -67,23 +118,39 @@ export function GameInteractionShell({
   const speaker = currentLine?.speaker && formatStorySpeaker ? formatStorySpeaker(currentLine.speaker) : currentLine?.speaker;
   const dialogText = runtime.dialogRevealRuntime.visibleText ?? currentLine?.text;
   const dialogRichText = runtime.dialogRevealRuntime.visibleRichText ?? currentLine?.richText;
+  const storyHasChoices = runtime.storyRuntime.state.pendingChoices.length > 0;
+  const dialogState = runtime.storyRuntime.state.ended ? "ended" : storyHasChoices ? "choices" : "line";
+  const showAdvanceHitPlane = shouldRenderVnAdvanceHitPlane({
+    flowMode: flow.mode,
+    hasActiveOverlay: Boolean(flow.activeOverlay),
+    hasInputPrompt: Boolean(runtime.uiRuntime.state.inputPrompt),
+    hasMovieOverlay: Boolean(runtime.uiRuntime.state.movieOverlay),
+    naviSubstate: runtime.navi.substate,
+    storyActive: runtime.storyRuntime.active,
+    storyEnded: runtime.storyRuntime.state.ended,
+    storyHasChoices
+  });
+  const showChoices =
+    runtime.storyRuntime.active &&
+    flow.mode === "navi" &&
+    runtime.navi.substate === "vn2d-overlay" &&
+    !runtime.storyRuntime.state.ended &&
+    storyHasChoices;
 
   return (
     <>
       {children}
+      {showAdvanceHitPlane ? <VnAdvanceHitPlane onAdvance={() => runtime.advanceStory("manual")} /> : null}
       {currentLine ? (
         <VnDialogSurface
           {...(speaker ? { speaker } : {})}
           text={dialogText ?? currentLine.text}
           {...(dialogRichText ? { richText: dialogRichText } : {})}
-          choices={runtime.storyRuntime.state.pendingChoices}
           {...(dialogDisplay ? { displaySettings: dialogDisplay } : {})}
-          ended={runtime.storyRuntime.state.ended}
-          onAdvance={runtime.advanceStory}
-          onChoice={runtime.chooseStory}
-          onCancel={() => runtime.closeStoryOverlay()}
+          state={dialogState}
         />
       ) : null}
+      {showChoices ? <VnChoiceOverlay choices={runtime.storyRuntime.state.pendingChoices} onChoice={runtime.chooseStory} /> : null}
       {runtime.storyRuntime.active && flow.mode !== "title" && runtime.uiRuntime.state.visible.commandBar ? (
         <VnCommandBar
           activeActions={runtime.storyPlayActiveActions}
@@ -112,3 +179,21 @@ export function GameInteractionShell({
     </>
   );
 }
+
+function VnAdvanceHitPlane({ onAdvance }: { onAdvance: () => void }) {
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="vn-advance-hit-plane"
+      onClick={() => onAdvance()}
+      style={advanceHitPlaneStyle}
+    />
+  );
+}
+
+const advanceHitPlaneStyle: CSSProperties = {
+  position: "absolute",
+  zIndex: VN_SHELL_LAYER_Z_INDEX.advanceHitPlane,
+  inset: 0,
+  cursor: "default"
+};

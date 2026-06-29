@@ -15,9 +15,10 @@ VN runtime output is split in two app-layer steps:
   The reveal runtime owns grapheme pacing and lifecycle events only; StoryEngine
   continues to own the complete visible line, backlog, and save snapshot.
 - `VnRuntimeDispatcher` renders already-materialized Pixi stage state.
-  `GameInteractionShell` renders DOM runtime UI surfaces such as dialog,
-  command bar, toast, input prompt, and movie overlay. Dialog text and choices
-  come from committed Story/app runtime state, not from command stream replay.
+  `GameInteractionShell` renders DOM runtime UI surfaces such as dialog
+  display, choice overlay, command bar, toast, input prompt, and movie overlay.
+  Dialog text and choices come from committed Story/app runtime state, not from
+  command stream replay.
 
 ## Ownership
 
@@ -45,6 +46,12 @@ VN runtime output is split in two app-layer steps:
   committed app runtime state. Script-controlled `showUI` / `hideUI` visibility
   applies only to concrete runtime UI surfaces, not shell overlays, debug
   readouts, or Pixi.
+- In Navi VN2D, `GameInteractionShell` also owns the transparent manual-advance
+  hit plane. It is app-local orchestration, not a shared input system. The hit
+  plane exists only while story is active and not ended, with no pending
+  choices, shell overlay, input prompt, or movie overlay. It may remain active
+  while the dialog surface itself is hidden so script-authored `hideUI dialog`
+  lines can still advance.
 - Pixi `PresentationTask` snapshots flow from `pixi-presenter` to app debug UI
   through `onTasksChanged`. They are renderer-local lifecycle observations, not
   save data. When StoryEngine is stopped on an explicit Pixi `wait!`, the app
@@ -63,7 +70,9 @@ VN runtime output is split in two app-layer steps:
   locale is explicitly added. Voice volume is
   `muted ? 0 : masterVolume * voiceVolume`.
 - DOM UI owns dialogue text, choices, menus, settings, save/load screens, and
-  other accessibility-sensitive surfaces.
+  other accessibility-sensitive surfaces. The VN dialog display and choice
+  selection are separate DOM surfaces: `VnDialogSurface` renders speaker/text
+  only, while `VnChoiceOverlay` renders pending choices above the dialog.
 - Pixi owns VN/trial 2D effects, backgrounds, layered characters, filters,
   particles, and fast 2D overlays.
 - R3F owns 3D staging, camera rigs, and spatial interaction.
@@ -182,9 +191,10 @@ emitted print + selectCurrentStoryLine()
 ```
 
 The full line remains in `StoryRuntimeState.text.current`, backlog, save data,
-and load summaries. `VnDialogSurface` does not own timers or reveal state; it
-only renders the text it receives and forwards advance input. Manual advance
-while reveal is active completes the current line and returns; the following
+and load summaries. `VnDialogSurface` does not own timers, reveal state,
+choices, keyboard handlers, or manual advance controls; it only renders the text
+it receives. Manual advance comes from the shell hit plane. While reveal is
+active, manual advance completes the current line and returns; the following
 advance is the one that enters StoryEngine. AUTO and one-shot `autoNext` use one
 line budget from the print commit time: elapsed reveal time counts toward that
 budget, but the adapter will not request the voice gate or StoryEngine advance
@@ -222,8 +232,9 @@ The vertical-slice harness uses:
 - `harnessContentManifest` plus `AssetRegistry` for all media, Pixi, R3F, and
   UI/evidence asset ids.
 - `VnRuntimeDispatcher` for Pixi snapshot rendering.
-- `GameInteractionShell` for VN dialog, command bar, toast, input prompt, movie
-  overlay, and durable shell overlay mounting.
+- `GameInteractionShell` for VN advance hit plane, dialog display, choice
+  overlay, command bar, toast, input prompt, movie overlay, and durable shell
+  overlay mounting.
 - `PixiStageSnapshot` as the saveable terminal state for VN 2D staging.
 - `InspectorLite` debug counters derived from the latest emitted command batch,
   not from a cumulative presentation log.

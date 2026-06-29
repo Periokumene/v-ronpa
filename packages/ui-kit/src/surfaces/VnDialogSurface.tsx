@@ -1,7 +1,8 @@
-import type { RichTextDocument, StoryChoiceOption } from "@v-ronpa/contracts";
+import type { RichTextDocument } from "@v-ronpa/contracts";
 import { useId } from "react";
-import type { CSSProperties, KeyboardEvent } from "react";
+import type { CSSProperties } from "react";
 import { RichTextRenderer } from "./RichTextRenderer";
+import { VN_UI_LAYER_Z_INDEX } from "./vnLayers";
 
 export interface VnDialogDisplaySettings {
   textSize: "small" | "medium" | "large";
@@ -13,14 +14,11 @@ export interface VnDialogSurfaceProps {
   speaker?: string;
   text: string;
   richText?: RichTextDocument;
-  choices?: StoryChoiceOption[];
   displaySettings?: VnDialogDisplaySettings;
-  ended?: boolean;
-  onAdvance?: () => void;
-  onAdvanceBlocked?: (reason: "ended") => void;
-  onChoice?: (index: number, choice: StoryChoiceOption) => void;
-  onCancel?: () => void;
+  state?: VnDialogState;
 }
+
+export type VnDialogState = "line" | "choices" | "ended";
 
 const DEFAULT_DISPLAY_SETTINGS = {
   textSize: "medium",
@@ -44,16 +42,9 @@ export function VnDialogSurface({
   speaker,
   text,
   richText,
-  choices = [],
   displaySettings,
-  ended = false,
-  onAdvance,
-  onAdvanceBlocked,
-  onChoice,
-  onCancel
+  state = "line"
 }: VnDialogSurfaceProps) {
-  const hasChoices = !ended && choices.length > 0;
-  const state = ended ? "ended" : hasChoices ? "choices" : "line";
   const speakerLabel = speaker ?? "旁白";
   const speakerId = useId();
   const textId = useId();
@@ -61,71 +52,25 @@ export function VnDialogSurface({
   const textSpeed = displaySettings?.textSpeed ?? DEFAULT_DISPLAY_SETTINGS.textSpeed;
   const textboxOpacity = displaySettings?.textboxOpacity ?? DEFAULT_DISPLAY_SETTINGS.textboxOpacity;
 
-  function selectChoice(index: number) {
-    const choice = choices[index];
-    if (!choice) return;
-
-    onChoice?.(index, choice);
-  }
-
-  function handleAdvance() {
-    if (ended) {
-      onAdvanceBlocked?.("ended");
-      return;
-    }
-
-    if (!hasChoices) {
-      onAdvance?.();
-    }
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onCancel?.();
-      return;
-    }
-
-    if (event.key !== "Enter" || event.currentTarget !== event.target) return;
-
-    // Root-level Enter/Escape mirrors harness input locks without replacing native button behavior.
-    event.preventDefault();
-
-    if (ended) {
-      onAdvanceBlocked?.("ended");
-      return;
-    }
-
-    if (hasChoices) {
-      selectChoice(0);
-      return;
-    }
-
-    onAdvance?.();
-  }
-
   return (
     <section
       aria-describedby={textId}
       aria-label="视觉小说对话"
       aria-labelledby={speakerId}
-      aria-keyshortcuts="Enter Escape"
       data-state={state}
       data-text-size={textSize}
       data-text-speed={String(textSpeed)}
       data-textbox-opacity={String(textboxOpacity)}
       data-testid="vn-dialog-surface"
-      onKeyDown={handleKeyDown}
       role="region"
       style={dialogRootStyle(textboxOpacity)}
-      tabIndex={0}
     >
       <div style={headerStyle}>
         <div data-testid="vn-dialog-speaker" id={speakerId} style={speakerStyle}>
           {speakerLabel}
         </div>
         <div aria-live="polite" data-testid="vn-dialog-state" style={stateStyle}>
-          {ended ? "已结束" : hasChoices ? "等待选择" : "可继续"}
+          {state === "ended" ? "已结束" : state === "choices" ? "等待选择" : "阅读中"}
         </div>
       </div>
 
@@ -133,43 +78,11 @@ export function VnDialogSurface({
         <RichTextRenderer document={richText} fallbackText={text} />
       </p>
 
-      {hasChoices && (
-        <div aria-label="对话选项" data-testid="vn-dialog-choices" role="group" style={choiceListStyle}>
-          {choices.map((choice, index) => (
-            <button
-              data-testid={`vn-dialog-choice-${index}`}
-              key={`${choice.text}-${index}`}
-              onClick={() => selectChoice(index)}
-              style={choiceButtonStyle}
-              type="button"
-            >
-              <RichTextRenderer document={choice.richText} fallbackText={choice.text} />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {ended && (
+      {state === "ended" && (
         <div aria-live="polite" data-testid="vn-dialog-ended" role="status" style={endedStyle}>
           本段剧情已结束，无法继续推进。
         </div>
       )}
-
-      <div style={controlRowStyle}>
-        <button
-          aria-disabled={ended || hasChoices}
-          data-testid="vn-dialog-advance"
-          disabled={ended || hasChoices}
-          onClick={handleAdvance}
-          style={ended || hasChoices ? disabledButtonStyle : controlButtonStyle}
-          type="button"
-        >
-          继续
-        </button>
-        <button data-testid="vn-dialog-cancel" onClick={onCancel} style={controlButtonStyle} type="button">
-          取消
-        </button>
-      </div>
     </section>
   );
 }
@@ -180,7 +93,7 @@ export function VnDialogSurface({
 // Dialog shell.
 const rootStyle: CSSProperties = {
   position: "absolute",
-  zIndex: 7,
+  zIndex: VN_UI_LAYER_Z_INDEX.dialogDisplay,
   left: "clamp(20px, 7vw, 96px)",
   right: "clamp(20px, 7vw, 96px)",
   bottom: 28,
@@ -193,7 +106,8 @@ const rootStyle: CSSProperties = {
   background: "linear-gradient(180deg, rgba(11, 16, 23, 0.91), rgba(13, 20, 31, 0.84))",
   boxShadow: "0 18px 42px rgba(0, 0, 0, 0.34)",
   color: "#edf7f8",
-  backdropFilter: "blur(12px)"
+  backdropFilter: "blur(12px)",
+  pointerEvents: "none"
 };
 
 function dialogRootStyle(textboxOpacity: number): CSSProperties {
@@ -255,38 +169,6 @@ function dialogTextStyle(textSize: VnDialogDisplaySettings["textSize"], textSpee
     transitionDuration: `${Math.round(TEXT_SPEED_TRANSITION_MS.max - clamp(textSpeed, 0, 1) * TEXT_SPEED_TRANSITION_MS.range)}ms`
   };
 }
-
-// Dialog actions.
-const choiceListStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 10,
-  marginTop: 2
-};
-
-const controlRowStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "flex-end",
-  gap: 8,
-  marginTop: 2
-};
-
-const controlButtonStyle: CSSProperties = {
-  borderRadius: 6
-};
-
-const choiceButtonStyle: CSSProperties = {
-  ...controlButtonStyle,
-  borderColor: "rgba(110, 231, 216, 0.42)",
-  background: "rgba(22, 34, 45, 0.86)",
-  whiteSpace: "pre-wrap"
-};
-
-const disabledButtonStyle: CSSProperties = {
-  ...controlButtonStyle,
-  cursor: "not-allowed",
-  opacity: 0.52
-};
 
 const endedStyle: CSSProperties = {
   width: "fit-content",

@@ -32,7 +32,10 @@ of overloading pressed/released action events.
 `InputLockState` describes who owns player input:
 
 - `none`: the active 3D mode may accept exploration or targeting input.
-- `dialog`: DOM/VN dialog owns advance and choices.
+- `dialog`: the app DOM VN interaction layer owns story advance and choices.
+  In the current Navi VN2D path, `GameInteractionShell` provides a transparent
+  playfield hit plane for manual story advance and `VnChoiceOverlay` owns
+  pending choices; `VnDialogSurface` is display-only.
 - `inventory`: inventory/menu surface owns input.
 - `trial-targeting`: Trial debate owns truth-bullet aiming and firing.
 - `menu`: global menu owns input.
@@ -95,5 +98,7 @@ commands, and interact signals to `ExplorationStage3D`, but they must not own
 camera pose or compute confirmable interactable candidates.
 
 The ESC pause path is authoritative at the shell layer: if Navi is active and no
-VN story is consuming dialog input, ESC opens `pause-menu` and locks input as
-`menu`. ESC must not mutate Navi maps, interactable candidates, or camera pose.
+top-level shell overlay, input prompt, or movie overlay is consuming input, ESC
+opens `pause-menu` and locks input as `menu`. If a shell overlay is already
+active, ESC closes that top overlay. ESC must not mutate Navi maps,
+interactable candidates, story state, or camera pose.

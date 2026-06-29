@@ -145,9 +145,9 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("pixi-layer")).toBeVisible();
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("aria-hidden", "false");
   await expect(page.getByTestId("vn-dialog-speaker")).toHaveText("旁白");
-  await expect(page.getByTestId("vn-dialog-state")).toHaveText("可继续");
-  await expect(page.getByTestId("vn-dialog-advance")).toHaveText("继续");
-  await expect(page.getByTestId("vn-dialog-cancel")).toHaveText("取消");
+  await expect(page.getByTestId("vn-dialog-state")).toHaveText("阅读中");
+  await expect(page.getByTestId("vn-dialog-advance")).toHaveCount(0);
+  await expect(page.getByTestId("vn-dialog-cancel")).toHaveCount(0);
   await advanceUntilText(page, "请选择测试路径");
   await advanceUntilChoices(page);
   await expect(page.getByTestId("vn-dialog-state")).toHaveText("等待选择");
@@ -159,8 +159,15 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expect(page.getByTestId("vn-command-save")).toBeEnabled();
   await expect(page.getByTestId("vn-command-load")).toBeEnabled();
   await expect(page.getByTestId("vn-command-settings")).toBeEnabled();
+  const dialogTextBeforeCommandOverlay = await currentDialogText(page);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pause-menu-overlay")).toBeVisible();
+  await page.getByTestId("pause-menu-overlay-close").click();
+  await expect(page.getByTestId("pause-menu-overlay")).toBeHidden();
+  await expect(page.getByTestId("vn-dialog-text")).toHaveText(dialogTextBeforeCommandOverlay);
   await page.getByTestId("vn-command-settings").click();
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
+  await expect(page.getByTestId("vn-dialog-text")).toHaveText(dialogTextBeforeCommandOverlay);
   await page.getByTestId("settings-display-text-size").selectOption("small");
   await page.getByTestId("settings-display-textbox-opacity").fill("40");
   await expect(page.getByTestId("settings-display-textbox-opacity-value")).toHaveText("40%");
@@ -208,11 +215,13 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await expectNoDocumentScroll(page);
   await page.screenshot({ path: "test-results/vertical-slice-vn-choice.png", fullPage: true });
 
-  await expect(page.getByTestId("vn-dialog-choices")).toBeVisible();
+  await expect(page.getByTestId("vn-choice-overlay")).toBeVisible();
+  await expect(page.getByTestId("vn-dialog-surface").getByTestId("vn-choice-overlay")).toHaveCount(0);
   await expect(page.getByTestId("vn-dialog-state")).toHaveText("等待选择");
-  await expect(page.getByTestId("vn-dialog-choice-0")).toHaveText("分支1：主交互流程验证入口");
-  await expect(page.getByTestId("vn-dialog-choice-1")).toHaveText("分支2：完整 Pixi 命令视觉验收");
-  await page.getByTestId("vn-dialog-choice-0").click();
+  await expect(page.getByTestId("vn-choice-0")).toHaveText("分支1：主交互流程验证入口");
+  await expect(page.getByTestId("vn-choice-1")).toHaveText("分支2：完整 Pixi 命令视觉验收");
+  await expect(page.getByTestId("vn-advance-hit-plane")).toHaveCount(0);
+  await page.getByTestId("vn-choice-0").click();
   await expect(page.getByTestId("vertical-slice-route")).toHaveText("return");
   await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
   await expect(page.getByTestId("vn-command-bar")).toBeHidden();
@@ -235,7 +244,7 @@ test("vertical slice connects Navi exploration, gameplay state, VN dialog, and b
   await page.getByTestId("vertical-slice-move-witness").click();
   await page.getByTestId("vertical-slice-confirm").click();
   await advanceUntilChoices(page);
-  await page.getByTestId("vn-dialog-choice-1").click();
+  await page.getByTestId("vn-choice-1").click();
   await expect(page.getByTestId("vertical-slice-route")).toHaveText("classroom");
   await expect(page.getByTestId("vertical-slice-evidence")).toContainText("evidence:keycard");
   await expect(page.getByTestId("vn-dialog-text")).toContainText("分支 2 开始");
@@ -366,36 +375,44 @@ async function expectNoRuntimeAssetDiagnostics(page: Page) {
 
 async function advanceUntilChoices(page: Page) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
-    if ((await page.getByTestId("vn-dialog-choices").count()) > 0) return;
-    await page.getByTestId("vn-dialog-advance").click();
+    if ((await page.getByTestId("vn-choice-overlay").count()) > 0) return;
+    await advanceVn(page);
   }
 
-  await expect(page.getByTestId("vn-dialog-choices")).toBeVisible();
+  await expect(page.getByTestId("vn-choice-overlay")).toBeVisible();
 }
 
 async function advanceUntilOverlayClosed(page: Page) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     if ((await page.getByTestId("vertical-slice-substate").textContent()) === "walk") return;
-    await page.getByTestId("vn-dialog-advance").click();
+    await advanceVn(page);
   }
 
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
 }
 
 async function advanceMainInteractionShowcase(page: Page) {
-  await page.getByTestId("vertical-slice-advance").click();
+  await advanceVn(page);
   await advanceUntilText(page, "CHECKPOINT MAIN 01B");
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
   await advanceUntilText(page, "附加文本验证");
-  await page.getByTestId("vn-dialog-advance").click();
+  await advanceUntilInputPrompt(page);
   await expect(page.getByTestId("runtime-input-prompt")).toBeVisible();
+  await expect(page.getByTestId("vn-advance-hit-plane")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pause-menu-overlay")).toHaveCount(0);
+  const dialogTextBeforeInputPromptSubmit = await currentDialogText(page);
   await page.getByTestId("runtime-input-field").fill("Smoke");
+  await expect(page.getByTestId("vn-dialog-text")).toHaveText(dialogTextBeforeInputPromptSubmit);
   await page.getByTestId("runtime-input-submit").click();
   await advanceUntilText(page, "CHECKPOINT MAIN 02");
   await advanceUntilText(page, "CHECKPOINT MAIN 03");
   await advanceUntilText(page, "CHECKPOINT MAIN 04");
-  await page.getByTestId("vn-dialog-advance").click();
+  await advanceVn(page);
   await expect(page.getByTestId("runtime-movie-overlay")).toBeVisible();
+  await expect(page.getByTestId("vn-advance-hit-plane")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pause-menu-overlay")).toHaveCount(0);
   await page.getByTestId("runtime-movie-skip").click();
   await advanceUntilText(page, "CHECKPOINT MAIN 05");
   await advanceUntilText(page, "CHECKPOINT MAIN 06");
@@ -408,12 +425,22 @@ async function advanceUntilText(page: Page, text: string) {
       await waitForDialogTextToSettle(page);
       return;
     }
-    await page.getByTestId("vn-dialog-advance").click();
+    await advanceVn(page);
     await page.waitForTimeout(120);
   }
 
   await expect(page.getByTestId("vn-dialog-text")).toContainText(text);
   await waitForDialogTextToSettle(page);
+}
+
+async function advanceUntilInputPrompt(page: Page) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if ((await page.getByTestId("runtime-input-prompt").count()) > 0) return;
+    await advanceVn(page);
+    await page.waitForTimeout(120);
+  }
+
+  await expect(page.getByTestId("runtime-input-prompt")).toBeVisible();
 }
 
 async function advanceUntilTextOrOverlayClosed(page: Page, text: string) {
@@ -427,11 +454,22 @@ async function advanceUntilTextOrOverlayClosed(page: Page, text: string) {
       await waitForDialogTextToSettle(page);
       return;
     }
-    await page.getByTestId("vn-dialog-advance").click();
+    await advanceVn(page);
     await page.waitForTimeout(120);
   }
 
   await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk");
+}
+
+async function advanceVn(page: Page) {
+  const hitPlane = page.getByTestId("vn-advance-hit-plane");
+  await expect(hitPlane).toBeVisible({ timeout: 5_000 });
+  await hitPlane.click();
+}
+
+async function currentDialogText(page: Page) {
+  await waitForDialogTextToSettle(page);
+  return (await page.getByTestId("vn-dialog-text").textContent()) ?? "";
 }
 
 async function waitForDialogTextToSettle(page: Page) {

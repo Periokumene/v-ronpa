@@ -12,54 +12,41 @@ import { Children, isValidElement, type ReactElement, type ReactNode } from "rea
 import { VnDialogSurface } from "./VnDialogSurface";
 
 describe("VnDialogSurface", () => {
-  it("renders the provided visible text without owning reveal state", () => {
-    const onAdvance = vi.fn();
+  it("renders the provided visible text without owning input behavior", () => {
     const element = VnDialogSurface({
       speaker: "Felix",
-      text: "Part",
-      onAdvance
+      text: "Part"
     });
 
     const text = findElementByTestId(element, "vn-dialog-text");
-    const advance = findElementByTestId(element, "vn-dialog-advance");
+    const state = findElementByTestId(element, "vn-dialog-state");
     const root = findElementByTestId(element, "vn-dialog-surface");
 
     expect(collectText(text).join("")).toBe("Part");
-
-    (advance?.props as { onClick?: () => void }).onClick?.();
-    expect(onAdvance).toHaveBeenCalledTimes(1);
-
-    (root?.props as { onKeyDown?: (event: { key: string; currentTarget: unknown; target: unknown; preventDefault: () => void }) => void })
-      .onKeyDown?.({
-        key: "Enter",
-        currentTarget: root,
-        target: root,
-        preventDefault: vi.fn()
-      });
-    expect(onAdvance).toHaveBeenCalledTimes(2);
+    expect(collectText(state).join("")).toBe("阅读中");
+    expect(root?.props).not.toHaveProperty("tabIndex");
+    expect(root?.props).not.toHaveProperty("onKeyDown");
+    expect((root?.props as { style?: Record<string, unknown> }).style).toMatchObject({ pointerEvents: "none" });
+    expect(findElementByTestId(element, "vn-dialog-advance")).toBeUndefined();
+    expect(findElementByTestId(element, "vn-dialog-cancel")).toBeUndefined();
+    expect(findElementByTestId(element, "vn-dialog-choices")).toBeUndefined();
   });
 
-  it("renders dialog and choice rich text spans with plain text fallback", () => {
+  it("renders dialog rich text spans with plain text fallback and display state", () => {
     const element = VnDialogSurface({
       speaker: "Felix",
       text: "Bold choice",
       richText: { text: "Bold choice", runs: [{ start: 0, end: 4, style: { bold: true, color: "#ff5577" } }] },
-      choices: [
-        {
-          text: "Inspect",
-          enabled: true,
-          richText: { text: "Inspect", runs: [{ start: 0, end: 7, style: { italic: true } }] }
-        }
-      ]
+      state: "choices"
     });
 
     const text = findElementByTestId(element, "vn-dialog-text");
-    const choice = findElementByTestId(element, "vn-dialog-choice-0");
+    const state = findElementByTestId(element, "vn-dialog-state");
     const richRuns = findElementsByProp(element, "data-rich-text-run", "");
 
     expect(collectText(text).join("")).toBe("Bold choice");
-    expect(collectText(choice).join("")).toBe("Inspect");
-    expect(richRuns.length).toBeGreaterThanOrEqual(2);
+    expect(collectText(state).join("")).toBe("等待选择");
+    expect(richRuns.length).toBeGreaterThanOrEqual(1);
     expect((richRuns[0]?.props as { style?: Record<string, unknown> }).style).toMatchObject({ color: "#ff5577", fontWeight: 700 });
   });
 });
