@@ -4,7 +4,9 @@ import {
   GameInteractionShell,
   VnRuntimeDispatcher,
   settingsToDialogDisplaySettings,
+  settingsToDialogueBleepRuntimeSettings,
   settingsToStoryPlayTimingPolicy,
+  settingsToVoiceRuntimeSettings,
   useGameSettingsAdapter
 } from "@v-ronpa/app-vn-shell";
 import { gameAContentManifest } from "./contentManifest";
@@ -19,7 +21,17 @@ export function App() {
   const assetRegistry = useMemo(() => createAssetRegistry(gameAContentManifest), []);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
-  const runtime = useGameAVnRuntime({ storyPlayTiming });
+  const dialogRevealSettings = useMemo(() => ({ textSpeed: dialogDisplay.textSpeed }), [dialogDisplay.textSpeed]);
+  const dialogueBleepSettings = useMemo(() => settingsToDialogueBleepRuntimeSettings(settings.settings), [settings.settings]);
+  const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
+  const runtime = useGameAVnRuntime({
+    assetResolver: assetRegistry,
+    ...(gameAContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: gameAContentManifest.audio.dialogueBleep } : {}),
+    dialogueBleepSettings,
+    dialogRevealSettings,
+    storyPlayTiming,
+    voiceSettings
+  });
   const save = useGameASaveAdapter({
     getPixiStage: () => runtime.pixiStageRuntime.snapshot,
     getStory: () => runtime.storyRuntime.state,

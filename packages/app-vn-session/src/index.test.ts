@@ -4,7 +4,7 @@ import {
   chooseVnSessionOption,
   completeVnSessionPresentationWait,
   completeVnSessionRuntimeWait,
-  createSaveableVnSessionSnapshot,
+  createVnSessionRestoreSnapshot,
   createVnSession,
   restoreVnSession,
   submitVnSessionInput,
@@ -37,12 +37,12 @@ describe("app VN session", () => {
     expect(first.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["print"]);
   });
 
-  it("chooses branches and keeps saveable session snapshots headless", () => {
+  it("chooses branches and keeps session restore snapshots headless", () => {
     const boot = createVnSession({ scriptPath: "session-choice.nani", sourceText, startLabel: "Start" });
     const first = advanceVnSession(boot.session, "start");
     const withChoices = advanceVnSession(first.session, "manual");
     const chosen = chooseVnSessionOption(withChoices.session, 1);
-    const snapshot = createSaveableVnSessionSnapshot(chosen.session);
+    const snapshot = createVnSessionRestoreSnapshot(chosen.session);
     const restored = restoreVnSession({ script: chosen.session.script, snapshot });
 
     expect(withChoices.session.story.pendingChoices.map((choice) => choice.text)).toEqual(["Left", "Right"]);

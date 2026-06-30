@@ -10,16 +10,12 @@
     "types": ["vite/client"]
   },
   "references": [
-    { "path": "../../packages/app-vn-dispatch" },
-    { "path": "../../packages/app-vn-session" },
+    { "path": "../../packages/app-vn-runtime" },
     { "path": "../../packages/app-vn-shell" },
     { "path": "../../packages/asset-registry" },
     { "path": "../../packages/contracts" },
     { "path": "../../packages/game-flow-machine" },
     { "path": "../../packages/gameplay" },
-    { "path": "../../packages/pixi-presenter" },
-    { "path": "../../packages/story-engine" },
-    { "path": "../../packages/story-play" },
     { "path": "../../packages/ui-kit" }
   ],
   "include": ["src"]

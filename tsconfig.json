@@ -10,6 +10,7 @@
     { "path": "packages/story-play" },
     { "path": "packages/app-vn-session" },
     { "path": "packages/app-vn-dispatch" },
+    { "path": "packages/app-vn-runtime" },
     { "path": "packages/app-vn-shell" },
     { "path": "packages/game-flow-machine" },
     { "path": "packages/gameplay" },

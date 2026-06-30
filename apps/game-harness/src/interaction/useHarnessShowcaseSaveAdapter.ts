@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { NaviRuntimeState, PixiStageSnapshot, SaveData, SaveSlotSummary, TrialRuntimeState } from "@v-ronpa/contracts";
+import type {
+  NaviRuntimeState,
+  PixiStageSnapshot,
+  SaveData,
+  SaveSlotSummary,
+  StoryRuntimeSnapshot,
+  TrialRuntimeState
+} from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
 import { createDexieSavePort, createSaveSlotSummary, type SavePort } from "@v-ronpa/media-save";
-import { storyRuntimeSnapshot, type StoryRuntimeState } from "@v-ronpa/story-engine";
 import type { useHarnessShowcaseRuntimeAdapter } from "./useHarnessShowcaseRuntimeAdapter";
 
 type HarnessShowcaseRuntimeAdapter = ReturnType<typeof useHarnessShowcaseRuntimeAdapter>;
@@ -14,7 +20,7 @@ export interface HarnessShowcaseSaveDataInput {
   mode?: SaveData["mode"];
   savedAt: string;
   navi: NaviRuntimeState;
-  story: StoryRuntimeState;
+  story: StoryRuntimeSnapshot;
   pixiStage: PixiStageSnapshot;
   gameplay: GameplayState;
   trial?: TrialRuntimeState;
@@ -29,8 +35,7 @@ export function createHarnessShowcaseSaveData({
   story,
   trial
 }: HarnessShowcaseSaveDataInput): SaveData {
-  const storySnapshot = storyRuntimeSnapshot(story);
-  const { runtimeWait: _runtimeWait, ...saveableStory } = storySnapshot;
+  const { runtimeWait: _runtimeWait, ...saveableStory } = story;
   void _runtimeWait;
   const data: SaveData = {
     version: 3,

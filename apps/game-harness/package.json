@@ -12,7 +12,7 @@
   "dependencies": {
     "@react-three/drei": "^10.0.0",
     "@react-three/fiber": "^9.0.0",
-    "@v-ronpa/app-vn-dispatch": "workspace:*",
+    "@v-ronpa/app-vn-runtime": "workspace:*",
     "@v-ronpa/app-vn-shell": "workspace:*",
     "@v-ronpa/asset-registry": "workspace:*",
     "@v-ronpa/contracts": "workspace:*",
@@ -25,7 +25,6 @@
     "@v-ronpa/pixi-presenter": "workspace:*",
     "@v-ronpa/r3f-adapter": "workspace:*",
     "@v-ronpa/story-engine": "workspace:*",
-    "@v-ronpa/story-play": "workspace:*",
     "@v-ronpa/trial-director": "workspace:*",
     "@v-ronpa/ui-kit": "workspace:*",
     "@xstate/react": "^6.1.0",

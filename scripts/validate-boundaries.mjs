@@ -13,6 +13,7 @@ const packageRoots = {
   "story-play": "packages/story-play",
   "app-vn-session": "packages/app-vn-session",
   "app-vn-dispatch": "packages/app-vn-dispatch",
+  "app-vn-runtime": "packages/app-vn-runtime",
   "app-vn-shell": "packages/app-vn-shell",
   "gameplay": "packages/gameplay",
   "navi-director": "packages/navi-director",
@@ -36,6 +37,18 @@ const allowedWorkspaceDeps = {
   "story-play": ["contracts", "story-engine"],
   "app-vn-session": ["contracts", "nani-parser", "nani-runtime-compiler", "story-engine", "story-play"],
   "app-vn-dispatch": ["contracts", "nani-parser", "nani-runtime-compiler", "pixi-presenter", "story-engine", "story-play"],
+  "app-vn-runtime": [
+    "app-vn-dispatch",
+    "app-vn-session",
+    "asset-registry",
+    "contracts",
+    "media-save",
+    "nani-parser",
+    "nani-runtime-compiler",
+    "pixi-presenter",
+    "story-engine",
+    "story-play"
+  ],
   "app-vn-shell": ["app-vn-dispatch", "contracts", "pixi-presenter", "story-engine", "story-play", "ui-kit"],
   "gameplay": ["contracts"],
   "navi-director": ["contracts", "gameplay"],
@@ -46,20 +59,16 @@ const allowedWorkspaceDeps = {
   "media-save": ["contracts"],
   "game-flow-machine": ["contracts"],
   "game-a": [
-    "app-vn-dispatch",
-    "app-vn-session",
+    "app-vn-runtime",
     "app-vn-shell",
     "asset-registry",
     "contracts",
     "game-flow-machine",
     "gameplay",
-    "pixi-presenter",
-    "story-engine",
-    "story-play",
     "ui-kit"
   ],
   "game-harness": [
-    "app-vn-dispatch",
+    "app-vn-runtime",
     "app-vn-shell",
     "asset-registry",
     "contracts",
@@ -100,6 +109,7 @@ const forbiddenExternalDeps = {
   "story-play": rendererAndBrowserAdapters,
   "app-vn-session": rendererAndBrowserAdapters,
   "app-vn-dispatch": rendererAndBrowserAdapters,
+  "app-vn-runtime": ["@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
   "app-vn-shell": ["@react-three/", "three", "dexie", "howler"],
   "gameplay": rendererAndBrowserAdapters,
   "navi-director": rendererAndBrowserAdapters,
@@ -114,6 +124,27 @@ const forbiddenExternalDeps = {
 };
 
 const dependencyFields = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
+const lowLevelVnRuntimeImports = [
+  "@v-ronpa/app-vn-session",
+  "@v-ronpa/app-vn-dispatch",
+  "@v-ronpa/story-play",
+  "@v-ronpa/story-engine",
+  "@v-ronpa/nani-parser",
+  "@v-ronpa/nani-runtime-compiler",
+  "@v-ronpa/pixi-presenter"
+];
+const vnRuntimeWrapperImportRules = [
+  {
+    path: "apps/game-a/src",
+    allowTests: true,
+    label: "Game A VN runtime source"
+  },
+  {
+    path: "apps/game-harness/src/interaction/useHarnessShowcaseRuntimeAdapter.ts",
+    allowTests: false,
+    label: "Harness VN runtime adapter"
+  }
+];
 const violations = [];
 const rootByAbsPath = new Map(
   Object.entries(packageRoots).map(([pkg, pkgRoot]) => [resolve(root, pkgRoot), pkg])
@@ -124,6 +155,7 @@ for (const pkg of Object.keys(packageRoots)) {
   validatePackageJson(pkg);
   validateTsconfigReferences(pkg);
 }
+validateVnRuntimeWrapperImports();
 
 if (violations.length > 0) {
   console.error("Boundary violations:");
@@ -187,6 +219,27 @@ function validateTsconfigReferences(pkg) {
   }
 }
 
+function validateVnRuntimeWrapperImports() {
+  for (const rule of vnRuntimeWrapperImportRules) {
+    const absolute = join(root, rule.path);
+    if (!existsSync(absolute)) continue;
+    const files = statSync(absolute).isDirectory() ? collectFiles(absolute) : [absolute];
+    for (const file of files) {
+      if (rule.allowTests && /\.(test|spec)\.(ts|tsx|js|jsx)$/u.test(file)) continue;
+      if (!/\.(ts|tsx|js|jsx|mjs|cjs)$/u.test(file)) continue;
+      const rel = relative(root, file);
+      const text = stripComments(readFileSync(file, "utf8"));
+      for (const specifier of collectImportSpecifiers(text)) {
+        const forbidden = lowLevelVnRuntimeImports.find((candidate) => isSamePackageOrSubpath(specifier, candidate));
+        if (!forbidden) continue;
+        violations.push(
+          `${rel}: ${rule.label} must use @v-ronpa/app-vn-runtime instead of low-level VN runtime import '${specifier}'.`
+        );
+      }
+    }
+  }
+}
+
 function validateSpecifier({ pkg, specifier, location, source }) {
   const targetPkg = workspacePackageFromSpecifier(specifier);
   if (targetPkg) {
@@ -228,7 +281,8 @@ function collectImportSpecifiers(text) {
   const patterns = [
     /\bimport\s+(?:type\s+)?(?:[^"'()]*?\s+from\s+)?["']([^"']+)["']/g,
     /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
-    /\brequire\s*\(\s*["']([^"']+)["']\s*\)/g
+    /\brequire\s*\(\s*["']([^"']+)["']\s*\)/g,
+    /\bexport\s+(?:type\s+)?(?:[^"'()]*?\s+from\s+)?["']([^"']+)["']/g
   ];
 
   for (const pattern of patterns) {
@@ -244,6 +298,10 @@ function workspacePackageFromSpecifier(specifier) {
   if (!specifier.startsWith("@v-ronpa/")) return undefined;
   const id = specifier.slice("@v-ronpa/".length).split("/")[0];
   return Object.hasOwn(packageRoots, id) ? id : undefined;
+}
+
+function isSamePackageOrSubpath(specifier, packageName) {
+  return specifier === packageName || specifier.startsWith(`${packageName}/`);
 }
 
 function externalPackageName(specifier) {

@@ -18,12 +18,21 @@ boundaries, CCR requirements, and dependency boundaries.
 
 `validate:boundaries` checks source imports, `package.json` dependency
 direction, and `tsconfig.json` project references against the same workspace
-dependency matrix.
+dependency matrix. It also owns the lasting VN runtime wrapper boundary:
+Game A runtime source and the harness VN runtime adapter must consume the
+shared `packages/app-vn-runtime` API instead of importing low-level VN session,
+dispatch, StoryEngine/story-play, parser/compiler, or Pixi presenter packages
+directly.
+
+`validate:vn-runtime-cleanup` remains available as a manual legacy cleanup
+check. It rejects old harness-private VN loop helper names in app adapters, but
+it is no longer part of `validate:baseline`; lasting dependency and import
+boundaries live in `validate:boundaries`.
 
 `pnpm validate:baseline` is the full repository gate. It runs `typecheck`,
 `validate:contracts`, unit tests, `validate:assets`, `validate:boundaries`,
-`validate:ccr`, `validate:app-cleanup`, both app builds
-(`@v-ronpa/game-a` and `@v-ronpa/game-harness`), and `test:smoke`.
+`validate:ccr`, `validate:app-cleanup`, both app builds (`@v-ronpa/game-a` and
+`@v-ronpa/game-harness`), and `test:smoke`.
 
 `validate:subsystem` is the task-review gate. It enforces task path
 boundaries, CCR requirements, dependency boundaries, typecheck, contract tests,
@@ -43,6 +52,7 @@ generator and registration allowlist.
 - Game A VN framework screenshots:
   - `test-results/game-a-title.png`
   - `test-results/game-a-vn-dialog.png`
+  - `test-results/game-a-movie.png`
   - `test-results/game-a-save-load.png`
 - Accepted harness-showcase screenshots:
   - `test-results/harness-showcase-title.png`
@@ -113,9 +123,9 @@ not a registry of independent subsystem slices; it is one game-shaped baseline
 that keeps VN, Navi, Trial, Pixi, R3F, media, save/load, settings, pause, debug
 readouts, and smoke controls available for capability verification.
 
-## Inspector Lite
+## Inspector Lite And Runtime Controls
 
-The harness inspector exposes:
+Inspector Lite exposes readouts:
 
 - current mode
 - Navi substate and Trial presentation profile
@@ -126,6 +136,10 @@ The harness inspector exposes:
 - trial segment
 - latest emitted RuntimeCommand count
 - RuntimeCommand/parser/compiler/story/transaction diagnostics
-- jump/grant/force outcome controls
+
+Harness runtime controls are separate from Inspector Lite readouts. They expose
+pose jumps, pointer-lock / first-person view controls, focused interaction
+confirmation, VN advance, Trial correct/miss/timeout/exit actions, and reset
+controls for smoke and manual verification.
 
 Inspector Lite is a developer harness, not production UI.

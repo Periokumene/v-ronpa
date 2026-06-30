@@ -51,7 +51,7 @@ export interface VnSessionPlayStep {
   emittedRuntimeCommands: RuntimeCommand[];
 }
 
-export interface SaveableVnSessionSnapshot {
+export interface VnSessionRestoreSnapshot {
   story: StoryRuntimeSnapshot;
   play: StoryPlayState;
 }
@@ -59,7 +59,7 @@ export interface SaveableVnSessionSnapshot {
 export interface VnSessionRestoreInput {
   script: RuntimeScript;
   diagnostics?: Partial<VnSessionDiagnostics>;
-  snapshot: SaveableVnSessionSnapshot;
+  snapshot: VnSessionRestoreSnapshot;
   active?: boolean;
 }
 
@@ -129,7 +129,7 @@ export function stopVnSessionAutomation(session: VnSessionState, reason: StoryPl
   return { ...session, play: stopStoryPlayAutomation(session.play, reason) };
 }
 
-export function createSaveableVnSessionSnapshot(session: VnSessionState): SaveableVnSessionSnapshot {
+export function createVnSessionRestoreSnapshot(session: VnSessionState): VnSessionRestoreSnapshot {
   return {
     story: session.story,
     play: session.play

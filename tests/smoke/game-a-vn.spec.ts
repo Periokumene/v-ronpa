@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 test("game-a boots the VN-first framework path", async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -42,6 +42,13 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await page.getByTestId("vn-choice-0").click();
   await expect(page.getByTestId("vn-dialog-text")).toContainText("记录了房间里的异常光线");
 
+  await advanceUntilText(page, "CHECKPOINT GAME-A WAIT", 8);
+  await advanceUntilMovie(page, 4);
+  await expect(page.getByTestId("runtime-movie-overlay")).toBeVisible();
+  await page.screenshot({ path: "test-results/game-a-movie.png", fullPage: true });
+  await page.getByTestId("runtime-movie-skip").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT GAME-A MOVIE");
+
   await page.getByTestId("vn-command-save").click();
   await expect(page.getByTestId("save-load-mode")).toHaveText("save");
   await page.getByTestId("save-slot-1").click();
@@ -51,8 +58,28 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await page.getByTestId("save-slot-1").click();
   await page.getByTestId("load-confirm").click();
   await expect(page.getByTestId("save-load-overlay")).toBeHidden();
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("记录了房间里的异常光线");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT GAME-A MOVIE");
   await page.screenshot({ path: "test-results/game-a-save-load.png", fullPage: true });
 
   expect(consoleErrors).toEqual([]);
 });
+
+async function advanceUntilText(page: Page, text: string, maxSteps: number) {
+  for (let attempt = 0; attempt < maxSteps; attempt += 1) {
+    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) return;
+    await page.getByTestId("vn-advance-hit-plane").click();
+    await page.waitForTimeout(160);
+  }
+
+  await expect(page.getByTestId("vn-dialog-text")).toContainText(text);
+}
+
+async function advanceUntilMovie(page: Page, maxSteps: number) {
+  for (let attempt = 0; attempt < maxSteps; attempt += 1) {
+    if ((await page.getByTestId("runtime-movie-overlay").count()) > 0) return;
+    await page.getByTestId("vn-advance-hit-plane").click();
+    await page.waitForTimeout(160);
+  }
+
+  await expect(page.getByTestId("runtime-movie-overlay")).toBeVisible();
+}

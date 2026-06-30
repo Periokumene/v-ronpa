@@ -29,6 +29,7 @@ Preferred fan-out:
 - `story-play`
 - `app-vn-session`
 - `app-vn-dispatch`
+- `app-vn-runtime`
 - `app-vn-shell`
 - `gameplay`
 - `navi-director`

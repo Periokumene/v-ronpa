@@ -1,0 +1,24 @@
+{
+  "name": "@v-ronpa/app-vn-runtime",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/app-vn-dispatch": "workspace:*",
+    "@v-ronpa/app-vn-session": "workspace:*",
+    "@v-ronpa/asset-registry": "workspace:*",
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/media-save": "workspace:*",
+    "@v-ronpa/pixi-presenter": "workspace:*",
+    "@v-ronpa/story-engine": "workspace:*",
+    "@v-ronpa/story-play": "workspace:*",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@v-ronpa/nani-parser": "workspace:*",
+    "@v-ronpa/nani-runtime-compiler": "workspace:*"
+  }
+}

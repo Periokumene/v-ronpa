@@ -42,9 +42,12 @@ catalog also declares each command's execution boundary, so compiler and app
 dispatch can distinguish StoryEngine control flow, Pixi presentation, gameplay
 events, and declared-only compatibility commands.
 
-App fanout is handled by `createVnRuntimePresentationTransaction` and
-`VnOutputRouteTable`. Route tables classify normalized
-`RuntimeCommand.commandId` entries first, then command categories as fallback.
+Shared VN fanout is handled by `packages/app-vn-dispatch` through
+`createVnRuntimePresentationTransaction` and `VnOutputRouteTable`.
+`app-vn-runtime` consumes that transaction during the runtime commit. Routing
+uses explicit normalized `RuntimeCommand.commandId` entries first, then
+catalog `execution` / `status` routing, and finally command categories as
+fallback.
 
 StoryEngine state stores story semantics only: script path, instruction pointer,
 variables, backlog, pending choices, and end state. It returns the current
@@ -69,42 +72,47 @@ injects the asset resolver.
 
 Expression params such as `duration:{flashDuration}` are preserved by the
 compiler, evaluated by StoryEngine against story variables, and should be
-resolved before app adapters consume emitted runtime commands.
+resolved before `app-vn-dispatch` plans and `app-vn-runtime` consumes emitted
+runtime commands.
 If a routed Pixi command reaches the reducer with missing or unsupported
 Pixi-consumable params, the reducer returns a diagnostic no-op instead of
 writing placeholder background, character, or keyword ids.
 
 `story-play` sits above StoryEngine for playback control only. It decides when
 manual, AUTO, SKIP, or one-shot `autoNext` should request the next StoryEngine
-step and emits a pacing intent such as normal or skip. App adapters host the
-actual browser timer and map skip pacing to presentation choices such as
+step and emits a pacing intent such as normal or skip. `app-vn-runtime` hosts
+the actual browser timer and maps skip pacing to presentation choices such as
 disabled Pixi animation; renderer packages do not own AUTO/SKIP scheduling.
-Voice-aware AUTO is also app adapter policy: after the `story-play` text minimum
-timer fires, AUTO/`autoNext` may wait for the current `AudioHandle.finished`
-result. Natural `ended` waits a fixed 500ms post-voice delay before advance;
-`failed` releases any pending AUTO/`autoNext` advance without that delay; and
-`stopped` only clears stale gates. This gate must not move into StoryEngine,
-`story-play`, Pixi, or DOM rendering.
+Voice-aware AUTO is also `app-vn-runtime` policy using app-derived voice
+settings: after the `story-play` text minimum timer fires, AUTO/`autoNext` may
+wait for the current `AudioHandle.finished` result. Natural `ended` waits a
+fixed 500ms post-voice delay before advance; `failed` releases any pending
+AUTO/`autoNext` advance without that delay; and `stopped` only clears stale
+gates. This gate must not move into StoryEngine, `story-play`, Pixi, DOM
+rendering, or app wrappers.
 
 Pixi keeps a separate presentation clock inside `pixi-presenter`. Actor
-transitions, transient effects, and screen/weather fades may run after the app
-has synchronously committed the latest StoryEngine step. These active visual
-lifecycles are tracked as Pixi-local `PresentationTask` snapshots and can be
-reported to app debug UI through `onTasksChanged`.
+transitions, transient effects, and screen/weather fades may run after
+`app-vn-runtime` has synchronously committed the latest StoryEngine step. These
+active visual lifecycles are tracked as Pixi-local `PresentationTask` snapshots
+and can be reported to app debug UI through `onTasksChanged`.
 
-For explicit Pixi `wait!`, StoryEngine stops with `presentationWait` and the app
-matches that wait against the transaction's `expectedTasks`. Pixi task
-completion is the primary resume source. A duration-based fallback exists only
-to diagnose and settle stuck tasks. Manual continue during a wait performs
-Complete On Continue: the app commits the terminal Pixi snapshot with animation
-disabled, clears the wait through `PRESENTATION_COMPLETE`, and immediately
-resumes to the next text, choice, end, or wait stop. Pixi task snapshots remain
-unsaved renderer lifecycle data and must not be treated as durable story state.
+For explicit Pixi `wait!`, StoryEngine stops with `presentationWait` and
+`app-vn-dispatch` returns Pixi wait descriptors as transaction `pixiWaitTasks`.
+`app-vn-runtime` stores those descriptors on
+`StoryRuntimeState.presentationWait.expectedTasks` and observes Pixi
+`PresentationTask` snapshots. Pixi task completion is the primary resume source.
+A duration-based fallback exists only to diagnose and settle stuck tasks. Manual
+continue during a wait performs Complete On Continue: `app-vn-runtime` commits
+the terminal Pixi snapshot with animation disabled, clears the wait through
+`PRESENTATION_COMPLETE`, and immediately resumes to the next text, choice, end,
+or wait stop. Pixi task snapshots remain unsaved renderer lifecycle data and
+must not be treated as durable story state.
 
 Save/load persists the terminal `PixiStageSnapshot` only. Active
 `PresentationTask` records, tween progress, transient render hints, and overlay
-objects are not saved. Restoring or resetting renders the terminal snapshot with
-animation disabled and clears the presenter task list.
+objects are not saved. `app-vn-runtime` restore/reset renders the terminal
+snapshot with animation disabled and clears transient runtime/Pixi task state.
 
 Weather snapshots are per-kind state records rather than a shared particle bag.
 `@rain` is the only script/save entry point for rain and stores
@@ -177,7 +185,8 @@ interactable using `start-trial`. The same scenario remains active; the app
 switches from Navi staging to the Trial stage based on `GameMode` and the
 current `TrialRuntimeState`.
 
-See `docs/architecture/vn-runtime-dispatcher.md` for the app-layer route table.
+See `docs/architecture/vn-runtime-dispatcher.md` for the shared
+`app-vn-dispatch` route table consumed by `app-vn-runtime`.
 
 ## Evidence Ownership Boundary
 

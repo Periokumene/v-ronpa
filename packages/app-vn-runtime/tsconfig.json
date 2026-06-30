@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["ES2022", "DOM"]
+  },
+  "references": [
+    { "path": "../app-vn-dispatch" },
+    { "path": "../app-vn-session" },
+    { "path": "../asset-registry" },
+    { "path": "../contracts" },
+    { "path": "../media-save" },
+    { "path": "../nani-parser" },
+    { "path": "../nani-runtime-compiler" },
+    { "path": "../pixi-presenter" },
+    { "path": "../story-engine" },
+    { "path": "../story-play" }
+  ],
+  "include": ["src"]
+}

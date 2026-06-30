@@ -89,7 +89,8 @@ registration sources.
 
 - generated harness assets from `harnessRuntimeAssets`
 - Pixi built-in FX assets from `builtInPixiFxRuntimeAssets`
-- maps, items, evidence, trials, and input fixtures from `showcase/*`
+- maps, items, evidence, trials, and scripts from `showcase/*`
+- input bindings from `inputActions.ts`
 
 `inputActions.ts` provides harness input bindings, and
 `useFirstPersonExplorationBridge.ts` is the app bridge into R3F first-person
@@ -98,14 +99,15 @@ exploration.
 The harness-showcase app creates one `AssetRegistry` from this manifest and passes
 it through adapter props:
 
-- media commands resolve `bgm`, `sfx`, `voice`, and `video` ids before calling
-  Howler or the HTML video port.
-- dialogue line audio checks `voice:<locale>:<textId>` through the same
-  registry; a resolved voice asset suppresses bleep, while a missing planned
-  voice asset can fallback to dialogue bleep.
+- `app-vn-runtime` resolves VN media command refs for `bgm`, `sfx`, `voice`,
+  and `video` ids before calling `media-save` `AudioPort` / `VideoPort`.
+- `app-vn-runtime` checks dialogue line audio ids such as
+  `voice:<locale>:<textId>` through the same registry; a resolved voice asset
+  suppresses bleep, while a missing planned voice asset can fallback to dialogue
+  bleep.
 - dialogue reveal bleep resolves `bleep:*` ids declared by
-  `ContentManifest.audio.dialogueBleep` through the same registry before
-  calling `AudioPort.playDialogueBleep`.
+  `ContentManifest.audio.dialogueBleep` through `app-vn-runtime` before calling
+  `AudioPort.playDialogueBleep`.
 - rich text font faces resolve `ContentManifest.fonts[*].sourceRef` to
   `RuntimeAsset.kind === "font"` before app code emits controlled `@font-face`
   CSS. Script-authored rich text stores only `fontId`, not raw CSS family names

@@ -52,22 +52,33 @@ adapters and apps
 - `app-vn-session` owns headless VN entry boot from resolved source text:
   `parseScenario`, `compileRuntimeScript`, StoryEngine state, story-play state,
   choice/input/runtime-wait/presentation-wait helpers, and session-local
-  restore snapshots. It returns emitted `RuntimeCommand` batches to app
-  adapters for fanout and never owns asset resolution, React effects,
-  Pixi/R3F/DOM rendering, Howler/media handles, reveal/voice gates, browser
-  timers, or save persistence.
+  restore snapshots. `app-vn-runtime` consumes its emitted `RuntimeCommand`
+  batches and delegates fanout to `app-vn-dispatch`. Session never owns asset
+  resolution, React effects, Pixi/R3F/DOM rendering, Howler/media handles,
+  reveal/voice gates, browser timers, or save persistence.
+- `app-vn-runtime` owns the reusable app-hosted VN runtime loop. It composes
+  `app-vn-session` and `app-vn-dispatch`, resolves media through the
+  app-created `AssetRegistry`, calls `media-save` `AudioPort` / `VideoPort`,
+  manages dialog reveal timers, AUTO/SKIP scheduling, voice gates, movie
+  overlay playback, Pixi `wait!` observation, runtime waits, restore cleanup,
+  and shell-compatible runtime state. It must not understand Navi or Trial
+  state.
 - `StoryEngine` owns script semantics, variables, backlog, choices,
   expression evaluation, serializable Story snapshots, and per-step
   `emittedRuntimeCommands`.
 - `story-play` owns VN story playback control over StoryEngine: AUTO/SKIP mode,
   one-shot `autoNext` scheduling, pacing intent, and automation stop reasons.
-  It is a pure playback state machine; browser timers and renderer commits stay
-  in app adapters.
+  It is a pure playback state machine; browser timers and VN runtime commits
+  stay in `app-vn-runtime`.
 - `app-vn-dispatch` owns headless VN RuntimeCommand fanout: the route table,
   presentation transaction, Pixi/media/UI reducers, dialog reveal pacing,
-  dialog playback gate, and dialogue audio planner. App adapters own timers,
-  ports, asset resolution, live media handles, and React commits around those
-  pure plans.
+  dialog playback gate, and dialogue audio planner. `app-vn-runtime` owns VN
+  timers, ports, asset resolution, live media handles, and React commits around
+  those pure plans; app wrappers provide registry/settings/ports/config.
+- App packages such as `apps/game-a` and `apps/game-harness` may wrap
+  `app-vn-runtime` for entry selection, app flow, save policy, Navi/Trial glue,
+  and debug readouts. They must not reimplement the VN story loop or keep
+  parallel browser timer/media/voice/reveal authorities.
 - `gameplay` owns domain reducers for exploration, inventory, evidence
   ownership, character state, and pure trial rule judgments.
 - `media-save` owns Dexie IndexedDB save storage, Howler audio playback,
@@ -135,7 +146,7 @@ into `RuntimeScript`. StoryEngine consumes `RuntimeScript`, updates story state,
 and emits the current step's non-control `RuntimeCommand` records.
 RuntimeCommand params use canonical runtime names only; raw script aliases stay
 in `sourceCommand`. Expressions are resolved by StoryEngine before emitted
-commands reach app adapters.
+commands reach `app-vn-dispatch` planning and `app-vn-runtime` commit.
 
 Command declarations live in the contracts `commandCatalog`. The catalog stores
 Naninovel canonical names, lowercase runtime ids, categories, parameter specs,
@@ -156,9 +167,9 @@ submission remains a Trial UI action routed through `trial-director`.
   -> StoryEngine story state + emittedRuntimeCommands
   -> story-play playback state + pacing schedule
   -> app-vn-dispatch VN runtime transaction + route table
-  -> routed RuntimeCommand consumption
-  -> app commit uses app-vn-dispatch planners for dialogue audio/reveal gates
-  -> AUTO/autoNext voice gate handles AudioHandle.finished ended/stopped/failed
+  -> app-vn-runtime routed RuntimeCommand consumption
+  -> app-vn-runtime uses app-vn-dispatch planners for dialogue audio/reveal gates
+  -> app-vn-runtime AUTO/autoNext voice gate handles AudioHandle.finished ended/stopped/failed
   -> app-created AssetRegistry resolves media/Pixi/R3F/UI asset ids
   -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events / AudioPort voice or bleep playback
   -> VnRuntimeDispatcher renders the Pixi snapshot
@@ -166,26 +177,27 @@ submission remains a Trial UI action routed through `trial-director`.
 ```
 
 Dialogue lines may include one `|#textId|` marker. The marker is parser
-metadata, not visible text. The app uses it as dialogue audio identity: a
-resolvable `voice:<locale>:<textId>` asset wins and suppresses dialogue bleep,
-while a missing planned voice asset can fall back to configured reveal bleep.
-Full localization, managed text files, and explicit voice commands remain
-future tasks.
+metadata, not visible text. `app-vn-runtime` uses it with app-derived voice
+settings as dialogue audio identity: a resolvable `voice:<locale>:<textId>`
+asset wins and suppresses dialogue bleep, while a missing planned voice asset
+can fall back to configured reveal bleep. Full localization, managed text
+files, and explicit voice commands remain future tasks.
 
-AUTO voice waiting is app policy, not script semantics. `story-play` computes
-the minimum text stay time, while the app adapter waits for a successfully
-started voice handle to report its terminal lifecycle. Natural `ended` adds
-500ms before advancing; `failed` releases any pending AUTO/`autoNext` advance
-without the post-voice delay; and explicit `stopped` only clears stale gates.
-Manual advance and SKIP do not wait for voice; missing, muted, zero-volume, or
-failed voice playback does not block automation. Dialogue bleep never installs
-or releases the AUTO voice gate.
+AUTO voice waiting is `app-vn-runtime` policy, not script semantics.
+`story-play` computes the minimum text stay time, while `app-vn-runtime` waits
+for a successfully started voice handle to report its terminal lifecycle.
+Natural `ended` adds 500ms before advancing; `failed` releases any pending
+AUTO/`autoNext` advance without the post-voice delay; and explicit `stopped`
+only clears stale gates. Manual advance and SKIP do not wait for voice; missing,
+muted, zero-volume, or failed voice playback does not block automation. Dialogue
+bleep never installs or releases the AUTO voice gate.
 
 For Pixi presentation commands, `wait!` is opt-in. StoryEngine creates a
-presentation wait, app transaction code attaches Pixi expected task descriptors,
-and Pixi task completion resumes the story. Manual continue during a wait
-settles Pixi to the terminal snapshot before resuming; saved data still stores
-only the terminal `PixiStageSnapshot`.
+presentation wait, `app-vn-dispatch` transaction code returns Pixi wait
+descriptors, and `app-vn-runtime` stores/observes them until Pixi task
+completion resumes the story. Manual continue during a wait settles Pixi to the
+terminal snapshot before resuming; saved data still stores only the terminal
+`PixiStageSnapshot`.
 
 See also:
 
@@ -206,16 +218,20 @@ after Gameplay returns pure rule judgments.
 
 Exploration enters Trial through the director-owned `InteractableDef.action`
 variant `start-trial`. Navi remains authoritative for focus and confirmation;
-the app runtime adapter creates `TrialRuntimeState` and enters `GameMode`
-`trial`. Trial entry must not be hidden inside `start-script` labels or separate
-query-param scenarios.
+harness/app flow glue creates `TrialRuntimeState` and enters `GameMode`
+`trial`. Trial entry must not be hidden inside `start-script` labels or
+separate query-param scenarios.
 
 ## Integrated Harness Showcase Baseline
 
 `apps/game-harness` is the accepted integrated harness-showcase baseline. It
-boots the showcase from `/` and composes VN, Navi, Trial, Pixi, R3F, media,
-save/load, settings, pause/menu, debug readouts, and smoke controls in one
-game-shaped harness.
+boots the showcase from `/` and composes shared VN runtime, Navi, Trial, Pixi,
+R3F, media, save/load, settings, pause/menu, debug readouts, and smoke controls
+in one game-shaped harness. The harness adapter is intentionally a thin app
+glue layer: VN reveal/audio/movie/wait/restore behavior lives in
+`packages/app-vn-runtime`; Navi/Trial/R3F app glue, showcase fixtures, and
+debug readouts remain in the harness app while shared director/runtime/presenter
+behavior remains in packages.
 
 The harness-owned integration fixtures live in `contentManifest`,
 `generatedAssets`, `inputActions`, `showcase/*`,

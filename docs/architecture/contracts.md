@@ -67,7 +67,8 @@ and merge the change through the integration baseline first.
   aliases and source params belong in `sourceCommand`.
 - RuntimeCommand may carry unresolved expression values and `condition/unless`
   expressions. The compiler preserves them; StoryEngine evaluates them against
-  story variables before app adapter fanout.
+  story variables before `app-vn-dispatch` fanout during `app-vn-runtime`
+  commit.
 - `commandCatalog` is the only declaration source for `.nani` commands.
   Runtime handler registries bind execution only; they must not define command
   metadata independently.
@@ -77,9 +78,10 @@ and merge the change through the integration baseline first.
 - `NaniCommandStatus` is the command maturity signal. `implemented` means
   V-Ronpa has tested runtime behavior for the command; it is not a promise that
   every official Naninovel parameter is fully compatible.
-- Explicit Pixi `wait!` stores a `StoryPresentationWait` with `expectedTasks`
-  supplied by app/Pixi transaction code. Active Pixi tasks and tween progress
-  are not save data.
+- Explicit Pixi `wait!` stores a `StoryPresentationWait`; `app-vn-dispatch`
+  transaction code supplies Pixi wait descriptors and `app-vn-runtime` stores
+  and observes them as `expectedTasks`. Active Pixi tasks and tween progress are
+  not save data.
 - Official Naninovel commands and V-Ronpa project commands are declared
   explicitly. Branch-local experiments must add catalog entries before they can
   compile to `RuntimeCommand`.
@@ -95,8 +97,8 @@ and merge the change through the integration baseline first.
   visual cues may mark keywords, but they must not define trial rules.
 - `InteractableDef.action` may use `start-trial` to enter an existing
   `TrialDefinition` from Navi exploration. The action is director-owned: it
-  does not mutate gameplay state, and app runtime code creates or restores the
-  `TrialRuntimeState`.
+  does not mutate gameplay state, and Navi/Trial app glue creates or restores
+  the `TrialRuntimeState`.
 
 ## Evidence / Trial Rule Ownership
 

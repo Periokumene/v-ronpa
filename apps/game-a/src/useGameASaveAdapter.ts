@@ -7,7 +7,6 @@ import {
   type StoryRuntimeSnapshot
 } from "@v-ronpa/contracts";
 import { createGameplayState } from "@v-ronpa/gameplay";
-import { selectCurrentStoryLine } from "@v-ronpa/story-engine";
 import { gameAVnEntry } from "./contentManifest";
 
 const GAME_A_SAVE_STORAGE_KEY = "v-ronpa:game-a:saves:v1";
@@ -92,7 +91,8 @@ export function useGameASaveAdapter({
 }
 
 function toSaveSlotSummary(id: string, save: SaveData): SaveSlotSummary {
-  const line = selectCurrentStoryLine(save.vn?.story ?? save.story);
+  const story = save.vn?.story ?? save.story;
+  const line = story.text?.current ?? story.backlog.at(-1);
   return {
     id,
     label: id.replace("slot:game-a:", "Game A "),
