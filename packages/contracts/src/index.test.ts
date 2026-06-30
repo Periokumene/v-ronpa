@@ -70,7 +70,15 @@ describe("contracts", () => {
         {
           id: "style:harness:vn",
           name: "Harness VN",
-          assets: [{ id: "ui:dialog:frame", role: "dialog-frame", assetId: "texture:title:bg", slice: "nine-slice" }],
+          assets: [
+            {
+              id: "ui:dialog:frame",
+              role: "dialog-frame",
+              assetId: "texture:title:bg",
+              slice: "nine-slice",
+              sliceInsets: { top: 36, right: 44, bottom: 36, left: 44 }
+            }
+          ],
           tokens: { accentColor: "#ffd166", panelOpacity: 0.82, motionScale: 1 }
         }
       ],
@@ -868,9 +876,19 @@ describe("contracts", () => {
         id: "ui:button:frame",
         role: "button-frame",
         assetId: "texture:evidence:keycard-icon",
-        slice: "nine-slice"
+        slice: "nine-slice",
+        sliceInsets: { top: 12, right: 16, bottom: 12, left: 16 }
       })
-    ).toMatchObject({ role: "button-frame", tags: [] });
+    ).toMatchObject({ role: "button-frame", sliceInsets: { top: 12, right: 16, bottom: 12, left: 16 }, tags: [] });
+    expect(() =>
+      UiAssetRefSchema.parse({
+        id: "ui:panel:bg",
+        role: "panel-background",
+        assetId: "texture:evidence:keycard-icon",
+        slice: "stretch",
+        sliceInsets: { top: 12, right: 16, bottom: 12, left: 16 }
+      })
+    ).toThrow();
 
     expect(
       InteractionStyleProfileSchema.parse({

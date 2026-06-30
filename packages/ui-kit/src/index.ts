@@ -21,6 +21,7 @@ export {
   RuntimeToastLayer
 } from "./surfaces/RuntimeUiSurfaces";
 export { ScenarioTabs } from "./surfaces/ScenarioTabs";
+export { SurfaceFrame } from "./surfaces/SurfaceFrame";
 export { VnChoiceOverlay } from "./surfaces/VnChoiceOverlay";
 export { VnDialogSurface } from "./surfaces/VnDialogSurface";
 export type {
@@ -30,9 +31,11 @@ export type {
   SaveLoadOverlayProps,
   SettingsOverlayProps,
   TitleSurfaceProps,
+  VnCommandBarCommand,
   VnCommandBarProps
 } from "./surfaces/GameInteractionSurfaces";
 export type { InspectorLiteProps, ScenarioOption } from "./surfaces/types";
+export type { SurfaceFrameInteraction, SurfaceFrameProps } from "./surfaces/SurfaceFrame";
 export type {
   RuntimeInputPromptProps,
   RuntimeMovieOverlayProps,

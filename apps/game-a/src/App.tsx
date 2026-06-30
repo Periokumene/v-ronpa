@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
@@ -14,6 +14,9 @@ import { useGameAFlowActor } from "./useGameAFlowActor";
 import { useGameAOverlayAdapters } from "./useGameAOverlayAdapters";
 import { useGameASaveAdapter } from "./useGameASaveAdapter";
 import { useGameAVnRuntime } from "./useGameAVnRuntime";
+import { createGameASurfaces } from "./ui/GameASurfaces";
+import { gameAUiConfig } from "./ui/gameAUiConfig";
+import { resolveGameAUiAssets } from "./ui/resolveGameAUiAssets";
 
 export function App() {
   const flow = useGameAFlowActor();
@@ -38,6 +41,15 @@ export function App() {
     onLoad: runtime.restoreFromSave
   });
   const overlayPages = useGameAOverlayAdapters({ flow, runtime, save, settings });
+  const gameAUiAssets = useMemo(() => resolveGameAUiAssets(assetRegistry, gameAUiConfig), [assetRegistry]);
+  const gameASurfaces = useMemo(
+    () => createGameASurfaces({ assets: gameAUiAssets, config: gameAUiConfig }),
+    [gameAUiAssets]
+  );
+
+  useEffect(() => {
+    gameAUiAssets.diagnostics.forEach(runtime.observeAssetDiagnostic);
+  }, [gameAUiAssets.diagnostics, runtime.observeAssetDiagnostic]);
 
   return (
     <main className="game-a-shell">
@@ -48,6 +60,7 @@ export function App() {
           formatStorySpeaker={displaySpeaker}
           overlayPages={overlayPages}
           runtime={runtime}
+          surfaces={gameASurfaces}
         >
           <div className="game-a-scene" data-testid="game-a-vn-shell">
             <VnRuntimeDispatcher

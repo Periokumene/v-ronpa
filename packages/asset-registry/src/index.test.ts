@@ -85,7 +85,16 @@ describe("asset registry", () => {
         { id: "font:wrong-kind", family: "Wrong", sourceRef: "sfx:wrong-kind", weight: "400", style: "normal" }
       ],
       assets: [{ id: "model:academy-hall", kind: "glb", tags: [] }],
-      uiAssets: [{ id: "ui:toolbar:icon", role: "toolbar-icon", assetId: "texture:evidence:keycard-thumbnail", slice: "stretch", tags: [] }],
+      uiAssets: [
+        {
+          id: "ui:toolbar:icon",
+          role: "toolbar-icon",
+          assetId: "texture:evidence:keycard-thumbnail",
+          slice: "nine-slice",
+          sliceInsets: { top: 8, right: 8, bottom: 8, left: 8 },
+          tags: []
+        }
+      ],
       interactionStyles: [
         {
           id: "style:harness",

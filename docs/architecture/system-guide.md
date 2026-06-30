@@ -41,7 +41,11 @@ adapters and apps
   overlay stack, and interaction capability policy.
 - `GameInteractionShell` in `packages/app-vn-shell` wires app adapters to
   title, overlay, VN toolbar, save/load, backlog, settings, and pause menu
-  surfaces. It is app-layer orchestration, not a gameplay director.
+  surfaces. It derives narrow ViewModels, mounts Surface slots that receive
+  `{ model, actions }`, and falls back per slot to the default preset when an
+  app does not provide a custom Surface. It is app-layer orchestration, not a
+  gameplay director, and must not absorb Story/reveal/AUTO/SKIP/voice/Pixi
+  wait responsibilities from `app-vn-runtime` or `story-play`.
 - `navi-director` owns Navi substates: `walk`, `interacting`, `vn2d-overlay`,
   `inventory`, and `event`.
 - `trial-director` owns Trial segment flow, presentation profile selection,
@@ -95,7 +99,9 @@ adapters and apps
   presenter traces used for adapter tests and inspection.
 - `ui-kit` owns DOM overlays, text-heavy surfaces, controls, and Inspector Lite.
   Settings UI components stay pure and controlled; app adapters own settings
-  state, persistence, and runtime derivation.
+  state, persistence, and runtime derivation. Reusable `ui-kit` components do
+  not read full runtime/flow objects, app paths, or `AssetRegistry`; VM-bound
+  shell defaults are composed at the `app-vn-shell` boundary.
 
 ## Mode Model
 
@@ -173,7 +179,7 @@ submission remains a Trial UI action routed through `trial-director`.
   -> app-created AssetRegistry resolves media/Pixi/R3F/UI asset ids
   -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events / AudioPort voice or bleep playback
   -> VnRuntimeDispatcher renders the Pixi snapshot
-  -> GameInteractionShell renders DOM dialog, choices, toolbar, and runtime overlays
+  -> GameInteractionShell creates ViewModels and renders DOM Surface slots
 ```
 
 Dialogue lines may include one `|#textId|` marker. The marker is parser

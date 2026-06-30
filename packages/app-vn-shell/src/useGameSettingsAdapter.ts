@@ -9,7 +9,7 @@ import {
   defaultStoryPlayTimingPolicy,
   type StoryPlayTimingPolicy
 } from "@v-ronpa/story-play";
-import type { VnDialogDisplaySettings } from "@v-ronpa/ui-kit";
+import type { VnDialogDisplaySettings } from "./GameInteractionViewModels";
 
 export const GAME_SETTINGS_STORAGE_KEY = "v-ronpa:settings:v1";
 export const GAME_SETTINGS_WRITE_DEBOUNCE_MS = 120;
