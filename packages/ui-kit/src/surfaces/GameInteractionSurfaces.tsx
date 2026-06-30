@@ -43,32 +43,30 @@ export function TitleSurface({ capabilities, onAction, title = "V-Ronpa" }: Titl
 }
 
 export interface VnCommandBarProps {
-  capabilities: InteractionCapabilitySnapshot;
-  activeActions?: Partial<Record<GameUiAction, boolean>>;
+  commands: VnCommandBarCommand[];
   onAction: (action: GameUiAction) => void;
 }
 
-export function VnCommandBar({ activeActions = {}, capabilities, onAction }: VnCommandBarProps) {
-  const commands: Array<{ action: GameUiAction; label: string; enabled: boolean; testId: string }> = [
-    { action: "open-backlog", label: "LOG", enabled: capabilities.canOpenBacklog, testId: "vn-command-backlog" },
-    { action: "toggle-skip", label: "SKIP", enabled: capabilities.canSkip, testId: "vn-command-skip" },
-    { action: "toggle-auto", label: "AUTO", enabled: capabilities.canAuto, testId: "vn-command-auto" },
-    { action: "open-save", label: "SAVE", enabled: capabilities.canSave, testId: "vn-command-save" },
-    { action: "open-load", label: "LOAD", enabled: capabilities.canLoad, testId: "vn-command-load" },
-    { action: "open-settings", label: "SETTING", enabled: capabilities.canOpenSettings, testId: "vn-command-settings" }
-  ];
+export interface VnCommandBarCommand {
+  action: GameUiAction;
+  label: string;
+  enabled: boolean;
+  testId: string;
+  active?: boolean;
+  toggle: boolean;
+}
 
+export function VnCommandBar({ commands, onAction }: VnCommandBarProps) {
   return (
     <Tooltip.Provider delayDuration={120}>
       <nav aria-label="VN command bar" data-testid="vn-command-bar" style={commandBarStyle}>
         {commands.map((command) => {
-          const active = Boolean(activeActions[command.action]);
-          const toggleCommand = command.action === "toggle-auto" || command.action === "toggle-skip";
+          const active = Boolean(command.active);
           return (
             <Tooltip.Root key={command.testId}>
               <Tooltip.Trigger asChild>
                 <button
-                  {...(toggleCommand ? { "aria-pressed": active } : {})}
+                  {...(command.toggle ? { "aria-pressed": active } : {})}
                   data-testid={command.testId}
                   disabled={!command.enabled}
                   onClick={() => onAction(command.action)}

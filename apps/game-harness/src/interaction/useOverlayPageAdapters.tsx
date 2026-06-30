@@ -1,17 +1,12 @@
-import type { ReactNode } from "react";
 import {
   createVnSaveLoadOverlayModel,
   overlayKindForVnShellAction,
   shouldStopVnShellAutomationForAction,
+  type GameInteractionOverlayActions,
+  type GameInteractionOverlayViewModelInputs,
   type useGameSettingsAdapter
 } from "@v-ronpa/app-vn-shell";
 import type { GameOverlayKind, GameUiAction } from "@v-ronpa/contracts";
-import {
-  PauseMenuOverlay,
-  ReadOnlyBacklogOverlay,
-  SaveLoadOverlay,
-  SettingsOverlay
-} from "@v-ronpa/ui-kit";
 import type { useGameFlowActor } from "./useGameFlowActor";
 import type { useHarnessShowcaseRuntimeAdapter } from "./useHarnessShowcaseRuntimeAdapter";
 import type { useHarnessShowcaseSaveAdapter } from "./useHarnessShowcaseSaveAdapter";
@@ -64,83 +59,74 @@ export function useOverlayPageAdapters({
 
   return {
     dispatchUiAction,
-    renderOverlay(overlay: GameOverlayKind | undefined): ReactNode {
-      if (!overlay) return null;
+    createOverlayViewModelInputs(overlay: GameOverlayKind | undefined): GameInteractionOverlayViewModelInputs {
+      if (!overlay) return {};
+      if (overlay === "vn-save" || overlay === "title-load" || overlay === "vn-load") {
+        return {
+          saveLoad: createVnSaveLoadOverlayModel({
+            canSave: flow.capabilities.canSave,
+            overlay,
+            pendingLoadSlot: save.pendingLoadSlot,
+            slotIds: save.slotIds,
+            slots: save.slots
+          })
+        };
+      }
+      if (overlay === "title-settings" || overlay === "vn-settings") {
+        return { settings: settings.settings };
+      }
+      return {};
+    },
+    createOverlayActions(overlay: GameOverlayKind | undefined): GameInteractionOverlayActions {
+      if (!overlay) return {};
 
       if (overlay === "vn-backlog") {
-        return <ReadOnlyBacklogOverlay entries={runtime.storyRuntime.state.backlog} onClose={flow.closeTopOverlay} />;
+        return { backlog: { close: flow.closeTopOverlay } };
       }
 
       if (overlay === "vn-save") {
-        const model = createVnSaveLoadOverlayModel({
-          canSave: flow.capabilities.canSave,
-          overlay,
-          pendingLoadSlot: save.pendingLoadSlot,
-          slotIds: save.slotIds,
-          slots: save.slots
-        });
-        if (!model) return null;
-        return (
-          <SaveLoadOverlay
-            canSave={model.canSave}
-            mode={model.mode}
-            onCancelLoad={save.cancelLoadSlot}
-            onClose={flow.closeTopOverlay}
-            onConfirmLoad={save.confirmLoadSlot}
-            onRequestLoad={save.requestLoadSlot}
-            onSave={save.saveSlot}
-            pendingLoadSlot={model.pendingLoadSlot}
-            slotIds={model.slotIds}
-            slots={model.slots}
-          />
-        );
+        return {
+          saveLoad: {
+            cancelLoad: save.cancelLoadSlot,
+            close: flow.closeTopOverlay,
+            confirmLoad: save.confirmLoadSlot,
+            requestLoad: save.requestLoadSlot,
+            save: save.saveSlot
+          }
+        };
       }
 
       if (overlay === "title-load" || overlay === "vn-load") {
-        const model = createVnSaveLoadOverlayModel({
-          canSave: flow.capabilities.canSave,
-          overlay,
-          pendingLoadSlot: save.pendingLoadSlot,
-          slotIds: save.slotIds,
-          slots: save.slots
-        });
-        if (!model) return null;
-        return (
-          <SaveLoadOverlay
-            canSave={model.canSave}
-            mode={model.mode}
-            onCancelLoad={save.cancelLoadSlot}
-            onClose={flow.closeTopOverlay}
-            onConfirmLoad={async () => {
+        return {
+          saveLoad: {
+            cancelLoad: save.cancelLoadSlot,
+            close: flow.closeTopOverlay,
+            confirmLoad: async () => {
               await save.confirmLoadSlot();
               flow.send({ type: "ENTER_NAVI" });
               flow.closeAllOverlays();
-            }}
-            onRequestLoad={save.requestLoadSlot}
-            onSave={save.saveSlot}
-            pendingLoadSlot={model.pendingLoadSlot}
-            slotIds={model.slotIds}
-            slots={model.slots}
-          />
-        );
+            },
+            requestLoad: save.requestLoadSlot,
+            save: save.saveSlot
+          }
+        };
       }
 
       if (overlay === "title-settings" || overlay === "vn-settings") {
-        return (
-          <SettingsOverlay
-            onClose={flow.closeTopOverlay}
-            onPatchSettings={settings.patchSettings}
-            onResetSettings={settings.resetSettings}
-            settings={settings.settings}
-          />
-        );
+        return {
+          settings: {
+            close: flow.closeTopOverlay,
+            patchSettings: settings.patchSettings,
+            resetSettings: settings.resetSettings
+          }
+        };
       }
 
       if (overlay === "pause-menu") {
-        return <PauseMenuOverlay capabilities={flow.capabilities} onAction={dispatchUiAction} onClose={flow.closeTopOverlay} />;
+        return { pauseMenu: { close: flow.closeTopOverlay, dispatch: dispatchUiAction } };
       }
 
-      return null;
+      return {};
     }
   };
 }

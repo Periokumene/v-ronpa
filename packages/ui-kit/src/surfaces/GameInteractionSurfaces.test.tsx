@@ -1,7 +1,44 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { createDefaultSettingsSnapshot } from "@v-ronpa/contracts";
-import { SettingsOverlay } from "./GameInteractionSurfaces";
+import { SettingsOverlay, VnCommandBar } from "./GameInteractionSurfaces";
+
+describe("VnCommandBar", () => {
+  it("renders VM-provided commands without deriving state from broader capabilities", () => {
+    const onAction = vi.fn();
+    const element = VnCommandBar({
+      commands: [
+        {
+          action: "toggle-skip",
+          label: "SKIP",
+          enabled: true,
+          active: true,
+          testId: "vn-command-skip",
+          toggle: true
+        },
+        {
+          action: "open-save",
+          label: "SAVE",
+          enabled: false,
+          testId: "vn-command-save",
+          toggle: false
+        }
+      ],
+      onAction
+    });
+
+    const ids = collectPropValues(element, "data-testid", "testId");
+    const skip = findElementByProp(element, "data-testid", "vn-command-skip");
+    const save = findElementByProp(element, "data-testid", "vn-command-save");
+
+    expect(ids).toEqual(expect.arrayContaining(["vn-command-bar", "vn-command-skip", "vn-command-save"]));
+    expect(skip?.props).toMatchObject({ "aria-pressed": true, disabled: false });
+    expect(save?.props).toMatchObject({ disabled: true });
+    expect((save?.props as Record<string, unknown>)["aria-pressed"]).toBeUndefined();
+    (skip?.props as { onClick: () => void }).onClick();
+    expect(onAction).toHaveBeenCalledWith("toggle-skip");
+  });
+});
 
 describe("SettingsOverlay", () => {
   it("is a controlled settings surface without subtitle preview rendering", () => {

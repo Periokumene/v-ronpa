@@ -14,7 +14,8 @@ export const gameAVnEntry = {
     { id: "sfx:game-a-chime", kind: "sfx" as const, tags: ["game-a", "vn"] },
     { id: "bleep:game-a-dialogue", kind: "bleep" as const, tags: ["game-a", "vn"] },
     { id: "voice:zh:game_a_voice_0001", kind: "voice" as const, tags: ["game-a", "vn"] },
-    { id: "video:game-a-intro", kind: "video" as const, tags: ["game-a", "vn"] }
+    { id: "video:game-a-intro", kind: "video" as const, tags: ["game-a", "vn"] },
+    { id: "texture:ui:game-a-dialog-frame", kind: "texture" as const, tags: ["game-a", "ui", "vn"] }
   ]
 };
 
@@ -62,8 +63,38 @@ const gameAContentManifestInput = {
     }
   },
   fonts: [],
-  uiAssets: [],
-  interactionStyles: [],
+  uiAssets: [
+    {
+      id: "ui:game-a-dialog-frame",
+      role: "dialog-frame",
+      assetId: "texture:ui:game-a-dialog-frame",
+      slice: "nine-slice",
+      sliceInsets: { top: 230, right: 190, bottom: 210, left: 190 },
+      tags: ["game-a", "dialog"]
+    }
+  ],
+  interactionStyles: [
+    {
+      id: "style:game-a:vn",
+      name: "Game A VN",
+      assets: [
+        {
+          id: "ui:game-a-dialog-frame",
+          role: "dialog-frame",
+          assetId: "texture:ui:game-a-dialog-frame",
+          slice: "nine-slice",
+          sliceInsets: { top: 230, right: 190, bottom: 210, left: 190 },
+          tags: ["game-a", "dialog"]
+        }
+      ],
+      tokens: {
+        accentColor: "#73e2d3",
+        textColor: "#f7fbff",
+        panelOpacity: 0.82,
+        motionScale: 1
+      }
+    }
+  ],
   runtimeAssets: [
     {
       id: "bg:game-a-room",
@@ -124,6 +155,17 @@ const gameAContentManifestInput = {
       lods: [],
       collisionProxyIds: [],
       tags: ["game-a", "vn"]
+    },
+    {
+      id: "texture:ui:game-a-dialog-frame",
+      kind: "texture",
+      sourceUri: "imagegen:019f17d7-f0a0-7821-9d5d-1b494ae8971e",
+      optimizedUri: "/game-a/ui/dialog-frame.png",
+      format: "png",
+      compression: [],
+      lods: [],
+      collisionProxyIds: [],
+      tags: ["game-a", "ui", "vn"]
     }
   ],
   collisionProxies: [],

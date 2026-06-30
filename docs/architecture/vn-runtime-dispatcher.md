@@ -24,6 +24,13 @@ VN runtime output is split across shared app-layer packages and render surfaces:
   display, choice overlay, command bar, toast, input prompt, and movie overlay.
   Dialog text and choices come from committed Story/app runtime state, not from
   command stream replay.
+- `GameInteractionShell` derives narrow ViewModels for dialog, choices,
+  command bar, title, toast layer, input prompt, backlog, save/load, settings,
+  and pause menu, then mounts Surface slots that receive only `{ model,
+  actions }`. Apps may replace any slot independently; omitted slots fall back
+  to the shared default preset. `RuntimeMovieOverlaySurface` and
+  `GameOverlayHost` remain shell infrastructure, not app-replaceable Surface
+  slots in this pass.
 
 ## Ownership
 
@@ -62,6 +69,12 @@ VN runtime output is split across shared app-layer packages and render surfaces:
   committed app runtime state. Script-controlled `showUI` / `hideUI` visibility
   applies only to concrete runtime UI surfaces, not shell overlays, debug
   readouts, or Pixi.
+- `GameInteractionShell` remains an orchestration layer: it updates flow
+  context, handles ESC close/pause behavior, mounts the VN advance hit plane,
+  gates choices, dispatches command actions, submits input prompts, dismisses
+  toasts, and mounts Surface slots. It does not own story stepping policy,
+  dialog reveal timers, AUTO/SKIP scheduling, voice gates, movie playback, Pixi
+  waits, save persistence, or app flow policy.
 - In primary VN and Navi VN2D, `GameInteractionShell` also owns the transparent
   manual-advance hit plane. It is app-layer orchestration, not a shared input
   system. The hit plane exists only while story is active and not ended, with
@@ -90,6 +103,11 @@ VN runtime output is split across shared app-layer packages and render surfaces:
   other accessibility-sensitive surfaces. The VN dialog display and choice
   selection are separate DOM surfaces: `VnDialogSurface` renders speaker/text
   only, while `VnChoiceOverlay` renders pending choices above the dialog.
+- `ui-kit` provides reusable controlled DOM surfaces and primitives such as
+  rich text rendering, command controls, overlay panels, and default
+  presentation components. The VM-bound default preset lives at the
+  `app-vn-shell` boundary so `ui-kit` does not depend on app shell ViewModel
+  types or read full runtime/flow state.
 - Pixi owns VN/trial 2D effects, backgrounds, layered characters, filters,
   particles, and fast 2D overlays.
 - R3F owns 3D staging, camera rigs, and spatial interaction.
@@ -99,6 +117,11 @@ VN runtime output is split across shared app-layer packages and render surfaces:
   resolver to Pixi; and app glue such as the harness first-person bridge passes
   it to R3F. Low-level ports such as Howler and HTML video receive only
   already-resolved URLs.
+- App-specific UI skins resolve texture ids through the same app-created
+  `AssetRegistry` before passing URLs into custom Surface components. UI
+  components must not hardcode app public paths; missing skin assets should
+  surface diagnostics and use CSS fallback chrome rather than substituting a
+  hidden default texture.
 
 ## Route Table
 
@@ -259,6 +282,12 @@ longer imports `app-vn-session`, `app-vn-dispatch`, `story-play`, StoryEngine,
 or Pixi runtime helpers from app source. Its save adapter is localStorage-backed
 and stores VN story plus Pixi stage snapshots for the Game A entry. Game A owns
 its own minimal bgm/sfx/bleep/voice/video resources under `apps/game-a/public`.
+Game A also owns an app UI skin layer that creates custom `GameInteractionShell`
+Surfaces for dialog, choices, command bar, title, backlog, save/load, settings,
+pause, toast, and input prompt. The dialog frame texture is registered as a
+`RuntimeAsset` and `uiAssets` `dialog-frame` entry. Game A resolves the
+`uiAssets.role` entry through its app-created `AssetRegistry`, then passes the
+resolved URL and UI metadata to the custom dialog Surface.
 
 ## Harness Showcase Migration
 
@@ -272,6 +301,9 @@ The harness-showcase harness uses:
 - `GameInteractionShell` for VN advance hit plane, dialog display, choice
   overlay, command bar, toast, input prompt, movie overlay, and durable shell
   overlay mounting.
+- The default `GameInteractionShell` Surface preset; the harness does not pass
+  game-specific custom Surfaces and remains the compatibility baseline for apps
+  that do not customize UI skin slots.
 - `PixiStageSnapshot` as the saveable terminal state for VN 2D staging.
 - `InspectorLite` debug counters derived from the latest emitted command batch,
   not from a cumulative presentation log.
@@ -290,15 +322,18 @@ rules to `story-play`. The Pixi active task debug list must not be used to
 enable or disable these controls.
 
 `vnShellActions` contains pure action-to-overlay and save/load model helpers.
-App-owned overlay/page adapters call those helpers and render concrete `ui-kit`
-overlay pages with app-specific save/load data collection.
+App-owned overlay/page adapters provide app save/settings data as overlay
+ViewModel inputs and bind app-specific actions such as save, load, settings
+patches, and title return. `GameInteractionShell` derives the final overlay
+ViewModels, selects the active overlay Surface slot, and mounts it with the
+adapter-provided actions.
 
 `apps/game-harness/src/interaction` is harness-only wiring:
 `useGameFlowActor` adapts `game-flow-machine`,
 `useHarnessShowcaseRuntimeAdapter` binds showcase fixtures to shared VN runtime,
 Navi, Trial, R3F, and debug state, `useHarnessShowcaseSaveAdapter` owns harness
-save collection and slot policy, and `useOverlayPageAdapters` renders
-app-specific overlay pages using `ui-kit` plus `app-vn-shell` helpers. These
+save collection and slot policy, and `useOverlayPageAdapters` provides
+overlay ViewModel inputs and app-specific overlay actions. These
 hooks must not move into `packages/app-vn-runtime`, `packages/app-vn-dispatch`,
 or `packages/app-vn-shell`; shared VN loop behavior belongs in
 `packages/app-vn-runtime`.

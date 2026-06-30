@@ -1,65 +1,54 @@
 import { useEffect, type CSSProperties, type ReactNode } from "react";
-import type {
-  GameInteractionContext,
-  GameMode,
-  GameOverlayKind,
-  GameUiAction,
-  InteractionCapabilitySnapshot,
-  NaviSubstate,
-  RichTextDocument
-} from "@v-ronpa/contracts";
-import type { UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
-import { selectCurrentStoryLine } from "@v-ronpa/story-engine";
-import type { StoryRuntimeState } from "@v-ronpa/story-engine";
-import type { StoryPlayAdvanceSource } from "@v-ronpa/story-play";
+import type { GameMode, GameOverlayKind, GameUiAction, NaviSubstate } from "@v-ronpa/contracts";
 import {
   GameOverlayHost,
+  PauseMenuOverlay,
+  ReadOnlyBacklogOverlay,
   RuntimeInputPromptSurface,
   RuntimeMovieOverlaySurface,
   RuntimeToastLayer,
+  SaveLoadOverlay,
+  SettingsOverlay,
   TitleSurface,
   VnChoiceOverlay,
   VnCommandBar,
-  VnDialogSurface,
-  type VnDialogDisplaySettings
+  VnDialogSurface
 } from "@v-ronpa/ui-kit";
-
-export interface GameFlowShellAdapter {
-  activeOverlay: GameOverlayKind | undefined;
-  capabilities: InteractionCapabilitySnapshot;
-  mode: GameMode;
-  closeTopOverlay(): void;
-  send(event: { type: string; [key: string]: unknown }): void;
-}
+import {
+  createGameInteractionShellViewModels,
+  type BacklogOverlayActions,
+  type BacklogOverlayViewModel,
+  type GameInteractionOverlayActions,
+  type GameInteractionOverlayViewModelInputs,
+  type GameFlowShellAdapter,
+  type GameInteractionShellSurfaces,
+  type GameInteractionShellViewModels,
+  type PauseMenuOverlayActions,
+  type PauseMenuOverlayViewModel,
+  type RuntimeInputPromptActions,
+  type RuntimeInputPromptViewModel,
+  type RuntimeToastActions,
+  type RuntimeToastLayerViewModel,
+  type SaveLoadOverlayActions,
+  type SaveLoadOverlayViewModel,
+  type SettingsOverlayActions,
+  type SettingsOverlayViewModel,
+  type SurfaceSlotProps,
+  type TitleActions,
+  type TitleViewModel,
+  type VnChoicesActions,
+  type VnChoicesViewModel,
+  type VnCommandBarActions,
+  type VnCommandBarViewModel,
+  type VnDialogDisplaySettings,
+  type VnDialogViewModel,
+  type VnShellRuntimeAdapter
+} from "./GameInteractionViewModels";
 
 export interface OverlayPageShellAdapter {
+  createOverlayViewModelInputs?(overlay: GameOverlayKind | undefined): GameInteractionOverlayViewModelInputs;
+  createOverlayActions?(overlay: GameOverlayKind | undefined): GameInteractionOverlayActions;
   dispatchUiAction(action: GameUiAction): void;
-  renderOverlay(overlay: GameOverlayKind | undefined): ReactNode;
-}
-
-export interface VnShellRuntimeAdapter {
-  advanceStory(source?: StoryPlayAdvanceSource): void;
-  attachMovieElement(element: HTMLVideoElement | null): void;
-  chooseStory(index: number): void;
-  completeMoviePlayback(): void;
-  dialogRevealRuntime: {
-    visibleRichText?: RichTextDocument | undefined;
-    visibleText?: string | undefined;
-  };
-  dismissRuntimeToast(toastId: string): void;
-  interactionContext: GameInteractionContext;
-  navi?: {
-    substate?: NaviSubstate | undefined;
-  };
-  storyPlayActiveActions: Partial<Record<GameUiAction, boolean>>;
-  storyRuntime: {
-    active: boolean;
-    state: StoryRuntimeState;
-  };
-  submitStoryInput(value: string | number | boolean): void;
-  uiRuntime: {
-    state: UiRuntimeState;
-  };
 }
 
 const VN_SHELL_LAYER_Z_INDEX = {
@@ -104,7 +93,8 @@ export function GameInteractionShell({
   flow,
   formatStorySpeaker,
   overlayPages,
-  runtime
+  runtime,
+  surfaces
 }: {
   children: ReactNode;
   dialogDisplay?: VnDialogDisplaySettings;
@@ -112,6 +102,7 @@ export function GameInteractionShell({
   formatStorySpeaker?: (speaker: string) => string;
   overlayPages: OverlayPageShellAdapter;
   runtime: VnShellRuntimeAdapter;
+  surfaces?: Partial<GameInteractionShellSurfaces>;
 }) {
   useEffect(() => {
     const { overlayStack: _overlayStack, ...runtimeContext } = runtime.interactionContext;
@@ -152,15 +143,21 @@ export function GameInteractionShell({
     runtime.uiRuntime.state.movieOverlay
   ]);
 
-  const currentLine =
-    runtime.storyRuntime.active && flow.mode !== "title" && runtime.uiRuntime.state.visible.dialog
-      ? selectCurrentStoryLine(runtime.storyRuntime.state)
-      : undefined;
-  const speaker = currentLine?.speaker && formatStorySpeaker ? formatStorySpeaker(currentLine.speaker) : currentLine?.speaker;
-  const dialogText = runtime.dialogRevealRuntime.visibleText ?? currentLine?.text;
-  const dialogRichText = runtime.dialogRevealRuntime.visibleRichText ?? currentLine?.richText;
+  const resolvedSurfaces = resolveGameInteractionShellSurfaces(surfaces);
+  const overlayModelInputs = overlayPages.createOverlayViewModelInputs?.(flow.activeOverlay);
+  const overlayActions = createGameInteractionOverlayActions({
+    closeTopOverlay: flow.closeTopOverlay,
+    dispatchUiAction: overlayPages.dispatchUiAction,
+    overlayActions: overlayPages.createOverlayActions?.(flow.activeOverlay)
+  });
+  const models = createGameInteractionShellViewModels({
+    ...(dialogDisplay ? { dialogDisplay } : {}),
+    flow,
+    ...(formatStorySpeaker ? { formatStorySpeaker } : {}),
+    ...(overlayModelInputs ? { overlayModels: overlayModelInputs } : {}),
+    runtime
+  });
   const storyHasChoices = runtime.storyRuntime.state.pendingChoices.length > 0;
-  const dialogState = runtime.storyRuntime.state.ended ? "ended" : storyHasChoices ? "choices" : "line";
   const showAdvanceHitPlane = shouldRenderVnAdvanceHitPlane({
     flowMode: flow.mode,
     hasActiveOverlay: Boolean(flow.activeOverlay),
@@ -171,35 +168,26 @@ export function GameInteractionShell({
     storyEnded: runtime.storyRuntime.state.ended,
     storyHasChoices
   });
-  const showChoices =
-    runtime.storyRuntime.active &&
-    (flow.mode === "vn" || (flow.mode === "navi" && runtime.navi?.substate === "vn2d-overlay")) &&
-    !runtime.storyRuntime.state.ended &&
-    storyHasChoices;
 
   return (
     <>
       {children}
       {showAdvanceHitPlane ? <VnAdvanceHitPlane onAdvance={() => runtime.advanceStory("manual")} /> : null}
-      {currentLine ? (
-        <VnDialogSurface
-          {...(speaker ? { speaker } : {})}
-          text={dialogText ?? currentLine.text}
-          {...(dialogRichText ? { richText: dialogRichText } : {})}
-          {...(dialogDisplay ? { displaySettings: dialogDisplay } : {})}
-          state={dialogState}
+      {models.dialog ? <resolvedSurfaces.Dialog model={models.dialog} actions={{}} /> : null}
+      {models.choices ? (
+        <resolvedSurfaces.Choices
+          model={models.choices}
+          actions={{ choose: (index) => runtime.chooseStory(index) }}
         />
       ) : null}
-      {showChoices ? <VnChoiceOverlay choices={runtime.storyRuntime.state.pendingChoices} onChoice={runtime.chooseStory} /> : null}
-      {runtime.storyRuntime.active && flow.mode !== "title" && runtime.uiRuntime.state.visible.commandBar ? (
-        <VnCommandBar
-          activeActions={runtime.storyPlayActiveActions}
-          capabilities={flow.capabilities}
-          onAction={overlayPages.dispatchUiAction}
+      {models.commandBar ? (
+        <resolvedSurfaces.CommandBar
+          model={models.commandBar}
+          actions={{ dispatch: overlayPages.dispatchUiAction }}
         />
       ) : null}
-      {runtime.uiRuntime.state.inputPrompt ? (
-        <RuntimeInputPromptSurface {...runtime.uiRuntime.state.inputPrompt} onSubmit={runtime.submitStoryInput} />
+      {models.inputPrompt ? (
+        <resolvedSurfaces.InputPrompt model={models.inputPrompt} actions={{ submit: runtime.submitStoryInput }} />
       ) : null}
       {runtime.uiRuntime.state.movieOverlay ? (
         <RuntimeMovieOverlaySurface
@@ -209,15 +197,160 @@ export function GameInteractionShell({
           onVideoElement={runtime.attachMovieElement}
         />
       ) : null}
-      <RuntimeToastLayer
-        onDismiss={runtime.dismissRuntimeToast}
-        visible={runtime.uiRuntime.state.visible.toastLayer}
-        toasts={runtime.uiRuntime.state.toasts}
-      />
-      {flow.mode === "title" ? <TitleSurface capabilities={flow.capabilities} onAction={overlayPages.dispatchUiAction} /> : null}
-      <GameOverlayHost activeOverlay={flow.activeOverlay}>{overlayPages.renderOverlay(flow.activeOverlay)}</GameOverlayHost>
+      {models.toastLayer ? (
+        <resolvedSurfaces.ToastLayer
+          model={models.toastLayer}
+          actions={{ dismiss: runtime.dismissRuntimeToast }}
+        />
+      ) : null}
+      {models.title ? (
+        <resolvedSurfaces.Title model={models.title} actions={{ dispatch: overlayPages.dispatchUiAction }} />
+      ) : null}
+      <GameOverlayHost activeOverlay={flow.activeOverlay}>
+        {renderGameInteractionOverlaySurface({
+          actions: overlayActions,
+          models,
+          overlay: flow.activeOverlay,
+          surfaces: resolvedSurfaces
+        })}
+      </GameOverlayHost>
     </>
   );
+}
+
+export function createGameInteractionOverlayActions({
+  closeTopOverlay,
+  dispatchUiAction,
+  overlayActions
+}: {
+  closeTopOverlay: () => void;
+  dispatchUiAction: (action: GameUiAction) => void;
+  overlayActions?: GameInteractionOverlayActions | undefined;
+}): GameInteractionOverlayActions {
+  return {
+    backlog: { close: closeTopOverlay, ...overlayActions?.backlog },
+    saveLoad: overlayActions?.saveLoad,
+    settings: overlayActions?.settings,
+    pauseMenu: { close: closeTopOverlay, dispatch: dispatchUiAction, ...overlayActions?.pauseMenu }
+  };
+}
+
+export function renderGameInteractionOverlaySurface({
+  actions,
+  models,
+  overlay,
+  surfaces
+}: {
+  actions: GameInteractionOverlayActions;
+  models: GameInteractionShellViewModels;
+  overlay: GameOverlayKind | undefined;
+  surfaces: GameInteractionShellSurfaces;
+}): ReactNode {
+  if (!overlay) return null;
+  if (overlay === "vn-backlog") {
+    if (!models.backlog || !actions.backlog) return null;
+    return <surfaces.BacklogOverlay model={models.backlog} actions={actions.backlog} />;
+  }
+  if (overlay === "vn-save" || overlay === "vn-load" || overlay === "title-load") {
+    if (!models.saveLoad || !actions.saveLoad) return null;
+    return <surfaces.SaveLoadOverlay model={models.saveLoad} actions={actions.saveLoad} />;
+  }
+  if (overlay === "title-settings" || overlay === "vn-settings") {
+    if (!models.settings || !actions.settings) return null;
+    return <surfaces.SettingsOverlay model={models.settings} actions={actions.settings} />;
+  }
+  if (overlay === "pause-menu") {
+    if (!models.pauseMenu || !actions.pauseMenu) return null;
+    return <surfaces.PauseMenuOverlay model={models.pauseMenu} actions={actions.pauseMenu} />;
+  }
+  return null;
+}
+
+export const defaultGameInteractionShellSurfaces: GameInteractionShellSurfaces = {
+  Dialog: DefaultDialogSurface,
+  Choices: DefaultChoicesSurface,
+  CommandBar: DefaultCommandBarSurface,
+  Title: DefaultTitleSurface,
+  ToastLayer: DefaultToastLayerSurface,
+  InputPrompt: DefaultInputPromptSurface,
+  BacklogOverlay: DefaultBacklogOverlaySurface,
+  SaveLoadOverlay: DefaultSaveLoadOverlaySurface,
+  SettingsOverlay: DefaultSettingsOverlaySurface,
+  PauseMenuOverlay: DefaultPauseMenuOverlaySurface
+};
+
+export function resolveGameInteractionShellSurfaces(
+  surfaces: Partial<GameInteractionShellSurfaces> | undefined
+): GameInteractionShellSurfaces {
+  return { ...defaultGameInteractionShellSurfaces, ...surfaces };
+}
+
+function DefaultDialogSurface({ model }: SurfaceSlotProps<VnDialogViewModel>) {
+  return (
+    <VnDialogSurface
+      {...(model.speakerLabel ? { speaker: model.speakerLabel } : {})}
+      text={model.text}
+      {...(model.richText ? { richText: model.richText } : {})}
+      {...(model.display ? { displaySettings: model.display } : {})}
+      state={model.state}
+    />
+  );
+}
+
+function DefaultChoicesSurface({ actions, model }: SurfaceSlotProps<VnChoicesViewModel, VnChoicesActions>) {
+  return <VnChoiceOverlay choices={model.choices} onChoice={actions.choose} />;
+}
+
+function DefaultCommandBarSurface({ actions, model }: SurfaceSlotProps<VnCommandBarViewModel, VnCommandBarActions>) {
+  return <VnCommandBar commands={model.commands} onAction={actions.dispatch} />;
+}
+
+function DefaultTitleSurface({ actions, model }: SurfaceSlotProps<TitleViewModel, TitleActions>) {
+  return <TitleSurface capabilities={model.capabilities} onAction={actions.dispatch} title={model.title} />;
+}
+
+function DefaultToastLayerSurface({ actions, model }: SurfaceSlotProps<RuntimeToastLayerViewModel, RuntimeToastActions>) {
+  return <RuntimeToastLayer onDismiss={actions.dismiss} visible={model.visible} toasts={model.toasts} />;
+}
+
+function DefaultInputPromptSurface({ actions, model }: SurfaceSlotProps<RuntimeInputPromptViewModel, RuntimeInputPromptActions>) {
+  return <RuntimeInputPromptSurface {...model.prompt} onSubmit={actions.submit} />;
+}
+
+function DefaultBacklogOverlaySurface({ actions, model }: SurfaceSlotProps<BacklogOverlayViewModel, BacklogOverlayActions>) {
+  return <ReadOnlyBacklogOverlay entries={model.entries} onClose={actions.close} />;
+}
+
+function DefaultSaveLoadOverlaySurface({ actions, model }: SurfaceSlotProps<SaveLoadOverlayViewModel, SaveLoadOverlayActions>) {
+  return (
+    <SaveLoadOverlay
+      canSave={model.canSave}
+      mode={model.mode}
+      onCancelLoad={actions.cancelLoad}
+      onClose={actions.close}
+      onConfirmLoad={actions.confirmLoad}
+      onRequestLoad={actions.requestLoad}
+      onSave={actions.save}
+      pendingLoadSlot={model.pendingLoadSlot}
+      slotIds={model.slotIds}
+      slots={model.slots}
+    />
+  );
+}
+
+function DefaultSettingsOverlaySurface({ actions, model }: SurfaceSlotProps<SettingsOverlayViewModel, SettingsOverlayActions>) {
+  return (
+    <SettingsOverlay
+      onClose={actions.close}
+      onPatchSettings={actions.patchSettings}
+      onResetSettings={actions.resetSettings}
+      settings={model.settings}
+    />
+  );
+}
+
+function DefaultPauseMenuOverlaySurface({ actions, model }: SurfaceSlotProps<PauseMenuOverlayViewModel, PauseMenuOverlayActions>) {
+  return <PauseMenuOverlay capabilities={model.capabilities} onAction={actions.dispatch} onClose={actions.close} />;
 }
 
 function VnAdvanceHitPlane({ onAdvance }: { onAdvance: () => void }) {

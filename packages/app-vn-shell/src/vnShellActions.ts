@@ -1,12 +1,7 @@
 import type { GameMode, GameOverlayKind, GameUiAction, SaveSlotSummary } from "@v-ronpa/contracts";
+import type { SaveLoadOverlayViewModel } from "./GameInteractionViewModels";
 
-export interface VnSaveLoadOverlayModel {
-  mode: "save" | "load";
-  slotIds: string[];
-  slots: SaveSlotSummary[];
-  canSave: boolean;
-  pendingLoadSlot: SaveSlotSummary | undefined;
-}
+export type VnSaveLoadOverlayModel = Omit<SaveLoadOverlayViewModel, "visible">;
 
 export function overlayKindForVnShellAction(action: GameUiAction, mode: GameMode): GameOverlayKind | undefined {
   if (action === "open-load") return mode === "title" ? "title-load" : "vn-load";

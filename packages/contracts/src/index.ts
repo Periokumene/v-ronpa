@@ -965,13 +965,33 @@ export const UiAssetRoleSchema = z.enum([
 ]);
 export type UiAssetRole = z.infer<typeof UiAssetRoleSchema>;
 
-export const UiAssetRefSchema = z.object({
-  id: IdSchema,
-  role: UiAssetRoleSchema,
-  assetId: IdSchema,
-  slice: z.enum(["stretch", "nine-slice", "tile"]).default("stretch"),
-  tags: z.array(z.string()).default([])
-}).strict();
+export const UiAssetRefSchema = z
+  .object({
+    id: IdSchema,
+    role: UiAssetRoleSchema,
+    assetId: IdSchema,
+    slice: z.enum(["stretch", "nine-slice", "tile"]).default("stretch"),
+    sliceInsets: z
+      .object({
+        top: z.number().nonnegative(),
+        right: z.number().nonnegative(),
+        bottom: z.number().nonnegative(),
+        left: z.number().nonnegative()
+      })
+      .strict()
+      .optional(),
+    tags: z.array(z.string()).default([])
+  })
+  .strict()
+  .superRefine((asset, ctx) => {
+    if (asset.sliceInsets && asset.slice !== "nine-slice") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["sliceInsets"],
+        message: "sliceInsets can only be used when slice is 'nine-slice'."
+      });
+    }
+  });
 export type UiAssetRef = z.infer<typeof UiAssetRefSchema>;
 
 export const InteractionStyleProfileSchema = z.object({

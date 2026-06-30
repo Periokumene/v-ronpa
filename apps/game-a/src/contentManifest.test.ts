@@ -18,7 +18,8 @@ describe("game-a content manifest", () => {
           { id: "sfx:game-a-chime", kind: "sfx", tags: ["game-a", "vn"] },
           { id: "bleep:game-a-dialogue", kind: "bleep", tags: ["game-a", "vn"] },
           { id: "voice:zh:game_a_voice_0001", kind: "voice", tags: ["game-a", "vn"] },
-          { id: "video:game-a-intro", kind: "video", tags: ["game-a", "vn"] }
+          { id: "video:game-a-intro", kind: "video", tags: ["game-a", "vn"] },
+          { id: "texture:ui:game-a-dialog-frame", kind: "texture", tags: ["game-a", "ui", "vn"] }
         ])
       })
     ]);
@@ -30,5 +31,14 @@ describe("game-a content manifest", () => {
       "/game-a/media/voice/zh/game_a_voice_0001.ogg"
     );
     expect(registry.url({ id: "video:game-a-intro", kind: "video" })).toBe("/game-a/media/video/intro.mp4");
+    expect(registry.url({ id: "texture:ui:game-a-dialog-frame", kind: "texture" })).toBe(
+      "/game-a/ui/dialog-frame.png"
+    );
+    expect(gameAContentManifest.uiAssets[0]).toMatchObject({
+      id: "ui:game-a-dialog-frame",
+      role: "dialog-frame",
+      slice: "nine-slice",
+      sliceInsets: { top: 230, right: 190, bottom: 210, left: 190 }
+    });
   });
 });

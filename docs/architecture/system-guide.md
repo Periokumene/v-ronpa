@@ -41,7 +41,13 @@ adapters and apps
   overlay stack, and interaction capability policy.
 - `GameInteractionShell` in `packages/app-vn-shell` wires app adapters to
   title, overlay, VN toolbar, save/load, backlog, settings, and pause menu
-  surfaces. It is app-layer orchestration, not a gameplay director.
+  surfaces. It derives narrow ViewModels, mounts Surface slots that receive
+  `{ model, actions }`, and falls back per slot to the default preset when an
+  app does not provide a custom Surface. App adapters provide overlay ViewModel
+  inputs and app-specific actions; they do not render selected overlay Surface
+  slots. It is app-layer orchestration, not a gameplay director, and must not
+  absorb Story/reveal/AUTO/SKIP/voice/Pixi wait responsibilities from
+  `app-vn-runtime` or `story-play`.
 - `navi-director` owns Navi substates: `walk`, `interacting`, `vn2d-overlay`,
   `inventory`, and `event`.
 - `trial-director` owns Trial segment flow, presentation profile selection,
@@ -77,8 +83,9 @@ adapters and apps
   those pure plans; app wrappers provide registry/settings/ports/config.
 - App packages such as `apps/game-a` and `apps/game-harness` may wrap
   `app-vn-runtime` for entry selection, app flow, save policy, Navi/Trial glue,
-  and debug readouts. They must not reimplement the VN story loop or keep
-  parallel browser timer/media/voice/reveal authorities.
+  custom Surface skins, asset role resolution, and debug readouts. They must
+  not reimplement the VN story loop or keep parallel browser
+  timer/media/voice/reveal authorities.
 - `gameplay` owns domain reducers for exploration, inventory, evidence
   ownership, character state, and pure trial rule judgments.
 - `media-save` owns Dexie IndexedDB save storage, Howler audio playback,
@@ -95,7 +102,9 @@ adapters and apps
   presenter traces used for adapter tests and inspection.
 - `ui-kit` owns DOM overlays, text-heavy surfaces, controls, and Inspector Lite.
   Settings UI components stay pure and controlled; app adapters own settings
-  state, persistence, and runtime derivation.
+  state, persistence, and runtime derivation. Reusable `ui-kit` components do
+  not read full runtime/flow objects, app paths, or `AssetRegistry`; VM-bound
+  shell defaults are composed at the `app-vn-shell` boundary.
 
 ## Mode Model
 
@@ -170,10 +179,10 @@ submission remains a Trial UI action routed through `trial-director`.
   -> app-vn-runtime routed RuntimeCommand consumption
   -> app-vn-runtime uses app-vn-dispatch planners for dialogue audio/reveal gates
   -> app-vn-runtime AUTO/autoNext voice gate handles AudioHandle.finished ended/stopped/failed
-  -> app-created AssetRegistry resolves media/Pixi/R3F/UI asset ids
+  -> app-created AssetRegistry resolves media/Pixi/R3F/UI asset ids and app-owned UI asset roles
   -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events / AudioPort voice or bleep playback
   -> VnRuntimeDispatcher renders the Pixi snapshot
-  -> GameInteractionShell renders DOM dialog, choices, toolbar, and runtime overlays
+  -> GameInteractionShell creates ViewModels and renders DOM Surface slots
 ```
 
 Dialogue lines may include one `|#textId|` marker. The marker is parser
