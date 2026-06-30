@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ReactElement } from "react";
 import {
+  createGameInteractionOverlayActions,
   createGameInteractionShellViewModels,
   createVnSaveLoadOverlayModel,
   overlayKindForVnShellAction,
+  renderGameInteractionOverlaySurface,
   type GameInteractionShellSurfaces,
   type SaveLoadOverlayViewModel,
   type VnShellRuntimeAdapter
@@ -140,11 +142,16 @@ describe("overlay page adapter helpers", () => {
       overlayModels: adapters.createOverlayViewModelInputs?.("vn-load"),
       runtime
     });
-    const rendered = adapters.renderOverlay(
-      "vn-load",
-      createNoopSurfaces(),
-      models
-    ) as ReactElement<{ model: SaveLoadOverlayViewModel }>;
+    const rendered = renderGameInteractionOverlaySurface({
+      actions: createGameInteractionOverlayActions({
+        closeTopOverlay: flow.closeTopOverlay,
+        dispatchUiAction: adapters.dispatchUiAction,
+        overlayActions: adapters.createOverlayActions?.("vn-load")
+      }),
+      models,
+      overlay: "vn-load",
+      surfaces: createNoopSurfaces()
+    }) as ReactElement<{ model: SaveLoadOverlayViewModel }>;
 
     expect(models.saveLoad).toMatchObject({ visible: true, mode: "load", pendingLoadSlot: slot });
     expect(rendered.props.model).toBe(models.saveLoad);

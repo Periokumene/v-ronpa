@@ -1,11 +1,9 @@
-import type { ReactNode } from "react";
 import {
   createVnSaveLoadOverlayModel,
   overlayKindForVnShellAction,
   shouldStopVnShellAutomationForAction,
+  type GameInteractionOverlayActions,
   type GameInteractionOverlayViewModelInputs,
-  type GameInteractionShellSurfaces,
-  type GameInteractionShellViewModels,
   type useGameSettingsAdapter
 } from "@v-ronpa/app-vn-shell";
 import type { GameOverlayKind, GameUiAction } from "@v-ronpa/contracts";
@@ -74,58 +72,39 @@ export function useGameAOverlayAdapters({
       }
       return {};
     },
-    renderOverlay(
-      overlay: GameOverlayKind | undefined,
-      surfaces: GameInteractionShellSurfaces,
-      models: GameInteractionShellViewModels
-    ): ReactNode {
-      if (!overlay) return null;
+    createOverlayActions(overlay: GameOverlayKind | undefined): GameInteractionOverlayActions {
+      if (!overlay) return {};
       if (overlay === "vn-backlog") {
-        if (!models.backlog) return null;
-        return <surfaces.BacklogOverlay model={models.backlog} actions={{ close: flow.closeTopOverlay }} />;
+        return { backlog: { close: flow.closeTopOverlay } };
       }
       if (overlay === "vn-save" || overlay === "vn-load" || overlay === "title-load") {
-        if (!models.saveLoad) return null;
-        return (
-          <surfaces.SaveLoadOverlay
-            model={models.saveLoad}
-            actions={{
-              cancelLoad: save.cancelLoadSlot,
-              close: flow.closeTopOverlay,
-              confirmLoad: () => {
-                save.confirmLoadSlot();
-                flow.send({ type: "ENTER_VN" });
-                flow.closeAllOverlays();
-              },
-              requestLoad: save.requestLoadSlot,
-              save: save.saveSlot
-            }}
-          />
-        );
+        return {
+          saveLoad: {
+            cancelLoad: save.cancelLoadSlot,
+            close: flow.closeTopOverlay,
+            confirmLoad: () => {
+              save.confirmLoadSlot();
+              flow.send({ type: "ENTER_VN" });
+              flow.closeAllOverlays();
+            },
+            requestLoad: save.requestLoadSlot,
+            save: save.saveSlot
+          }
+        };
       }
       if (overlay === "title-settings" || overlay === "vn-settings") {
-        if (!models.settings) return null;
-        return (
-          <surfaces.SettingsOverlay
-            model={models.settings}
-            actions={{
-              close: flow.closeTopOverlay,
-              patchSettings: settings.patchSettings,
-              resetSettings: settings.resetSettings
-            }}
-          />
-        );
+        return {
+          settings: {
+            close: flow.closeTopOverlay,
+            patchSettings: settings.patchSettings,
+            resetSettings: settings.resetSettings
+          }
+        };
       }
       if (overlay === "pause-menu") {
-        if (!models.pauseMenu) return null;
-        return (
-          <surfaces.PauseMenuOverlay
-            model={models.pauseMenu}
-            actions={{ close: flow.closeTopOverlay, dispatch: dispatchUiAction }}
-          />
-        );
+        return { pauseMenu: { close: flow.closeTopOverlay, dispatch: dispatchUiAction } };
       }
-      return null;
+      return {};
     }
   };
 }

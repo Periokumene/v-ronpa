@@ -28,7 +28,9 @@ VN runtime output is split across shared app-layer packages and render surfaces:
   command bar, title, toast layer, input prompt, backlog, save/load, settings,
   and pause menu, then mounts Surface slots that receive only `{ model,
   actions }`. Apps may replace any slot independently; omitted slots fall back
-  to the shared default preset.
+  to the shared default preset. `RuntimeMovieOverlaySurface` and
+  `GameOverlayHost` remain shell infrastructure, not app-replaceable Surface
+  slots in this pass.
 
 ## Ownership
 
@@ -283,8 +285,9 @@ its own minimal bgm/sfx/bleep/voice/video resources under `apps/game-a/public`.
 Game A also owns an app UI skin layer that creates custom `GameInteractionShell`
 Surfaces for dialog, choices, command bar, title, backlog, save/load, settings,
 pause, toast, and input prompt. The dialog frame texture is registered as a
-`RuntimeAsset` and `uiAssets` `dialog-frame` entry, resolved by asset id in app
-code, then passed to the custom dialog Surface.
+`RuntimeAsset` and `uiAssets` `dialog-frame` entry. Game A resolves the
+`uiAssets.role` entry through its app-created `AssetRegistry`, then passes the
+resolved URL and UI metadata to the custom dialog Surface.
 
 ## Harness Showcase Migration
 
@@ -322,14 +325,15 @@ enable or disable these controls.
 App-owned overlay/page adapters provide app save/settings data as overlay
 ViewModel inputs and bind app-specific actions such as save, load, settings
 patches, and title return. `GameInteractionShell` derives the final overlay
-ViewModels before the adapter renders the selected Surface slot.
+ViewModels, selects the active overlay Surface slot, and mounts it with the
+adapter-provided actions.
 
 `apps/game-harness/src/interaction` is harness-only wiring:
 `useGameFlowActor` adapts `game-flow-machine`,
 `useHarnessShowcaseRuntimeAdapter` binds showcase fixtures to shared VN runtime,
 Navi, Trial, R3F, and debug state, `useHarnessShowcaseSaveAdapter` owns harness
-save collection and slot policy, and `useOverlayPageAdapters` renders
-app-specific overlay pages using `ui-kit` plus `app-vn-shell` helpers. These
+save collection and slot policy, and `useOverlayPageAdapters` provides
+overlay ViewModel inputs and app-specific overlay actions. These
 hooks must not move into `packages/app-vn-runtime`, `packages/app-vn-dispatch`,
 or `packages/app-vn-shell`; shared VN loop behavior belongs in
 `packages/app-vn-runtime`.

@@ -16,8 +16,11 @@ renderer or filesystem details in UI code.
 ## Runtime Ownership
 
 - `packages/contracts` declares the metadata shape.
-- Apps and UI surfaces may interpret the metadata while resolving texture ids
-  through an app-created `AssetRegistry`.
+- Apps and app-owned custom UI surfaces may interpret the metadata after the
+  app resolves texture ids through an app-created `AssetRegistry`.
+- Shared `ui-kit` primitives and default surfaces do not read `AssetRegistry`
+  or resolve manifest roles directly; they only receive already-prepared props
+  from app/shell composition code.
 - `UiAssetRef` still carries only asset ids; direct URLs, React components,
   Pixi objects, and renderer instances remain outside contracts.
 

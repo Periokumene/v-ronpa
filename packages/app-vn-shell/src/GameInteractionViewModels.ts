@@ -182,6 +182,13 @@ export interface PauseMenuOverlayActions {
   close(): void;
 }
 
+export interface GameInteractionOverlayActions {
+  backlog?: BacklogOverlayActions | undefined;
+  saveLoad?: SaveLoadOverlayActions | undefined;
+  settings?: SettingsOverlayActions | undefined;
+  pauseMenu?: PauseMenuOverlayActions | undefined;
+}
+
 export interface GameInteractionShellViewModels {
   dialog?: VnDialogViewModel | undefined;
   choices?: VnChoicesViewModel | undefined;

@@ -15,6 +15,7 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await expect(page.getByTestId("game-a-playfield")).toBeVisible();
   await expect(page.getByTestId("game-a-app-id")).toHaveText("game-a");
   await expect(page.getByTestId("title-surface")).toBeVisible();
+  await expect(page.getByTestId("title-surface")).toHaveClass(/game-a-title-surface/);
   await page.screenshot({ path: "test-results/game-a-title.png", fullPage: true });
 
   await page.getByTestId("title-settings").click();
@@ -26,7 +27,16 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await expect(page.getByTestId("game-a-mode")).toHaveText("vn");
   await expect(page.getByTestId("vn-dialog-text")).toContainText("Game A VN framework smoke");
   await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-frame", "resolved");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveClass(/game-a-dialog-surface/);
+  await expect
+    .poll(() =>
+      page
+        .getByTestId("vn-dialog-surface")
+        .evaluate((element) => getComputedStyle(element, "::before").backgroundImage)
+    )
+    .toContain("/game-a/ui/dialog-frame.png");
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
+  await expect(page.getByTestId("vn-command-bar")).toHaveClass(/game-a-command-bar/);
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-background", "bg:game-a-room");
   await page.screenshot({ path: "test-results/game-a-vn-dialog.png", fullPage: true });
 

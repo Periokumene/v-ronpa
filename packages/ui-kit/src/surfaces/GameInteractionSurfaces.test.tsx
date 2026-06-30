@@ -20,7 +20,8 @@ describe("VnCommandBar", () => {
           action: "open-save",
           label: "SAVE",
           enabled: false,
-          testId: "vn-command-save"
+          testId: "vn-command-save",
+          toggle: false
         }
       ],
       onAction
@@ -33,6 +34,7 @@ describe("VnCommandBar", () => {
     expect(ids).toEqual(expect.arrayContaining(["vn-command-bar", "vn-command-skip", "vn-command-save"]));
     expect(skip?.props).toMatchObject({ "aria-pressed": true, disabled: false });
     expect(save?.props).toMatchObject({ disabled: true });
+    expect((save?.props as Record<string, unknown>)["aria-pressed"]).toBeUndefined();
     (skip?.props as { onClick: () => void }).onClick();
     expect(onAction).toHaveBeenCalledWith("toggle-skip");
   });

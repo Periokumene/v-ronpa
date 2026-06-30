@@ -53,7 +53,7 @@ export interface VnCommandBarCommand {
   enabled: boolean;
   testId: string;
   active?: boolean;
-  toggle?: boolean;
+  toggle: boolean;
 }
 
 export function VnCommandBar({ commands, onAction }: VnCommandBarProps) {
@@ -62,13 +62,11 @@ export function VnCommandBar({ commands, onAction }: VnCommandBarProps) {
       <nav aria-label="VN command bar" data-testid="vn-command-bar" style={commandBarStyle}>
         {commands.map((command) => {
           const active = Boolean(command.active);
-          const inferredToggle = command.action === "toggle-auto" || command.action === "toggle-skip";
-          const toggleCommand = command.toggle ?? inferredToggle;
           return (
             <Tooltip.Root key={command.testId}>
               <Tooltip.Trigger asChild>
                 <button
-                  {...(toggleCommand ? { "aria-pressed": active } : {})}
+                  {...(command.toggle ? { "aria-pressed": active } : {})}
                   data-testid={command.testId}
                   disabled={!command.enabled}
                   onClick={() => onAction(command.action)}

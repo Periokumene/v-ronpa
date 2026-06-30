@@ -18,6 +18,7 @@ import {
   createGameInteractionShellViewModels,
   type BacklogOverlayActions,
   type BacklogOverlayViewModel,
+  type GameInteractionOverlayActions,
   type GameInteractionOverlayViewModelInputs,
   type GameFlowShellAdapter,
   type GameInteractionShellSurfaces,
@@ -46,12 +47,8 @@ import {
 
 export interface OverlayPageShellAdapter {
   createOverlayViewModelInputs?(overlay: GameOverlayKind | undefined): GameInteractionOverlayViewModelInputs;
+  createOverlayActions?(overlay: GameOverlayKind | undefined): GameInteractionOverlayActions;
   dispatchUiAction(action: GameUiAction): void;
-  renderOverlay(
-    overlay: GameOverlayKind | undefined,
-    surfaces: GameInteractionShellSurfaces,
-    models: GameInteractionShellViewModels
-  ): ReactNode;
 }
 
 const VN_SHELL_LAYER_Z_INDEX = {
@@ -148,6 +145,11 @@ export function GameInteractionShell({
 
   const resolvedSurfaces = resolveGameInteractionShellSurfaces(surfaces);
   const overlayModelInputs = overlayPages.createOverlayViewModelInputs?.(flow.activeOverlay);
+  const overlayActions = createGameInteractionOverlayActions({
+    closeTopOverlay: flow.closeTopOverlay,
+    dispatchUiAction: overlayPages.dispatchUiAction,
+    overlayActions: overlayPages.createOverlayActions?.(flow.activeOverlay)
+  });
   const models = createGameInteractionShellViewModels({
     ...(dialogDisplay ? { dialogDisplay } : {}),
     flow,
@@ -205,10 +207,63 @@ export function GameInteractionShell({
         <resolvedSurfaces.Title model={models.title} actions={{ dispatch: overlayPages.dispatchUiAction }} />
       ) : null}
       <GameOverlayHost activeOverlay={flow.activeOverlay}>
-        {overlayPages.renderOverlay(flow.activeOverlay, resolvedSurfaces, models)}
+        {renderGameInteractionOverlaySurface({
+          actions: overlayActions,
+          models,
+          overlay: flow.activeOverlay,
+          surfaces: resolvedSurfaces
+        })}
       </GameOverlayHost>
     </>
   );
+}
+
+export function createGameInteractionOverlayActions({
+  closeTopOverlay,
+  dispatchUiAction,
+  overlayActions
+}: {
+  closeTopOverlay: () => void;
+  dispatchUiAction: (action: GameUiAction) => void;
+  overlayActions?: GameInteractionOverlayActions | undefined;
+}): GameInteractionOverlayActions {
+  return {
+    backlog: { close: closeTopOverlay, ...overlayActions?.backlog },
+    saveLoad: overlayActions?.saveLoad,
+    settings: overlayActions?.settings,
+    pauseMenu: { close: closeTopOverlay, dispatch: dispatchUiAction, ...overlayActions?.pauseMenu }
+  };
+}
+
+export function renderGameInteractionOverlaySurface({
+  actions,
+  models,
+  overlay,
+  surfaces
+}: {
+  actions: GameInteractionOverlayActions;
+  models: GameInteractionShellViewModels;
+  overlay: GameOverlayKind | undefined;
+  surfaces: GameInteractionShellSurfaces;
+}): ReactNode {
+  if (!overlay) return null;
+  if (overlay === "vn-backlog") {
+    if (!models.backlog || !actions.backlog) return null;
+    return <surfaces.BacklogOverlay model={models.backlog} actions={actions.backlog} />;
+  }
+  if (overlay === "vn-save" || overlay === "vn-load" || overlay === "title-load") {
+    if (!models.saveLoad || !actions.saveLoad) return null;
+    return <surfaces.SaveLoadOverlay model={models.saveLoad} actions={actions.saveLoad} />;
+  }
+  if (overlay === "title-settings" || overlay === "vn-settings") {
+    if (!models.settings || !actions.settings) return null;
+    return <surfaces.SettingsOverlay model={models.settings} actions={actions.settings} />;
+  }
+  if (overlay === "pause-menu") {
+    if (!models.pauseMenu || !actions.pauseMenu) return null;
+    return <surfaces.PauseMenuOverlay model={models.pauseMenu} actions={actions.pauseMenu} />;
+  }
+  return null;
 }
 
 export const defaultGameInteractionShellSurfaces: GameInteractionShellSurfaces = {
