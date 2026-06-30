@@ -34,11 +34,5 @@ describe("game-a content manifest", () => {
     expect(registry.url({ id: "texture:ui:game-a-dialog-frame", kind: "texture" })).toBe(
       "/game-a/ui/dialog-frame.png"
     );
-    expect(gameAContentManifest.uiAssets[0]).toMatchObject({
-      id: "ui:game-a-dialog-frame",
-      role: "dialog-frame",
-      slice: "nine-slice",
-      sliceInsets: { top: 230, right: 190, bottom: 210, left: 190 }
-    });
   });
 });

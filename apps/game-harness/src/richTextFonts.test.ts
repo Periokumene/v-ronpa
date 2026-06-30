@@ -45,12 +45,10 @@ describe("rich text font CSS", () => {
 
 function manifestWithAssets(runtimeAssets: RuntimeAsset[], fonts: ContentManifest["fonts"]): ContentManifest {
   return {
-    version: 2,
+    version: 3,
     assets: [],
     fonts,
     runtimeAssets,
-    uiAssets: [],
-    interactionStyles: [],
     collisionProxies: [],
     vnEntries: [],
     maps: [],

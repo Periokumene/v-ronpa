@@ -953,62 +953,6 @@ export const RuntimeScriptSchema = z
   .strict();
 export type RuntimeScript = z.infer<typeof RuntimeScriptSchema>;
 
-export const UiAssetRoleSchema = z.enum([
-  "title-background",
-  "panel-background",
-  "dialog-frame",
-  "button-frame",
-  "button-icon",
-  "toolbar-icon",
-  "overlay-backdrop",
-  "motion-sprite"
-]);
-export type UiAssetRole = z.infer<typeof UiAssetRoleSchema>;
-
-export const UiAssetRefSchema = z
-  .object({
-    id: IdSchema,
-    role: UiAssetRoleSchema,
-    assetId: IdSchema,
-    slice: z.enum(["stretch", "nine-slice", "tile"]).default("stretch"),
-    sliceInsets: z
-      .object({
-        top: z.number().nonnegative(),
-        right: z.number().nonnegative(),
-        bottom: z.number().nonnegative(),
-        left: z.number().nonnegative()
-      })
-      .strict()
-      .optional(),
-    tags: z.array(z.string()).default([])
-  })
-  .strict()
-  .superRefine((asset, ctx) => {
-    if (asset.sliceInsets && asset.slice !== "nine-slice") {
-      ctx.addIssue({
-        code: "custom",
-        path: ["sliceInsets"],
-        message: "sliceInsets can only be used when slice is 'nine-slice'."
-      });
-    }
-  });
-export type UiAssetRef = z.infer<typeof UiAssetRefSchema>;
-
-export const InteractionStyleProfileSchema = z.object({
-  id: IdSchema,
-  name: z.string().min(1),
-  assets: z.array(UiAssetRefSchema).default([]),
-  tokens: z
-    .object({
-      accentColor: z.string().optional(),
-      textColor: z.string().optional(),
-      panelOpacity: z.number().min(0).max(1).optional(),
-      motionScale: z.number().nonnegative().optional()
-    })
-    .default({})
-});
-export type InteractionStyleProfile = z.infer<typeof InteractionStyleProfileSchema>;
-
 export const RuntimeAssetFormatSchema = z.enum([
   "glb",
   "gltf",
@@ -1875,12 +1819,10 @@ export const SaveDataSchema = z.object({
 export type SaveData = z.infer<typeof SaveDataSchema>;
 
 export const ContentManifestSchema = z.object({
-  version: z.literal(2),
+  version: z.literal(3),
   assets: z.array(AssetRefSchema).default([]),
   audio: ContentAudioConfigSchema.optional(),
   fonts: z.array(FontFaceDefinitionSchema).default([]),
-  uiAssets: z.array(UiAssetRefSchema).default([]),
-  interactionStyles: z.array(InteractionStyleProfileSchema).default([]),
   runtimeAssets: z.array(RuntimeAssetSchema).default([]),
   collisionProxies: z.array(CollisionProxySchema).default([]),
   input: InputBindingMapSchema.optional(),

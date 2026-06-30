@@ -471,12 +471,10 @@ describe("app VN runtime helpers", () => {
 
 function manifestWithAssets(runtimeAssets: RuntimeAsset[]): ContentManifest {
   return {
-    version: 2 as const,
+    version: 3 as const,
     assets: [],
     fonts: [],
     runtimeAssets,
-    uiAssets: [],
-    interactionStyles: [],
     collisionProxies: [],
     vnEntries: [],
     maps: [],

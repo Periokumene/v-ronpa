@@ -285,9 +285,10 @@ its own minimal bgm/sfx/bleep/voice/video resources under `apps/game-a/public`.
 Game A also owns an app UI skin layer that creates custom `GameInteractionShell`
 Surfaces for dialog, choices, command bar, title, backlog, save/load, settings,
 pause, toast, and input prompt. The dialog frame texture is registered as a
-`RuntimeAsset` and `uiAssets` `dialog-frame` entry. Game A resolves the
-`uiAssets.role` entry through its app-created `AssetRegistry`, then passes the
-resolved URL and UI metadata to the custom dialog Surface.
+`RuntimeAsset` and declared by the Game A VN entry `assetRefs`. Game A keeps the
+dialog frame asset id in app-local UI config, resolves it through its app-created
+`AssetRegistry`, then passes the resolved URL to the custom dialog Surface. Frame
+rendering details remain in Game A's app-local surface and CSS.
 
 ## Harness Showcase Migration
 

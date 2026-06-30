@@ -239,7 +239,7 @@ function collectRegisteredAssetMap() {
 function collectManifestFontFaces() {
   if (!existsSync(contentManifestPath)) return [];
   const content = readFileSync(contentManifestPath, "utf8");
-  const block = content.match(/fonts:\s*\[([\s\S]*?)\],\s*uiAssets/u)?.[1] ?? "";
+  const block = content.match(/fonts:\s*\[([\s\S]*?)\],\s*runtimeAssets/u)?.[1] ?? "";
   const fonts = [];
   for (const match of block.matchAll(/\{([\s\S]*?)\}/gu)) {
     const body = match[1] ?? "";

@@ -9,7 +9,6 @@ import {
   InputBindingMapSchema,
   InputActionStateSchema,
   InteractionCapabilitySnapshotSchema,
-  InteractionStyleProfileSchema,
   LayeredCharacterDefinitionSchema,
   LayeredCharacterLayerRefSchema,
   LayeredCharacterLayerMetadataSchema,
@@ -34,7 +33,6 @@ import {
   createDefaultSettingsSnapshot,
   TrialDefinitionSchema,
   TrialRuntimeStateSchema,
-  UiAssetRefSchema,
   getNaniCommandDefinition,
   naniCommandCatalog
 } from "./index";
@@ -42,7 +40,7 @@ import {
 describe("contracts", () => {
   it("validates the baseline content manifest", () => {
     const manifest = ContentManifestSchema.parse({
-      version: 2,
+      version: 3,
       assets: [
         { id: "Ema", kind: "character-pack", tags: ["placeholder"] },
         { id: "texture:evidence:keycard-icon", kind: "texture", tags: ["placeholder", "evidence"] }
@@ -57,31 +55,6 @@ describe("contracts", () => {
         }
       },
       fonts: [{ id: "font:serif", family: "Serif", sourceRef: "font:serif-regular", weight: "400", style: "normal" }],
-      uiAssets: [
-        {
-          id: "ui:title:bg",
-          role: "title-background",
-          assetId: "texture:title:bg",
-          slice: "stretch",
-          tags: ["harness"]
-        }
-      ],
-      interactionStyles: [
-        {
-          id: "style:harness:vn",
-          name: "Harness VN",
-          assets: [
-            {
-              id: "ui:dialog:frame",
-              role: "dialog-frame",
-              assetId: "texture:title:bg",
-              slice: "nine-slice",
-              sliceInsets: { top: 36, right: 44, bottom: 36, left: 44 }
-            }
-          ],
-          tokens: { accentColor: "#ffd166", panelOpacity: 0.82, motionScale: 1 }
-        }
-      ],
       runtimeAssets: [
         {
           id: "Ema",
@@ -255,9 +228,20 @@ describe("contracts", () => {
     expect(manifest.maps[0]?.interactables[2]?.action.type).toBe("change-map");
     expect(manifest.evidence[0]?.shortLabel).toBe("Keycard");
     expect(manifest.input?.bindings[1]?.action).toBe("fire-truth-bullet");
-    expect(manifest.uiAssets[0]?.role).toBe("title-background");
     expect(manifest.fonts[0]).toMatchObject({ id: "font:serif", sourceRef: "font:serif-regular" });
-    expect(manifest.interactionStyles[0]?.assets[0]?.slice).toBe("nine-slice");
+  });
+
+  it("rejects old content manifest versions and stale uiAssets declarations", () => {
+    expect(() => ContentManifestSchema.parse({ version: 2, maps: [], items: [], trials: [] })).toThrow();
+    expect(() =>
+      ContentManifestSchema.parse({
+        version: 3,
+        uiAssets: [{ id: "ui:title:bg", role: "title-background", assetId: "texture:title:bg" }],
+        maps: [],
+        items: [],
+        trials: []
+      })
+    ).toThrow();
   });
 
   it("validates rich text documents and font runtime assets", () => {
@@ -871,33 +855,6 @@ describe("contracts", () => {
       })
     ).toMatchObject({ mode: "navi", text: "A saved line." });
 
-    expect(
-      UiAssetRefSchema.parse({
-        id: "ui:button:frame",
-        role: "button-frame",
-        assetId: "texture:evidence:keycard-icon",
-        slice: "nine-slice",
-        sliceInsets: { top: 12, right: 16, bottom: 12, left: 16 }
-      })
-    ).toMatchObject({ role: "button-frame", sliceInsets: { top: 12, right: 16, bottom: 12, left: 16 }, tags: [] });
-    expect(() =>
-      UiAssetRefSchema.parse({
-        id: "ui:panel:bg",
-        role: "panel-background",
-        assetId: "texture:evidence:keycard-icon",
-        slice: "stretch",
-        sliceInsets: { top: 12, right: 16, bottom: 12, left: 16 }
-      })
-    ).toThrow();
-
-    expect(
-      InteractionStyleProfileSchema.parse({
-        id: "style:default",
-        name: "Default",
-        assets: [{ id: "ui:toolbar:icon", role: "toolbar-icon", assetId: "texture:evidence:keycard-icon" }],
-        tokens: { accentColor: "#6ee7d8", panelOpacity: 0.9 }
-      })
-    ).toMatchObject({ assets: [{ role: "toolbar-icon" }], tokens: { accentColor: "#6ee7d8", panelOpacity: 0.9 } });
   });
 
   it("rejects legacy asset references that carry direct URIs", () => {
@@ -912,16 +869,8 @@ describe("contracts", () => {
     ).toThrow();
 
     expect(() =>
-      UiAssetRefSchema.parse({
-        id: "ui:toolbar:icon",
-        role: "toolbar-icon",
-        uri: "/harness/ui/icon.png"
-      })
-    ).toThrow();
-
-    expect(() =>
       ContentManifestSchema.parse({
-        version: 2,
+        version: 3,
         assets: [],
         runtimeAssets: [],
         maps: [

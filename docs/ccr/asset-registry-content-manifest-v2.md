@@ -2,7 +2,7 @@
 
 ## Requested Change
 
-Hard-cut `ContentManifest` to version 2 and make
+Hard-cut `ContentManifest` to version 3 and make
 `ContentManifest.runtimeAssets` the single runtime-loading authority. Add a pure
 `@v-ronpa/asset-registry` package so apps can resolve declared asset ids and
 inject structural resolvers into Pixi, R3F, media, and UI adapters.
@@ -24,19 +24,20 @@ Asset loading had drifted into multiple local conventions:
 - Pixi portraits assembled public harness paths from `portrait:*`
 - Pixi FX owned a package-local URL table outside the app manifest
 - R3F map assets carried direct `uri` fields in `WorldMapDef.assetRefs`
-- UI/evidence asset ids existed but had no common resolution or validation gate
+- evidence asset ids existed but had no common resolution or validation gate
 
 That made content review and missing-asset diagnostics inconsistent across
 runtime surfaces.
 
 ## Proposed Shape
 
-- `ContentManifest.version` is now `2`.
+- `ContentManifest.version` is now `3`.
 - `ContentManifest.runtimeAssets` declares every runtime-loadable asset.
 - `AssetRef` is id-only: `{ id, kind, tags? }`.
 - `WorldMapDef.assetRefs` and `RuntimeScript.assets` continue to declare
   dependencies but no longer contain URLs.
-- `UiAssetRef` uses `assetId`; direct `uri` fields are rejected.
+- UI skin asset bindings are outside the registry contract; apps may resolve
+  app-local UI texture ids through their app-created registries.
 - `CollisionProxy` may point at mesh-backed collision data through `assetId`.
 - `RuntimeAsset.optimizedUri` remains the runtime file URL, but only manifest
   registration and generator output should author that URL.
@@ -52,23 +53,24 @@ runtime surfaces.
 
 ## Compatibility And Migration
 
-This is a breaking contract change. v1 manifests and asset refs containing
+This is a breaking contract change. v1/v2 manifests and asset refs containing
 `uri` are rejected by contract tests. Existing callers must migrate direct URLs
-into `ContentManifest.runtimeAssets` and replace loader inputs with asset ids.
+into `ContentManifest.runtimeAssets`, replace loader inputs with asset ids, and
+move public UI binding metadata into app-local config when needed.
 
 Rollback is straightforward but intentionally coarse: restore manifest v1 schema
-support, reintroduce URL-bearing `AssetRef` and `UiAssetRef.uri`, and remove the
-registry requirement from adapters. No save-data migration is required because
-this change affects content manifests and runtime loading, not `SaveData`.
+support, reintroduce URL-bearing `AssetRef`, and remove the registry requirement
+from adapters. No save-data migration is required because this change affects
+content manifests and runtime loading, not `SaveData`.
 
 ## Fixtures And Tests
 
-- Contract tests reject `uri` on `AssetRef`, `RuntimeScript.assets`,
-  `WorldMapDef.assetRefs`, and `UiAssetRef`.
+- Contract tests reject `uri` on `AssetRef`, `RuntimeScript.assets`, and
+  `WorldMapDef.assetRefs`.
 - Asset registry tests cover normal resolution for every runtime asset kind,
   duplicate ids, missing ids, kind mismatch, raw URI rejection, and unsupported
   manifest versions.
-- Harness manifest tests parse the composed v2 manifest and validate references,
+- Harness manifest tests parse the composed v3 manifest and validate references,
   including Pixi built-in FX assets.
 - App/runtime adapter tests cover registry-backed media resolution and missing
   media diagnostics.

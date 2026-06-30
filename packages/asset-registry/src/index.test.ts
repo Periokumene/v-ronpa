@@ -30,7 +30,7 @@ describe("asset registry", () => {
   });
 
   it("diagnoses unsupported manifest versions", () => {
-    const registry = createAssetRegistry({ ...baseManifest([]), version: 1 as 2 });
+    const registry = createAssetRegistry({ ...baseManifest([]), version: 2 as 3 });
 
     expect(registry.diagnostics).toEqual(
       expect.arrayContaining([
@@ -42,7 +42,7 @@ describe("asset registry", () => {
 
   it("diagnoses malformed manifests without resolving partially declared assets", () => {
     const registry = createAssetRegistry({
-      version: 2,
+      version: 3,
       runtimeAssets: [{ id: "bg:harness", kind: "background" }],
       maps: [],
       items: [],
@@ -59,6 +59,7 @@ describe("asset registry", () => {
         runtimeAsset("texture:evidence:keycard-thumbnail", "texture"),
         runtimeAsset("model:academy-hall", "glb"),
         runtimeAsset("bleep:dialogue-default", "bleep"),
+        runtimeAsset("sfx:wrong-kind", "sfx"),
         runtimeAsset("font:serif-regular", "font")
       ]),
       audio: {
@@ -85,22 +86,13 @@ describe("asset registry", () => {
         { id: "font:wrong-kind", family: "Wrong", sourceRef: "sfx:wrong-kind", weight: "400", style: "normal" }
       ],
       assets: [{ id: "model:academy-hall", kind: "glb", tags: [] }],
-      uiAssets: [
+      vnEntries: [
         {
-          id: "ui:toolbar:icon",
-          role: "toolbar-icon",
-          assetId: "texture:evidence:keycard-thumbnail",
-          slice: "nine-slice",
-          sliceInsets: { top: 8, right: 8, bottom: 8, left: 8 },
-          tags: []
-        }
-      ],
-      interactionStyles: [
-        {
-          id: "style:harness",
-          name: "Harness",
-          assets: [{ id: "ui:missing", role: "button-icon", assetId: "texture:missing", slice: "stretch", tags: [] }],
-          tokens: {}
+          id: "vn:opening",
+          title: "Opening",
+          scriptPath: "opening.nani",
+          profile: "vn2d",
+          assetRefs: [{ id: "texture:missing-vn", kind: "texture", tags: [] }]
         }
       ],
       maps: [
@@ -120,10 +112,11 @@ describe("asset registry", () => {
           shortLabel: "Keycard",
           description: "A keycard.",
           details: [],
-          visual: { thumbnailAssetId: "texture:evidence:keycard-thumbnail", iconAssetId: "texture:evidence:keycard-thumbnail" },
+          visual: { thumbnailAssetId: "texture:evidence:keycard-thumbnail", iconAssetId: "texture:missing-icon" },
           tags: []
         }
-      ]
+      ],
+      collisionProxies: [{ id: "collision:academy", kind: "trimesh", assetId: "model:missing-collision" }]
     };
 
     expect(createAssetRegistry(manifest).validateReferences()).toEqual(
@@ -132,7 +125,9 @@ describe("asset registry", () => {
         expect.objectContaining({ code: "asset-kind-mismatch", id: "sfx:wrong-kind", kind: "bleep" }),
         expect.objectContaining({ code: "asset-missing", id: "font:missing", kind: "font" }),
         expect.objectContaining({ code: "asset-kind-mismatch", id: "sfx:wrong-kind", kind: "font" }),
-        expect.objectContaining({ code: "asset-missing", id: "texture:missing" })
+        expect.objectContaining({ code: "asset-missing", id: "texture:missing-vn", kind: "texture" }),
+        expect.objectContaining({ code: "asset-missing", id: "texture:missing-icon", kind: "texture" }),
+        expect.objectContaining({ code: "asset-missing", id: "model:missing-collision", kind: "glb" })
       ])
     );
   });
@@ -150,12 +145,10 @@ function manifestWithKinds(kinds: RuntimeAssetKind[]): ContentManifest {
 
 function baseManifest(runtimeAssets: RuntimeAsset[]): ContentManifest {
   return {
-    version: 2,
+    version: 3,
     assets: [],
     fonts: [],
     runtimeAssets,
-    uiAssets: [],
-    interactionStyles: [],
     collisionProxies: [],
     vnEntries: [],
     maps: [],

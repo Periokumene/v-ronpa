@@ -3,11 +3,11 @@
 ## Public Contract Packages
 
 - `packages/contracts`: source of truth for schemas, fixtures, save data, top
-  modes, interaction shell context, overlay/action/capability snapshots, UI
-  asset refs, style profile refs, Navi runtime state, Trial runtime state,
-  inventory, trial definitions, evidence definitions, input bindings, camera
-  modes, runtime assets, Story snapshots, RuntimeCommand bridge schemas, typed
-  gameplay events, and `.nani` command catalog metadata.
+  modes, interaction shell context, overlay/action/capability snapshots, Navi
+  runtime state, Trial runtime state, inventory, trial definitions, evidence
+  definitions, input bindings, camera modes, runtime assets, Story snapshots,
+  RuntimeCommand bridge schemas, typed gameplay events, and `.nani` command
+  catalog metadata.
 - `packages/nani-parser`: `.nani` AST and IR shape.
 
 Changes to these packages are cross-module changes. A module worktree must not
@@ -27,8 +27,10 @@ and merge the change through the integration baseline first.
   `RuntimeAsset`, and `CollisionProxy`.
 - Runtime asset references must be id-only. `AssetRef`,
   `VnEntryDef.assetRefs`, `WorldMapDef.assetRefs`, `RuntimeScript.assets`,
-  `UiAssetRef`, evidence visuals, and mesh-backed collision proxies must not
-  carry direct URLs.
+  evidence visuals, and mesh-backed collision proxies must not carry direct
+  URLs.
+- UI skin asset bindings stay in app-local config unless a complete shared
+  renderer is added by CCR.
 - Apps create `AssetRegistry` instances from parsed content manifests and
   inject structural resolvers into renderer/media adapters. Pixi, R3F, Howler,
   and DOM UI code must not assemble public asset paths.
@@ -51,9 +53,6 @@ and merge the change through the integration baseline first.
   migrate them at the storage boundary instead of weakening the public schema.
 - Presenter runtime traces are adapter internals. They must not be used as
   SaveData shapes or as public stage snapshots.
-- UI asset refs and interaction style profiles are manifest/config references.
-  They must not contain renderer objects, React components, Pixi instances, or
-  Three.js objects.
 - Renderer-specific objects must not appear in contracts.
 - Script source locations must be preserved through parse and compile outputs.
 - Dialogue `TextIR.textId`, when present, is metadata extracted from

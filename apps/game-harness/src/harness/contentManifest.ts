@@ -5,7 +5,7 @@ import { harnessShowcaseEvidence, harnessShowcaseItem, harnessShowcaseMaps, harn
 import { harnessRuntimeAssets } from "./generatedAssets";
 
 const harnessContentManifestInput = {
-  version: 2,
+  version: 3,
   audio: {
     dialogueBleep: {
       defaultSound: { sourceRef: "bleep:dialogue-default", gain: 0.45 },
@@ -25,8 +25,6 @@ const harnessContentManifestInput = {
       style: "normal"
     }
   ],
-  uiAssets: [],
-  interactionStyles: [],
   runtimeAssets: [
     ...harnessRuntimeAssets,
     ...builtInPixiFxRuntimeAssets

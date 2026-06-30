@@ -43,9 +43,13 @@ such as `RuntimeScript.assets`, `VnEntryDef.assetRefs`, and
 `WorldMapDef.assetRefs`. These lists declare what content a script, VN entry,
 or map needs, not where the file lives.
 
-UI and evidence resources follow the same rule:
+UI skin resources are app-local config. When an app skin needs a runtime file,
+its config should reference a `RuntimeAsset` id and resolve it through the
+app-created `AssetRegistry`; shared contracts do not define UI asset roles,
+frame slicing, tiling, or skin rendering behavior.
 
-- `UiAssetRef.assetId` points to a `RuntimeAsset` of kind `texture`.
+Evidence resources follow the same rule:
+
 - `EvidenceVisual.iconAssetId` and `thumbnailAssetId` point to texture runtime
   assets.
 - `CollisionProxy.assetId`, when used for mesh-backed collision data, points to

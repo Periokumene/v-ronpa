@@ -5,11 +5,11 @@ import { builtInPixiFxRuntimeAssets } from "@v-ronpa/pixi-presenter";
 import { harnessContentManifest } from "./contentManifest";
 
 describe("harness content manifest", () => {
-  it("parses as ContentManifest v2 and resolves declared runtime asset references", () => {
+  it("parses as ContentManifest v3 and resolves declared runtime asset references", () => {
     const manifest = ContentManifestSchema.parse(harnessContentManifest);
     const registry = createAssetRegistry(manifest);
 
-    expect(manifest.version).toBe(2);
+    expect(manifest.version).toBe(3);
     expect(manifest.audio?.dialogueBleep?.enabled).toBe(true);
     expect(manifest.audio?.dialogueBleep?.speakerOverrides).toEqual({
       Felix: { sourceRef: "bleep:dialogue-felix", gain: 0.55 },
