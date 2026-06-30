@@ -5,7 +5,6 @@ import type {
   GameOverlayKind,
   GameUiAction,
   InteractionCapabilitySnapshot,
-  InteractionStyleProfile,
   SaveSlotSummary,
   SettingsPatch,
   SettingsSnapshot,
@@ -92,14 +91,12 @@ export function VnCommandBar({ commands, onAction }: VnCommandBarProps) {
 export interface GameOverlayHostProps {
   activeOverlay: GameOverlayKind | undefined;
   children?: ReactNode;
-  styleProfile?: InteractionStyleProfile;
 }
 
-export function GameOverlayHost({ activeOverlay, children, styleProfile }: GameOverlayHostProps) {
+export function GameOverlayHost({ activeOverlay, children }: GameOverlayHostProps) {
   if (!activeOverlay) return null;
-  const accentColor = styleProfile?.tokens.accentColor ?? "#ffd166";
   return (
-    <div data-overlay={activeOverlay} data-testid="game-overlay-host" style={{ ...overlayHostStyle, borderColor: accentColor }}>
+    <div data-overlay={activeOverlay} data-testid="game-overlay-host" style={overlayHostStyle}>
       {children}
     </div>
   );

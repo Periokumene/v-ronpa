@@ -3,9 +3,9 @@
 ## Requested Change
 
 Add public interaction-shell contracts for title/overlay UI flow, capability
-snapshots, settings/style shells, UI asset references, and save slot summaries.
-Extend `ContentManifest` with additive fields used by the vertical-slice
-interaction shell.
+snapshots, settings, UI asset references, and save slot summaries. Extend
+`ContentManifest` with additive fields used by the vertical-slice interaction
+shell.
 
 ## Affected Packages
 
@@ -19,8 +19,8 @@ interaction shell.
 
 The previous vertical slice entered Navi directly and kept interaction controls
 inside harness code. The UI/interaction branch needs shared vocabulary for title
-entry, VN toolbar actions, overlay stack, save/load summaries, style profiles,
-and settings shells before feature branches add concrete pages. Without those
+entry, VN toolbar actions, overlay stack, save/load summaries, UI asset
+references, and settings shells before feature branches add concrete pages. Without those
 contracts, app adapters, ui-kit surfaces, save storage, and game-flow capability
 logic would each invent their own shape.
 
@@ -35,13 +35,9 @@ logic would each invent their own shape.
 - `InteractionCapabilitySnapshot` is derived by `game-flow-machine` and consumed
   by UI surfaces.
 - `SettingsSnapshot` is an empty additive shell for future persistent settings.
-- `InteractionStyleProfile` and `UiAssetRef` reserve style/asset configuration
-  without binding contracts to DOM, Pixi, or R3F objects.
 - `SaveSlotSummary` stores text-only save previews for lists and load menus.
 - Save data remains the runtime restore payload. Slot summaries are derived by
   `media-save` from `SaveData` instead of being stored inside `SaveData`.
-- `ContentManifest.uiAssets` and `ContentManifest.interactionStyles` are
-  optional additive fields.
 
 ## Runtime Ownership
 
@@ -57,14 +53,14 @@ logic would each invent their own shape.
 
 ## Compatibility And Migration
 
-Existing manifests remain valid because UI asset refs and interaction style
-profiles default to empty arrays. Slot summaries can be regenerated from save
-data story backlog when a slot is normalized.
+Slot summaries can be regenerated from save data story backlog when a slot is
+normalized. UI skin assets remain app-local configuration and are not shell
+contract fields.
 
 ## Fixtures And Tests
 
 - `packages/contracts/src/index.test.ts` covers interaction, overlay,
-  capability, settings, style, UI asset, and save slot summary schemas.
+  capability, settings, and save slot summary schemas.
 - `packages/game-flow-machine/src/index.test.ts` covers title flow, overlay
   stack, capability matrix, and exploration save behavior after VN ends.
 - `packages/media-save/src/index.test.ts` covers save summary derivation,
@@ -77,6 +73,6 @@ data story backlog when a slot is normalized.
 ## Rebase Impact
 
 Branches building VN interaction UI should consume these contract shapes instead
-of defining local action, overlay, capability, style, or slot-summary types.
+of defining local action, overlay, capability, or slot-summary types.
 Branches adding production settings or screenshot previews must add follow-up
 task cards and CCRs if they expand public save/settings contracts.

@@ -41,10 +41,7 @@ export function App() {
     onLoad: runtime.restoreFromSave
   });
   const overlayPages = useGameAOverlayAdapters({ flow, runtime, save, settings });
-  const gameAUiAssets = useMemo(
-    () => resolveGameAUiAssets(assetRegistry, gameAUiConfig, gameAContentManifest),
-    [assetRegistry]
-  );
+  const gameAUiAssets = useMemo(() => resolveGameAUiAssets(assetRegistry, gameAUiConfig), [assetRegistry]);
   const gameASurfaces = useMemo(
     () => createGameASurfaces({ assets: gameAUiAssets, config: gameAUiConfig }),
     [gameAUiAssets]

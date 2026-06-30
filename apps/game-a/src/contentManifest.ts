@@ -53,7 +53,7 @@ Narrator: Game A VN smoke 完成。
 @end`;
 
 const gameAContentManifestInput = {
-  version: 2,
+  version: 3,
   assets: [],
   audio: {
     dialogueBleep: {
@@ -63,38 +63,6 @@ const gameAContentManifestInput = {
     }
   },
   fonts: [],
-  uiAssets: [
-    {
-      id: "ui:game-a-dialog-frame",
-      role: "dialog-frame",
-      assetId: "texture:ui:game-a-dialog-frame",
-      slice: "nine-slice",
-      sliceInsets: { top: 230, right: 190, bottom: 210, left: 190 },
-      tags: ["game-a", "dialog"]
-    }
-  ],
-  interactionStyles: [
-    {
-      id: "style:game-a:vn",
-      name: "Game A VN",
-      assets: [
-        {
-          id: "ui:game-a-dialog-frame",
-          role: "dialog-frame",
-          assetId: "texture:ui:game-a-dialog-frame",
-          slice: "nine-slice",
-          sliceInsets: { top: 230, right: 190, bottom: 210, left: 190 },
-          tags: ["game-a", "dialog"]
-        }
-      ],
-      tokens: {
-        accentColor: "#73e2d3",
-        textColor: "#f7fbff",
-        panelOpacity: 0.82,
-        motionScale: 1
-      }
-    }
-  ],
   runtimeAssets: [
     {
       id: "bg:game-a-room",

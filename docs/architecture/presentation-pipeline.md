@@ -194,10 +194,11 @@ Evidence display data is declared in the content manifest as `EvidenceDef`.
 Evidence ownership is stored in `EvidenceState.ownedEvidenceIds`. Inventory
 items remain limited to gifts and tools.
 
-Evidence and UI visuals use texture asset ids (`thumbnailAssetId`,
-`iconAssetId`, `UiAssetRef.assetId`). They are validated against
-`ContentManifest.runtimeAssets` even when a current harness surface does not
-render every image.
+Evidence visuals use texture asset ids (`thumbnailAssetId`, `iconAssetId`) and
+are validated against `ContentManifest.runtimeAssets` even when a current
+harness surface does not render every image. App-specific UI skins may also
+resolve runtime texture ids through the app-created `AssetRegistry`, but those
+bindings are not public contract fields.
 
 `.nani` can grant evidence through a typed gameplay event, but evidence
 submission is not a script command. Submit actions originate from Trial UI,

@@ -43,7 +43,7 @@ const rawUriPattern = /^(\/|\.\/|\.\.\/|https?:\/\/|data:|blob:)/u;
 export function createAssetRegistry(manifestInput: unknown): AssetRegistry {
   const diagnostics: AssetRegistryDiagnostic[] = [];
   const inputVersion = manifestVersion(manifestInput);
-  if (inputVersion !== 2) {
+  if (inputVersion !== 3) {
     diagnostics.push({
       code: "manifest-version-unsupported",
       severity: "error",
@@ -167,12 +167,6 @@ export function collectManifestAssetReferences(manifest: ContentManifest): Asset
     refs.push({ id: font.sourceRef, kind: "font", tags: [] });
   }
 
-  for (const uiAsset of manifest.uiAssets) {
-    refs.push({ id: uiAsset.assetId, kind: "texture", tags: uiAsset.tags });
-  }
-  for (const profile of manifest.interactionStyles) {
-    for (const uiAsset of profile.assets) refs.push({ id: uiAsset.assetId, kind: "texture", tags: uiAsset.tags });
-  }
   for (const entry of manifest.vnEntries) {
     refs.push(...entry.assetRefs);
   }
@@ -197,11 +191,9 @@ function manifestVersion(input: unknown): unknown {
 
 function createEmptyManifest(): ContentManifest {
   return {
-    version: 2,
+    version: 3,
     assets: [],
     fonts: [],
-    uiAssets: [],
-    interactionStyles: [],
     runtimeAssets: [],
     collisionProxies: [],
     vnEntries: [],

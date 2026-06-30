@@ -9,7 +9,7 @@ import { resolveGameAUiAssets } from "./resolveGameAUiAssets";
 
 describe("game-a interaction surfaces", () => {
   it("provides custom implementations for every first-pass surface slot", () => {
-    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig, gameAContentManifest);
+    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
     const surfaces = createGameASurfaces({ assets, config: gameAUiConfig });
 
     expect(Object.keys(surfaces).sort()).toEqual([
@@ -26,8 +26,8 @@ describe("game-a interaction surfaces", () => {
     ]);
   });
 
-  it("resolves the generated dialog frame through the manifest and applies it to the dialog surface", () => {
-    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig, gameAContentManifest);
+  it("resolves the configured dialog frame asset and applies it to the dialog surface", () => {
+    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
     const element = GameADialogSurface({
       actions: {},
       assets,
@@ -37,7 +37,7 @@ describe("game-a interaction surfaces", () => {
     const root = findElementByTestId(element, "vn-dialog-surface");
 
     expect(assets.dialogFrameUri).toBe("/game-a/ui/dialog-frame.png");
-    expect(assets.dialogFrameSliceInsets).toEqual({ top: 230, right: 190, bottom: 210, left: 190 });
+    expect(gameAUiConfig.dialog.frameAssetId).toBe("texture:ui:game-a-dialog-frame");
     expect(assets.diagnostics).toEqual([]);
     expect(root?.props).toMatchObject({ "data-frame": "resolved" });
     expect((root?.props as { style?: Record<string, string> }).style).toMatchObject({
@@ -58,7 +58,7 @@ describe("game-a interaction surfaces", () => {
         }
       })
     };
-    const assets = resolveGameAUiAssets(missingResolver, gameAUiConfig, gameAContentManifest);
+    const assets = resolveGameAUiAssets(missingResolver, gameAUiConfig);
     const element = GameADialogSurface({
       actions: {},
       assets,
@@ -71,19 +71,6 @@ describe("game-a interaction surfaces", () => {
     expect(assets.diagnostics).toMatchObject([{ code: "asset-missing", id: "texture:ui:game-a-dialog-frame" }]);
     expect(root?.props).toMatchObject({ "data-frame": "fallback" });
     expect(findElementByTestId(element, "vn-dialog-text")).toBeDefined();
-  });
-
-  it("diagnoses a missing dialog frame role before resolving runtime textures", () => {
-    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig, { uiAssets: [] });
-
-    expect(assets.dialogFrameUri).toBeUndefined();
-    expect(assets.diagnostics).toEqual([
-      expect.objectContaining({
-        code: "asset-missing",
-        id: "dialog-frame",
-        kind: "texture"
-      })
-    ]);
   });
 });
 

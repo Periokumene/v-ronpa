@@ -1,7 +1,7 @@
 export const gameAUiConfig = {
   dialog: {
     showSpeakerName: true,
-    frameRole: "dialog-frame"
+    frameAssetId: "texture:ui:game-a-dialog-frame"
   },
   title: {
     title: "Game A"
