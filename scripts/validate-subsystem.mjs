@@ -17,7 +17,8 @@ const commands = [
   ["pnpm", ["typecheck"]],
   ["pnpm", ["validate:contracts"]],
   ["pnpm", ["test"]],
-  ["pnpm", ["--filter", "@v-ronpa/game", "build"]],
+  ["pnpm", ["--filter", "@v-ronpa/game-a", "build"]],
+  ["pnpm", ["--filter", "@v-ronpa/game-harness", "build"]],
   ["pnpm", ["test:smoke"]]
 ];
 

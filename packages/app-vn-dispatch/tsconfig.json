@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["ES2022", "DOM"]
+  },
+  "references": [
+    { "path": "../contracts" },
+    { "path": "../nani-parser" },
+    { "path": "../nani-runtime-compiler" },
+    { "path": "../pixi-presenter" },
+    { "path": "../story-engine" },
+    { "path": "../story-play" }
+  ],
+  "include": ["src"]
+}

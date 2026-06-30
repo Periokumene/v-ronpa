@@ -12,12 +12,13 @@
     "test:smoke": "playwright test",
     "generate:assets": "node scripts/generate-assets.mjs",
     "validate:assets": "node scripts/validate-assets.mjs",
-    "validate:contracts": "vitest run packages/contracts packages/asset-registry packages/layered-character packages/nani-parser packages/nani-runtime-compiler packages/story-engine packages/story-play packages/gameplay packages/navi-director packages/trial-director packages/media-save",
+    "validate:contracts": "vitest run packages/contracts packages/asset-registry packages/layered-character packages/nani-parser packages/nani-runtime-compiler packages/story-engine packages/story-play packages/app-vn-session packages/app-vn-dispatch packages/app-vn-shell packages/gameplay packages/navi-director packages/trial-director packages/media-save",
     "validate:boundaries": "node scripts/validate-boundaries.mjs",
     "validate:task-boundaries": "node scripts/validate-task-boundaries.mjs",
     "validate:ccr": "node scripts/validate-ccr.mjs",
     "validate:subsystem": "node scripts/validate-subsystem.mjs",
-    "validate:baseline": "pnpm typecheck && pnpm validate:contracts && pnpm test && pnpm validate:assets && pnpm validate:boundaries && pnpm validate:ccr && pnpm --filter @v-ronpa/game build && pnpm test:smoke",
+    "validate:app-cleanup": "node scripts/validate-app-cleanup.mjs",
+    "validate:baseline": "pnpm typecheck && pnpm validate:contracts && pnpm test && pnpm validate:assets && pnpm validate:boundaries && pnpm validate:ccr && pnpm validate:app-cleanup && pnpm --filter @v-ronpa/game-a build && pnpm --filter @v-ronpa/game-harness build && pnpm test:smoke",
     "setup:worktree-env": "node scripts/setup-worktree-env.mjs"
   },
   "devDependencies": {

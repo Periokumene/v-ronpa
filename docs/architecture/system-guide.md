@@ -39,9 +39,9 @@ adapters and apps
 
 - `GameFlowMachine` owns shell flow state: `loading`, `title`, playable modes,
   overlay stack, and interaction capability policy.
-- `GameInteractionShell` in `apps/game` wires app adapters to title, overlay,
-  VN toolbar, save/load, backlog, settings, and pause menu surfaces. It is app
-  orchestration, not a gameplay director.
+- `GameInteractionShell` in `packages/app-vn-shell` wires app adapters to
+  title, overlay, VN toolbar, save/load, backlog, settings, and pause menu
+  surfaces. It is app-layer orchestration, not a gameplay director.
 - `navi-director` owns Navi substates: `walk`, `interacting`, `vn2d-overlay`,
   `inventory`, and `event`.
 - `trial-director` owns Trial segment flow, presentation profile selection,
@@ -49,6 +49,13 @@ adapters and apps
 - `nani-runtime-compiler` owns `.nani` IR to `RuntimeScript` compilation,
   command normalization, canonical runtime params, expression preservation, and
   compiler diagnostics.
+- `app-vn-session` owns headless VN entry boot from resolved source text:
+  `parseScenario`, `compileRuntimeScript`, StoryEngine state, story-play state,
+  choice/input/runtime-wait/presentation-wait helpers, and session-local
+  restore snapshots. It returns emitted `RuntimeCommand` batches to app
+  adapters for fanout and never owns asset resolution, React effects,
+  Pixi/R3F/DOM rendering, Howler/media handles, reveal/voice gates, browser
+  timers, or save persistence.
 - `StoryEngine` owns script semantics, variables, backlog, choices,
   expression evaluation, serializable Story snapshots, and per-step
   `emittedRuntimeCommands`.
@@ -56,6 +63,11 @@ adapters and apps
   one-shot `autoNext` scheduling, pacing intent, and automation stop reasons.
   It is a pure playback state machine; browser timers and renderer commits stay
   in app adapters.
+- `app-vn-dispatch` owns headless VN RuntimeCommand fanout: the route table,
+  presentation transaction, Pixi/media/UI reducers, dialog reveal pacing,
+  dialog playback gate, and dialogue audio planner. App adapters own timers,
+  ports, asset resolution, live media handles, and React commits around those
+  pure plans.
 - `gameplay` owns domain reducers for exploration, inventory, evidence
   ownership, character state, and pure trial rule judgments.
 - `media-save` owns Dexie IndexedDB save storage, Howler audio playback,
@@ -76,8 +88,11 @@ adapters and apps
 
 ## Mode Model
 
-The game has two primary playable modes:
+The game has three primary playable modes:
 
+- `vn`: visual novel story playback. It owns StoryEngine session state,
+  story-play AUTO/SKIP intent, VN entry selection, and VN2D/VN3D presentation
+  profile selection through app-layer VN packages.
 - `navi`: first-person 3D exploration. Walk, interactables, inventory,
   character-state changes, event triggers, and foreground VN2D overlays are
   substates of Navi, not separate global modes.
@@ -85,10 +100,12 @@ The game has two primary playable modes:
   future minigames are Trial segments. `vn2d`, `vn3d`, `debate3d`, and
   `minigame` are presentation profiles selected by the current Trial segment.
 
-This prevents `VN2D` and `VN3D` from being treated as equivalent top-level game
-modes. VN2D is an overlay-heavy presentation path; VN3D requires 3D camera
-focus, staged character standees, Pixi/DOM overlays, and may participate in
-Trial-specific input locks.
+This prevents `VN2D` and `VN3D` from becoming parallel top-level game modes.
+They are presentation profiles under VN, or overlay/profile paths used by Navi
+and Trial when those modes temporarily host story presentation. VN2D is an
+overlay-heavy presentation path; VN3D requires 3D camera focus, staged
+character standees, Pixi/DOM overlays, and may participate in Trial-specific
+input locks.
 
 The title screen and pause/settings/save/load/backlog screens are shell or
 overlay flow, not additional playable modes. They coordinate through
@@ -98,10 +115,11 @@ DOM UI composition.
 
 Settings are app-owned user preferences, not save data and not media-save
 payloads. `packages/contracts` declares the versioned `SettingsSnapshot`;
-`apps/game` owns the canonical settings adapter and localStorage persistence;
-`ui-kit` renders controlled controls only. Runtime consumers receive narrow
-derived values such as `StoryPlayTimingPolicy`, VN dialog display props, and
-dialog reveal text speed instead of the full settings snapshot.
+`packages/app-vn-shell` exports the reusable settings adapter and browser
+storage boundary; apps mount it and remain responsible for app-specific runtime
+data. `ui-kit` renders controlled controls only. Runtime consumers receive
+narrow derived values such as `StoryPlayTimingPolicy`, VN dialog display props,
+and dialog reveal text speed instead of the full settings snapshot.
 Voice runtime settings follow the same pattern: the app derives locale and
 volume from settings and passes only those narrow values to the runtime adapter.
 
@@ -134,15 +152,17 @@ submission remains a Trial UI action routed through `trial-director`.
 .nani source
   -> nani-parser AST/IR
   -> nani-runtime-compiler RuntimeScript / RuntimeCommand
+  -> app-vn-session boot/step wrapper
   -> StoryEngine story state + emittedRuntimeCommands
   -> story-play playback state + pacing schedule
-  -> VN runtime transaction + route table
+  -> app-vn-dispatch VN runtime transaction + route table
   -> routed RuntimeCommand consumption
-  -> app commit plans dialogue audio from emitted print textId + reveal state
+  -> app commit uses app-vn-dispatch planners for dialogue audio/reveal gates
   -> AUTO/autoNext voice gate handles AudioHandle.finished ended/stopped/failed
   -> app-created AssetRegistry resolves media/Pixi/R3F/UI asset ids
   -> PixiStageSnapshot / PixiStageRenderHint / Pixi wait tasks / gameplay events / AudioPort voice or bleep playback
-  -> VnRuntimeDispatcher renders DOM dialog and Pixi snapshot
+  -> VnRuntimeDispatcher renders the Pixi snapshot
+  -> GameInteractionShell renders DOM dialog, choices, toolbar, and runtime overlays
 ```
 
 Dialogue lines may include one `|#textId|` marker. The marker is parser
@@ -190,17 +210,23 @@ the app runtime adapter creates `TrialRuntimeState` and enters `GameMode`
 `trial`. Trial entry must not be hidden inside `start-script` labels or separate
 query-param scenarios.
 
-## First-Round Thin Slices
+## Integrated Harness Showcase Baseline
 
-- Parse labels, comments, commands, text, inline commands, choices, and jumps.
-- Validate fixtures with Zod.
-- Run a headless story reducer snapshot.
-- Resolve trial keyword outcomes with evidence without putting segment flow in
-  gameplay helpers.
-- Render harness scenes for Navi walk/VN2D/inventory and Trial VN3D/debate.
-- Capture Playwright smoke screenshots for visual evidence.
-- Validate Trial graph references before subsystem fanout.
-- Validate save data through a versioned migrator boundary.
+`apps/game-harness` is the accepted integrated harness-showcase baseline. It
+boots the showcase from `/` and composes VN, Navi, Trial, Pixi, R3F, media,
+save/load, settings, pause/menu, debug readouts, and smoke controls in one
+game-shaped harness.
+
+The harness-owned integration fixtures live in `contentManifest`,
+`generatedAssets`, `inputActions`, `showcase/*`,
+`scenarios/harness-showcase`, and `useFirstPersonExplorationBridge`. They are
+not independent registry entries, subsystem slices, or a legacy slice scenario
+set.
+
+The baseline validates parser/compiler behavior, StoryEngine snapshots,
+story-play pacing, gameplay outcomes, Navi and Trial director flow, Pixi/R3F
+presentation, runtime asset resolution, save data migration boundaries, and
+Playwright smoke evidence against the integrated harness and `game-a` VN path.
 
 ## Non-Goals
 

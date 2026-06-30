@@ -26,15 +26,16 @@ and merge the change through the integration baseline first.
   proxy relationships through `ContentManifest.runtimeAssets`,
   `RuntimeAsset`, and `CollisionProxy`.
 - Runtime asset references must be id-only. `AssetRef`,
-  `WorldMapDef.assetRefs`, `RuntimeScript.assets`, `UiAssetRef`, evidence
-  visuals, and mesh-backed collision proxies must not carry direct URLs.
+  `VnEntryDef.assetRefs`, `WorldMapDef.assetRefs`, `RuntimeScript.assets`,
+  `UiAssetRef`, evidence visuals, and mesh-backed collision proxies must not
+  carry direct URLs.
 - Apps create `AssetRegistry` instances from parsed content manifests and
   inject structural resolvers into renderer/media adapters. Pixi, R3F, Howler,
   and DOM UI code must not assemble public asset paths.
-- `GameMode` is intentionally narrow: `navi` and `trial` are the playable root
-  modes; VN2D/VN3D belong to Navi substates or Trial presentation profiles.
-  `title`, `paused`, and `saving` are shell flow states and must not absorb
-  Navi/Trial runtime ownership.
+- `GameMode` is intentionally narrow: `vn`, `navi`, and `trial` are the
+  playable root modes; VN2D/VN3D are presentation profiles under VN or
+  Navi/Trial-hosted story presentation paths. `title`, `paused`, and `saving`
+  are shell flow states and must not absorb VN/Navi/Trial runtime ownership.
 - Interaction shell controls should use `GameOverlayKind`, `GameUiAction`,
   `GameInteractionContext`, and `InteractionCapabilitySnapshot`. App adapters
   and UI surfaces must not redefine these shapes locally.

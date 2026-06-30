@@ -148,6 +148,7 @@ function baseManifest(runtimeAssets: RuntimeAsset[]): ContentManifest {
     uiAssets: [],
     interactionStyles: [],
     collisionProxies: [],
+    vnEntries: [],
     maps: [],
     items: [],
     evidence: [],

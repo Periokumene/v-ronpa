@@ -13,6 +13,7 @@ import {
 export type GameFlowEvent =
   | { type: "BOOT" }
   | { type: "START_NEW_GAME" }
+  | { type: "ENTER_VN" }
   | { type: "ENTER_NAVI" }
   | { type: "ENTER_TRIAL" }
   | { type: "PAUSE" }
@@ -42,6 +43,7 @@ const initialGameFlowContext: GameFlowContext = {
 };
 
 const rootModeTransitions = {
+  ENTER_VN: "vn",
   ENTER_NAVI: "navi",
   ENTER_TRIAL: "trial",
   PAUSE: "paused",
@@ -109,6 +111,7 @@ const flowMachineSetup = setup({
   actions: {
     setLoadingMode: assign(({ context }) => withMode(context, "loading")),
     setTitleMode: assign(({ context }) => withMode(context, "title")),
+    setVnMode: assign(({ context }) => withMode(context, "vn")),
     setNaviMode: assign(({ context }) => withMode(context, "navi")),
     setTrialMode: assign(({ context }) => withMode(context, "trial")),
     setPausedMode: assign(({ context }) => withMode(context, "paused", ["pause-menu"])),
@@ -139,10 +142,15 @@ export const gameFlowMachine = flowMachineSetup.createMachine({
       entry: "setTitleMode",
       on: {
         START_NEW_GAME: "navi",
+        ENTER_VN: "vn",
         ENTER_NAVI: "navi",
         ENTER_TRIAL: "trial",
         ...overlayEvents
       }
+    },
+    vn: {
+      entry: "setVnMode",
+      on: modeEvents
     },
     navi: {
       entry: "setNaviMode",
@@ -154,11 +162,11 @@ export const gameFlowMachine = flowMachineSetup.createMachine({
     },
     paused: {
       entry: "setPausedMode",
-      on: { RESUME: "navi", ENTER_NAVI: "navi", ENTER_TRIAL: "trial", ...overlayEvents }
+      on: { RESUME: "navi", ENTER_VN: "vn", ENTER_NAVI: "navi", ENTER_TRIAL: "trial", ...overlayEvents }
     },
     saving: {
       entry: "setSavingMode",
-      on: { SAVED: "navi", ENTER_NAVI: "navi", ENTER_TRIAL: "trial", ...overlayEvents }
+      on: { SAVED: "navi", ENTER_VN: "vn", ENTER_NAVI: "navi", ENTER_TRIAL: "trial", ...overlayEvents }
     }
   }
 });
@@ -170,7 +178,7 @@ export function modeFromSnapshotValue(value: unknown): GameMode {
 export function calculateInteractionCapabilities(context: GameInteractionContext): InteractionCapabilitySnapshot {
   const mode = context.mode;
   const inTitle = mode === "title";
-  const inPlayableMode = mode === "navi" || mode === "trial";
+  const inPlayableMode = mode === "vn" || mode === "navi" || mode === "trial";
   const inVnStory = context.hasActiveStory && context.inputLock === "dialog";
   const canAutomateStory = inVnStory && !context.storyEnded && !context.storyHasChoices;
   const canSave = inPlayableMode && context.isAtStableStop && !(context.hasActiveStory && context.storyEnded);
@@ -181,7 +189,8 @@ export function calculateInteractionCapabilities(context: GameInteractionContext
     canSave,
     canLoad,
     canOpenSettings: true,
-    canOpenBacklog: inVnStory && (context.naviSubstate === "vn2d-overlay" || context.trialPresentation === "vn2d"),
+    canOpenBacklog:
+      inVnStory && (mode === "vn" || context.naviSubstate === "vn2d-overlay" || context.trialPresentation === "vn2d"),
     canOpenPauseMenu: inPlayableMode && context.inputLock !== "menu",
     canAuto: canAutomateStory,
     canSkip: canAutomateStory,

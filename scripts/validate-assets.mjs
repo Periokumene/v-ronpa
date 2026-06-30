@@ -10,14 +10,18 @@ const {
   LayeredCharacterLayerMetadataSchema,
   LayeredCharacterLayersSchema
 } = await import(pathToFileURL(join(repoRoot, "packages/contracts/src/index.ts")).href);
-const generatedPath = join(repoRoot, "apps/game/src/harness/generatedAssets.ts");
-const contentManifestPath = join(repoRoot, "apps/game/src/harness/contentManifest.ts");
+const generatedPath = join(repoRoot, "apps/game-harness/src/harness/generatedAssets.ts");
+const contentManifestPath = join(repoRoot, "apps/game-harness/src/harness/contentManifest.ts");
+const gameAContentManifestPath = join(repoRoot, "apps/game-a/src/contentManifest.ts");
 const pixiFxAssetsPath = join(repoRoot, "packages/pixi-presenter/src/internal/fxAssets.ts");
-const bleepAssetsRoot = join(repoRoot, "apps/game/public/harness/media/bleep");
-const voiceAssetsRoot = join(repoRoot, "apps/game/public/harness/media/voice");
-const sourceRoots = ["apps/game/src", "packages", "scripts"].map((path) => join(repoRoot, path));
+const bleepAssetsRoot = join(repoRoot, "apps/game-harness/public/harness/media/bleep");
+const voiceAssetsRoot = join(repoRoot, "apps/game-harness/public/harness/media/voice");
+const sourceRoots = ["apps/game-a/src", "apps/game-harness/src", "packages", "scripts"].map((path) => join(repoRoot, path));
 const harnessReferenceFiles = [
-  join(repoRoot, "apps/game/src/harness/fixtures/verticalSlice.ts"),
+  join(repoRoot, "apps/game-harness/src/harness/showcase/script.ts"),
+  join(repoRoot, "apps/game-harness/src/harness/showcase/items.ts"),
+  join(repoRoot, "apps/game-harness/src/harness/showcase/maps.ts"),
+  join(repoRoot, "apps/game-a/src/contentManifest.ts"),
   join(repoRoot, "docs/nani/basic-p1-example.md"),
   ...fixtureNaniFiles(join(repoRoot, "packages/nani-parser/fixtures"))
 ];
@@ -28,7 +32,8 @@ const bleepAssetIdPattern = /^[a-zA-Z0-9_-]+$/u;
 const voiceTextIdPattern = /^[a-zA-Z0-9_-]+$/u;
 const characterPackCommandPattern = /^\s*@(char|slide)\s+([^\s]+)/gmu;
 const allowedHardcodedFiles = new Set([
-  "apps/game/src/harness/generatedAssets.ts",
+  "apps/game-harness/src/harness/generatedAssets.ts",
+  "apps/game-a/src/contentManifest.ts",
   "packages/pixi-presenter/src/internal/fxAssets.ts",
   "scripts/generate-assets.mjs",
   "scripts/validate-assets.mjs"
@@ -59,7 +64,7 @@ function checkHarnessFilesExist() {
   for (const asset of collectHarnessRuntimeAssets()) {
     if (ids.has(asset.id)) fail(`Duplicate generated asset id '${asset.id}'.`);
     ids.add(asset.id);
-    const filePath = join(repoRoot, "apps/game/public", asset.optimizedUri.replace(/^\//u, ""));
+    const filePath = join(repoRoot, "apps/game-harness/public", asset.optimizedUri.replace(/^\//u, ""));
     if (!existsSync(filePath)) fail(`Generated asset '${asset.id}' points to missing file ${relative(repoRoot, filePath)}.`);
   }
 }
@@ -73,7 +78,7 @@ function checkHarnessVoiceAssetLayout() {
     const ext = extname(filename);
     const textId = filename.slice(0, -ext.length);
     if (parts.length !== 2 || ext !== ".ogg") {
-      fail(`${toPosix(relative(repoRoot, filePath))} must use apps/game/public/harness/media/voice/<locale>/<textId>.ogg.`);
+      fail(`${toPosix(relative(repoRoot, filePath))} must use apps/game-harness/public/harness/media/voice/<locale>/<textId>.ogg.`);
       continue;
     }
     if (!voiceTextIdPattern.test(textId)) {
@@ -83,7 +88,7 @@ function checkHarnessVoiceAssetLayout() {
 }
 
 function checkHarnessFontAssetLayout() {
-  const fontsRoot = join(repoRoot, "apps/game/public/harness/fonts");
+  const fontsRoot = join(repoRoot, "apps/game-harness/public/harness/fonts");
   if (!existsSync(fontsRoot)) return;
   for (const filePath of walkFiles(fontsRoot)) {
     const rel = toPosix(relative(fontsRoot, filePath));
@@ -91,7 +96,7 @@ function checkHarnessFontAssetLayout() {
     const ext = extname(parts.at(-1) ?? "");
     if (rel === "README.md") continue;
     if (parts.length !== 1 || ![".woff", ".woff2", ".ttf", ".otf"].includes(ext)) {
-      fail(`${toPosix(relative(repoRoot, filePath))} must use apps/game/public/harness/fonts/<fontId>.{woff,woff2,ttf,otf}.`);
+      fail(`${toPosix(relative(repoRoot, filePath))} must use apps/game-harness/public/harness/fonts/<fontId>.{woff,woff2,ttf,otf}.`);
     }
   }
 }
@@ -105,7 +110,7 @@ function checkHarnessBleepAssetLayout() {
     const ext = extname(filename);
     const bleepId = filename.slice(0, -ext.length);
     if (parts.length !== 1 || ext !== ".ogg") {
-      fail(`${toPosix(relative(repoRoot, filePath))} must use apps/game/public/harness/media/bleep/<bleepId>.ogg.`);
+      fail(`${toPosix(relative(repoRoot, filePath))} must use apps/game-harness/public/harness/media/bleep/<bleepId>.ogg.`);
       continue;
     }
     if (!bleepAssetIdPattern.test(bleepId)) {
@@ -116,7 +121,7 @@ function checkHarnessBleepAssetLayout() {
 
 function checkCharacterPacks() {
   for (const asset of collectHarnessRuntimeAssets().filter((item) => item.kind === "character-pack")) {
-    const entryPath = join(repoRoot, "apps/game/public", asset.optimizedUri.replace(/^\//u, ""));
+    const entryPath = join(repoRoot, "apps/game-harness/public", asset.optimizedUri.replace(/^\//u, ""));
     if (!existsSync(entryPath)) {
       fail(`Character pack '${asset.id}' points to missing entry ${relative(repoRoot, entryPath)}.`);
       continue;
@@ -176,6 +181,11 @@ function checkHarnessReferencesResolve() {
 
 function checkContentManifestReferencesResolve() {
   const knownAssets = collectRegisteredAssetMap();
+  for (const asset of knownAssets.values()) {
+    if (!asset.optimizedUri?.startsWith("/game-a/")) continue;
+    const filePath = join(repoRoot, "apps/game-a/public", asset.optimizedUri.replace(/^\/game-a\//u, "game-a/"));
+    if (!existsSync(filePath)) fail(`Runtime asset '${asset.id}' points to missing file ${relative(repoRoot, filePath)}.`);
+  }
   for (const font of collectManifestFontFaces()) {
     const asset = knownAssets.get(font.sourceRef);
     if (!asset) {
@@ -218,7 +228,12 @@ function collectRegisteredIds() {
 }
 
 function collectRegisteredAssetMap() {
-  return new Map(collectHarnessRuntimeAssets().map((asset) => [asset.id, asset]));
+  return new Map(
+    [
+      ...collectHarnessRuntimeAssets(),
+      ...collectInlineRuntimeAssets(gameAContentManifestPath)
+    ].map((asset) => [asset.id, asset])
+  );
 }
 
 function collectManifestFontFaces() {
@@ -233,6 +248,21 @@ function collectManifestFontFaces() {
     if (id && sourceRef) fonts.push({ id, sourceRef });
   }
   return fonts;
+}
+
+function collectInlineRuntimeAssets(manifestPath) {
+  if (!existsSync(manifestPath)) return [];
+  const content = readFileSync(manifestPath, "utf8");
+  const block = content.match(/runtimeAssets:\s*\[([\s\S]*?)\],\s*collisionProxies/u)?.[1] ?? "";
+  const assets = [];
+  for (const match of block.matchAll(/\{([\s\S]*?)\}/gu)) {
+    const body = match[1] ?? "";
+    const id = body.match(/\bid:\s*"([^"]+)"/u)?.[1];
+    const kind = body.match(/\bkind:\s*"([^"]+)"/u)?.[1];
+    const optimizedUri = body.match(/\boptimizedUri:\s*"([^"]+)"/u)?.[1];
+    if (id && kind) assets.push({ id, kind, optimizedUri });
+  }
+  return assets;
 }
 
 function checkNoHardcodedRuntimeAssetPaths() {

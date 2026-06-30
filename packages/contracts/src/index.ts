@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const IdSchema = z.string().min(1).regex(/^[a-zA-Z0-9:_./-]+$/);
 
-export const GameModeSchema = z.enum(["loading", "title", "navi", "trial", "paused", "saving"]);
+export const GameModeSchema = z.enum(["loading", "title", "vn", "navi", "trial", "paused", "saving"]);
 export type GameMode = z.infer<typeof GameModeSchema>;
 
 export const GameOverlayKindSchema = z.enum([
@@ -1815,10 +1815,35 @@ export const TrialRuntimeStateSchema = z.object({
 });
 export type TrialRuntimeState = z.infer<typeof TrialRuntimeStateSchema>;
 
+export const VnPresentationProfileSchema = z.enum(["vn2d", "vn3d"]);
+export type VnPresentationProfile = z.infer<typeof VnPresentationProfileSchema>;
+
+export const VnEntryDefSchema = z
+  .object({
+    id: IdSchema,
+    title: z.string().min(1),
+    scriptPath: z.string().min(1),
+    startLabel: z.string().min(1).optional(),
+    profile: VnPresentationProfileSchema.default("vn2d"),
+    assetRefs: z.array(AssetRefSchema).default([])
+  })
+  .strict();
+export type VnEntryDef = z.infer<typeof VnEntryDefSchema>;
+
+export const SaveableVnStateSchema = z
+  .object({
+    entryId: IdSchema.optional(),
+    story: StoryRuntimeSnapshotSchema,
+    pixiStage: PixiStageSnapshotSchema
+  })
+  .strict();
+export type SaveableVnState = z.infer<typeof SaveableVnStateSchema>;
+
 export const SaveDataSchema = z.object({
   version: z.literal(3),
   savedAt: z.string(),
   mode: GameModeSchema,
+  vn: SaveableVnStateSchema.optional(),
   navi: NaviRuntimeStateSchema.optional(),
   story: StoryRuntimeSnapshotSchema,
   pixiStage: PixiStageSnapshotSchema,
@@ -1839,6 +1864,7 @@ export const ContentManifestSchema = z.object({
   runtimeAssets: z.array(RuntimeAssetSchema).default([]),
   collisionProxies: z.array(CollisionProxySchema).default([]),
   input: InputBindingMapSchema.optional(),
+  vnEntries: z.array(VnEntryDefSchema).default([]),
   maps: z.array(WorldMapDefSchema),
   items: z.array(ItemDefSchema),
   evidence: z.array(EvidenceDefSchema).default([]),

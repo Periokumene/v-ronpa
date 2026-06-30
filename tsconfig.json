@@ -8,6 +8,9 @@
     { "path": "packages/nani-runtime-compiler" },
     { "path": "packages/story-engine" },
     { "path": "packages/story-play" },
+    { "path": "packages/app-vn-session" },
+    { "path": "packages/app-vn-dispatch" },
+    { "path": "packages/app-vn-shell" },
     { "path": "packages/game-flow-machine" },
     { "path": "packages/gameplay" },
     { "path": "packages/media-save" },
@@ -16,6 +19,7 @@
     { "path": "packages/r3f-adapter" },
     { "path": "packages/trial-director" },
     { "path": "packages/ui-kit" },
-    { "path": "apps/game" }
+    { "path": "apps/game-a" },
+    { "path": "apps/game-harness" }
   ]
 }

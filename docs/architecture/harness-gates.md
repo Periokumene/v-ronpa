@@ -20,6 +20,17 @@ boundaries, CCR requirements, and dependency boundaries.
 direction, and `tsconfig.json` project references against the same workspace
 dependency matrix.
 
+`pnpm validate:baseline` is the full repository gate. It runs `typecheck`,
+`validate:contracts`, unit tests, `validate:assets`, `validate:boundaries`,
+`validate:ccr`, `validate:app-cleanup`, both app builds
+(`@v-ronpa/game-a` and `@v-ronpa/game-harness`), and `test:smoke`.
+
+`validate:subsystem` is the task-review gate. It enforces task path
+boundaries, CCR requirements, dependency boundaries, typecheck, contract tests,
+unit tests, both app builds, and smoke. It does not replace the baseline-only
+asset generation or app-cleanup residue checks unless those commands are run
+separately.
+
 `validate:assets` dry-runs harness asset generation, verifies generated
 `RuntimeAsset` files exist, checks harness asset ids resolve through registered
 assets, and rejects hardcoded runtime asset file paths in source outside the
@@ -28,18 +39,22 @@ generator and registration allowlist.
 ## Smoke And Evidence Gates
 
 - `pnpm test:smoke`
-- Fixed scenario registry screenshot at `test-results/harness-registry.png`
-- Accepted vertical-slice screenshots:
-  - `test-results/vertical-slice-title.png`
-  - `test-results/vertical-slice-navi.png`
-  - `test-results/vertical-slice-vn-toolbar.png`
-  - `test-results/vertical-slice-backlog.png`
-  - `test-results/vertical-slice-save-load.png`
-  - `test-results/vertical-slice-pause-menu.png`
-  - `test-results/vertical-slice-map-change.png`
-  - `test-results/vertical-slice-trial-entry.png`
-  - `test-results/vertical-slice-vn-choice.png`
-  - `test-results/vertical-slice-branch-b.png`
+- Harness root screenshot at `test-results/harness-root.png`
+- Game A VN framework screenshots:
+  - `test-results/game-a-title.png`
+  - `test-results/game-a-vn-dialog.png`
+  - `test-results/game-a-save-load.png`
+- Accepted harness-showcase screenshots:
+  - `test-results/harness-showcase-title.png`
+  - `test-results/harness-showcase-navi.png`
+  - `test-results/harness-showcase-vn-toolbar.png`
+  - `test-results/harness-showcase-backlog.png`
+  - `test-results/harness-showcase-save-load.png`
+  - `test-results/harness-showcase-pause-menu.png`
+  - `test-results/harness-showcase-map-change.png`
+  - `test-results/harness-showcase-trial-entry.png`
+  - `test-results/harness-showcase-vn-choice.png`
+  - `test-results/harness-showcase-branch-b.png`
 - Failure screenshots under `test-results/`
 - HTML report under `playwright-report/`
 
@@ -49,16 +64,22 @@ Run `pnpm setup:worktree-env` once in every worktree before launching the app
 or running smoke tests. The script creates an ignored `.env.worktree` with
 worktree-specific `PORT` and `VITE_DEV_PORT` values.
 
-`apps/game/vite.config.ts` and `playwright.config.ts` both search upward for
-`.env.worktree`. Explicit shell values still win, then `.env.worktree`, then
-the default `5173`. Vite uses `strictPort` so a busy port fails loudly instead
-of silently moving the app while Playwright waits on a different URL.
+`apps/game-harness/vite.config.ts` and `playwright.config.ts` both search
+upward for `.env.worktree`. Explicit shell values still win, then
+`.env.worktree`, then the default `5173`. The harness Vite config uses
+`strictPort` so a busy port fails loudly instead of silently moving the app
+while Playwright waits on a different URL.
+
+Playwright starts `game-harness` on `PORT` and `game-a` on `PORT + 1`. Manual
+`game-a` dev runs currently need an explicit `PORT` / `VITE_DEV_PORT` when the
+default port is not desired, unless `apps/game-a/vite.config.ts` is updated to
+share the worktree port helper and `strictPort`.
 
 Parallel-safe commands:
 
 ```bash
 pnpm setup:worktree-env
-pnpm --filter @v-ronpa/game dev
+pnpm --filter @v-ronpa/game-harness dev
 pnpm test:smoke
 ```
 
@@ -67,7 +88,7 @@ and rerun `pnpm setup:worktree-env`, or set both `PORT` and `VITE_DEV_PORT`
 for that shell. Never commit `.env.worktree`, `.local-state/`,
 `test-results/`, or `playwright-report/`.
 
-Smoke gates confirm the app boots into the accepted vertical slice title page,
+Smoke gates confirm the app boots into the accepted harness showcase title page,
 title load/settings entries open, Settings edits persist outside save slots, New
 Game enters Navi, Navi can move through first-person exploration, no-target
 interactions are rejected, items and evidence update gameplay state, map
@@ -85,20 +106,12 @@ The first app build intentionally allows the large R3F/Pixi/Three bundle
 warning. A later performance task should add route or adapter code splitting
 once subsystem APIs stabilize.
 
-## Fixed Harness Scenario Entries
+## Harness Entry
 
-The first vertical-slice fanout used fixed query-param entries as temporary
-developer harnesses. After the P1 lines were integrated, only the accepted
-vertical-slice harness remains active.
-
-| Entry | Owning worktree | Modules allowed to change |
-|---|---|---|
-| `/?scenario=vertical-slice` | accepted integration baseline; see `docs/archive/completed-tasks/vertical-slice-integration.md` and `docs/archive/completed-tasks/game-interaction-shell.md` | integration harness, title-first flow, Trial entry, interaction shell overlays, save/load smoke evidence |
-
-Completed temporary subsystem entries are archived under
-`docs/archive/completed-tasks/`. Future slices should add new scenario entries
-for their own acceptance evidence instead of reviving the removed temporary
-entries.
+`apps/game-harness` now boots the integrated showcase directly from `/`. It is
+not a registry of independent subsystem slices; it is one game-shaped baseline
+that keeps VN, Navi, Trial, Pixi, R3F, media, save/load, settings, pause, debug
+readouts, and smoke controls available for capability verification.
 
 ## Inspector Lite
 

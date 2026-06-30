@@ -1,0 +1,102 @@
+import { describe, expect, it } from "vitest";
+import {
+  advanceVnSession,
+  chooseVnSessionOption,
+  completeVnSessionPresentationWait,
+  completeVnSessionRuntimeWait,
+  createSaveableVnSessionSnapshot,
+  createVnSession,
+  restoreVnSession,
+  submitVnSessionInput,
+  toggleVnSessionAuto,
+  toggleVnSessionSkip
+} from "./index";
+
+const sourceText = `#Start
+Narrator: First.
+@choice "Left" goto:#Left
+@choice "Right" goto:#Right
+
+#Left
+@set route:"left"
+Narrator: Left route.
+@end
+
+#Right
+@set route:"right"
+Narrator: Right route.
+@end`;
+
+describe("app VN session", () => {
+  it("boots and advances a script without renderer state", () => {
+    const boot = createVnSession({ scriptPath: "session-test.nani", sourceText, startLabel: "Start" });
+    const first = advanceVnSession(boot.session, "start");
+
+    expect(boot.session.diagnostics).toEqual({ parser: [], compiler: [] });
+    expect(first.session.story.backlog).toEqual([{ speaker: "Narrator", text: "First." }]);
+    expect(first.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["print"]);
+  });
+
+  it("chooses branches and keeps saveable session snapshots headless", () => {
+    const boot = createVnSession({ scriptPath: "session-choice.nani", sourceText, startLabel: "Start" });
+    const first = advanceVnSession(boot.session, "start");
+    const withChoices = advanceVnSession(first.session, "manual");
+    const chosen = chooseVnSessionOption(withChoices.session, 1);
+    const snapshot = createSaveableVnSessionSnapshot(chosen.session);
+    const restored = restoreVnSession({ script: chosen.session.script, snapshot });
+
+    expect(withChoices.session.story.pendingChoices.map((choice) => choice.text)).toEqual(["Left", "Right"]);
+    expect(chosen.session.story.variables.route).toBe("right");
+    expect(snapshot.story.variables.route).toBe("right");
+    expect(restored.story.variables.route).toBe("right");
+  });
+
+  it("toggles AUTO and SKIP in session state without timers", () => {
+    const boot = createVnSession({ scriptPath: "session-play.nani", sourceText, startLabel: "Start" });
+    expect(toggleVnSessionAuto(boot.session).play.mode).toBe("auto");
+    expect(toggleVnSessionSkip(boot.session).play.mode).toBe("skip");
+  });
+
+  it("completes runtime waits and input waits without owning browser timers", () => {
+    const boot = createVnSession({
+      scriptPath: "session-wait.nani",
+      sourceText: `#Start
+@movie video:session-intro block!
+Narrator: After movie.
+@input codename type:string summary:"Codename" value:Felix
+Narrator: After input.
+@end`,
+      startLabel: "Start"
+    });
+    const waiting = advanceVnSession(boot.session, "start");
+    const completedWait = completeVnSessionRuntimeWait(waiting.session, "movie");
+    const afterMovie = advanceVnSession(completedWait.session, "manual");
+    const inputWaiting = advanceVnSession(afterMovie.session, "manual");
+    const submitted = submitVnSessionInput(inputWaiting.session, "Mira");
+
+    expect(waiting.session.story.runtimeWait).toMatchObject({ kind: "movie", moviePath: "video:session-intro" });
+    expect(completedWait.session.story.runtimeWait).toBeUndefined();
+    expect(afterMovie.session.story.backlog.at(-1)?.text).toBe("After movie.");
+    expect(inputWaiting.session.story.runtimeWait).toMatchObject({ kind: "input", variableName: "codename" });
+    expect(submitted.session.story.variables.codename).toBe("Mira");
+    expect(submitted.session.story.backlog.at(-1)?.text).toBe("After input.");
+  });
+
+  it("completes presentation waits without storing renderer task state", () => {
+    const boot = createVnSession({
+      scriptPath: "session-presentation-wait.nani",
+      sourceText: `#Start
+@char Ema time:0.25 wait!
+Narrator: After presentation.
+@end`,
+      startLabel: "Start"
+    });
+    const waiting = advanceVnSession(boot.session, "start");
+    const completed = completeVnSessionPresentationWait(waiting.session);
+    const afterPresentation = advanceVnSession(completed.session, "manual");
+
+    expect(waiting.session.story.presentationWait).toMatchObject({ commandId: "char", durationMs: 250 });
+    expect(completed.session.story.presentationWait).toBeUndefined();
+    expect(afterPresentation.session.story.backlog.at(-1)?.text).toBe("After presentation.");
+  });
+});

@@ -1,0 +1,18 @@
+{
+  "name": "@v-ronpa/app-vn-shell",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/app-vn-dispatch": "workspace:*",
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/pixi-presenter": "workspace:*",
+    "@v-ronpa/story-engine": "workspace:*",
+    "@v-ronpa/story-play": "workspace:*",
+    "@v-ronpa/ui-kit": "workspace:*",
+    "react": "^19.0.0"
+  }
+}

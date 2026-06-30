@@ -33,9 +33,9 @@ of overloading pressed/released action events.
 
 - `none`: the active 3D mode may accept exploration or targeting input.
 - `dialog`: the app DOM VN interaction layer owns story advance and choices.
-  In the current Navi VN2D path, `GameInteractionShell` provides a transparent
-  playfield hit plane for manual story advance and `VnChoiceOverlay` owns
-  pending choices; `VnDialogSurface` is display-only.
+  In primary `vn` and the Navi `vn2d-overlay` path, `GameInteractionShell`
+  provides a transparent playfield hit plane for manual story advance and
+  `VnChoiceOverlay` owns pending choices; `VnDialogSurface` is display-only.
 - `inventory`: inventory/menu surface owns input.
 - `trial-targeting`: Trial debate owns truth-bullet aiming and firing.
 - `menu`: global menu owns input.

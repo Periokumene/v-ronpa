@@ -151,8 +151,8 @@ before probing or calling `useGLTF`.
 
 ## VN3D Versus Trial
 
-`vn2d` and `vn3d` are not global modes. They are presentation profiles used
-inside Navi or Trial flows.
+`vn2d` and `vn3d` are not global modes. They are presentation profiles used by
+root `vn` entries and by Navi/Trial-hosted story presentation paths.
 
 `vn2d` is an overlay-heavy presentation profile: DOM owns text and choices,
 Pixi owns foreground visual effects, and the 3D scene can remain passive in the
@@ -172,7 +172,7 @@ as `vn3d`, but it is not just `vn3d` with a different camera. Trial requires a
 `TrialDefinition`, `TrialRuntimeState`, and `trial-director` logic on top of
 story presentation.
 
-The accepted vertical-slice harness enters Trial from an in-scene Navi
+The accepted harness-showcase harness enters Trial from an in-scene Navi
 interactable using `start-trial`. The same scenario remains active; the app
 switches from Navi staging to the Trial stage based on `GameMode` and the
 current `TrialRuntimeState`.

@@ -173,6 +173,9 @@ export function collectManifestAssetReferences(manifest: ContentManifest): Asset
   for (const profile of manifest.interactionStyles) {
     for (const uiAsset of profile.assets) refs.push({ id: uiAsset.assetId, kind: "texture", tags: uiAsset.tags });
   }
+  for (const entry of manifest.vnEntries) {
+    refs.push(...entry.assetRefs);
+  }
   for (const map of manifest.maps) {
     refs.push(...map.assetRefs);
   }
@@ -201,6 +204,7 @@ function createEmptyManifest(): ContentManifest {
     interactionStyles: [],
     runtimeAssets: [],
     collisionProxies: [],
+    vnEntries: [],
     maps: [],
     items: [],
     evidence: [],

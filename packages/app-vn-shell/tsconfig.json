@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx"
+  },
+  "references": [
+    { "path": "../app-vn-dispatch" },
+    { "path": "../contracts" },
+    { "path": "../pixi-presenter" },
+    { "path": "../story-engine" },
+    { "path": "../story-play" },
+    { "path": "../ui-kit" }
+  ],
+  "include": ["src"]
+}

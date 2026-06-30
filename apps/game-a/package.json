@@ -1,0 +1,29 @@
+{
+  "name": "@v-ronpa/game-a",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@v-ronpa/app-vn-dispatch": "workspace:*",
+    "@v-ronpa/app-vn-session": "workspace:*",
+    "@v-ronpa/app-vn-shell": "workspace:*",
+    "@v-ronpa/asset-registry": "workspace:*",
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/game-flow-machine": "workspace:*",
+    "@v-ronpa/gameplay": "workspace:*",
+    "@v-ronpa/pixi-presenter": "workspace:*",
+    "@v-ronpa/story-engine": "workspace:*",
+    "@v-ronpa/story-play": "workspace:*",
+    "@v-ronpa/ui-kit": "workspace:*",
+    "@xstate/react": "^6.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "xstate": "^5.0.0"
+  }
+}

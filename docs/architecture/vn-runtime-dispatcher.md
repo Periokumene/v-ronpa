@@ -2,18 +2,22 @@
 
 VN runtime output is split in two app-layer steps:
 
+- `packages/app-vn-session` wraps parser/compiler/StoryEngine/story-play boot
+  and stepping for VN-only app adapters that can use the shared headless
+  session boundary.
 - `StoryEngine` advances a compiled `RuntimeScript` and returns the current
   step's `emittedRuntimeCommands`.
 - `createVnRuntimePresentationTransaction` fans those emitted runtime commands
   out to runtime consumers such as Pixi stage snapshots, render hints, and
   gameplay events.
-- The vertical-slice app adapter also derives dialogue line audio from emitted
-  `print.params.textId` and reveal state during story step commit; this is
-  intentionally outside React render/effect replay.
-- The vertical-slice app adapter derives transient dialog text reveal state
-  from the emitted `print` plus the current Story line during the same commit.
-  The reveal runtime owns grapheme pacing and lifecycle events only; StoryEngine
-  continues to own the complete visible line, backlog, and save snapshot.
+- `packages/app-vn-dispatch` also owns the pure dialog reveal, playback gate,
+  and dialogue audio planners. App adapters host the transient state, timers,
+  ports, and media handles while calling those shared helpers during story step
+  commit.
+- App adapters derive transient dialog text reveal state from the emitted
+  `print` plus the current Story line during the same commit. The reveal
+  runtime owns grapheme pacing and lifecycle events only; StoryEngine continues
+  to own the complete visible line, backlog, and save snapshot.
 - `VnRuntimeDispatcher` renders already-materialized Pixi stage state.
   `GameInteractionShell` renders DOM runtime UI surfaces such as dialog
   display, choice overlay, command bar, toast, input prompt, and movie overlay.
@@ -35,10 +39,18 @@ VN runtime output is split in two app-layer steps:
   one-shot `autoNext`, schedule selection, pacing intent, and automation stop
   reasons. It does not own timers, React effects, Pixi, DOM, voice state, or
   save data.
+- `packages/app-vn-session` is the reusable headless wrapper around VN
+  parser/compiler/StoryEngine/story-play boot and stepping. It owns choice,
+  input, runtime-wait, presentation-wait, AUTO/SKIP toggles, and session-local
+  restore snapshots, but not public save persistence or browser side effects.
+  Integrated adapters may compose lower-level packages directly for Navi/Trial
+  bridging, but the same headless boundary applies to reusable VN session work.
 - `StoryRuntimeState` is saveable story state only. It must not store runtime
   command streams, presentation logs, or transient effects.
-- `createVnRuntimePresentationTransaction` owns app-level fanout from emitted
-  `RuntimeCommand` records.
+- `packages/app-vn-dispatch` owns shared headless fanout from emitted
+  `RuntimeCommand` records: route selection, presentation transactions,
+  media/UI reducers, dialog reveal pacing, dialog playback gate selection, and
+  dialogue audio planning.
 - `VnRuntimeDispatcher` owns React rendering of the Pixi layer from committed
   runtime state and receives the app-created structural asset resolver for Pixi
   texture loads.
@@ -46,20 +58,21 @@ VN runtime output is split in two app-layer steps:
   committed app runtime state. Script-controlled `showUI` / `hideUI` visibility
   applies only to concrete runtime UI surfaces, not shell overlays, debug
   readouts, or Pixi.
-- In Navi VN2D, `GameInteractionShell` also owns the transparent manual-advance
-  hit plane. It is app-local orchestration, not a shared input system. The hit
-  plane exists only while story is active and not ended, with no pending
-  choices, shell overlay, input prompt, or movie overlay. It may remain active
-  while the dialog surface itself is hidden so script-authored `hideUI dialog`
-  lines can still advance.
+- In primary VN and Navi VN2D, `GameInteractionShell` also owns the transparent
+  manual-advance hit plane. It is app-layer orchestration, not a shared input
+  system. The hit plane exists only while story is active and not ended, with
+  no pending choices, shell overlay, input prompt, or movie overlay. It may
+  remain active while the dialog surface itself is hidden so script-authored
+  `hideUI dialog` lines can still advance.
 - Pixi `PresentationTask` snapshots flow from `pixi-presenter` to app debug UI
   through `onTasksChanged`. They are renderer-local lifecycle observations, not
   save data. When StoryEngine is stopped on an explicit Pixi `wait!`, the app
   matches the wait's `expectedTasks` against these snapshots to resume story
   flow on real Pixi completion.
 - Settings are not routed through StoryEngine or RuntimeCommand output.
-  `apps/game` derives VN dialog display props and story-play timing policy from
-  the canonical settings snapshot, then passes those narrow values into runtime
+  `packages/app-vn-shell` exposes the reusable settings adapter, and each app
+  derives VN dialog display props and story-play timing policy from the
+  canonical settings snapshot before passing those narrow values into runtime
   adapters and `GameInteractionShell` / `VnDialogSurface`.
 - Dialog reveal uses the same app-derived display `textSpeed` as
   `VnDialogSurface`. It is not a settings schema extension and does not add a
@@ -82,7 +95,7 @@ VN runtime output is split in two app-layer steps:
 
 ## Route Table
 
-`apps/game/src/vnOutputRoutes.ts` exports `VnOutputRouteTable`.
+`packages/app-vn-dispatch/src/vnOutputRoutes.ts` exports `VnOutputRouteTable`.
 
 Route entries are fixed in this baseline and support one-to-many targets:
 
@@ -120,17 +133,17 @@ Pixi reducers also return diagnostic no-op output for commands with missing or
 unsupported Pixi-consumable params rather than writing placeholder stage ids.
 
 Media source refs, Pixi appearances, R3F model refs, and UI/evidence texture
-refs are asset ids, not paths. The vertical-slice runtime adapter resolves
+refs are asset ids, not paths. The harness-showcase runtime adapter resolves
 media ids before calling `AudioPort` or `VideoPort`; `VnRuntimeDispatcher`
 passes the same resolver to Pixi; and the first-person bridge passes it to the
 R3F stage. Missing asset resolution is surfaced as runtime diagnostics and
 visible fallback behavior, not guessed public URLs.
 
-Dialogue line audio is a media derivation, not StoryEngine behavior. The app
-uses one dialogue audio planner for each committed `print`: a resolvable
-`voice:<locale>:<textId>` asset wins and suppresses bleep, even when voice
-volume is zero; otherwise reveal bleep may fallback through
-`ContentManifest.audio.dialogueBleep`.
+Dialogue line audio is a media derivation, not StoryEngine behavior. App
+adapters use the `app-vn-dispatch` dialogue audio planner for each committed
+`print`: a resolvable `voice:<locale>:<textId>` asset wins and suppresses
+bleep, even when voice volume is zero; otherwise reveal bleep may fallback
+through `ContentManifest.audio.dialogueBleep`.
 
 ```text
 print.params.textId
@@ -181,11 +194,12 @@ load, reset, overlay close, story end, and trial entry clear any pending gate;
 manual advance only stops voice when the current Story state can actually
 advance or complete its wait.
 
-Dialog text reveal is app-local transient presentation state:
+Dialog text reveal is app-hosted transient presentation state driven by
+`app-vn-dispatch` reveal helpers:
 
 ```text
 emitted print + selectCurrentStoryLine()
-  -> app dialogRevealRuntime
+  -> app-hosted dialogRevealRuntime state
   -> visible text slice for GameInteractionShell
   -> VnDialogSurface text prop
 ```
@@ -208,22 +222,31 @@ StoryEngine step changes the current line without emitting a new `print`, the
 adapter clears the overlay so text mutations such as `@append` are not hidden
 behind stale partial text.
 Reveal lifecycle events (`reveal-start`, `reveal-tick`, `reveal-finish`) remain
-app-local presentation signals. Dialogue bleep uses reveal start/finish as a
-loop boundary only; completing or instantly revealing a line does not synthesize
-catch-up `reveal-tick` events, so bleep playback does not burst during manual
-completion, SKIP, or restore-like paths.
+app-hosted presentation signals produced by shared reveal helpers. Dialogue
+bleep uses reveal start/finish as a loop boundary only; completing or instantly
+revealing a line does not synthesize catch-up `reveal-tick` events, so bleep
+playback does not burst during manual completion, SKIP, or restore-like paths.
 
 Presentation wait release is task-driven. `createVnRuntimePresentationTransaction`
-returns Pixi wait descriptors, the runtime adapter stores them on
+returns Pixi wait descriptors, the app runtime adapter stores them on
 `StoryRuntimeState.presentationWait.expectedTasks`, and `onTasksChanged`
 completion triggers `PRESENTATION_COMPLETE` followed by immediate StoryEngine
 resume. App timers are fallback diagnostics only, not the primary wait release
 mechanism. Manual advance during the wait settles Pixi to the terminal snapshot
 and then resumes story flow.
 
-## Vertical Slice Migration
+## Game A Consumption
 
-The vertical-slice harness uses:
+`apps/game-a` uses the same VN session, transaction, `GameInteractionShell`,
+`VnRuntimeDispatcher`, and app-created `AssetRegistry` path, but only for a
+standalone VN2D entry. It does not mount Navi, Trial, R3F, `media-save`,
+voice/bleep media ports, or harness debug controls. Its save adapter is
+localStorage-backed and stores VN story plus Pixi stage snapshots for the Game
+A entry.
+
+## Harness Showcase Migration
+
+The harness-showcase harness uses:
 
 - `parseScenario` followed by `compileRuntimeScript`.
 - `StoryEngine` stepping over `RuntimeScript`.
@@ -246,10 +269,23 @@ into the runtime adapter instead.
 VN dialog and toolbar actions are intentionally outside `VnRuntimeDispatcher`.
 LOG, SKIP, AUTO, SAVE, LOAD, and SETTING are shell UI actions derived from
 `InteractionCapabilitySnapshot`; they should enter the app through
-`GameInteractionShell` and its overlay/page adapters. AUTO/SKIP actions are
-routed from those adapters into the runtime adapter, which hosts web timers and
-delegates playback rules to `story-play`. The Pixi active task debug list must
-not be used to enable or disable these controls.
+`GameInteractionShell` and an app-provided overlay/page adapter such as the
+harness `useOverlayPageAdapters`. AUTO/SKIP actions are routed from those
+adapters into the runtime adapter, which hosts web timers and delegates playback
+rules to `story-play`. The Pixi active task debug list must not be used to
+enable or disable these controls.
+
+`vnShellActions` contains pure action-to-overlay and save/load model helpers.
+App-owned overlay/page adapters call those helpers and render concrete `ui-kit`
+overlay pages with app-specific save/load data collection.
+
+`apps/game-harness/src/interaction` is harness-only wiring:
+`useGameFlowActor` adapts `game-flow-machine`,
+`useHarnessShowcaseRuntimeAdapter` binds showcase fixtures to runtime state and
+ports, `useHarnessShowcaseSaveAdapter` owns harness save collection and slot
+policy, and `useOverlayPageAdapters` renders app-specific overlay pages using
+`ui-kit` plus `app-vn-shell` helpers. These hooks must not move into
+`packages/app-vn-dispatch` or `packages/app-vn-shell`.
 
 Settings overlay edits update app-owned canonical settings immediately and are
 debounced to localStorage by the app adapter. The overlay does not own draft

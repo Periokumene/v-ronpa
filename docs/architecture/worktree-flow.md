@@ -27,12 +27,16 @@ Preferred fan-out:
 - `nani-parser`
 - `story-engine`
 - `story-play`
+- `app-vn-session`
+- `app-vn-dispatch`
+- `app-vn-shell`
 - `gameplay`
 - `navi-director`
 - `trial-director`
 - `pixi-presenter`
 - `r3f-adapter`
 - `ui-kit`
+- `game-a`
 - `harness`
 
 See `docs/architecture/subsystem-fanout.md` for the first fan-out table.
@@ -75,7 +79,8 @@ BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tas
 ```
 
 This gate checks task path boundaries, CCR requirements, dependency direction,
-TypeScript, contract tests, unit tests, app build, and smoke evidence.
+TypeScript, contract tests, unit tests, both app builds (`@v-ronpa/game-a` and
+`@v-ronpa/game-harness`), and smoke evidence.
 
 ## Phase 4: Contract Change Request
 

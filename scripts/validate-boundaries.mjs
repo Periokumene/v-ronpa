@@ -11,6 +11,9 @@ const packageRoots = {
   "nani-runtime-compiler": "packages/nani-runtime-compiler",
   "story-engine": "packages/story-engine",
   "story-play": "packages/story-play",
+  "app-vn-session": "packages/app-vn-session",
+  "app-vn-dispatch": "packages/app-vn-dispatch",
+  "app-vn-shell": "packages/app-vn-shell",
   "gameplay": "packages/gameplay",
   "navi-director": "packages/navi-director",
   "trial-director": "packages/trial-director",
@@ -19,7 +22,8 @@ const packageRoots = {
   "ui-kit": "packages/ui-kit",
   "media-save": "packages/media-save",
   "game-flow-machine": "packages/game-flow-machine",
-  "game": "apps/game"
+  "game-a": "apps/game-a",
+  "game-harness": "apps/game-harness"
 };
 
 const allowedWorkspaceDeps = {
@@ -30,6 +34,9 @@ const allowedWorkspaceDeps = {
   "nani-runtime-compiler": ["contracts", "nani-parser"],
   "story-engine": ["contracts"],
   "story-play": ["contracts", "story-engine"],
+  "app-vn-session": ["contracts", "nani-parser", "nani-runtime-compiler", "story-engine", "story-play"],
+  "app-vn-dispatch": ["contracts", "nani-parser", "nani-runtime-compiler", "pixi-presenter", "story-engine", "story-play"],
+  "app-vn-shell": ["app-vn-dispatch", "contracts", "pixi-presenter", "story-engine", "story-play", "ui-kit"],
   "gameplay": ["contracts"],
   "navi-director": ["contracts", "gameplay"],
   "trial-director": ["contracts", "gameplay"],
@@ -38,7 +45,22 @@ const allowedWorkspaceDeps = {
   "ui-kit": ["contracts"],
   "media-save": ["contracts"],
   "game-flow-machine": ["contracts"],
-  "game": [
+  "game-a": [
+    "app-vn-dispatch",
+    "app-vn-session",
+    "app-vn-shell",
+    "asset-registry",
+    "contracts",
+    "game-flow-machine",
+    "gameplay",
+    "pixi-presenter",
+    "story-engine",
+    "story-play",
+    "ui-kit"
+  ],
+  "game-harness": [
+    "app-vn-dispatch",
+    "app-vn-shell",
     "asset-registry",
     "contracts",
     "game-flow-machine",
@@ -76,6 +98,9 @@ const forbiddenExternalDeps = {
   "nani-runtime-compiler": rendererAndBrowserAdapters,
   "story-engine": rendererAndBrowserAdapters,
   "story-play": rendererAndBrowserAdapters,
+  "app-vn-session": rendererAndBrowserAdapters,
+  "app-vn-dispatch": rendererAndBrowserAdapters,
+  "app-vn-shell": ["@react-three/", "three", "dexie", "howler"],
   "gameplay": rendererAndBrowserAdapters,
   "navi-director": rendererAndBrowserAdapters,
   "trial-director": rendererAndBrowserAdapters,
@@ -84,7 +109,8 @@ const forbiddenExternalDeps = {
   "pixi-presenter": ["react", "react-dom", "@react-three/", "three", "dexie", "howler", "@radix-ui/"],
   "r3f-adapter": ["pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
   "ui-kit": ["@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler"],
-  "game": []
+  "game-a": ["@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler"],
+  "game-harness": []
 };
 
 const dependencyFields = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];

@@ -1,0 +1,19 @@
+{
+  "name": "@v-ronpa/app-vn-dispatch",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/pixi-presenter": "workspace:*",
+    "@v-ronpa/story-play": "workspace:*"
+  },
+  "devDependencies": {
+    "@v-ronpa/nani-parser": "workspace:*",
+    "@v-ronpa/nani-runtime-compiler": "workspace:*",
+    "@v-ronpa/story-engine": "workspace:*"
+  }
+}

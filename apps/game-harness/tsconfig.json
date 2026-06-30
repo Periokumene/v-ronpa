@@ -1,0 +1,31 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"]
+  },
+  "references": [
+    { "path": "../../packages/app-vn-dispatch" },
+    { "path": "../../packages/app-vn-shell" },
+    { "path": "../../packages/asset-registry" },
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/nani-parser" },
+    { "path": "../../packages/nani-runtime-compiler" },
+    { "path": "../../packages/story-engine" },
+    { "path": "../../packages/story-play" },
+    { "path": "../../packages/game-flow-machine" },
+    { "path": "../../packages/gameplay" },
+    { "path": "../../packages/media-save" },
+    { "path": "../../packages/navi-director" },
+    { "path": "../../packages/pixi-presenter" },
+    { "path": "../../packages/r3f-adapter" },
+    { "path": "../../packages/trial-director" },
+    { "path": "../../packages/ui-kit" }
+  ],
+  "include": ["src"]
+}

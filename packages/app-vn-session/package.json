@@ -1,0 +1,16 @@
+{
+  "name": "@v-ronpa/app-vn-session",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/nani-parser": "workspace:*",
+    "@v-ronpa/nani-runtime-compiler": "workspace:*",
+    "@v-ronpa/story-engine": "workspace:*",
+    "@v-ronpa/story-play": "workspace:*"
+  }
+}

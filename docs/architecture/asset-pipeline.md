@@ -39,8 +39,9 @@ paths.
 ## Asset References
 
 `AssetRef` is id-only: `{ id, kind, tags? }`. It appears in dependency lists
-such as `RuntimeScript.assets` and `WorldMapDef.assetRefs`. These lists declare
-what content a script or map needs, not where the file lives.
+such as `RuntimeScript.assets`, `VnEntryDef.assetRefs`, and
+`WorldMapDef.assetRefs`. These lists declare what content a script, VN entry,
+or map needs, not where the file lives.
 
 UI and evidence resources follow the same rule:
 
@@ -55,12 +56,12 @@ UI and evidence resources follow the same rule:
 
 Harness assets use a convention-plus-override generator:
 
-- `pnpm generate:assets` scans `apps/game/public/harness/**` and writes
-  `apps/game/src/harness/generatedAssets.ts`.
-- Font fixtures live under `apps/game/public/harness/fonts/*.{woff,woff2,ttf,otf}`;
+- `pnpm generate:assets` scans `apps/game-harness/public/harness/**` and writes
+  `apps/game-harness/src/harness/generatedAssets.ts`.
+- Font fixtures live under `apps/game-harness/public/harness/fonts/*.{woff,woff2,ttf,otf}`;
   the generator emits ids as `font:<file-name-without-extension>`.
 - Voice validation assets live under
-  `apps/game/public/harness/media/voice/<locale>/*.ogg`; the generator emits
+  `apps/game-harness/public/harness/media/voice/<locale>/*.ogg`; the generator emits
   ids as `voice:<locale>:<file-name-without-extension>`, for example
   `voice:zh:voice_validation_0001`.
 - Voice text ids use the same flat filename-safe stem as the `.ogg` file:
@@ -77,13 +78,24 @@ scripts, and renderer systems must use asset ids and injected resolvers.
 
 ## App Composition
 
-`apps/game/src/harness/contentManifest.ts` composes the vertical-slice manifest:
+`apps/game-a/src/contentManifest.ts` is a separate VN-first manifest. Its
+inline runtime assets may declare `/game-a/**` `optimizedUri` values as
+registration data, and `validate:assets` checks those files under
+`apps/game-a/public`. Game A scripts and render code must still reference
+runtime asset ids only; raw public paths remain limited to manifest
+registration sources.
+
+`apps/game-harness/src/harness/contentManifest.ts` composes the harness-showcase manifest:
 
 - generated harness assets from `harnessRuntimeAssets`
 - Pixi built-in FX assets from `builtInPixiFxRuntimeAssets`
-- maps, items, evidence, trials, and input fixtures
+- maps, items, evidence, trials, and input fixtures from `showcase/*`
 
-The vertical-slice app creates one `AssetRegistry` from this manifest and passes
+`inputActions.ts` provides harness input bindings, and
+`useFirstPersonExplorationBridge.ts` is the app bridge into R3F first-person
+exploration.
+
+The harness-showcase app creates one `AssetRegistry` from this manifest and passes
 it through adapter props:
 
 - media commands resolve `bgm`, `sfx`, `voice`, and `video` ids before calling

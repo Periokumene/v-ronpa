@@ -3,8 +3,8 @@ import { dirname, extname, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
-const harnessRoot = join(repoRoot, "apps/game/public/harness");
-const outputPath = join(repoRoot, "apps/game/src/harness/generatedAssets.ts");
+const harnessRoot = join(repoRoot, "apps/game-harness/public/harness");
+const outputPath = join(repoRoot, "apps/game-harness/src/harness/generatedAssets.ts");
 
 const kindByDirectory = new Map([
   ["backgrounds", "background"],

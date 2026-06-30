@@ -9,7 +9,7 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
   });
 
   await page.addInitScript(() => localStorage.removeItem("v-ronpa:settings:v1"));
-  await page.goto("/?scenario=vertical-slice");
+  await page.goto("/");
   await page.getByTestId("title-new-game").click();
   await startWitnessStory(page);
 
@@ -51,8 +51,8 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
 
   await page.getByTestId("vn-command-skip").click();
   await expect(page.getByTestId("vn-command-skip")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("vertical-slice-substate")).toHaveText("walk", { timeout: 30_000 });
-  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
+  await expect(page.getByTestId("harness-showcase-substate")).toHaveText("walk", { timeout: 30_000 });
+  await expect(page.getByTestId("harness-showcase-pixi-tasks")).toHaveText("empty");
 
   expect(consoleErrors).toEqual([]);
 });
@@ -64,14 +64,14 @@ test("VN opening autoNext completes reveal without manual input", async ({ page 
   });
 
   await page.addInitScript(() => localStorage.removeItem("v-ronpa:settings:v1"));
-  await page.goto("/?scenario=vertical-slice");
+  await page.goto("/");
   await page.getByTestId("title-new-game").click();
   await startWitnessStory(page);
 
   const observed = await observeOpeningAutoNext(page);
   expect(observed.sawCompletedFirstLine).toBe(true);
   expect(observed.sawSecondLine).toBe(true);
-  await expect(page.getByTestId("vertical-slice-last-action")).toHaveText("story:auto-next");
+  await expect(page.getByTestId("harness-showcase-last-action")).toHaveText("story:auto-next");
   expect(consoleErrors).toEqual([]);
 });
 
@@ -82,21 +82,21 @@ test("VN wait! resumes from Pixi task completion and manual continue settles the
   });
 
   await page.addInitScript(() => localStorage.removeItem("v-ronpa:settings:v1"));
-  await page.goto("/?scenario=vertical-slice");
+  await page.goto("/");
   await page.getByTestId("title-new-game").click();
   await startWitnessStory(page);
 
   await advanceUntilChoices(page);
   await chooseAutomationSmokeBranch(page);
   await advanceUntilText(page, "CHECKPOINT AUTO 03", 16);
-  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
+  await expect(page.getByTestId("harness-showcase-pixi-tasks")).toHaveText("empty");
 
   await advanceVn(page);
-  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toContainText("actor-transition:Ema", { timeout: 1_000 });
+  await expect(page.getByTestId("harness-showcase-pixi-tasks")).toContainText("actor-transition:Ema", { timeout: 1_000 });
   await advanceVn(page);
 
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT AUTO 04", { timeout: 2_000 });
-  await expect(page.getByTestId("vertical-slice-pixi-tasks")).toHaveText("empty");
+  await expect(page.getByTestId("harness-showcase-pixi-tasks")).toHaveText("empty");
   expect(consoleErrors).toEqual([]);
 });
 
@@ -107,7 +107,7 @@ test("VN AUTO voice gate advances branch 3 without returning to the baseline che
   });
 
   await page.addInitScript(() => localStorage.removeItem("v-ronpa:settings:v1"));
-  await page.goto("/?scenario=vertical-slice&voiceSmoke=fast");
+  await page.goto("/?voiceSmoke=fast");
   await page.getByTestId("title-new-game").click();
   await startWitnessStory(page);
   await advanceUntilChoices(page);
@@ -133,17 +133,17 @@ test("VN AUTO voice gate advances branch 3 without returning to the baseline che
 });
 
 async function startWitnessStory(page: Page) {
-  await page.getByTestId("vertical-slice-move-witness").click();
-  await expect(page.getByTestId("vertical-slice-active-interactable")).toHaveText("interactable:witness");
-  await page.getByTestId("vertical-slice-confirm").click();
-  await expect(page.getByTestId("vertical-slice-substate")).toHaveText("vn2d-overlay");
+  await page.getByTestId("harness-showcase-move-witness").click();
+  await expect(page.getByTestId("harness-showcase-active-interactable")).toHaveText("interactable:witness");
+  await page.getByTestId("harness-showcase-confirm").click();
+  await expect(page.getByTestId("harness-showcase-substate")).toHaveText("vn2d-overlay");
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
 }
 
 async function chooseAutomationSmokeBranch(page: Page) {
   await page.getByRole("button", { name: /VN 自动化短路径/u }).click();
-  await expect(page.getByTestId("vertical-slice-route")).toHaveText("automation-smoke");
+  await expect(page.getByTestId("harness-showcase-route")).toHaveText("automation-smoke");
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT AUTO 00");
 }
 

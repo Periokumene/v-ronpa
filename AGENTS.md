@@ -6,9 +6,11 @@
 - Treat `packages/contracts` and `.nani` IR as public API.
 - Do not modify shared contracts from a module task without adding a Contract Change Request under `docs/ccr/`.
 - Keep gameplay/state logic independent from React, R3F, Pixi, DOM, Dexie, and Howler.
-- Treat `navi` and `trial` as the only primary playable modes; keep VN2D/VN3D as substates or presentation profiles.
+- Treat `vn`, `navi`, and `trial` as primary playable modes; keep VN2D/VN3D as VN presentation profiles or Navi/Trial substates where appropriate.
 - Keep Navi flow in `packages/navi-director` and Trial flow in `packages/trial-director`.
-- Keep R3F and Pixi code inside adapter packages or `apps/game` harness code.
+- Keep VN session orchestration in `packages/app-vn-session`, VN command fanout in `packages/app-vn-dispatch`, and React VN shell mounting in `packages/app-vn-shell`.
+- Keep raw R3F/Pixi renderer code inside adapter packages or `apps/game-harness` harness code; `apps/game-a` may mount VN shell/Pixi adapter surfaces and use Pixi snapshot types for VN2D, but must not import `three`, `@react-three/*`, `pixi.js`, `@pixi/*`, `media-save`, Navi, or Trial packages.
+- Keep app-specific flow/save/overlay wiring in app packages such as `apps/game-harness`; shared VN packages expose shell surfaces and headless dispatch helpers only.
 - DOM UI owns text-heavy menus, dialogs, inventory, and accessibility-sensitive interactions.
 - Pixi owns VN/trial 2D effects, portrait staging, filters, particles, and fast debate overlays.
 - R3F owns 3D exploration, round-table trial staging, camera rigs, and 3D interaction hotspots.
@@ -24,9 +26,11 @@
 - Task path checks: `BASE_REF=integration/v-ronpa-baseline pnpm validate:task-boundaries -- --task docs/tasks/<name>.md`
 - Subsystem gate: `BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/<name>.md`
 - Baseline gate: `pnpm validate:baseline`
-- App dev server: `pnpm --filter @v-ronpa/game dev`
+- VN app dev server: `pnpm --filter @v-ronpa/game-a dev`
+- Harness dev server: `pnpm --filter @v-ronpa/game-harness dev`
 - Playwright smoke: `pnpm test:smoke`
-- App production build: `pnpm --filter @v-ronpa/game build`
+- VN app production build: `pnpm --filter @v-ronpa/game-a build`
+- Harness production build: `pnpm --filter @v-ronpa/game-harness build`
 
 ## Testing And Regression Expectations
 

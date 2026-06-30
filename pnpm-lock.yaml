@@ -33,7 +33,55 @@ importers:
         specifier: ^4.0.0
         version: 4.1.8(@types/node@24.13.2)(vite@7.3.5(@types/node@24.13.2))
 
-  apps/game:
+  apps/game-a:
+    dependencies:
+      '@v-ronpa/app-vn-dispatch':
+        specifier: workspace:*
+        version: link:../../packages/app-vn-dispatch
+      '@v-ronpa/app-vn-session':
+        specifier: workspace:*
+        version: link:../../packages/app-vn-session
+      '@v-ronpa/app-vn-shell':
+        specifier: workspace:*
+        version: link:../../packages/app-vn-shell
+      '@v-ronpa/asset-registry':
+        specifier: workspace:*
+        version: link:../../packages/asset-registry
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@v-ronpa/game-flow-machine':
+        specifier: workspace:*
+        version: link:../../packages/game-flow-machine
+      '@v-ronpa/gameplay':
+        specifier: workspace:*
+        version: link:../../packages/gameplay
+      '@v-ronpa/pixi-presenter':
+        specifier: workspace:*
+        version: link:../../packages/pixi-presenter
+      '@v-ronpa/story-engine':
+        specifier: workspace:*
+        version: link:../../packages/story-engine
+      '@v-ronpa/story-play':
+        specifier: workspace:*
+        version: link:../../packages/story-play
+      '@v-ronpa/ui-kit':
+        specifier: workspace:*
+        version: link:../../packages/ui-kit
+      '@xstate/react':
+        specifier: ^6.1.0
+        version: 6.1.0(@types/react@19.2.17)(react@19.2.7)(xstate@5.32.0)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.7(react@19.2.7)
+      xstate:
+        specifier: ^5.0.0
+        version: 5.32.0
+
+  apps/game-harness:
     dependencies:
       '@react-three/drei':
         specifier: ^10.0.0
@@ -41,6 +89,12 @@ importers:
       '@react-three/fiber':
         specifier: ^9.0.0
         version: 9.6.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.181.2)
+      '@v-ronpa/app-vn-dispatch':
+        specifier: workspace:*
+        version: link:../../packages/app-vn-dispatch
+      '@v-ronpa/app-vn-shell':
+        specifier: workspace:*
+        version: link:../../packages/app-vn-shell
       '@v-ronpa/asset-registry':
         specifier: workspace:*
         version: link:../../packages/asset-registry
@@ -105,6 +159,70 @@ importers:
       '@types/three':
         specifier: ^0.181.0
         version: 0.181.0
+
+  packages/app-vn-dispatch:
+    dependencies:
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@v-ronpa/pixi-presenter':
+        specifier: workspace:*
+        version: link:../pixi-presenter
+      '@v-ronpa/story-play':
+        specifier: workspace:*
+        version: link:../story-play
+    devDependencies:
+      '@v-ronpa/nani-parser':
+        specifier: workspace:*
+        version: link:../nani-parser
+      '@v-ronpa/nani-runtime-compiler':
+        specifier: workspace:*
+        version: link:../nani-runtime-compiler
+      '@v-ronpa/story-engine':
+        specifier: workspace:*
+        version: link:../story-engine
+
+  packages/app-vn-session:
+    dependencies:
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@v-ronpa/nani-parser':
+        specifier: workspace:*
+        version: link:../nani-parser
+      '@v-ronpa/nani-runtime-compiler':
+        specifier: workspace:*
+        version: link:../nani-runtime-compiler
+      '@v-ronpa/story-engine':
+        specifier: workspace:*
+        version: link:../story-engine
+      '@v-ronpa/story-play':
+        specifier: workspace:*
+        version: link:../story-play
+
+  packages/app-vn-shell:
+    dependencies:
+      '@v-ronpa/app-vn-dispatch':
+        specifier: workspace:*
+        version: link:../app-vn-dispatch
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@v-ronpa/pixi-presenter':
+        specifier: workspace:*
+        version: link:../pixi-presenter
+      '@v-ronpa/story-engine':
+        specifier: workspace:*
+        version: link:../story-engine
+      '@v-ronpa/story-play':
+        specifier: workspace:*
+        version: link:../story-play
+      '@v-ronpa/ui-kit':
+        specifier: workspace:*
+        version: link:../ui-kit
+      react:
+        specifier: ^19.0.0
+        version: 19.2.7
 
   packages/asset-registry:
     dependencies:
