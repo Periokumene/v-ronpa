@@ -1,6 +1,6 @@
 import { useVnRuntime, type UseVnRuntimeOptions } from "@v-ronpa/app-vn-runtime";
 import type { SaveData } from "@v-ronpa/contracts";
-import { gameAScript, gameAVnEntry } from "./contentManifest";
+import { gameAOpeningRuntimeEntry } from "./gameAScripts";
 
 export type UseGameAVnRuntimeOptions = Pick<
   UseVnRuntimeOptions,
@@ -15,13 +15,7 @@ export type UseGameAVnRuntimeOptions = Pick<
 export function useGameAVnRuntime(options: UseGameAVnRuntimeOptions = {}) {
   const runtime = useVnRuntime({
     ...options,
-    entry: {
-      id: gameAVnEntry.id,
-      profile: gameAVnEntry.profile,
-      scriptPath: gameAVnEntry.scriptPath,
-      sourceText: gameAScript,
-      ...(gameAVnEntry.startLabel ? { startLabel: gameAVnEntry.startLabel } : {})
-    },
+    entry: gameAOpeningRuntimeEntry,
     interactionMode: "vn"
   });
 
@@ -41,4 +35,3 @@ export function useGameAVnRuntime(options: UseGameAVnRuntimeOptions = {}) {
     }
   };
 }
-
