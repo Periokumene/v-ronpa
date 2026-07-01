@@ -9,7 +9,7 @@ import {
 import { createGameplayState } from "@v-ronpa/gameplay";
 import { gameAVnEntry } from "./contentManifest";
 
-const GAME_A_SAVE_STORAGE_KEY = "v-ronpa:game-a:saves:v1";
+const GAME_A_SAVE_STORAGE_KEY = "v-ronpa:game-a:saves:v2";
 export const gameASaveSlotIds = ["slot:game-a:1", "slot:game-a:2", "slot:game-a:3"];
 
 export interface GameASaveSnapshotInput {
@@ -20,7 +20,7 @@ export interface GameASaveSnapshotInput {
 export function createGameASaveData({ pixiStage, story }: GameASaveSnapshotInput): SaveData {
   const gameplay = createGameplayState();
   return SaveDataSchema.parse({
-    version: 3,
+    version: 4,
     savedAt: new Date().toISOString(),
     mode: "vn",
     vn: {

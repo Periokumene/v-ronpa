@@ -307,6 +307,20 @@ describe("nani parser", () => {
     ]);
   });
 
+  it("collects inner background references from inback commands as background assets", () => {
+    const result = parseScenario({
+      sourceText: "@inback bg:framed-room effect:fade time:0.2 wait!",
+      scriptPath: "inner-background-assets.nani"
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.scenario.assets).toEqual([{ id: "bg:framed-room", kind: "background" }]);
+    expect(result.scenario.statements[0]).toMatchObject({
+      kind: "command",
+      commandId: "inback"
+    });
+  });
+
   it("loads P1 fixture files into stable IR", () => {
     const results = [
       parseFixture("basic-navi.p1.nani"),

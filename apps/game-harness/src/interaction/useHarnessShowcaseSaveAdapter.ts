@@ -13,7 +13,7 @@ import type { useHarnessShowcaseRuntimeAdapter } from "./useHarnessShowcaseRunti
 
 type HarnessShowcaseRuntimeAdapter = ReturnType<typeof useHarnessShowcaseRuntimeAdapter>;
 
-const HARNESS_SHOWCASE_DB = "v-ronpa-harness-showcase-v2";
+const HARNESS_SHOWCASE_DB = "v-ronpa-harness-showcase-v3";
 export const harnessShowcaseSaveSlotIds = ["slot:harness:1", "slot:harness:2", "slot:harness:3", "slot:harness:4"];
 
 export interface HarnessShowcaseSaveDataInput {
@@ -38,7 +38,7 @@ export function createHarnessShowcaseSaveData({
   const { runtimeWait: _runtimeWait, ...saveableStory } = story;
   void _runtimeWait;
   const data: SaveData = {
-    version: 3,
+    version: 4,
     savedAt,
     mode,
     navi,

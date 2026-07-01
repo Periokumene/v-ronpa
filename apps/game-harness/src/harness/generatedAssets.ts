@@ -39,6 +39,30 @@ export const harnessRuntimeAssets = [
       ]
     },
     {
+      "id": "bg:inner-academy-hall",
+      "kind": "background",
+      "optimizedUri": "/harness/backgrounds/inner-academy-hall.png",
+      "format": "png",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
+      "id": "bg:inner-snow-outskirts",
+      "kind": "background",
+      "optimizedUri": "/harness/backgrounds/inner-snow-outskirts.png",
+      "format": "png",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "harness"
+      ]
+    },
+    {
       "id": "bgm:validation-alt",
       "kind": "bgm",
       "optimizedUri": "/harness/media/bgm/bgm-validation-alt.ogg",

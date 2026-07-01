@@ -16,10 +16,18 @@ describe("harness showcase runtime adapter glue", () => {
     const compiled = compileRuntimeScript(parsed.scenario);
 
     expect(parsed.diagnostics).toEqual([]);
+    expect(parsed.scenario.assets).toEqual(
+      expect.arrayContaining([
+        { id: "bg:classroom", kind: "background" },
+        { id: "bg:inner-academy-hall", kind: "background" },
+        { id: "bg:inner-snow-outskirts", kind: "background" }
+      ])
+    );
     expect(compiled.diagnostics).toEqual([]);
     const commandIds = new Set(compiled.script.commands.map((command) => command.commandId));
     for (const commandId of [
       "back",
+      "inback",
       "char",
       "arrange",
       "hidechars",
@@ -186,4 +194,3 @@ describe("harness showcase runtime adapter glue", () => {
     });
   });
 });
-

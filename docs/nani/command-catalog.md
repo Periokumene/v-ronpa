@@ -193,6 +193,11 @@ Shared shorthand:
   transform-only changes. `@slide Character.Expression` updates appearance,
   while `@slide Character` is transform-only and does not create a
   `character-pack` resource reference.
+- Inner backgrounds use project command `@inback bg:id`. V1 writes the reserved
+  `InnerBackground` actor in `PixiStageSnapshot.innerBackgroundsById` and
+  supports only appearance, `effect`/`via`, `time`, `easing`, `visible`, and
+  `wait`. It is not a `@back` alias and does not expose `id`, transform, tint,
+  pose, params, or dissolve controls.
 - `rain params`: `power:decimal`, `wind:decimal`, `hue:decimal`,
   `tint:decimal`, `time:decimal`, `easing:string`, `wait:boolean`.
   Runtime and saves store only `rainCommandParams` plus transition timing;
@@ -216,6 +221,8 @@ handler registration cannot drift:
   prefer official `char`
 - `flash`
 - `focus`
+- `inback`; params `appearanceAndTransition`, `appearance`, `via`, `effect`,
+  `visible`, `easing`, `time`, and `wait`
 - `trialkeyword` alias `trial-keyword`
 
 Compatibility params currently attached to official commands:

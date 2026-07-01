@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RuntimeScript } from "@v-ronpa/contracts";
+import { PIXI_INNER_BACKGROUND_ID, PIXI_MAIN_BACKGROUND_ID, type RuntimeScript } from "@v-ronpa/contracts";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-presenter";
@@ -28,11 +28,11 @@ describe("VN runtime presentation transaction", () => {
     expect(advanced.state.backlog).toEqual([{ speaker: "Felix", text: "Hello." }]);
     expect(advanced.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "char", "print"]);
     expect(transaction.pixiStage).toMatchObject({
-      version: 4,
+      version: 5,
       revision: 2,
       backgroundsById: {
-        MainBackground: {
-          id: "MainBackground",
+        [PIXI_MAIN_BACKGROUND_ID]: {
+          id: PIXI_MAIN_BACKGROUND_ID,
           kind: "background",
           appearance: "bg:harness"
         }
@@ -45,7 +45,7 @@ describe("VN runtime presentation transaction", () => {
           pos: [0.5, 0]
         }
       },
-      actorOrder: ["MainBackground", "Ema"]
+      actorOrder: [PIXI_MAIN_BACKGROUND_ID, "Ema"]
     });
     expect(transaction.pixiStage).not.toHaveProperty("background");
     expect(transaction.pixiStage).not.toHaveProperty("slots");
@@ -70,6 +70,37 @@ describe("VN runtime presentation transaction", () => {
     expect(transaction.pixiStage).toBe(initialPixiStage);
     expect(transaction.pixiHints).toEqual([{ type: "flash", color: "#ffffff", durationMs: 120, wait: false }]);
     expect(transaction.pixiWaitTasks).toEqual([]);
+    expect(transaction.diagnostics).toEqual([]);
+  });
+
+  it("routes inback commands into the Pixi inner background snapshot", () => {
+    const runtimeScript = compileScenario(
+      ["@back bg:harness", "@inback bg:classroom effect:fade time:0.2", "Felix: Framed."].join("\n"),
+      "transaction-inback-test.nani"
+    );
+    const advanced = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+    const transaction = createVnRuntimePresentationTransaction({
+      runtimeCommands: advanced.emittedRuntimeCommands,
+      previousPixiStage: createInitialPixiStageSnapshot()
+    });
+
+    expect(advanced.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "inback", "print"]);
+    expect(transaction.pixiStage).toMatchObject({
+      version: 5,
+      revision: 2,
+      backgroundsById: {
+        [PIXI_MAIN_BACKGROUND_ID]: { appearance: "bg:harness" }
+      },
+      innerBackgroundsById: {
+        [PIXI_INNER_BACKGROUND_ID]: {
+          id: PIXI_INNER_BACKGROUND_ID,
+          kind: "background",
+          appearance: "bg:classroom",
+          transition: { name: "fade", durationMs: 200 }
+        }
+      }
+    });
+    expect(transaction.pixiHints).toEqual([]);
     expect(transaction.diagnostics).toEqual([]);
   });
 

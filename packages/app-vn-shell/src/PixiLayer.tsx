@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { PixiStageSnapshot } from "@v-ronpa/contracts";
+import { PIXI_INNER_BACKGROUND_ID, PIXI_MAIN_BACKGROUND_ID, type PixiStageSnapshot } from "@v-ronpa/contracts";
 import {
   createPixiPresenter,
   type PixiAssetResolver,
@@ -80,7 +80,8 @@ export function PixiLayer({
       data-testid="pixi-layer"
       data-pixi-revision={String(snapshot.revision)}
       data-pixi-animate={String(animate)}
-      data-pixi-background={snapshot.backgroundsById.MainBackground?.appearance ?? "none"}
+      data-pixi-background={snapshot.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance ?? "none"}
+      data-pixi-inner-background={snapshot.innerBackgroundsById[PIXI_INNER_BACKGROUND_ID]?.appearance ?? "none"}
       data-pixi-actors={formatPixiStageActors(snapshot)}
       data-pixi-characters={formatPixiStageCharacters(snapshot)}
       data-pixi-hints={formatPixiHints(hints)}
@@ -102,7 +103,11 @@ function formatPixiPresentationTasks(tasks: PixiPresentationTaskSnapshot[]): str
 }
 
 function formatPixiStageActors(snapshot: PixiStageSnapshot): string {
-  const entries = [...Object.values(snapshot.backgroundsById), ...Object.values(snapshot.charactersById)].map((actor) => {
+  const entries = [
+    ...Object.values(snapshot.backgroundsById),
+    ...Object.values(snapshot.innerBackgroundsById),
+    ...Object.values(snapshot.charactersById)
+  ].map((actor) => {
     const visibility = actor.visible ? "visible" : "hidden";
     const pos = actor.pos ? `@${actor.pos[0].toFixed(2)},${actor.pos[1].toFixed(2)}` : "";
     const appearance = actor.kind === "character" ? `/${actor.appearanceExpression || "default"}` : actor.appearance ? `/${actor.appearance}` : "";

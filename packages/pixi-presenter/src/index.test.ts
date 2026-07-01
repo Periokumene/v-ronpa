@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { NaniCommandCategory, NaniCommandSource, NaniCommandStatus, RuntimeCommand, RuntimeValue } from "@v-ronpa/contracts";
 import {
+  INNER_BACKGROUND_ID,
   createInitialPixiStageSnapshot,
   createPixiPresenter,
   reducePixiRuntimeCommand
@@ -36,7 +37,7 @@ describe("pixi presenter port", () => {
 
     expect(withBackground).toMatchObject({
       snapshot: {
-        version: 4,
+        version: 5,
         revision: 1,
         backgroundsById: {
           MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness", visible: true }
@@ -48,7 +49,7 @@ describe("pixi presenter port", () => {
     });
     expect(withBackground.snapshot).not.toHaveProperty("background");
     expect(withCharacter.snapshot).toMatchObject({
-      version: 4,
+      version: 5,
       revision: 2,
       backgroundsById: {
         MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness" }
@@ -68,6 +69,79 @@ describe("pixi presenter port", () => {
     expect(withCharacter.snapshot).not.toHaveProperty("slots");
     expect(withCharacter.hints).toEqual([]);
     expect(withCharacter.diagnostics).toEqual([]);
+  });
+
+  it("reduces inback into the reserved inner background actor without touching main backgrounds", () => {
+    const withMain = reducePixiRuntimeCommand(
+      createInitialPixiStageSnapshot(),
+      runtimeCommand("back", "scene", { appearance: "bg:harness" })
+    ).snapshot;
+    const withInner = reducePixiRuntimeCommand(
+      withMain,
+      runtimeCommand("inback", "scene", {
+        appearance: "bg:framed-room",
+        transition: "fade",
+        durationMs: 200,
+        easing: "linear",
+        wait: true
+      })
+    );
+
+    expect(withInner.snapshot.backgroundsById.MainBackground).toMatchObject({ appearance: "bg:harness" });
+    expect(withInner.snapshot.innerBackgroundsById[INNER_BACKGROUND_ID]).toMatchObject({
+      id: INNER_BACKGROUND_ID,
+      kind: "background",
+      appearance: "bg:framed-room",
+      visible: true,
+      transition: { name: "fade", durationMs: 200, easing: "linear", wait: true }
+    });
+    expect(withInner.snapshot.actorOrder).toEqual(["MainBackground"]);
+    expect(withInner.waitTasks).toEqual([
+      { kind: "actor-transition", target: INNER_BACKGROUND_ID, revision: withInner.snapshot.revision }
+    ]);
+    expect(withInner.diagnostics).toEqual([]);
+  });
+
+  it("keeps back wildcard targeting scoped to main background actors, not inner backgrounds", () => {
+    let stage = reducePixiRuntimeCommand(
+      createInitialPixiStageSnapshot(),
+      runtimeCommand("back", "scene", { appearance: "bg:harness" })
+    ).snapshot;
+    stage = reducePixiRuntimeCommand(stage, runtimeCommand("back", "scene", { target: "Flower", appearance: "Bloomed" })).snapshot;
+    stage = reducePixiRuntimeCommand(stage, runtimeCommand("inback", "scene", { appearance: "bg:framed-room" })).snapshot;
+
+    const replacedMainBackgrounds = reducePixiRuntimeCommand(
+      stage,
+      runtimeCommand("back", "scene", { target: "*", appearance: "bg:replacement" })
+    ).snapshot;
+
+    expect(Object.values(replacedMainBackgrounds.backgroundsById).map((actor) => actor.appearance)).toEqual([
+      "bg:replacement",
+      "bg:replacement"
+    ]);
+    expect(replacedMainBackgrounds.innerBackgroundsById[INNER_BACKGROUND_ID]?.appearance).toBe("bg:framed-room");
+  });
+
+  it("hides existing inner background actors and no-ops when none exists", () => {
+    const initial = createInitialPixiStageSnapshot();
+    const noOpHidden = reducePixiRuntimeCommand(initial, runtimeCommand("inback", "scene", { visible: false, wait: true }));
+
+    expect(noOpHidden).toEqual({ snapshot: initial, hints: [], waitTasks: [], diagnostics: [] });
+
+    const withInner = reducePixiRuntimeCommand(initial, runtimeCommand("inback", "scene", { appearance: "bg:framed-room" })).snapshot;
+    const hidden = reducePixiRuntimeCommand(
+      withInner,
+      runtimeCommand("inback", "scene", { visible: false, durationMs: 120, wait: true })
+    );
+
+    expect(hidden.snapshot.innerBackgroundsById[INNER_BACKGROUND_ID]).toMatchObject({
+      appearance: "bg:framed-room",
+      visible: false,
+      transition: { durationMs: 120, wait: true }
+    });
+    expect(hidden.waitTasks).toEqual([
+      { kind: "actor-transition", target: INNER_BACKGROUND_ID, revision: hidden.snapshot.revision }
+    ]);
   });
 
   it("keeps transient Pixi runtime commands out of the saveable stage snapshot", () => {
@@ -139,6 +213,18 @@ describe("pixi presenter port", () => {
         }
       ]
     });
+    expect(reducePixiRuntimeCommand(initial, runtimeCommand("inback", "scene", {}))).toEqual({
+      snapshot: initial,
+      hints: [],
+      waitTasks: [],
+      diagnostics: [
+        {
+          code: "unsupported-pixi-params",
+          commandId: "inback",
+          message: "@inback is routed to Pixi but cannot be consumed: missing required params: appearance."
+        }
+      ]
+    });
   });
 
   it("diagnoses unresolved runtime expressions without falling back to default visual params", () => {
@@ -204,7 +290,7 @@ describe("pixi presenter port", () => {
     ).snapshot;
 
     expect(replacedCenter).toMatchObject({
-      version: 4,
+      version: 5,
       revision: 5,
       charactersById: {
         Ren: {
@@ -237,7 +323,7 @@ describe("pixi presenter port", () => {
     const second = reducePixiRuntimeCommand(first, runtimeCommand("back", "scene", { appearance: "bg:harness" })).snapshot;
 
     expect(second).toMatchObject({
-      version: 4,
+      version: 5,
       revision: 2,
       backgroundsById: {
         MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness" }

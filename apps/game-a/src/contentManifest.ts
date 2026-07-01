@@ -1,6 +1,8 @@
 import { ContentManifestSchema, type ContentManifestInput } from "@v-ronpa/contracts";
 
 export const gameAVnScriptPath = "game-a/opening.nani";
+const GAME_A_MAIN_BACKGROUND_ID = "bg:game-a-academy-hall-fullscreen";
+const GAME_A_INNER_BACKGROUND_ID = "bg:game-a-snow-outskirts-frame";
 
 export const gameAVnEntry = {
   id: "vn:game-a-opening",
@@ -9,7 +11,8 @@ export const gameAVnEntry = {
   startLabel: "Start",
   profile: "vn2d" as const,
   assetRefs: [
-    { id: "bg:game-a-room", kind: "background" as const, tags: ["game-a", "vn"] },
+    { id: GAME_A_MAIN_BACKGROUND_ID, kind: "background" as const, tags: ["game-a", "vn"] },
+    { id: GAME_A_INNER_BACKGROUND_ID, kind: "background" as const, tags: ["game-a", "vn"] },
     { id: "bgm:game-a-main", kind: "bgm" as const, tags: ["game-a", "vn"] },
     { id: "sfx:game-a-chime", kind: "sfx" as const, tags: ["game-a", "vn"] },
     { id: "bleep:game-a-dialogue", kind: "bleep" as const, tags: ["game-a", "vn"] },
@@ -22,7 +25,8 @@ export const gameAVnEntry = {
 export const gameAScript = `#Start
 @showUI dialog
 @showUI commandBar visible:true
-@back bg:game-a-room effect:fade time:0.12
+@back ${GAME_A_MAIN_BACKGROUND_ID} effect:fade time:0.12
+@inback ${GAME_A_INNER_BACKGROUND_ID} effect:fade time:0.12
 @bgm bgm:game-a-main group:music volume:0.35 fade:0.1
 @sfx sfx:game-a-chime volume:0.5
 Narrator: Game A VN framework smoke。这个入口接入共享 VN runtime，不连接 Trial 或 3D。
@@ -65,9 +69,19 @@ const gameAContentManifestInput = {
   fonts: [],
   runtimeAssets: [
     {
-      id: "bg:game-a-room",
+      id: "bg:game-a-academy-hall-fullscreen",
       kind: "background",
-      optimizedUri: "/game-a/backgrounds/vn-room.png",
+      optimizedUri: "/game-a/backgrounds/bg-fullscreen-academy-hall-2560x1440.png",
+      format: "png",
+      compression: [],
+      lods: [],
+      collisionProxyIds: [],
+      tags: ["game-a", "vn"]
+    },
+    {
+      id: "bg:game-a-snow-outskirts-frame",
+      kind: "background",
+      optimizedUri: "/game-a/backgrounds/bg-framed-snow-outskirts-2560x1440.png",
       format: "png",
       compression: [],
       lods: [],

@@ -13,7 +13,8 @@ describe("game-a content manifest", () => {
         id: gameAVnEntry.id,
         scriptPath: gameAVnEntry.scriptPath,
         assetRefs: expect.arrayContaining([
-          { id: "bg:game-a-room", kind: "background", tags: ["game-a", "vn"] },
+          { id: "bg:game-a-academy-hall-fullscreen", kind: "background", tags: ["game-a", "vn"] },
+          { id: "bg:game-a-snow-outskirts-frame", kind: "background", tags: ["game-a", "vn"] },
           { id: "bgm:game-a-main", kind: "bgm", tags: ["game-a", "vn"] },
           { id: "sfx:game-a-chime", kind: "sfx", tags: ["game-a", "vn"] },
           { id: "bleep:game-a-dialogue", kind: "bleep", tags: ["game-a", "vn"] },
@@ -23,7 +24,12 @@ describe("game-a content manifest", () => {
         ])
       })
     ]);
-    expect(registry.url({ id: "bg:game-a-room", kind: "background" })).toBe("/game-a/backgrounds/vn-room.png");
+    expect(registry.url({ id: "bg:game-a-academy-hall-fullscreen", kind: "background" })).toBe(
+      "/game-a/backgrounds/bg-fullscreen-academy-hall-2560x1440.png"
+    );
+    expect(registry.url({ id: "bg:game-a-snow-outskirts-frame", kind: "background" })).toBe(
+      "/game-a/backgrounds/bg-framed-snow-outskirts-2560x1440.png"
+    );
     expect(registry.url({ id: "bgm:game-a-main", kind: "bgm" })).toBe("/game-a/media/bgm/main.ogg");
     expect(registry.url({ id: "sfx:game-a-chime", kind: "sfx" })).toBe("/game-a/media/sfx/chime.ogg");
     expect(registry.url({ id: "bleep:game-a-dialogue", kind: "bleep" })).toBe("/game-a/media/bleep/dialogue.ogg");

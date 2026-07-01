@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-test.setTimeout(300_000);
+test.setTimeout(420_000);
 
 test("harness showcase connects Navi exploration, gameplay state, VN dialog, and branch outcomes", async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -152,6 +152,7 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
   await advanceUntilChoices(page);
   await expect(page.getByTestId("vn-dialog-state")).toHaveText("等待选择");
   await expect(page.getByTestId("harness-showcase-pixi-background")).toHaveText("bg:harness");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg:inner-academy-hall");
   await expect(page.getByTestId("harness-showcase-pixi-characters")).toContainText("Ema/default@0.50,0.00");
   await expect(page.getByTestId("harness-showcase-pixi-tasks")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
@@ -210,6 +211,7 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
   await expect(page.getByTestId("harness-showcase-substate")).toHaveText("vn2d-overlay");
   await expect(page.getByTestId("vn-dialog-text")).toContainText(savedDialogExcerpt);
   await expect(page.getByTestId("harness-showcase-pixi-background")).toHaveText("bg:harness");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg:inner-academy-hall");
   await expect(page.getByTestId("harness-showcase-pixi-characters")).toContainText("Ema/default@0.50,0.00");
   await expect(page.getByTestId("harness-showcase-pixi-tasks")).toHaveText("empty");
   await expectNoDocumentScroll(page);
@@ -280,6 +282,14 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/harness-showcase-snow-storm.png", fullPage: true });
   await page.screenshot({ path: "test-results/harness-showcase-snow-shader.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 01C");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg:inner-academy-hall");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/harness-showcase-sun-blur-inner-covered.png", fullPage: true });
+  await advanceUntilText(page, "CHECKPOINT 01D");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg:inner-snow-outskirts");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/harness-showcase-inback-switch-real-image.png", fullPage: true });
   await advanceUntilText(page, "CHECKPOINT 02A");
   await expect(page.getByTestId("harness-showcase-pixi-characters")).toContainText("Ema/default@0.50,0.00");
   await page.waitForTimeout(200);
@@ -421,7 +431,13 @@ async function advanceMainInteractionShowcase(page: Page) {
 
 async function advanceUntilText(page: Page, text: string) {
   for (let attempt = 0; attempt < 80; attempt += 1) {
-    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) {
+    const dialogText = page.getByTestId("vn-dialog-text");
+    if ((await dialogText.count()) === 0) {
+      const substate = await page.getByTestId("harness-showcase-substate").textContent();
+      const lastAction = await page.getByTestId("harness-showcase-last-action").textContent();
+      throw new Error(`VN overlay closed before '${text}' was reached. substate=${substate ?? "unknown"} lastAction=${lastAction ?? "unknown"}`);
+    }
+    if (((await dialogText.textContent()) ?? "").includes(text)) {
       await waitForDialogTextToSettle(page);
       return;
     }

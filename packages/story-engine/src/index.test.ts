@@ -257,6 +257,7 @@ describe("story engine", () => {
       "gameplay",
       "flash",
       "focus",
+      "inback",
       "trialkeyword"
     ]);
   });

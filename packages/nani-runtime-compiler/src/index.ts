@@ -1,4 +1,6 @@
 import {
+  PIXI_INNER_BACKGROUND_ID,
+  PIXI_MAIN_BACKGROUND_ID,
   getNaniCommandDefinition,
   type RichTextDocument,
   type NaniCommandDefinition,
@@ -427,6 +429,8 @@ function normalizeCommandParams(command: CommandShape, definition: NaniCommandDe
       return normalizeGlitchCommand(command);
     case "glitchfilter":
       return normalizeGlitchFilterCommand(command);
+    case "inback":
+      return normalizeInbackCommand(command);
     case "rain":
       return normalizeRainCommand(command);
     case "snow":
@@ -538,7 +542,7 @@ function normalizeBackCommand(command: CommandShape): NormalizedCommandParams {
   const named = splitNamedString(runtimeCommandValue(command.primary) ?? runtimeParam(command, "appearanceAndTransition"));
   return {
     params: compactParams({
-      target: runtimeParam(command, "id") ?? "MainBackground",
+      target: runtimeParam(command, "id") ?? PIXI_MAIN_BACKGROUND_ID,
       appearance: runtimeParam(command, "appearance") ?? named.id,
       pose: runtimeParam(command, "pose"),
       transition: runtimeParam(command, "via") ?? named.value ?? runtimeParam(command, "effect"),
@@ -566,6 +570,22 @@ function normalizeBackCommand(command: CommandShape): NormalizedCommandParams {
       "visible",
       "effect"
     ]
+  };
+}
+
+function normalizeInbackCommand(command: CommandShape): NormalizedCommandParams {
+  const named = splitNamedString(runtimeCommandValue(command.primary) ?? runtimeParam(command, "appearanceAndTransition"));
+  return {
+    params: compactParams({
+      target: PIXI_INNER_BACKGROUND_ID,
+      appearance: runtimeParam(command, "appearance") ?? named.id,
+      transition: runtimeParam(command, "via") ?? named.value ?? runtimeParam(command, "effect"),
+      visible: runtimeParam(command, "visible"),
+      easing: runtimeParam(command, "easing"),
+      durationMs: durationMsValue(runtimeParam(command, "time")),
+      wait: runtimeParam(command, "wait") ?? false
+    }),
+    consumesParams: ["appearanceAndTransition", "appearance", "via", "effect", "visible", "easing", "time", "wait"]
   };
 }
 
@@ -674,7 +694,7 @@ function normalizeShakeCommand(command: CommandShape): NormalizedCommandParams {
 function normalizeBlurCommand(command: CommandShape): NormalizedCommandParams {
   return {
     params: compactParams({
-      target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "actorId") ?? "MainBackground",
+      target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "actorId") ?? PIXI_MAIN_BACKGROUND_ID,
       power: runtimeParam(command, "power") ?? 0,
       ...normalizeTimingParams(command)
     }),

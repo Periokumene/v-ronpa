@@ -15,7 +15,7 @@ import {
 } from "pixi.js";
 import { GodrayFilter, KawaseBlurFilter } from "pixi-filters";
 import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherKind, PixiWeatherSnapshot } from "@v-ronpa/contracts";
-import type { PixiStageRenderHint } from "../stageSnapshot";
+import { INNER_BACKGROUND_ID, type PixiStageRenderHint } from "../stageSnapshot";
 import { getBuiltInPixiFxTexture } from "./fxAssets";
 import type { PixiPresentationTaskHandle, PresentationTaskController } from "./presentationTasks";
 import { pixiAssetLoadFailed, resolvePixiAsset, type PixiAssetResolver, type PixiPresenterDiagnostic } from "./assetResolver";
@@ -354,8 +354,19 @@ export class FilterSystem {
   }
 }
 
+export interface InnerBackgroundFrameRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const INNER_BACKGROUND_FRAME_SCALE = 0.72;
+const INNER_BACKGROUND_FRAME_ASPECT = 16 / 9;
+
 export class ActorSystem {
   private readonly backgroundLayer = new Container({ label: "backgrounds" });
+  private readonly innerBackLayer = new Container({ label: "inner-backgrounds" });
   private readonly characterLayer = new Container({ label: "characters" });
   private readonly actors = new Map<string, ActorRecord>();
   private readonly characters: CharacterSystem;
@@ -368,18 +379,24 @@ export class ActorSystem {
   ) {
     this.characters = new CharacterSystem(options);
     this.backgroundLayer.zIndex = 0;
+    this.innerBackLayer.zIndex = 2;
     this.characterLayer.zIndex = 10;
     options.root.sortableChildren = true;
-    options.root.addChild(this.backgroundLayer, this.characterLayer);
+    options.root.addChild(this.backgroundLayer, this.innerBackLayer, this.characterLayer);
   }
 
   reconcile(snapshot: PixiStageSnapshot, animate: boolean): void {
-    const activeIds = new Set([...Object.keys(snapshot.backgroundsById), ...Object.keys(snapshot.charactersById)]);
+    const activeIds = new Set([
+      ...Object.keys(snapshot.backgroundsById),
+      ...Object.keys(snapshot.innerBackgroundsById),
+      ...Object.keys(snapshot.charactersById)
+    ]);
     for (const id of [...this.actors.keys()]) {
       if (!activeIds.has(id)) this.remove(id);
     }
 
     for (const actor of Object.values(snapshot.backgroundsById)) this.upsert(actor, animate, snapshot.revision);
+    for (const actor of Object.values(snapshot.innerBackgroundsById)) this.upsert(actor, animate, snapshot.revision);
     const orderedCharacters = snapshot.actorOrder
       .map((id) => snapshot.charactersById[id])
       .filter((actor): actor is PixiActorSnapshot => Boolean(actor));
@@ -410,7 +427,8 @@ export class ActorSystem {
       record.contentGeneration += 1;
       if (actor.kind === "background") {
         for (const child of record.container.removeChildren()) child.destroy({ children: true });
-        this.drawBackground(record, actor);
+        if (actor.id === INNER_BACKGROUND_ID) this.drawInnerBackground(record, actor);
+        else this.drawBackground(record, actor);
       }
       else this.drawCharacter(record, actor);
       record.contentKey = contentKey;
@@ -441,7 +459,11 @@ export class ActorSystem {
     const existing = this.actors.get(actor.id);
     if (existing) return existing;
     const container = new Container({ label: `actor:${actor.id}` });
-    const layer = actor.kind === "background" ? this.backgroundLayer : this.characterLayer;
+    const layer = actor.kind === "background"
+      ? actor.id === INNER_BACKGROUND_ID
+        ? this.innerBackLayer
+        : this.backgroundLayer
+      : this.characterLayer;
     layer.addChild(container);
     const record: ActorRecord = { actor, container, contentKey: "", contentGeneration: 0 };
     this.actors.set(actor.id, record);
@@ -541,6 +563,63 @@ export class ActorSystem {
     });
     title.x = 48;
     title.y = 42;
+    fallback.addChild(plate, title);
+    return fallback;
+  }
+
+  private drawInnerBackground(record: ActorRecord, actor: PixiActorSnapshot): void {
+    const container = record.container;
+    const contentGeneration = record.contentGeneration;
+    const width = this.options.width();
+    const height = this.options.height();
+    const frame = resolveInnerBackgroundFrameRect(width, height);
+    const frameRoot = new Container({ label: `inner-background-frame:${actor.id}` });
+    const masked = new Container({ label: `inner-background-content:${actor.id}` });
+    const mask = new Graphics()
+      .rect(frame.x, frame.y, frame.width, frame.height)
+      .fill({ color: 0xffffff, alpha: 1 });
+    mask.label = `inner-background-mask:${actor.id}`;
+    masked.mask = mask;
+    const fallback = this.createInnerBackgroundFallback(actor, frame);
+    masked.addChild(fallback);
+    frameRoot.addChild(masked, mask, createInnerBackgroundStroke(frame));
+    container.addChild(frameRoot);
+
+    const backgroundId = actor.appearance;
+    const backgroundUrl = backgroundId ? resolvePixiAsset(this.options.assetResolver, { id: backgroundId, kind: "background" }, this.options.onDiagnostic) : undefined;
+    if (backgroundId && backgroundUrl) {
+      const sprite = new Sprite(Texture.EMPTY);
+      sprite.visible = false;
+      masked.addChildAt(sprite, 0);
+      void Assets.load<Texture>(backgroundUrl)
+        .then((texture) => {
+          if (!sprite.parent || record.contentGeneration !== contentGeneration) return;
+          sprite.texture = texture;
+          fitSpriteToRect(sprite, texture, frame);
+          sprite.visible = true;
+          fallback.visible = false;
+        })
+        .catch((error) => {
+          this.options.onDiagnostic?.(pixiAssetLoadFailed({ id: backgroundId, kind: "background" }, error));
+          fallback.visible = true;
+        });
+    }
+  }
+
+  private createInnerBackgroundFallback(actor: PixiActorSnapshot, frame: InnerBackgroundFrameRect): Container {
+    const fallback = new Container({ label: `fallback:${actor.id}` });
+    const style = backgroundStyleFromId(actor.appearance ?? "inner-background");
+    const plate = new Graphics()
+      .rect(frame.x, frame.y, frame.width, frame.height)
+      .fill({ color: style.color, alpha: style.alpha })
+      .rect(frame.x + 18, frame.y + 18, Math.max(1, frame.width - 36), Math.max(1, frame.height - 36))
+      .stroke({ color: 0x83e4d3, width: 2, alpha: style.strokeAlpha });
+    const title = new Text({
+      text: actor.appearance ?? actor.id,
+      style: { fill: 0xeef8ff, fontSize: 16, fontFamily: "Inter, ui-sans-serif, system-ui", letterSpacing: 0 }
+    });
+    title.x = frame.x + 28;
+    title.y = frame.y + 26;
     fallback.addChild(plate, title);
     return fallback;
   }
@@ -1227,6 +1306,39 @@ function fitBackgroundSprite(sprite: Sprite, texture: Texture, width: number, he
   sprite.height = textureHeight * scale;
   sprite.x = (width - sprite.width) / 2;
   sprite.y = (height - sprite.height) / 2;
+}
+
+export function resolveInnerBackgroundFrameRect(width: number, height: number): InnerBackgroundFrameRect {
+  const safeWidth = Math.max(1, width);
+  const safeHeight = Math.max(1, height);
+  const frameWidth = Math.min(safeWidth * INNER_BACKGROUND_FRAME_SCALE, safeHeight * INNER_BACKGROUND_FRAME_SCALE * INNER_BACKGROUND_FRAME_ASPECT);
+  const frameHeight = frameWidth / INNER_BACKGROUND_FRAME_ASPECT;
+  return {
+    x: Math.round((safeWidth - frameWidth) / 2),
+    y: Math.round((safeHeight - frameHeight) / 2),
+    width: Math.round(frameWidth),
+    height: Math.round(frameHeight)
+  };
+}
+
+function fitSpriteToRect(sprite: Sprite, texture: Texture, frame: InnerBackgroundFrameRect): void {
+  const textureWidth = Math.max(1, texture.width);
+  const textureHeight = Math.max(1, texture.height);
+  const scale = Math.max(frame.width / textureWidth, frame.height / textureHeight);
+  sprite.width = textureWidth * scale;
+  sprite.height = textureHeight * scale;
+  sprite.x = frame.x + (frame.width - sprite.width) / 2;
+  sprite.y = frame.y + (frame.height - sprite.height) / 2;
+}
+
+function createInnerBackgroundStroke(frame: InnerBackgroundFrameRect): Graphics {
+  const stroke = new Graphics()
+    .rect(frame.x, frame.y, frame.width, frame.height)
+    .stroke({ color: 0xe7f6f1, width: 2, alpha: 0.72 })
+    .rect(frame.x + 5, frame.y + 5, Math.max(1, frame.width - 10), Math.max(1, frame.height - 10))
+    .stroke({ color: 0x1d2e35, width: 1, alpha: 0.62 });
+  stroke.label = "inner-background-stroke";
+  return stroke;
 }
 
 function createWeatherContainer(kind: string): Container {
