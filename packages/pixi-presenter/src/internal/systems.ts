@@ -37,6 +37,44 @@ interface ActorRecord {
   container: Container;
   contentKey: string;
   contentGeneration: number;
+  layout?: ActorLayoutRecord;
+  positionTransition?: ActorPositionTransition;
+}
+
+type ActorLayoutRecord = BackgroundLayoutRecord | InnerBackgroundLayoutRecord | CharacterLayoutRecord;
+
+interface BackgroundFallbackLayout {
+  container: Container;
+  plate: Graphics;
+  title: Text;
+  style: ReturnType<typeof backgroundStyleFromId>;
+}
+
+interface BackgroundLayoutRecord {
+  kind: "background";
+  fallback: BackgroundFallbackLayout;
+  sprite?: Sprite;
+  texture?: Texture;
+}
+
+interface InnerBackgroundLayoutRecord {
+  kind: "inner-background";
+  fallback: BackgroundFallbackLayout;
+  matte: Graphics;
+  mask: Graphics;
+  stroke: Graphics;
+  sprite?: Sprite;
+  texture?: Texture;
+}
+
+interface CharacterLayoutRecord {
+  kind: "character";
+}
+
+interface ActorPositionTransition {
+  from: [number, number] | undefined;
+  to: [number, number] | undefined;
+  progress: { value: number };
 }
 
 interface WeatherRecord {
@@ -111,6 +149,12 @@ interface GlitchShaderControls {
   seed?: number | undefined;
 }
 
+interface ViewportGraphicRecord {
+  graphic: Graphics;
+  color: number;
+  alpha: number;
+}
+
 interface TweenHandle {
   stop(): void;
 }
@@ -126,10 +170,12 @@ export class TweenSystem {
     durationMs: number,
     easingName?: string,
     onComplete?: () => void,
-    delayMs = 0
+    delayMs = 0,
+    onUpdate?: () => void
   ): TweenHandle {
     if (durationMs <= 0) {
       Object.assign(target, to);
+      onUpdate?.();
       onComplete?.();
       return { stop: () => undefined };
     }
@@ -137,6 +183,9 @@ export class TweenSystem {
     const tween = new Tween(target, this.group)
       .to(to, durationMs)
       .easing(resolveEasing(easingName))
+      .onUpdate(() => {
+        if (generation === this.generation) onUpdate?.();
+      })
       .onComplete(() => {
         if (generation === this.generation) onComplete?.();
       });
@@ -193,6 +242,12 @@ export class RootFilterStack {
     this.apply();
   }
 
+  relayoutViewport(): void {
+    if ([...this.screenFilters, ...this.transientFilters].length > 0) {
+      this.options.root.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
+    }
+  }
+
   private apply(): void {
     const filters = [...this.screenFilters, ...this.transientFilters];
     this.options.root.filters = filters.length > 0 ? filters : null;
@@ -222,6 +277,18 @@ export class FilterSystem {
       container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
     }
     container.filters = filters.length > 0 ? filters : null;
+  }
+
+  relayoutViewport(): void {
+    if (this.persistentGlitch) {
+      setGlitchResolution(this.persistentGlitch.uniforms, this.options.width(), this.options.height());
+    }
+    this.rootFilters.relayoutViewport();
+  }
+
+  relayoutActorFilterArea(container: Container): void {
+    if (!container.filters || container.filters.length === 0) return;
+    container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
   }
 
   applyScreenFilters(snapshot: PixiStageSnapshot, animate: boolean, hints: PixiStageRenderHint[] = []): void {
@@ -361,8 +428,10 @@ export interface InnerBackgroundFrameRect {
   height: number;
 }
 
-const INNER_BACKGROUND_FRAME_SCALE = 0.72;
-const INNER_BACKGROUND_FRAME_ASPECT = 16 / 9;
+const INNER_BACKGROUND_FRAME_WIDTH_SCALE = 0.766;
+const INNER_BACKGROUND_FRAME_HEIGHT_SCALE = 0.558974358974359;
+const INNER_BACKGROUND_FRAME_TOP_SCALE = 0.13846153846153847;
+const INNER_BACKGROUND_IMAGE_INSET_PX = 8;
 
 export class ActorSystem {
   private readonly backgroundLayer = new Container({ label: "backgrounds" });
@@ -408,6 +477,14 @@ export class ActorSystem {
     for (const id of [...this.actors.keys()]) this.remove(id);
   }
 
+  relayoutViewport(): void {
+    for (const record of this.actors.values()) {
+      this.relayoutActorContent(record);
+      this.applyCurrentActorPosition(record);
+      this.filters.relayoutActorFilterArea(record.container);
+    }
+  }
+
   getLayerForEffects(target: string): Container | undefined {
     if (target === "stage" || target === "camera") return this.options.root;
     return this.actors.get(target)?.container;
@@ -430,7 +507,10 @@ export class ActorSystem {
         if (actor.id === INNER_BACKGROUND_ID) this.drawInnerBackground(record, actor);
         else this.drawBackground(record, actor);
       }
-      else this.drawCharacter(record, actor);
+      else {
+        record.layout = { kind: "character" };
+        this.drawCharacter(record, actor);
+      }
       record.contentKey = contentKey;
       const targetAlpha = actor.visible ? actor.alpha : 0;
       if (shouldAnimate && targetAlpha > 0) {
@@ -485,7 +565,8 @@ export class ActorSystem {
       to: Record<string, number>,
       durationMs: number,
       easingName?: string,
-      onComplete?: () => void
+      onComplete?: () => void,
+      onUpdate?: () => void
     ) => void;
     hasWork: () => boolean;
   } {
@@ -509,13 +590,13 @@ export class ActorSystem {
     };
     return {
       hasWork: () => pending > 0 || Boolean(task),
-      tween: (target, to, durationMs, easingName, onComplete) => {
+      tween: (target, to, durationMs, easingName, onComplete, onUpdate) => {
         ensureTask();
         pending += 1;
         const handle = this.tweens.tween(target, to, durationMs, easingName, () => {
           if (task?.isCurrent()) onComplete?.();
           completeOne();
-        });
+        }, 0, onUpdate);
         handles.push(handle);
       }
     };
@@ -524,66 +605,65 @@ export class ActorSystem {
   private drawBackground(record: ActorRecord, actor: PixiActorSnapshot): void {
     const container = record.container;
     const contentGeneration = record.contentGeneration;
-    const width = this.options.width();
-    const height = this.options.height();
-    const fallback = this.createFallbackBackground(actor, width, height);
-    container.addChild(fallback);
+    const fallback = this.createFallbackBackground(actor);
+    const layout: BackgroundLayoutRecord = { kind: "background", fallback };
+    record.layout = layout;
+    container.addChild(fallback.container);
+    this.relayoutBackground(layout);
     const backgroundId = actor.appearance;
     const backgroundUrl = backgroundId ? resolvePixiAsset(this.options.assetResolver, { id: backgroundId, kind: "background" }, this.options.onDiagnostic) : undefined;
     if (backgroundId && backgroundUrl) {
       const sprite = new Sprite(Texture.EMPTY);
       sprite.visible = false;
       container.addChildAt(sprite, 0);
+      layout.sprite = sprite;
       void Assets.load<Texture>(backgroundUrl)
         .then((texture) => {
-          if (!sprite.parent || record.contentGeneration !== contentGeneration) return;
+          if (!sprite.parent || record.contentGeneration !== contentGeneration || record.layout !== layout) return;
           sprite.texture = texture;
-          fitBackgroundSprite(sprite, texture, width, height);
+          layout.texture = texture;
+          this.relayoutBackground(layout);
           sprite.visible = true;
-          fallback.visible = false;
+          fallback.container.visible = false;
         })
         .catch((error) => {
           this.options.onDiagnostic?.(pixiAssetLoadFailed({ id: backgroundId, kind: "background" }, error));
-          fallback.visible = true;
+          fallback.container.visible = true;
         });
     }
   }
 
-  private createFallbackBackground(actor: PixiActorSnapshot, width: number, height: number): Container {
+  private createFallbackBackground(actor: PixiActorSnapshot): BackgroundFallbackLayout {
     const fallback = new Container({ label: `fallback:${actor.id}` });
     const style = backgroundStyleFromId(actor.appearance ?? "background");
-    const plate = new Graphics()
-      .rect(0, 0, width, height)
-      .fill({ color: style.color, alpha: style.alpha })
-      .rect(32, 32, width - 64, height - 64)
-      .stroke({ color: 0x83e4d3, width: 2, alpha: style.strokeAlpha });
+    const plate = new Graphics();
     const title = new Text({
       text: actor.appearance ?? actor.id,
       style: { fill: 0xeef8ff, fontSize: 18, fontFamily: "Inter, ui-sans-serif, system-ui", letterSpacing: 0 }
     });
-    title.x = 48;
-    title.y = 42;
     fallback.addChild(plate, title);
-    return fallback;
+    return { container: fallback, plate, title, style };
   }
 
   private drawInnerBackground(record: ActorRecord, actor: PixiActorSnapshot): void {
     const container = record.container;
     const contentGeneration = record.contentGeneration;
-    const width = this.options.width();
-    const height = this.options.height();
-    const frame = resolveInnerBackgroundFrameRect(width, height);
     const frameRoot = new Container({ label: `inner-background-frame:${actor.id}` });
     const masked = new Container({ label: `inner-background-content:${actor.id}` });
-    const mask = new Graphics()
-      .rect(frame.x, frame.y, frame.width, frame.height)
-      .fill({ color: 0xffffff, alpha: 1 });
+    const matte = new Graphics();
+    matte.label = "inner-background-matte";
+    const mask = new Graphics();
     mask.label = `inner-background-mask:${actor.id}`;
     masked.mask = mask;
-    const fallback = this.createInnerBackgroundFallback(actor, frame);
-    masked.addChild(fallback);
-    frameRoot.addChild(masked, mask, createInnerBackgroundStroke(frame));
+    const fallback = this.createInnerBackgroundFallback(actor);
+    const stroke = new Graphics();
+    stroke.label = "inner-background-stroke";
+    const layout: InnerBackgroundLayoutRecord = { kind: "inner-background", fallback, matte, mask, stroke };
+    record.layout = layout;
+    masked.addChild(fallback.container);
+    frameRoot.addChild(matte, masked, mask, stroke);
     container.addChild(frameRoot);
+    this.relayoutInnerBackground(layout);
 
     const backgroundId = actor.appearance;
     const backgroundUrl = backgroundId ? resolvePixiAsset(this.options.assetResolver, { id: backgroundId, kind: "background" }, this.options.onDiagnostic) : undefined;
@@ -591,37 +671,90 @@ export class ActorSystem {
       const sprite = new Sprite(Texture.EMPTY);
       sprite.visible = false;
       masked.addChildAt(sprite, 0);
+      layout.sprite = sprite;
       void Assets.load<Texture>(backgroundUrl)
         .then((texture) => {
-          if (!sprite.parent || record.contentGeneration !== contentGeneration) return;
+          if (!sprite.parent || record.contentGeneration !== contentGeneration || record.layout !== layout) return;
           sprite.texture = texture;
-          fitSpriteToRect(sprite, texture, frame);
+          layout.texture = texture;
+          this.relayoutInnerBackground(layout);
           sprite.visible = true;
-          fallback.visible = false;
+          fallback.container.visible = false;
         })
         .catch((error) => {
           this.options.onDiagnostic?.(pixiAssetLoadFailed({ id: backgroundId, kind: "background" }, error));
-          fallback.visible = true;
+          fallback.container.visible = true;
         });
     }
   }
 
-  private createInnerBackgroundFallback(actor: PixiActorSnapshot, frame: InnerBackgroundFrameRect): Container {
+  private createInnerBackgroundFallback(actor: PixiActorSnapshot): BackgroundFallbackLayout {
     const fallback = new Container({ label: `fallback:${actor.id}` });
     const style = backgroundStyleFromId(actor.appearance ?? "inner-background");
-    const plate = new Graphics()
-      .rect(frame.x, frame.y, frame.width, frame.height)
-      .fill({ color: style.color, alpha: style.alpha })
-      .rect(frame.x + 18, frame.y + 18, Math.max(1, frame.width - 36), Math.max(1, frame.height - 36))
-      .stroke({ color: 0x83e4d3, width: 2, alpha: style.strokeAlpha });
+    const plate = new Graphics();
     const title = new Text({
       text: actor.appearance ?? actor.id,
       style: { fill: 0xeef8ff, fontSize: 16, fontFamily: "Inter, ui-sans-serif, system-ui", letterSpacing: 0 }
     });
-    title.x = frame.x + 28;
-    title.y = frame.y + 26;
     fallback.addChild(plate, title);
-    return fallback;
+    return { container: fallback, plate, title, style };
+  }
+
+  private relayoutActorContent(record: ActorRecord): void {
+    const layout = record.layout;
+    if (!layout) return;
+    if (layout.kind === "background") {
+      this.relayoutBackground(layout);
+      return;
+    }
+    if (layout.kind === "inner-background") {
+      this.relayoutInnerBackground(layout);
+      return;
+    }
+    this.characters.relayout(record.container);
+  }
+
+  private relayoutBackground(layout: BackgroundLayoutRecord): void {
+    const width = this.options.width();
+    const height = this.options.height();
+    this.drawBackgroundFallback(layout.fallback, width, height);
+    if (layout.sprite && layout.texture) {
+      fitBackgroundSprite(layout.sprite, layout.texture, width, height);
+    }
+  }
+
+  private relayoutInnerBackground(layout: InnerBackgroundLayoutRecord): void {
+    const frame = resolveInnerBackgroundFrameRect(this.options.width(), this.options.height());
+    const imageRect = insetRect(frame, INNER_BACKGROUND_IMAGE_INSET_PX);
+    drawInnerBackgroundMatte(layout.matte, frame);
+    drawInnerBackgroundMask(layout.mask, imageRect);
+    drawInnerBackgroundStroke(layout.stroke, frame);
+    this.drawInnerBackgroundFallback(layout.fallback, imageRect);
+    if (layout.sprite && layout.texture) {
+      fitSpriteToRect(layout.sprite, layout.texture, imageRect);
+    }
+  }
+
+  private drawBackgroundFallback(layout: BackgroundFallbackLayout, width: number, height: number): void {
+    layout.plate
+      .clear()
+      .rect(0, 0, width, height)
+      .fill({ color: layout.style.color, alpha: layout.style.alpha })
+      .rect(32, 32, Math.max(1, width - 64), Math.max(1, height - 64))
+      .stroke({ color: 0x83e4d3, width: 2, alpha: layout.style.strokeAlpha });
+    layout.title.x = 48;
+    layout.title.y = 42;
+  }
+
+  private drawInnerBackgroundFallback(layout: BackgroundFallbackLayout, frame: InnerBackgroundFrameRect): void {
+    layout.plate
+      .clear()
+      .rect(frame.x, frame.y, frame.width, frame.height)
+      .fill({ color: layout.style.color, alpha: layout.style.alpha })
+      .rect(frame.x + 18, frame.y + 18, Math.max(1, frame.width - 36), Math.max(1, frame.height - 36))
+      .stroke({ color: 0x83e4d3, width: 2, alpha: layout.style.strokeAlpha });
+    layout.title.x = frame.x + 28;
+    layout.title.y = frame.y + 26;
   }
 
   private drawCharacter(record: ActorRecord, actor: PixiActorSnapshot): void {
@@ -640,6 +773,7 @@ export class ActorSystem {
     const target = this.toScreenPosition(actor, actor.pos);
     const shouldAnimate = animate && actor.transition.durationMs > 0;
     const targetAlpha = actor.visible ? actor.alpha : 0;
+    const record = this.actors.get(actor.id);
     if (shouldAnimate && !actor.transition.lazy) {
       const previousTarget = this.toScreenPosition(previous, previous.pos);
       container.x = previousTarget.x;
@@ -650,18 +784,22 @@ export class ActorSystem {
     container.visible = actor.visible || (shouldAnimate && previous.visible);
     container.zIndex = actor.z;
     if (shouldAnimate && (actor.transition.name === "slide" || !sameVector2(actor.pos, previous.pos))) {
-      const from = actor.transition.from ? this.toScreenPosition(actor, actor.transition.from) : undefined;
-      if (from) {
-        container.x = from.x;
-        container.y = from.y;
-      }
+      const from = actor.transition.from ?? previous.pos;
+      const positionTransition: ActorPositionTransition = { from, to: actor.pos, progress: { value: 0 } };
+      if (record) record.positionTransition = positionTransition;
+      this.applyPositionTransition(container, actor, positionTransition);
       transition?.tween(
-        container as unknown as Record<string, number>,
-        { x: target.x, y: target.y },
+        positionTransition.progress,
+        { value: 1 },
         actor.transition.durationMs,
-        actor.transition.easing
+        actor.transition.easing,
+        () => {
+          if (record?.positionTransition === positionTransition) delete record.positionTransition;
+        },
+        () => this.applyPositionTransition(container, actor, positionTransition)
       );
     } else {
+      if (record) delete record.positionTransition;
       container.x = target.x;
       container.y = target.y;
     }
@@ -682,6 +820,28 @@ export class ActorSystem {
     const scale = actor.scale?.[0] ?? 1;
     container.scale.set(scale);
     container.rotation = ((actor.rotation?.[2] ?? 0) * Math.PI) / 180;
+  }
+
+  private applyCurrentActorPosition(record: ActorRecord): void {
+    if (record.positionTransition) {
+      this.applyPositionTransition(record.container, record.actor, record.positionTransition);
+      return;
+    }
+    const target = this.toScreenPosition(record.actor, record.actor.pos);
+    record.container.x = target.x;
+    record.container.y = target.y;
+  }
+
+  private applyPositionTransition(
+    container: Container,
+    actor: PixiActorSnapshot,
+    transition: ActorPositionTransition
+  ): void {
+    const from = this.toScreenPosition(actor, transition.from);
+    const to = this.toScreenPosition(actor, transition.to);
+    const progress = clamp01(transition.progress.value);
+    container.x = from.x + (to.x - from.x) * progress;
+    container.y = from.y + (to.y - from.y) * progress;
   }
 
   private toScreenPosition(actor: PixiActorSnapshot, pos: [number, number] | undefined): { x: number; y: number } {
@@ -774,6 +934,26 @@ export class WeatherSystem {
 
   clear(): void {
     for (const kind of [...this.records.keys()]) this.remove(kind);
+  }
+
+  relayoutViewport(): void {
+    const width = this.options.width();
+    const height = this.options.height();
+    for (const record of this.records.values()) {
+      if (record.rainShader) {
+        record.rainShader.resize(width, height);
+      }
+      if (record.snowShader) {
+        this.resizeSnowShader(record, width, height);
+      }
+      if (record.snapshot.kind === "sun") {
+        record.container.filterArea = new Rectangle(0, 0, width, height);
+      }
+      for (const particle of record.particles) {
+        particle.x = clamp(particle.x, 0, width);
+        particle.y = clamp(particle.y, 0, height);
+      }
+    }
   }
 
   private upsert(kind: string, snapshot: PixiWeatherSnapshot, animate: boolean, revision: number): void {
@@ -974,6 +1154,7 @@ export class WeatherSystem {
 export class ScreenOverlaySystem {
   private readonly layer = new Container({ label: "screen-filter-overlays" });
   private bokehKey = "";
+  private bokehPower = 0;
 
   constructor(
     private readonly options: PixiPresenterSystemsOptions,
@@ -987,6 +1168,7 @@ export class ScreenOverlaySystem {
 
   reconcile(snapshot: PixiStageSnapshot, animate: boolean): void {
     const power = clamp01(snapshot.screenFilters.bokeh?.power ?? 0);
+    this.bokehPower = power;
     const transition = snapshot.screenFilters.bokeh?.transition;
     if (power <= 0) {
       if (animate && transition && transition.durationMs > 0 && this.layer.children.length > 0) {
@@ -1022,9 +1204,10 @@ export class ScreenOverlaySystem {
       return;
     }
 
-    const key = `${this.options.width()}x${this.options.height()}:${Math.round(power * 100)}`;
+    const key = this.bokehLayoutKey(power);
     if (key !== this.bokehKey) {
       this.clear();
+      this.bokehPower = power;
       this.populateBokeh(power);
       this.bokehKey = key;
       if (animate && transition && transition.durationMs > 0) this.layer.alpha = 0;
@@ -1065,6 +1248,16 @@ export class ScreenOverlaySystem {
     if (cancelTasks) this.tasks.cancelTarget("bokeh");
     this.layer.removeChildren().forEach((child) => child.destroy());
     this.bokehKey = "";
+    this.bokehPower = 0;
+  }
+
+  relayoutViewport(): void {
+    if (this.bokehPower <= 0 || this.layer.children.length === 0) return;
+    const key = this.bokehLayoutKey(this.bokehPower);
+    if (key === this.bokehKey) return;
+    this.layer.removeChildren().forEach((child) => child.destroy());
+    this.populateBokeh(this.bokehPower);
+    this.bokehKey = key;
   }
 
   private populateBokeh(power: number): void {
@@ -1090,12 +1283,17 @@ export class ScreenOverlaySystem {
       this.layer.addChild(sprite);
     }
   }
+
+  private bokehLayoutKey(power: number): string {
+    return `${this.options.width()}x${this.options.height()}:${Math.round(power * 100)}`;
+  }
 }
 
 export class TransientEffectSystem {
   private readonly layer = new Container({ label: "transient-effects" });
   private readonly trialLayer = new Container({ label: "trial-overlay" });
   private readonly glitchShaders = new Set<GlitchShaderRecord>();
+  private readonly viewportGraphics = new Set<ViewportGraphicRecord>();
 
   constructor(
     private readonly options: PixiPresenterSystemsOptions,
@@ -1122,6 +1320,7 @@ export class TransientEffectSystem {
 
   clear(): void {
     for (const record of [...this.glitchShaders]) this.cleanupGlitchShader(record);
+    this.viewportGraphics.clear();
     this.layer.removeChildren().forEach((child) => child.destroy());
     this.clearTrialOverlays();
   }
@@ -1130,12 +1329,27 @@ export class TransientEffectSystem {
     this.trialLayer.removeChildren().forEach((child) => child.destroy());
   }
 
+  relayoutViewport(): void {
+    for (const record of this.viewportGraphics) {
+      drawViewportGraphic(record, this.options.width(), this.options.height());
+    }
+    for (const record of this.glitchShaders) {
+      setGlitchResolution(record.uniforms, this.options.width(), this.options.height());
+    }
+    this.relayoutTrialOverlays();
+  }
+
   private flash(hint: Extract<PixiStageRenderHint, { type: "flash" }>, revision: number): void {
     const color = Number.parseInt(hint.color.replace("#", ""), 16);
-    const flash = new Graphics().rect(0, 0, this.options.width(), this.options.height()).fill({ color, alpha: 0.55 });
+    const flash = new Graphics();
+    flash.label = "flash-overlay";
+    const viewportRecord = { graphic: flash, color, alpha: 0.55 };
+    this.viewportGraphics.add(viewportRecord);
+    drawViewportGraphic(viewportRecord, this.options.width(), this.options.height());
     flash.alpha = 0.55;
     this.layer.addChild(flash);
     const cleanup = () => {
+      this.viewportGraphics.delete(viewportRecord);
       flash.removeFromParent();
       flash.destroy();
     };
@@ -1268,6 +1482,13 @@ export class TransientEffectSystem {
     group.addChild(pill, label);
     this.trialLayer.addChild(group);
   }
+
+  private relayoutTrialOverlays(): void {
+    this.trialLayer.children.forEach((child, index) => {
+      child.x = Math.max(24, this.options.width() - 360);
+      child.y = 100 + index * 42;
+    });
+  }
 }
 
 function resolveEasing(name: string | undefined): (amount: number) => number {
@@ -1311,13 +1532,23 @@ function fitBackgroundSprite(sprite: Sprite, texture: Texture, width: number, he
 export function resolveInnerBackgroundFrameRect(width: number, height: number): InnerBackgroundFrameRect {
   const safeWidth = Math.max(1, width);
   const safeHeight = Math.max(1, height);
-  const frameWidth = Math.min(safeWidth * INNER_BACKGROUND_FRAME_SCALE, safeHeight * INNER_BACKGROUND_FRAME_SCALE * INNER_BACKGROUND_FRAME_ASPECT);
-  const frameHeight = frameWidth / INNER_BACKGROUND_FRAME_ASPECT;
+  const frameWidth = safeWidth * INNER_BACKGROUND_FRAME_WIDTH_SCALE;
+  const frameHeight = safeHeight * INNER_BACKGROUND_FRAME_HEIGHT_SCALE;
   return {
     x: Math.round((safeWidth - frameWidth) / 2),
-    y: Math.round((safeHeight - frameHeight) / 2),
+    y: Math.round(safeHeight * INNER_BACKGROUND_FRAME_TOP_SCALE),
     width: Math.round(frameWidth),
     height: Math.round(frameHeight)
+  };
+}
+
+function insetRect(frame: InnerBackgroundFrameRect, inset: number): InnerBackgroundFrameRect {
+  const safeInset = Math.max(0, inset);
+  return {
+    x: frame.x + safeInset,
+    y: frame.y + safeInset,
+    width: Math.max(1, frame.width - safeInset * 2),
+    height: Math.max(1, frame.height - safeInset * 2)
   };
 }
 
@@ -1331,14 +1562,37 @@ function fitSpriteToRect(sprite: Sprite, texture: Texture, frame: InnerBackgroun
   sprite.y = frame.y + (frame.height - sprite.height) / 2;
 }
 
-function createInnerBackgroundStroke(frame: InnerBackgroundFrameRect): Graphics {
-  const stroke = new Graphics()
+function drawInnerBackgroundMatte(matte: Graphics, frame: InnerBackgroundFrameRect): void {
+  matte
+    .clear()
     .rect(frame.x, frame.y, frame.width, frame.height)
-    .stroke({ color: 0xe7f6f1, width: 2, alpha: 0.72 })
-    .rect(frame.x + 5, frame.y + 5, Math.max(1, frame.width - 10), Math.max(1, frame.height - 10))
-    .stroke({ color: 0x1d2e35, width: 1, alpha: 0.62 });
-  stroke.label = "inner-background-stroke";
-  return stroke;
+    .fill({ color: 0x000000, alpha: 1 });
+}
+
+function drawInnerBackgroundMask(mask: Graphics, frame: InnerBackgroundFrameRect): void {
+  mask
+    .clear()
+    .rect(frame.x, frame.y, frame.width, frame.height)
+    .fill({ color: 0xffffff, alpha: 1 });
+}
+
+function drawInnerBackgroundStroke(stroke: Graphics, frame: InnerBackgroundFrameRect): void {
+  stroke
+    .clear()
+    .rect(frame.x, frame.y, frame.width, frame.height)
+    .stroke({ color: 0xe7f6f1, width: 2, alpha: 0.72 });
+}
+
+function drawViewportGraphic(record: ViewportGraphicRecord, width: number, height: number): void {
+  record.graphic
+    .clear()
+    .rect(0, 0, width, height)
+    .fill({ color: record.color, alpha: record.alpha });
+}
+
+function setGlitchResolution(uniforms: GlitchShaderUniformValues, width: number, height: number): void {
+  uniforms.uResolution[0] = width;
+  uniforms.uResolution[1] = height;
 }
 
 function createWeatherContainer(kind: string): Container {
@@ -1372,6 +1626,10 @@ function weatherSpeedX(snapshot: PixiWeatherSnapshot): number {
 function weatherSpeedY(snapshot: PixiWeatherSnapshot): number {
   if (snapshot.kind === "snow") return snapshot.ySpeed ?? 0.45;
   return 6;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function createSnowShaderFilter(width: number, height: number): { filter: SnowShaderFilter; uniforms: SnowShaderUniformValues } {

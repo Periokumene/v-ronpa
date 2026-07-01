@@ -70,10 +70,14 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
   let mounted = false;
   let destroyed = false;
   let lastRenderedSnapshot: PixiStageSnapshot | undefined;
+  let viewportKey = "";
+  let resizeObserver: ResizeObserver | undefined;
+  let listeningForWindowResize = false;
+  let resizeFrame: number | undefined;
 
   const size = {
-    width: () => app.renderer.width || options.host.clientWidth || options.width || 960,
-    height: () => app.renderer.height || options.host.clientHeight || options.height || 540
+    width: () => Math.max(1, options.host.clientWidth || (initialized ? app.renderer.width : 0) || options.width || 960),
+    height: () => Math.max(1, options.host.clientHeight || (initialized ? app.renderer.height : 0) || options.height || 540)
   };
   const rootFilters = new RootFilterStack({ root: stageRoot, width: size.width, height: size.height });
   const filters = new FilterSystem({ root: stageRoot, width: size.width, height: size.height }, rootFilters, tweens, tasks);
@@ -122,6 +126,8 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     effects = new TransientEffectSystem(systemOptions, actors, rootFilters, tweens, tasks);
     app.ticker.add(tick);
     mounted = true;
+    viewportKey = currentViewportKey();
+    startResizeObservation();
     if (pendingReconcile) {
       const pending = pendingReconcile;
       pendingReconcile = undefined;
@@ -151,6 +157,57 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     effects?.clearTrialOverlays();
     if (animate) effects?.run(reconcileOptions.hints ?? [], snapshot.revision);
     lastRenderedSnapshot = snapshot;
+    viewportKey = currentViewportKey();
+  }
+
+  function relayoutViewport() {
+    if (!mounted || destroyed) return;
+    const nextViewportKey = currentViewportKey();
+    if (nextViewportKey === viewportKey) return;
+    viewportKey = nextViewportKey;
+    actors?.relayoutViewport();
+    filters.relayoutViewport();
+    weather?.relayoutViewport();
+    screenOverlays?.relayoutViewport();
+    effects?.relayoutViewport();
+  }
+
+  function currentViewportKey(): string {
+    return `${size.width()}x${size.height()}`;
+  }
+
+  function startResizeObservation() {
+    if (resizeObserver || listeningForWindowResize || destroyed) return;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(scheduleViewportRelayout);
+      resizeObserver.observe(options.host);
+      return;
+    }
+    if (typeof globalThis.addEventListener === "function") {
+      globalThis.addEventListener("resize", scheduleViewportRelayout);
+      listeningForWindowResize = true;
+    }
+  }
+
+  function stopResizeObservation() {
+    resizeObserver?.disconnect();
+    resizeObserver = undefined;
+    if (listeningForWindowResize && typeof globalThis.removeEventListener === "function") {
+      globalThis.removeEventListener("resize", scheduleViewportRelayout);
+    }
+    listeningForWindowResize = false;
+    if (resizeFrame !== undefined) {
+      cancelFrame(resizeFrame);
+      resizeFrame = undefined;
+    }
+  }
+
+  function scheduleViewportRelayout() {
+    if (!mounted || destroyed || resizeFrame !== undefined) return;
+    resizeFrame = requestFrame(() => {
+      resizeFrame = undefined;
+      relayoutViewport();
+    });
   }
 
   function clear() {
@@ -163,10 +220,12 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     screenOverlays?.clear();
     effects?.clear();
     lastRenderedSnapshot = undefined;
+    viewportKey = currentViewportKey();
   }
 
   function destroy() {
     destroyed = true;
+    stopResizeObservation();
     clear();
     if (!initialized) return;
     app.ticker.remove(tick);
@@ -176,4 +235,17 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
   }
 
   return { mount, reconcile, clear, destroy };
+}
+
+function requestFrame(callback: FrameRequestCallback): number {
+  if (typeof globalThis.requestAnimationFrame === "function") return globalThis.requestAnimationFrame(callback);
+  return globalThis.setTimeout(() => callback(Date.now()), 16) as unknown as number;
+}
+
+function cancelFrame(handle: number): void {
+  if (typeof globalThis.cancelAnimationFrame === "function") {
+    globalThis.cancelAnimationFrame(handle);
+    return;
+  }
+  globalThis.clearTimeout(handle as unknown as ReturnType<typeof setTimeout>);
 }

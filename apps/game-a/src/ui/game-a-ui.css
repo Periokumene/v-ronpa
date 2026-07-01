@@ -1,19 +1,27 @@
 .game-a-dialog-surface {
-  --dialog-opacity: 0.92;
-  --dialog-panel: rgba(9, 13, 18, var(--dialog-opacity));
+  --dialog-opacity: 0.96;
+  --game-a-dialog-left: 11.7vw;
+  --game-a-dialog-right: 11.7vw;
+  --game-a-dialog-bottom: 0px;
+  --game-a-dialog-height: 27.692vh;
+  --game-a-dialog-line: rgba(229, 234, 236, 0.74);
+  --game-a-dialog-line-soft: rgba(229, 234, 236, 0.38);
+  --game-a-dialog-copy-left: clamp(42px, 5vw, 130px);
+  --game-a-dialog-copy-right: clamp(96px, 6.55vw, 168px);
   position: absolute;
   z-index: 9;
-  right: clamp(18px, 5vw, 72px);
-  bottom: clamp(24px, 6vh, 64px);
-  left: clamp(18px, 5vw, 72px);
-  min-height: clamp(168px, 24vh, 252px);
-  padding: clamp(30px, 5vw, 54px) clamp(34px, 6vw, 72px) clamp(28px, 4vw, 48px);
-  color: #f8fbf4;
+  right: var(--game-a-dialog-right);
+  bottom: var(--game-a-dialog-bottom);
+  left: var(--game-a-dialog-left);
+  height: var(--game-a-dialog-height);
+  min-height: 0;
+  padding: clamp(72px, 10vh, 118px) clamp(28px, 7vw, 110px) clamp(66px, 9vh, 92px);
+  color: #f1f1f1;
+  font-family: "Courier New", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   isolation: isolate;
 }
 
-.game-a-dialog-surface::before,
-.game-a-dialog-surface::after {
+.game-a-dialog-surface::before {
   position: absolute;
   content: "";
   inset: 0;
@@ -22,75 +30,75 @@
 
 .game-a-dialog-surface::before {
   z-index: -2;
-  border: 1px solid rgba(199, 223, 207, 0.38);
-  border-radius: 6px;
-  background:
-    linear-gradient(90deg, rgba(17, 31, 34, 0.88), rgba(18, 14, 21, 0.84)),
-    var(--dialog-panel);
-  box-shadow:
-    0 26px 56px rgba(0, 0, 0, 0.46),
-    inset 0 0 0 1px rgba(87, 191, 178, 0.12);
+  border: 2px solid var(--game-a-dialog-line);
+  border-bottom: 0;
+  background: rgba(0, 0, 0, var(--dialog-opacity));
 }
 
-.game-a-dialog-surface[data-frame="resolved"]::before {
-  border: 0;
-  background-image: var(--game-a-dialog-frame);
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 100% 100%;
-  box-shadow: none;
-}
-
-.game-a-dialog-surface::after {
-  z-index: -1;
-  inset: clamp(22px, 4vw, 40px) clamp(26px, 5vw, 56px);
-  border-radius: 4px;
-  background: linear-gradient(180deg, rgba(5, 9, 13, 0.18), rgba(5, 9, 13, 0.34));
-}
-
-.game-a-dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 12px;
+.game-a-screen-reader-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
 }
 
 .game-a-dialog-speaker {
-  min-width: 96px;
-  max-width: 42%;
+  position: absolute;
+  top: -5.4vh;
+  left: 3.9vw;
+  display: grid;
+  place-items: center;
+  min-width: clamp(170px, 11.6vw, 300px);
+  max-width: min(38vw, 340px);
+  min-height: 8vh;
+  padding: 0 clamp(18px, 2.2vw, 34px);
+  border: 2px solid var(--game-a-dialog-line);
+  background: #000;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 1px var(--game-a-dialog-line-soft);
   overflow: hidden;
-  color: #dff6ef;
-  font-weight: 700;
+  color: #efefef;
+  font-size: clamp(24px, 2.3vw, 44px);
+  font-weight: 400;
+  line-height: 1;
   text-overflow: ellipsis;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
 .game-a-dialog-state {
-  color: #9ccfc6;
-  font-size: 12px;
-  letter-spacing: 0;
+  color: #efefef;
+}
+
+.game-a-dialog-copy {
+  width: min(1450px, calc(100% - var(--game-a-dialog-copy-left) - var(--game-a-dialog-copy-right)));
+  margin-left: var(--game-a-dialog-copy-left);
 }
 
 .game-a-dialog-text {
-  max-width: 72ch;
   margin: 0;
-  color: #f5f8ef;
-  line-height: 1.72;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+  color: rgba(239, 239, 239, 0.88);
+  font-weight: 400;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  text-shadow:
+    0 0 1px rgba(255, 255, 255, 0.46),
+    1px 1px 0 rgba(0, 0, 0, 0.9);
 }
 
 .game-a-dialog-text-small {
-  font-size: 15px;
+  font-size: clamp(17px, 1.55vw, 26px);
 }
 
 .game-a-dialog-text-medium {
-  font-size: 18px;
+  font-size: clamp(20px, 1.85vw, 32px);
 }
 
 .game-a-dialog-text-large {
-  font-size: 22px;
+  font-size: clamp(24px, 2.15vw, 38px);
 }
 
 .game-a-choice-overlay {
@@ -125,26 +133,48 @@
 .game-a-command-bar {
   position: absolute;
   z-index: 11;
-  right: clamp(18px, 5vw, 72px);
-  bottom: 12px;
+  right: 11.7vw;
+  bottom: clamp(10px, 1.7vh, 22px);
+  left: 11.7vw;
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
+  justify-content: center;
+  gap: clamp(24px, 3vw, 76px);
   pointer-events: auto;
 }
 
 .game-a-command-button {
-  min-width: 64px;
-  border-color: rgba(180, 205, 203, 0.26);
-  background: rgba(7, 12, 16, 0.78);
-  color: #dcebe5;
-  font-size: 12px;
+  min-width: 0;
+  min-height: auto;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(239, 239, 239, 0.42);
+  font-family: "Courier New", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(12px, 1.05vw, 19px);
+  line-height: 1;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.24);
 }
 
 .game-a-command-button-active {
-  border-color: #c9b56b;
-  color: #fff4bf;
+  color: rgba(239, 239, 239, 0.9);
+}
+
+.game-a-command-button:hover:not(:disabled),
+.game-a-command-button:focus-visible {
+  color: rgba(239, 239, 239, 0.95);
+  outline: none;
+}
+
+.game-a-command-button:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.game-a-command-button:disabled {
+  cursor: default;
+  opacity: 0.36;
 }
 
 .game-a-title-surface {
@@ -376,21 +406,26 @@
 
 @media (max-width: 720px) {
   .game-a-dialog-surface {
+    --game-a-dialog-height: clamp(248px, 46vh, 360px);
     right: 12px;
-    bottom: 64px;
+    bottom: -1px;
     left: 12px;
-    min-height: 176px;
-    padding: 28px 24px 26px;
-  }
-
-  .game-a-dialog-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 6px;
+    min-height: var(--game-a-dialog-height);
+    padding: 58px 18px 64px;
   }
 
   .game-a-dialog-speaker {
-    max-width: 100%;
+    top: -32px;
+    left: 28px;
+    min-width: 128px;
+    min-height: 58px;
+    max-width: calc(100vw - 80px);
+    font-size: 24px;
+  }
+
+  .game-a-dialog-copy {
+    width: 100%;
+    margin-left: 0;
   }
 
   .game-a-choice-overlay {
@@ -401,8 +436,9 @@
 
   .game-a-command-bar {
     right: 12px;
-    bottom: 10px;
+    bottom: 16px;
     left: 12px;
     justify-content: center;
+    gap: 12px;
   }
 }

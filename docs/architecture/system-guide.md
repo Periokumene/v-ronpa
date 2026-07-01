@@ -99,7 +99,11 @@ adapters and apps
   references, and does not load Pixi, Three, Howler, DOM, or files.
 - `r3f-adapter` owns 3D scene presentation only.
 - `pixi-presenter` owns 2D canvas/WebGL presentation only, including internal
-  presenter traces used for adapter tests and inspection.
+  presenter traces used for adapter tests and inspection. It also owns
+  layout-only relayout for Pixi display objects when the Pixi host/canvas
+  changes size; resize relayout updates canvas-internal geometry, masks, sprite
+  cover-fit, filter areas, and shader resolution without replaying runtime
+  commands or clearing active presentation tasks.
 - `ui-kit` owns DOM overlays, text-heavy surfaces, controls, and Inspector Lite.
   Settings UI components stay pure and controlled; app adapters own settings
   state, persistence, and runtime derivation. Reusable `ui-kit` components do

@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Assets, Container, Rectangle, Sprite, Texture, TilingSprite, type Filter, type Ticker } from "pixi.js";
+import { Assets, Container, Graphics, Rectangle, Sprite, Texture, TilingSprite, type Filter, type Ticker } from "pixi.js";
 import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "@v-ronpa/contracts";
 import { INNER_BACKGROUND_ID, createInitialPixiStageSnapshot } from "../stageSnapshot";
 import {
   ActorSystem,
   FilterSystem,
   RootFilterStack,
+  ScreenOverlaySystem,
   TransientEffectSystem,
   TweenSystem,
   WeatherSystem,
@@ -16,6 +17,8 @@ import type { PixiAssetResolver, PixiPresenterDiagnostic } from "./assetResolver
 import { CharacterSystem } from "./characters";
 
 describe("pixi presentation task system integration", () => {
+  const innerBackgroundImageInsetPx = 8;
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -113,11 +116,13 @@ describe("pixi presentation task system integration", () => {
     expect(innerActor).toBeDefined();
     const frameRoot = findDescendant(innerActor, `inner-background-frame:${INNER_BACKGROUND_ID}`, Container);
     const content = findDescendant(innerActor, `inner-background-content:${INNER_BACKGROUND_ID}`, Container);
+    const matte = findDescendant(innerActor, "inner-background-matte");
     const mask = findDescendant(innerActor, `inner-background-mask:${INNER_BACKGROUND_ID}`);
     const stroke = findDescendant(innerActor, "inner-background-stroke");
     const fallback = findDescendant(innerActor, `fallback:${INNER_BACKGROUND_ID}`, Container);
 
     expect(frameRoot).toBeDefined();
+    expect(matte).toBeDefined();
     expect(content?.mask).toBe(mask);
     expect(stroke).toBeDefined();
     expect(fallback?.visible).toBe(true);
@@ -125,20 +130,89 @@ describe("pixi presentation task system integration", () => {
     expect(load).toHaveBeenCalledWith("/resolved/bg:inner.png");
 
     const frame = resolveInnerBackgroundFrameRect(960, 540);
+    const imageRect = insetFrame(frame, innerBackgroundImageInsetPx);
     await waitFor(() => {
       const sprite = findFirstDescendant(content, Sprite);
       expect(sprite?.visible).toBe(true);
-      expect(sprite?.x).toBeLessThanOrEqual(frame.x);
-      expect(sprite?.y).toBeLessThanOrEqual(frame.y);
-      expect((sprite?.x ?? 0) + (sprite?.width ?? 0)).toBeGreaterThanOrEqual(frame.x + frame.width);
-      expect((sprite?.y ?? 0) + (sprite?.height ?? 0)).toBeGreaterThanOrEqual(frame.y + frame.height);
+      expect(sprite?.x).toBeLessThanOrEqual(imageRect.x);
+      expect(sprite?.y).toBeLessThanOrEqual(imageRect.y);
+      expect((sprite?.x ?? 0) + (sprite?.width ?? 0)).toBeGreaterThanOrEqual(imageRect.x + imageRect.width);
+      expect((sprite?.y ?? 0) + (sprite?.height ?? 0)).toBeGreaterThanOrEqual(imageRect.y + imageRect.height);
       expect(fallback?.visible).toBe(false);
     });
   });
 
-  it("uses a stable centered 16:9 rect for inner background frames", () => {
-    expect(resolveInnerBackgroundFrameRect(960, 540)).toEqual({ x: 134, y: 76, width: 691, height: 389 });
-    expect(resolveInnerBackgroundFrameRect(1000, 1000)).toEqual({ x: 140, y: 298, width: 720, height: 405 });
+  it("uses a stable reference-style wide rect for inner background frames", () => {
+    expect(resolveInnerBackgroundFrameRect(960, 540)).toEqual({ x: 112, y: 75, width: 735, height: 302 });
+    expect(resolveInnerBackgroundFrameRect(1000, 1000)).toEqual({ x: 117, y: 138, width: 766, height: 559 });
+  });
+
+  it("relayouts main and inner backgrounds against the resized viewport without a new snapshot", async () => {
+    vi.spyOn(Assets, "load").mockResolvedValue(Texture.WHITE as never);
+    const { actors, root, viewport } = createSystems({
+      assetResolver: {
+        resolve(input) {
+          return { uri: `/resolved/${input.id}.png` };
+        }
+      }
+    });
+
+    actors.reconcile(stageWithInnerBackground({ includeCharacter: false }), false);
+
+    const mainActor = findDescendant(root, "actor:MainBackground", Container);
+    const mainSprite = findFirstDescendant(mainActor, Sprite);
+    const innerActor = findDescendant(root, `actor:${INNER_BACKGROUND_ID}`, Container);
+    const innerContent = findDescendant(innerActor, `inner-background-content:${INNER_BACKGROUND_ID}`, Container);
+    const innerSprite = findFirstDescendant(innerContent, Sprite);
+    await waitFor(() => {
+      expect(mainSprite?.visible).toBe(true);
+      expect(innerSprite?.visible).toBe(true);
+    });
+
+    viewport.width = 1280;
+    viewport.height = 720;
+    actors.relayoutViewport();
+
+    const frame = resolveInnerBackgroundFrameRect(1280, 720);
+    const imageRect = insetFrame(frame, innerBackgroundImageInsetPx);
+    expect(mainSprite?.width).toBeCloseTo(1280);
+    expect(mainSprite?.height).toBeCloseTo(1280);
+    expect(mainSprite?.x).toBeCloseTo(0);
+    expect(mainSprite?.y).toBeCloseTo(-280);
+    expect(innerSprite?.x).toBeLessThanOrEqual(imageRect.x);
+    expect(innerSprite?.y).toBeLessThanOrEqual(imageRect.y);
+    expect((innerSprite?.x ?? 0) + (innerSprite?.width ?? 0)).toBeGreaterThanOrEqual(imageRect.x + imageRect.width);
+    expect((innerSprite?.y ?? 0) + (innerSprite?.height ?? 0)).toBeGreaterThanOrEqual(imageRect.y + imageRect.height);
+  });
+
+  it("reprojects active actor position transitions on resize without settling presentation tasks", () => {
+    const { actors, root, tasks, tweens, viewport } = createSystems();
+    const first = { ...characterActor("Ema", "Pensive1"), pos: [0.2, 0] as [number, number] };
+    const second = {
+      ...characterActor("Ema", "Pensive1"),
+      pos: [0.8, 0] as [number, number],
+      transition: { durationMs: 100, easing: "linear", lazy: false, wait: true }
+    };
+    actors.reconcile(stageWithActors(backgroundActor({ durationMs: 0 }), [first], 1), false);
+    actors.reconcile(stageWithActors(backgroundActor({ durationMs: 0 }), [second], 2), true);
+
+    const ema = findDescendant(root, "actor:Ema", Container);
+    tick(tweens, 50);
+    expect(ema?.x).toBeCloseTo(480);
+    expect(tasks.snapshot()).toMatchObject([{ kind: "actor-transition", target: "Ema", revision: 2, status: "running" }]);
+
+    viewport.width = 1920;
+    viewport.height = 1080;
+    actors.relayoutViewport();
+
+    expect(ema?.x).toBeCloseTo(960);
+    expect(ema?.y).toBeCloseTo(972);
+    expect(tasks.snapshot()).toMatchObject([{ kind: "actor-transition", target: "Ema", revision: 2, status: "running" }]);
+
+    tick(tweens, 60);
+
+    expect(ema?.x).toBeCloseTo(1536);
+    expect(tasks.snapshot()).toEqual([]);
   });
 
   it("emits diagnostics for missing background and character-pack assets while keeping fallbacks", () => {
@@ -391,7 +465,8 @@ describe("pixi presentation task system integration", () => {
 
   it("composes screen and transient filters without overwriting unrelated filters", () => {
     const root = new Container();
-    const stack = new RootFilterStack({ root, width: () => 960, height: () => 540 });
+    const viewport = { width: 960, height: 540 };
+    const stack = new RootFilterStack({ root, width: () => viewport.width, height: () => viewport.height });
     const bokeh = { label: "bokeh" } as unknown as Filter;
     const persistent = { label: "persistent-glitch" } as unknown as Filter;
     const pulse = { label: "one-shot-glitch" } as unknown as Filter;
@@ -408,9 +483,34 @@ describe("pixi presentation task system integration", () => {
     stack.removeScreenFilter(persistent);
     expect(root.filters).toEqual([bokeh]);
 
+    viewport.width = 1280;
+    viewport.height = 720;
+    stack.relayoutViewport();
+    expect(root.filterArea).toEqual(new Rectangle(0, 0, 1280, 720));
+
     stack.clear();
     expect(root.filters).toBeNull();
     expect(root.filterArea).toBeUndefined();
+  });
+
+  it("relayouts bokeh overlays for the resized viewport without a new reconcile", () => {
+    const { root, screenOverlays, viewport } = createSystems();
+    screenOverlays.reconcile(stageWithBokeh(0.8, 1), false);
+    const layer = findDescendant(root, "screen-filter-overlays", Container);
+    const firstBefore = layer?.children[0] as Sprite | undefined;
+    expect(firstBefore).toBeDefined();
+    const beforeX = firstBefore?.x ?? 0;
+
+    viewport.width = 1280;
+    viewport.height = 720;
+    screenOverlays.relayoutViewport();
+
+    const firstAfter = layer?.children[0] as Sprite | undefined;
+    expect(firstAfter).toBeDefined();
+    expect(firstAfter).not.toBe(firstBefore);
+    expect(firstAfter?.x).toBeGreaterThan(beforeX);
+    expect(firstAfter?.x).toBeLessThanOrEqual(1280);
+    expect(firstAfter?.y).toBeLessThanOrEqual(720);
   });
 
   it("composes persistent and one-shot glitch filters without stale cleanup", () => {
@@ -605,6 +705,33 @@ describe("pixi presentation task system integration", () => {
     expect(Number(uniforms?.uTime ?? 0)).toBeGreaterThan(before);
   });
 
+  it("relayouts weather shader surfaces on viewport changes", () => {
+    const { root, viewport, weather } = createSystems();
+    weather.reconcile(
+      stageWithWeathers({
+        rain: weatherSnapshot({ power: 0.7, durationMs: 0 }),
+        snow: snowWeatherSnapshot({ power: 0.9, durationMs: 0 })
+      }, 1),
+      false
+    );
+
+    viewport.width = 1280;
+    viewport.height = 720;
+    weather.relayoutViewport();
+
+    const rain = findWeatherContainer(root, "rain");
+    const rainShader = rain?.children.find((child): child is Container => child instanceof Container && child.label === "weather:rain:shader");
+    const rainSurface = rainShader?.children[0] as Sprite | undefined;
+    expect(rainSurface?.width).toBeCloseTo(1280);
+    expect(rainSurface?.height).toBeCloseTo(720);
+
+    const snow = findWeatherContainer(root, "snow");
+    const snowSurface = snow?.children.find((child) => child.label === "weather:snow:shader-surface");
+    const snowFilter = snowSurface?.filters?.[0] as { resources: { snowUniforms: { uniforms: Record<string, Float32Array> } } } | undefined;
+    expect(snowSurface?.filterArea).toEqual(new Rectangle(0, 0, 1280, 720));
+    expect(Array.from(snowFilter?.resources.snowUniforms.uniforms.uResolution ?? [])).toEqual([1280, 720]);
+  });
+
   it("keeps rain and shader snow independent through animated snow cleanup", () => {
     const { root, tasks, tweens, weather } = createSystems();
     weather.reconcile(stageWithWeathers({ rain: weatherSnapshot({ power: 0.7, durationMs: 0 }), snow: snowWeatherSnapshot({ power: 0.9, durationMs: 0 }) }, 1), false);
@@ -638,19 +765,73 @@ describe("pixi presentation task system integration", () => {
 
     expect(tasks.snapshot()).toEqual([]);
   });
+
+  it("relayouts transient viewport effects without cancelling active tasks", () => {
+    const { effects, root, tasks, viewport } = createSystems();
+    effects.run(
+      [
+        { type: "flash", color: "#ffffff", durationMs: 100, wait: true },
+        {
+          type: "glitch",
+          power: 0.8,
+          durationMs: 100,
+          blockJump: 1,
+          burstJump: 1,
+          pixelScatter: 1,
+          colorNoise: 1,
+          speed: 1,
+          seed: 7,
+          wait: true
+        },
+        { type: "trial-keyword", keywordId: "kw:test", text: "resize", evidenceId: "ev:test" }
+      ],
+      3
+    );
+
+    viewport.width = 1280;
+    viewport.height = 720;
+    effects.relayoutViewport();
+
+    const transientLayer = findDescendant(root, "transient-effects", Container);
+    const flash = findDescendant(transientLayer, "flash-overlay", Graphics);
+    expect(flash?.width).toBeCloseTo(1280);
+    expect(flash?.height).toBeCloseTo(720);
+    const glitchFilter = (root.filters as unknown as GlitchTestFilter[] | null)?.find((filter) => filter.resources?.glitchUniforms);
+    expect(Array.from(glitchFilter?.resources.glitchUniforms.uniforms.uResolution ?? [])).toEqual([1280, 720]);
+    const trialLayer = findDescendant(root, "trial-overlay", Container);
+    expect(trialLayer?.children[0]?.x).toBe(920);
+    expect(tasks.snapshot()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "flash", target: "screen", revision: 3, status: "running" }),
+        expect.objectContaining({ kind: "glitch", target: "screen", revision: 3, status: "running" })
+      ])
+    );
+  });
 });
 
-function createSystems(overrides: { assetResolver?: PixiAssetResolver; onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void } = {}) {
+function createSystems(overrides: {
+  assetResolver?: PixiAssetResolver;
+  onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
+  viewport?: { width: number; height: number };
+} = {}) {
   const root = new Container({ label: "test-root" });
-  const options = { root, width: () => 960, height: () => 540, ...overrides };
+  const viewport = overrides.viewport ?? { width: 960, height: 540 };
+  const options = {
+    root,
+    width: () => viewport.width,
+    height: () => viewport.height,
+    ...(overrides.assetResolver ? { assetResolver: overrides.assetResolver } : {}),
+    ...(overrides.onDiagnostic ? { onDiagnostic: overrides.onDiagnostic } : {})
+  };
   const tweens = new TweenSystem();
   const tasks = new PresentationTaskController();
   const rootFilters = new RootFilterStack(options);
   const filters = new FilterSystem(options, rootFilters, tweens, tasks);
   const actors = new ActorSystem(options, filters, tweens, tasks);
   const weather = new WeatherSystem(options, filters, tweens, tasks);
+  const screenOverlays = new ScreenOverlaySystem(options, tweens, tasks);
   const effects = new TransientEffectSystem(options, actors, rootFilters, tweens, tasks);
-  return { actors, effects, filters, root, tasks, tweens, weather };
+  return { actors, effects, filters, root, screenOverlays, tasks, tweens, viewport, weather };
 }
 
 type GlitchTestFilter = Filter & {
@@ -685,13 +866,26 @@ function stageWithActor(actor: PixiActorSnapshot, revision: number): PixiStageSn
   };
 }
 
-function stageWithActors(background: PixiActorSnapshot, characters: PixiActorSnapshot[]): PixiStageSnapshot {
+function stageWithActors(background: PixiActorSnapshot, characters: PixiActorSnapshot[], revision = 1): PixiStageSnapshot {
   return {
     ...createInitialPixiStageSnapshot(),
-    revision: 1,
+    revision,
     backgroundsById: { [background.id]: background },
     charactersById: Object.fromEntries(characters.map((actor) => [actor.id, actor])),
     actorOrder: [background.id, ...characters.map((actor) => actor.id)]
+  };
+}
+
+function stageWithBokeh(power: number, revision: number): PixiStageSnapshot {
+  return {
+    ...createInitialPixiStageSnapshot(),
+    revision,
+    screenFilters: {
+      bokeh: {
+        power,
+        transition: { durationMs: 0, lazy: false, wait: false }
+      }
+    }
   };
 }
 
@@ -917,6 +1111,15 @@ function installCharacterPackFetch(options: {
   });
   vi.stubGlobal("fetch", fetch);
   return fetch;
+}
+
+function insetFrame(frame: ReturnType<typeof resolveInnerBackgroundFrameRect>, inset: number): ReturnType<typeof resolveInnerBackgroundFrameRect> {
+  return {
+    x: frame.x + inset,
+    y: frame.y + inset,
+    width: Math.max(1, frame.width - inset * 2),
+    height: Math.max(1, frame.height - inset * 2)
+  };
 }
 
 function characterPackFixture() {
