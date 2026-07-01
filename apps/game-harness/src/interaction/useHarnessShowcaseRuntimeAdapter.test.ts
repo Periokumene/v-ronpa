@@ -108,6 +108,16 @@ describe("harness showcase runtime adapter glue", () => {
         expect.objectContaining({ fontId: "font:serif" })
       ])
     );
+
+    const fontFaceComparison = richCommands.find((command) => String(command.params.text ?? "").includes("CHECKPOINT RICH 05"));
+    const comparisonSample = "AaGgQq Font ID 123";
+    const fontFaceRun = fontFaceComparison?.richText?.runs.find((run) => run.style.fontId === "font:serif");
+
+    expect(fontFaceComparison?.params.text).toContain(
+      `默认 ${comparisonSample} / serif ${comparisonSample}`
+    );
+    expect(fontFaceRun).toBeDefined();
+    expect(fontFaceComparison?.richText?.text.slice(fontFaceRun?.start, fontFaceRun?.end)).toBe(comparisonSample);
   });
 
   it("extracts GameInteractionContext from harness Navi and Trial glue", () => {

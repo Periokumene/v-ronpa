@@ -58,7 +58,7 @@ Narrator: CHECKPOINT RICH 03 - 上下标 H<sub>2</sub>O / x<sup>2</sup>，以及
 @print "<font color='red'>CHECKPOINT RICH 04 named color</font> + <font color='#ff5577'><b>hex color + bold</b></font> - @print 中颜色与粗体应生效。" author:Narrator
 @append " <font size='+1'>@append 追加段落字号变大</font>，但不继承上一段颜色。"
 @toast "<mark>CHECKPOINT RICH TOAST</mark> <small>toast 使用同一 renderer，且不进入存档。</small>" appearance:info time:2
-Narrator: CHECKPOINT RICH 05 - font face 使用 <font face='font:serif'>注册 font id</font>，Backlog 应保留前述富文本快照，加载失败时应回退默认字体。
+Narrator: CHECKPOINT RICH 05 - font face 英文同字符对比：默认 AaGgQq Font ID 123 / serif <font face='font:serif'>AaGgQq Font ID 123</font>；后者应使用注册 font id，中文不覆盖时可回退默认字体。
 @choice "<b><font color='#ffd166'>富文本 choice</font></b> - 回到入口" goto:#Start
 
 #MainInteractionFlow
