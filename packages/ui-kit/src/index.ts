@@ -5,6 +5,15 @@ export {
   richTextFontFamilyValue,
 } from "./surfaces/RichTextRenderer";
 export type { RichTextRendererProps } from "./surfaces/RichTextRenderer";
+export { RichTextFontStyles, createRichTextFontCss } from "./surfaces/RichTextFontStyles";
+export type {
+  CreateRichTextFontCssInput,
+  RichTextFontAssetResolver,
+  RichTextFontCssResult,
+  RichTextFontDiagnostic,
+  RichTextFontRuntimeDiagnostic,
+  RichTextFontStylesProps
+} from "./surfaces/RichTextFontStyles";
 export {
   GameOverlayHost,
   PauseMenuOverlay,

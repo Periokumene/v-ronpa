@@ -24,21 +24,33 @@ describe("game-a content manifest", () => {
         ])
       })
     ]);
+    expect(gameAContentManifest.fonts).toEqual([
+      {
+        id: "font:jinghua-laosong-gb",
+        family: "font:jinghua-laosong-gb",
+        sourceRef: "font:jinghua-laosong-gb",
+        weight: "400",
+        style: "normal"
+      }
+    ]);
     expect(registry.url({ id: "bg:game-a-academy-hall-fullscreen", kind: "background" })).toBe(
-      "/game-a/backgrounds/bg-fullscreen-academy-hall-2560x1440.png"
+      "/game-a/backgrounds/game-a-academy-hall-fullscreen.png"
     );
     expect(registry.url({ id: "bg:game-a-snow-outskirts-frame", kind: "background" })).toBe(
-      "/game-a/backgrounds/bg-framed-snow-outskirts-2560x1440.png"
+      "/game-a/backgrounds/game-a-snow-outskirts-frame.png"
     );
-    expect(registry.url({ id: "bgm:game-a-main", kind: "bgm" })).toBe("/game-a/media/bgm/main.ogg");
-    expect(registry.url({ id: "sfx:game-a-chime", kind: "sfx" })).toBe("/game-a/media/sfx/chime.ogg");
-    expect(registry.url({ id: "bleep:game-a-dialogue", kind: "bleep" })).toBe("/game-a/media/bleep/dialogue.ogg");
+    expect(registry.url({ id: "bgm:game-a-main", kind: "bgm" })).toBe("/game-a/media/bgm/game-a-main.ogg");
+    expect(registry.url({ id: "sfx:game-a-chime", kind: "sfx" })).toBe("/game-a/media/sfx/game-a-chime.ogg");
+    expect(registry.url({ id: "bleep:game-a-dialogue", kind: "bleep" })).toBe("/game-a/media/bleep/game-a-dialogue.ogg");
     expect(registry.url({ id: "voice:zh:game_a_voice_0001", kind: "voice" })).toBe(
       "/game-a/media/voice/zh/game_a_voice_0001.ogg"
     );
-    expect(registry.url({ id: "video:game-a-intro", kind: "video" })).toBe("/game-a/media/video/intro.mp4");
+    expect(registry.url({ id: "video:game-a-intro", kind: "video" })).toBe("/game-a/media/video/game-a-intro.mp4");
     expect(registry.url({ id: "texture:ui:game-a-dialog-frame", kind: "texture" })).toBe(
-      "/game-a/ui/dialog-frame.png"
+      "/game-a/ui/game-a-dialog-frame.png"
+    );
+    expect(registry.url({ id: "font:jinghua-laosong-gb", kind: "font" })).toBe(
+      "/game-a/fonts/jinghua-laosong-gb.woff2"
     );
   });
 });

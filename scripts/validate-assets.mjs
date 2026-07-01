@@ -1,7 +1,14 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { collectHarnessRuntimeAssets, generateHarnessRuntimeAssetsModule } from "./generate-assets.mjs";
+import {
+  collectGameAFontFaces,
+  collectGameARuntimeAssets,
+  collectHarnessFontFaces,
+  collectHarnessRuntimeAssets,
+  generateGameARuntimeAssetsModule,
+  generateHarnessRuntimeAssetsModule
+} from "./generate-assets.mjs";
 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const {
@@ -10,22 +17,25 @@ const {
   LayeredCharacterLayerMetadataSchema,
   LayeredCharacterLayersSchema
 } = await import(pathToFileURL(join(repoRoot, "packages/contracts/src/index.ts")).href);
-const generatedPath = join(repoRoot, "apps/game-harness/src/harness/generatedAssets.ts");
-const contentManifestPath = join(repoRoot, "apps/game-harness/src/harness/contentManifest.ts");
+const harnessGeneratedPath = join(repoRoot, "apps/game-harness/src/harness/generatedAssets.ts");
+const gameAGeneratedPath = join(repoRoot, "apps/game-a/src/generatedAssets.ts");
 const gameAContentManifestPath = join(repoRoot, "apps/game-a/src/contentManifest.ts");
 const pixiFxAssetsPath = join(repoRoot, "packages/pixi-presenter/src/internal/fxAssets.ts");
 const bleepAssetsRoot = join(repoRoot, "apps/game-harness/public/harness/media/bleep");
 const voiceAssetsRoot = join(repoRoot, "apps/game-harness/public/harness/media/voice");
+const gameABleepAssetsRoot = join(repoRoot, "apps/game-a/public/game-a/media/bleep");
+const gameAVoiceAssetsRoot = join(repoRoot, "apps/game-a/public/game-a/media/voice");
+const gameAFontAssetsRoot = join(repoRoot, "apps/game-a/public/game-a/fonts");
 const sourceRoots = ["apps/game-a/src", "apps/game-harness/src", "packages", "scripts"].map((path) => join(repoRoot, path));
 const harnessReferenceFiles = [
   join(repoRoot, "apps/game-harness/src/harness/showcase/script.ts"),
   join(repoRoot, "apps/game-harness/src/harness/showcase/items.ts"),
   join(repoRoot, "apps/game-harness/src/harness/showcase/maps.ts"),
-  join(repoRoot, "apps/game-a/src/contentManifest.ts"),
   join(repoRoot, "docs/nani/basic-p1-example.md"),
   ...fixtureNaniFiles(join(repoRoot, "packages/nani-parser/fixtures"))
 ];
-const hardcodedAssetPattern = /(["'`])(?:\/harness\/|\.\/assets\/|\.\.\/assets\/|https?:\/\/|data:image\/|blob:)[^"'`]*\.(?:json|png|webp|avif|ktx2|woff2?|ttf|otf|ogg|mp3|mp4|webm|gltf|glb)\1/u;
+const gameAReferenceFiles = [gameAContentManifestPath];
+const hardcodedAssetPattern = /(["'`])(?:\/harness\/|\/game-a\/|\.\/assets\/|\.\.\/assets\/|https?:\/\/|data:image\/|blob:)[^"'`]*\.(?:json|png|webp|avif|ktx2|woff2?|ttf|otf|ogg|mp3|mp4|webm|gltf|glb)\1/u;
 const assetIdPattern = /\b(?:bg|bgm|sfx|bleep|voice|video|model|texture|fx):[a-zA-Z0-9:_./-]+/gu;
 const richTextFontFacePattern = /<font\b[^>]*\bface\s*=\s*(?:"(font:[a-zA-Z0-9:_./-]+)"|'(font:[a-zA-Z0-9:_./-]+)'|(font:[a-zA-Z0-9:_./-]+))/gu;
 const bleepAssetIdPattern = /^[a-zA-Z0-9_-]+$/u;
@@ -33,52 +43,96 @@ const voiceTextIdPattern = /^[a-zA-Z0-9_-]+$/u;
 const characterPackCommandPattern = /^\s*@(char|slide)\s+([^\s]+)/gmu;
 const allowedHardcodedFiles = new Set([
   "apps/game-harness/src/harness/generatedAssets.ts",
-  "apps/game-a/src/contentManifest.ts",
+  "apps/game-a/src/generatedAssets.ts",
   "packages/pixi-presenter/src/internal/fxAssets.ts",
   "scripts/generate-assets.mjs",
   "scripts/validate-assets.mjs"
 ]);
 
+const appAssetConfigs = [
+  {
+    label: "harness",
+    assets: collectHarnessRuntimeAssets(),
+    fontFaces: collectHarnessFontFaces(),
+    publicRoot: "apps/game-harness/public",
+    referenceFiles: harnessReferenceFiles,
+    includePixiFxIds: true
+  },
+  {
+    label: "game-a",
+    assets: collectGameARuntimeAssets(),
+    fontFaces: collectGameAFontFaces(),
+    publicRoot: "apps/game-a/public",
+    referenceFiles: gameAReferenceFiles,
+    includePixiFxIds: false
+  }
+];
+
 let failed = false;
 
 checkGeneratedAssets();
-checkHarnessFilesExist();
-checkHarnessBleepAssetLayout();
-checkHarnessVoiceAssetLayout();
-checkHarnessFontAssetLayout();
+for (const config of appAssetConfigs) {
+  checkGeneratedFilesExist(config.label, config.assets, config.publicRoot);
+  checkGeneratedFontFacesResolve(config.label, config.assets, config.fontFaces);
+}
+checkBleepAssetLayout(bleepAssetsRoot, "apps/game-harness/public/harness/media/bleep");
+checkBleepAssetLayout(gameABleepAssetsRoot, "apps/game-a/public/game-a/media/bleep");
+checkVoiceAssetLayout(voiceAssetsRoot, "apps/game-harness/public/harness/media/voice");
+checkVoiceAssetLayout(gameAVoiceAssetsRoot, "apps/game-a/public/game-a/media/voice");
+checkFontAssetLayout(join(repoRoot, "apps/game-harness/public/harness/fonts"), "apps/game-harness/public/harness/fonts");
+checkFontAssetLayout(gameAFontAssetsRoot, "apps/game-a/public/game-a/fonts");
 checkCharacterPacks();
-checkContentManifestReferencesResolve();
-checkHarnessReferencesResolve();
+for (const config of appAssetConfigs) checkReferencesResolve(config);
 checkNoHardcodedRuntimeAssetPaths();
 
 if (failed) process.exitCode = 1;
 
 function checkGeneratedAssets() {
-  const expected = generateHarnessRuntimeAssetsModule();
-  const current = existsSync(generatedPath) ? readFileSync(generatedPath, "utf8") : "";
-  if (current !== expected) fail(`${relative(repoRoot, generatedPath)} is out of date. Run pnpm generate:assets.`);
-}
-
-function checkHarnessFilesExist() {
-  const ids = new Set();
-  for (const asset of collectHarnessRuntimeAssets()) {
-    if (ids.has(asset.id)) fail(`Duplicate generated asset id '${asset.id}'.`);
-    ids.add(asset.id);
-    const filePath = join(repoRoot, "apps/game-harness/public", asset.optimizedUri.replace(/^\//u, ""));
-    if (!existsSync(filePath)) fail(`Generated asset '${asset.id}' points to missing file ${relative(repoRoot, filePath)}.`);
+  const generatedFiles = [
+    { path: harnessGeneratedPath, expected: generateHarnessRuntimeAssetsModule() },
+    { path: gameAGeneratedPath, expected: generateGameARuntimeAssetsModule() }
+  ];
+  for (const generated of generatedFiles) {
+    const current = existsSync(generated.path) ? readFileSync(generated.path, "utf8") : "";
+    if (current !== generated.expected) fail(`${relative(repoRoot, generated.path)} is out of date. Run pnpm generate:assets.`);
   }
 }
 
-function checkHarnessVoiceAssetLayout() {
-  if (!existsSync(voiceAssetsRoot)) return;
-  for (const filePath of walkFiles(voiceAssetsRoot)) {
-    const rel = toPosix(relative(voiceAssetsRoot, filePath));
+function checkGeneratedFilesExist(label, assets, publicRoot) {
+  const ids = new Set();
+  for (const asset of assets) {
+    if (ids.has(asset.id)) fail(`Duplicate generated asset id '${asset.id}'.`);
+    ids.add(asset.id);
+    const filePath = join(repoRoot, publicRoot, asset.optimizedUri.replace(/^\//u, ""));
+    if (!existsSync(filePath)) fail(`Generated ${label} asset '${asset.id}' points to missing file ${relative(repoRoot, filePath)}.`);
+  }
+}
+
+function checkGeneratedFontFacesResolve(label, assets, fontFaces) {
+  const byId = new Map(assets.map((asset) => [asset.id, asset]));
+  const faceIds = new Set();
+  for (const face of fontFaces) {
+    if (faceIds.has(face.id)) fail(`Duplicate generated ${label} font face id '${face.id}'.`);
+    faceIds.add(face.id);
+    const asset = byId.get(face.sourceRef);
+    if (!asset) {
+      fail(`Generated ${label} font face '${face.id}' references undeclared runtime asset '${face.sourceRef}'.`);
+    } else if (asset.kind !== "font") {
+      fail(`Generated ${label} font face '${face.id}' references '${face.sourceRef}', which is '${asset.kind}', not 'font'.`);
+    }
+  }
+}
+
+function checkVoiceAssetLayout(root, labelPath) {
+  if (!existsSync(root)) return;
+  for (const filePath of walkFiles(root)) {
+    const rel = toPosix(relative(root, filePath));
     const parts = rel.split("/");
     const filename = parts.at(-1) ?? "";
     const ext = extname(filename);
     const textId = filename.slice(0, -ext.length);
     if (parts.length !== 2 || ext !== ".ogg") {
-      fail(`${toPosix(relative(repoRoot, filePath))} must use apps/game-harness/public/harness/media/voice/<locale>/<textId>.ogg.`);
+      fail(`${toPosix(relative(repoRoot, filePath))} must use ${labelPath}/<locale>/<textId>.ogg.`);
       continue;
     }
     if (!voiceTextIdPattern.test(textId)) {
@@ -87,30 +141,39 @@ function checkHarnessVoiceAssetLayout() {
   }
 }
 
-function checkHarnessFontAssetLayout() {
-  const fontsRoot = join(repoRoot, "apps/game-harness/public/harness/fonts");
-  if (!existsSync(fontsRoot)) return;
-  for (const filePath of walkFiles(fontsRoot)) {
-    const rel = toPosix(relative(fontsRoot, filePath));
+function checkFontAssetLayout(root, labelPath) {
+  if (!existsSync(root)) return;
+  const seenStems = new Map();
+  for (const filePath of walkFiles(root)) {
+    const rel = toPosix(relative(root, filePath));
     const parts = rel.split("/");
-    const ext = extname(parts.at(-1) ?? "");
+    const filename = parts.at(-1) ?? "";
+    const ext = extname(filename);
     if (rel === "README.md") continue;
     if (parts.length !== 1 || ![".woff", ".woff2", ".ttf", ".otf"].includes(ext)) {
-      fail(`${toPosix(relative(repoRoot, filePath))} must use apps/game-harness/public/harness/fonts/<fontId>.{woff,woff2,ttf,otf}.`);
+      fail(`${toPosix(relative(repoRoot, filePath))} must use ${labelPath}/<fontId>.{woff,woff2,ttf,otf}.`);
+      continue;
+    }
+    const stem = filename.slice(0, -ext.length);
+    const previous = seenStems.get(stem);
+    if (previous) {
+      fail(`${toPosix(relative(repoRoot, filePath))} duplicates font stem '${stem}' already provided by ${previous}; keep only the shipped runtime format.`);
+    } else {
+      seenStems.set(stem, toPosix(relative(repoRoot, filePath)));
     }
   }
 }
 
-function checkHarnessBleepAssetLayout() {
-  if (!existsSync(bleepAssetsRoot)) return;
-  for (const filePath of walkFiles(bleepAssetsRoot)) {
-    const rel = toPosix(relative(bleepAssetsRoot, filePath));
+function checkBleepAssetLayout(root, labelPath) {
+  if (!existsSync(root)) return;
+  for (const filePath of walkFiles(root)) {
+    const rel = toPosix(relative(root, filePath));
     const parts = rel.split("/");
     const filename = parts.at(-1) ?? "";
     const ext = extname(filename);
     const bleepId = filename.slice(0, -ext.length);
     if (parts.length !== 1 || ext !== ".ogg") {
-      fail(`${toPosix(relative(repoRoot, filePath))} must use apps/game-harness/public/harness/media/bleep/<bleepId>.ogg.`);
+      fail(`${toPosix(relative(repoRoot, filePath))} must use ${labelPath}/<bleepId>.ogg.`);
       continue;
     }
     if (!bleepAssetIdPattern.test(bleepId)) {
@@ -152,9 +215,9 @@ function checkCharacterPacks() {
   }
 }
 
-function checkHarnessReferencesResolve() {
-  const { knownAssetIds, knownFontFaceIds } = collectRegisteredIds();
-  for (const filePath of harnessReferenceFiles) {
+function checkReferencesResolve(config) {
+  const { knownAssetIds, knownFontFaceIds } = collectRegisteredIds(config);
+  for (const filePath of config.referenceFiles) {
     const content = readFileSync(filePath, "utf8");
     for (const match of content.matchAll(assetIdPattern)) {
       const id = match[0];
@@ -179,23 +242,6 @@ function checkHarnessReferencesResolve() {
   }
 }
 
-function checkContentManifestReferencesResolve() {
-  const knownAssets = collectRegisteredAssetMap();
-  for (const asset of knownAssets.values()) {
-    if (!asset.optimizedUri?.startsWith("/game-a/")) continue;
-    const filePath = join(repoRoot, "apps/game-a/public", asset.optimizedUri.replace(/^\/game-a\//u, "game-a/"));
-    if (!existsSync(filePath)) fail(`Runtime asset '${asset.id}' points to missing file ${relative(repoRoot, filePath)}.`);
-  }
-  for (const font of collectManifestFontFaces()) {
-    const asset = knownAssets.get(font.sourceRef);
-    if (!asset) {
-      fail(`ContentManifest font '${font.id}' references undeclared runtime asset '${font.sourceRef}'.`);
-    } else if (asset.kind !== "font") {
-      fail(`ContentManifest font '${font.id}' references '${font.sourceRef}', which is '${asset.kind}', not 'font'.`);
-    }
-  }
-}
-
 function characterPackIdForCommand(command, primary) {
   if (!primary || primary === "*") return undefined;
   const value = primary.startsWith("id:") ? primary.slice(3) : primary;
@@ -213,9 +259,9 @@ function resolvePackPath(packRoot, relativePath) {
   return resolved === packRoot || resolved.startsWith(`${packRoot}${sep}`) ? resolved : undefined;
 }
 
-function collectRegisteredIds() {
-  const ids = new Set(collectRegisteredAssetMap().keys());
-  if (existsSync(pixiFxAssetsPath)) {
+function collectRegisteredIds(config) {
+  const ids = new Set(config.assets.map((asset) => asset.id));
+  if (config.includePixiFxIds && existsSync(pixiFxAssetsPath)) {
     const content = readFileSync(pixiFxAssetsPath, "utf8");
     for (const match of content.matchAll(/runtimeFxAsset\("([^"]+)"/gu)) {
       if (match[1]) ids.add(`fx:${match[1]}`);
@@ -223,46 +269,8 @@ function collectRegisteredIds() {
   }
   return {
     knownAssetIds: ids,
-    knownFontFaceIds: new Set(collectManifestFontFaces().map((font) => font.id))
+    knownFontFaceIds: new Set(config.fontFaces.map((font) => font.id))
   };
-}
-
-function collectRegisteredAssetMap() {
-  return new Map(
-    [
-      ...collectHarnessRuntimeAssets(),
-      ...collectInlineRuntimeAssets(gameAContentManifestPath)
-    ].map((asset) => [asset.id, asset])
-  );
-}
-
-function collectManifestFontFaces() {
-  if (!existsSync(contentManifestPath)) return [];
-  const content = readFileSync(contentManifestPath, "utf8");
-  const block = content.match(/fonts:\s*\[([\s\S]*?)\],\s*runtimeAssets/u)?.[1] ?? "";
-  const fonts = [];
-  for (const match of block.matchAll(/\{([\s\S]*?)\}/gu)) {
-    const body = match[1] ?? "";
-    const id = body.match(/\bid:\s*"([^"]+)"/u)?.[1];
-    const sourceRef = body.match(/\bsourceRef:\s*"([^"]+)"/u)?.[1];
-    if (id && sourceRef) fonts.push({ id, sourceRef });
-  }
-  return fonts;
-}
-
-function collectInlineRuntimeAssets(manifestPath) {
-  if (!existsSync(manifestPath)) return [];
-  const content = readFileSync(manifestPath, "utf8");
-  const block = content.match(/runtimeAssets:\s*\[([\s\S]*?)\],\s*collisionProxies/u)?.[1] ?? "";
-  const assets = [];
-  for (const match of block.matchAll(/\{([\s\S]*?)\}/gu)) {
-    const body = match[1] ?? "";
-    const id = body.match(/\bid:\s*"([^"]+)"/u)?.[1];
-    const kind = body.match(/\bkind:\s*"([^"]+)"/u)?.[1];
-    const optimizedUri = body.match(/\boptimizedUri:\s*"([^"]+)"/u)?.[1];
-    if (id && kind) assets.push({ id, kind, optimizedUri });
-  }
-  return assets;
 }
 
 function checkNoHardcodedRuntimeAssetPaths() {

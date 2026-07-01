@@ -1,4 +1,5 @@
 import { ContentManifestSchema, type ContentManifestInput } from "@v-ronpa/contracts";
+import { gameAFontFaces, gameARuntimeAssets } from "./generatedAssets";
 
 export const gameAVnScriptPath = "game-a/opening.nani";
 const GAME_A_MAIN_BACKGROUND_ID = "bg:game-a-academy-hall-fullscreen";
@@ -66,90 +67,8 @@ const gameAContentManifestInput = {
       speakerOverrides: {}
     }
   },
-  fonts: [],
-  runtimeAssets: [
-    {
-      id: "bg:game-a-academy-hall-fullscreen",
-      kind: "background",
-      optimizedUri: "/game-a/backgrounds/bg-fullscreen-academy-hall-2560x1440.png",
-      format: "png",
-      compression: [],
-      lods: [],
-      collisionProxyIds: [],
-      tags: ["game-a", "vn"]
-    },
-    {
-      id: "bg:game-a-snow-outskirts-frame",
-      kind: "background",
-      optimizedUri: "/game-a/backgrounds/bg-framed-snow-outskirts-2560x1440.png",
-      format: "png",
-      compression: [],
-      lods: [],
-      collisionProxyIds: [],
-      tags: ["game-a", "vn"]
-    },
-    {
-      id: "bgm:game-a-main",
-      kind: "bgm",
-      optimizedUri: "/game-a/media/bgm/main.ogg",
-      format: "ogg",
-      compression: [],
-      lods: [],
-      collisionProxyIds: [],
-      tags: ["game-a", "vn"]
-    },
-    {
-      id: "sfx:game-a-chime",
-      kind: "sfx",
-      optimizedUri: "/game-a/media/sfx/chime.ogg",
-      format: "ogg",
-      compression: [],
-      lods: [],
-      collisionProxyIds: [],
-      tags: ["game-a", "vn"]
-    },
-    {
-      id: "bleep:game-a-dialogue",
-      kind: "bleep",
-      optimizedUri: "/game-a/media/bleep/dialogue.ogg",
-      format: "ogg",
-      compression: [],
-      lods: [],
-      collisionProxyIds: [],
-      tags: ["game-a", "vn"]
-    },
-    {
-      id: "voice:zh:game_a_voice_0001",
-      kind: "voice",
-      optimizedUri: "/game-a/media/voice/zh/game_a_voice_0001.ogg",
-      format: "ogg",
-      compression: [],
-      lods: [],
-      collisionProxyIds: [],
-      tags: ["game-a", "vn"]
-    },
-    {
-      id: "video:game-a-intro",
-      kind: "video",
-      optimizedUri: "/game-a/media/video/intro.mp4",
-      format: "mp4",
-      compression: [],
-      lods: [],
-      collisionProxyIds: [],
-      tags: ["game-a", "vn"]
-    },
-    {
-      id: "texture:ui:game-a-dialog-frame",
-      kind: "texture",
-      sourceUri: "imagegen:019f17d7-f0a0-7821-9d5d-1b494ae8971e",
-      optimizedUri: "/game-a/ui/dialog-frame.png",
-      format: "png",
-      compression: [],
-      lods: [],
-      collisionProxyIds: [],
-      tags: ["game-a", "ui", "vn"]
-    }
-  ],
+  fonts: gameAFontFaces,
+  runtimeAssets: gameARuntimeAssets,
   collisionProxies: [],
   vnEntries: [gameAVnEntry],
   maps: [],

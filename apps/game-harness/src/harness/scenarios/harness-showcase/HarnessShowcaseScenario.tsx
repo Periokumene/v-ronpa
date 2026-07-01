@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ButtonHTMLAttributes } from "react";
+import { useCallback, useMemo, useState, type ButtonHTMLAttributes } from "react";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
@@ -14,7 +14,7 @@ import type { GameplayState } from "@v-ronpa/gameplay";
 import type { AudioHandle, AudioHandleFinishReason, AudioPort } from "@v-ronpa/media-save";
 import type { PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
 import { ExplorationStage3D, TrialRoundTableStage } from "@v-ronpa/r3f-adapter";
-import { InspectorLite } from "@v-ronpa/ui-kit";
+import { InspectorLite, RichTextFontStyles } from "@v-ronpa/ui-kit";
 import { useGameFlowActor } from "../../../interaction/useGameFlowActor";
 import { useOverlayPageAdapters } from "../../../interaction/useOverlayPageAdapters";
 import {
@@ -24,7 +24,6 @@ import {
   harnessShowcasePosePresets
 } from "../../../interaction/useHarnessShowcaseRuntimeAdapter";
 import { useHarnessShowcaseSaveAdapter } from "../../../interaction/useHarnessShowcaseSaveAdapter";
-import { createRichTextFontCss } from "../../../richTextFonts";
 import { harnessContentManifest } from "../../contentManifest";
 
 type DebugTabId = "runtime" | "inspector";
@@ -35,7 +34,6 @@ export function HarnessShowcaseScenario() {
   const flow = useGameFlowActor();
   const settings = useGameSettingsAdapter();
   const assetRegistry = useMemo(() => createAssetRegistry(harnessContentManifest), []);
-  const richTextFontCss = useMemo(() => createRichTextFontCss(harnessContentManifest, assetRegistry), [assetRegistry]);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
   const dialogRevealSettings = useMemo(() => ({ textSpeed: dialogDisplay.textSpeed }), [dialogDisplay.textSpeed]);
@@ -58,46 +56,17 @@ export function HarnessShowcaseScenario() {
     onEnterTrial: enterTrialMode,
     onEnterNavi: enterNaviMode
   });
-  useEffect(() => {
-    for (const diagnostic of richTextFontCss.diagnostics) {
-      runtime.observeAssetDiagnostic({
-        code: diagnostic.code,
-        severity: diagnostic.severity,
-        message: diagnostic.message,
-        assetId: diagnostic.sourceRef,
-        kind: "font"
-      });
-    }
-  }, [richTextFontCss.diagnostics, runtime.observeAssetDiagnostic]);
-  useEffect(() => {
-    if (typeof document === "undefined" || !document.fonts) return;
-    let cancelled = false;
-    for (const font of harnessContentManifest.fonts) {
-      void document.fonts
-        .load(`${font.style} ${font.weight} 16px ${fontLoadFamily(font.family)}`)
-        .then(() => undefined)
-        .catch((error: unknown) => {
-          if (cancelled) return;
-          runtime.observeAssetDiagnostic({
-            code: "font-load-failed",
-            severity: "warning",
-            message: `Font '${font.id}' failed to load: ${error instanceof Error ? error.message : String(error)}`,
-            assetId: font.sourceRef,
-            kind: "font"
-          });
-        });
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [runtime.observeAssetDiagnostic]);
   const save = useHarnessShowcaseSaveAdapter(runtime);
   const overlayPages = useOverlayPageAdapters({ flow, runtime, save, settings });
   const [activeDebugTab, setActiveDebugTab] = useState<DebugTabId>("runtime");
 
   return (
     <main className="app-shell app-shell-harness">
-      {richTextFontCss.cssText ? <style data-testid="rich-text-font-faces">{richTextFontCss.cssText}</style> : null}
+      <RichTextFontStyles
+        assetResolver={assetRegistry}
+        fonts={harnessContentManifest.fonts}
+        onDiagnostic={runtime.observeAssetDiagnostic}
+      />
       <section className="playfield" data-testid="playfield">
         <GameInteractionShell dialogDisplay={dialogDisplay} flow={flow} formatStorySpeaker={displayStorySpeaker} overlayPages={overlayPages} runtime={runtime}>
           <div className="scene-stack" data-testid="harness-showcase-shell">
@@ -383,10 +352,6 @@ function displayStorySpeaker(speaker: string): string {
     Narrator: "旁白"
   };
   return labels[speaker] ?? speaker;
-}
-
-function fontLoadFamily(family: string): string {
-  return `"${family.replace(/\\/gu, "\\\\").replace(/"/gu, "\\\"")}"`;
 }
 
 function selectVoiceSmokeAudioMode(): VoiceSmokeAudioMode | undefined {

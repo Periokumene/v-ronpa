@@ -2,7 +2,7 @@ import { ContentManifestSchema, type ContentManifestInput } from "@v-ronpa/contr
 import { builtInPixiFxRuntimeAssets } from "@v-ronpa/pixi-presenter";
 import { defaultHarnessInputBindings } from "./inputActions";
 import { harnessShowcaseEvidence, harnessShowcaseItem, harnessShowcaseMaps, harnessShowcaseTrial } from "./showcase";
-import { harnessRuntimeAssets } from "./generatedAssets";
+import { harnessFontFaces, harnessRuntimeAssets } from "./generatedAssets";
 
 const harnessContentManifestInput = {
   version: 3,
@@ -16,15 +16,7 @@ const harnessContentManifestInput = {
     }
   },
   assets: [],
-  fonts: [
-    {
-      id: "font:serif",
-      family: "V Ronpa Rich Serif",
-      sourceRef: "font:rich-serif",
-      weight: "400",
-      style: "normal"
-    }
-  ],
+  fonts: harnessFontFaces,
   runtimeAssets: [
     ...harnessRuntimeAssets,
     ...builtInPixiFxRuntimeAssets

@@ -36,7 +36,7 @@ describe("game-a interaction surfaces", () => {
     });
     const root = findElementByTestId(element, "vn-dialog-surface");
 
-    expect(assets.dialogFrameUri).toBe("/game-a/ui/dialog-frame.png");
+    expect(assets.dialogFrameUri).toBe("/game-a/ui/game-a-dialog-frame.png");
     expect(gameAUiConfig.dialog.frameAssetId).toBe("texture:ui:game-a-dialog-frame");
     expect(assets.diagnostics).toEqual([]);
     expect(root?.props).toMatchObject({ "data-frame": "resolved" });

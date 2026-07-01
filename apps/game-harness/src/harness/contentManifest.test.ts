@@ -25,6 +25,15 @@ describe("harness content manifest", () => {
     expect(registry.resolve({ id: "bleep:dialogue-felix", kind: "bleep" }).uri).toBe("/harness/media/bleep/dialogue-felix.ogg");
     expect(registry.resolve({ id: "Ema", kind: "character-pack" }).uri).toBe("/harness/characters/Ema/character.json");
     expect(registry.resolve({ id: "font:rich-serif", kind: "font" }).uri).toBe("/harness/fonts/rich-serif.ttf");
+    expect(manifest.fonts).toEqual([
+      {
+        id: "font:serif",
+        family: "V Ronpa Rich Serif",
+        sourceRef: "font:rich-serif",
+        weight: "400",
+        style: "normal"
+      }
+    ]);
     expect(registry.resolve({ id: "model:academy-hall", kind: "glb" }).uri).toBe("/harness/models/academy-hall.gltf");
     expect(registry.resolve({ id: "texture:evidence:keycard-thumbnail", kind: "texture" }).uri).toBe("/harness/thumbnails/evidence-keycard.png");
     expect(registry.resolve({ id: "voice:zh:voice_validation_0001", kind: "voice" }).uri).toBe("/harness/media/voice/zh/voice_validation_0001.ogg");
