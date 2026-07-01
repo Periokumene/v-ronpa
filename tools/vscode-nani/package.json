@@ -1,0 +1,64 @@
+{
+  "name": "v-ronpa-nani",
+  "displayName": "V-Ronpa Nani",
+  "description": "VS Code language support for V-Ronpa .nani scripts.",
+  "publisher": "v-ronpa",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/extension.cjs",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:nani"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "nani",
+        "aliases": [
+          "Nani",
+          "Naninovel",
+          "V-Ronpa Nani"
+        ],
+        "extensions": [
+          ".nani"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "nani",
+        "scopeName": "source.nani",
+        "path": "./syntaxes/nani.tmLanguage.json"
+      }
+    ]
+  },
+  "scripts": {
+    "check-types": "tsc -b --pretty false",
+    "build": "pnpm run check-types && node scripts/esbuild.mjs",
+    "build:prod": "pnpm run check-types && node scripts/esbuild.mjs --production",
+    "test": "vitest run",
+    "vscode:prepublish": "pnpm run build:prod",
+    "package:vsix": "vsce package --no-dependencies --out v-ronpa-nani-0.1.0.vsix"
+  },
+  "dependencies": {
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/nani-parser": "workspace:*",
+    "@v-ronpa/nani-runtime-compiler": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "1.99.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}
