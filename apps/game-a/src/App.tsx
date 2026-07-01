@@ -9,6 +9,7 @@ import {
   settingsToVoiceRuntimeSettings,
   useGameSettingsAdapter
 } from "@v-ronpa/app-vn-shell";
+import { RichTextFontStyles } from "@v-ronpa/ui-kit";
 import { gameAContentManifest } from "./contentManifest";
 import { useGameAFlowActor } from "./useGameAFlowActor";
 import { useGameAOverlayAdapters } from "./useGameAOverlayAdapters";
@@ -53,6 +54,11 @@ export function App() {
 
   return (
     <main className="game-a-shell">
+      <RichTextFontStyles
+        assetResolver={assetRegistry}
+        fonts={gameAContentManifest.fonts}
+        onDiagnostic={runtime.observeAssetDiagnostic}
+      />
       <section className="game-a-playfield" data-testid="game-a-playfield">
         <GameInteractionShell
           dialogDisplay={dialogDisplay}

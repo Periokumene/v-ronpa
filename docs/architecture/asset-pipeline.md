@@ -58,36 +58,54 @@ Evidence resources follow the same rule:
 
 ## Generator And Validation
 
-Harness assets use a convention-plus-override generator:
+Harness and Game A app assets use a convention-plus-override generator:
 
 - `pnpm generate:assets` scans `apps/game-harness/public/harness/**` and writes
   `apps/game-harness/src/harness/generatedAssets.ts`.
-- Font fixtures live under `apps/game-harness/public/harness/fonts/*.{woff,woff2,ttf,otf}`;
-  the generator emits ids as `font:<file-name-without-extension>`.
-- Voice validation assets live under
-  `apps/game-harness/public/harness/media/voice/<locale>/*.ogg`; the generator emits
-  ids as `voice:<locale>:<file-name-without-extension>`, for example
+- The same command scans `apps/game-a/public/game-a/**` and writes
+  `apps/game-a/src/generatedAssets.ts`.
+- The generated modules export both runtime assets and font face definitions.
+  Runtime assets register files; font face definitions describe which font ids
+  rich text may use.
+- Font fixtures live under each app public asset root's
+  `fonts/*.{woff,woff2,ttf,otf}`;
+  the generator emits ids as `font:<file-name-without-extension>`. When multiple
+  font runtime formats share the same stem, the generator registers the most
+  web-ready format first: `woff2`, then `woff`, `otf`, and `ttf`.
+  Validation rejects duplicate font stems in public roots so source TTF files do
+  not ship alongside preferred WOFF2 runtime files.
+- Generated font faces default to `id = sourceRef = family = font:<stem>`,
+  `weight = "400"`, and `style = "normal"`. App-specific overrides handle
+  historical aliases or special CSS family names; for example the harness keeps
+  the rich text id `font:serif` mapped to the runtime asset `font:rich-serif`.
+- Voice validation assets live under each app public asset root's
+  `media/voice/<locale>/*.ogg`; the generator emits ids as
+  `voice:<locale>:<file-name-without-extension>`, for example
   `voice:zh:voice_validation_0001`.
 - Voice text ids use the same flat filename-safe stem as the `.ogg` file:
   letters, numbers, `_`, and `-`. `pnpm validate:assets` rejects nested voice
   files or path-like text ids under `media/voice`.
 - `pnpm validate:assets` dry-runs the generator, checks generated files exist,
-  checks manifest font references and script-authored rich text `font:*` ids
-  resolve through the same manifest path, and rejects hardcoded runtime asset
-  paths in source.
+  checks generated font faces resolve to font runtime assets, checks each app's
+  script-authored asset ids and rich text `font:*` ids against that app's
+  generated declarations, and rejects hardcoded runtime asset paths in source.
+  Harness and Game A are validated with separate id pools; one app cannot pass
+  because another app happens to declare the same or similar asset id.
 
 Generated asset files and the Pixi built-in FX manifest are allowed to contain
 runtime URLs because they are asset registration sources. Runtime adapters,
 scripts, and renderer systems must use asset ids and injected resolvers.
+Public app asset roots should contain only shipped runtime files. Source fonts,
+obsolete filenames, and unused staging assets must live outside public roots so
+Vite does not publish them.
 
 ## App Composition
 
-`apps/game-a/src/contentManifest.ts` is a separate VN-first manifest. Its
-inline runtime assets may declare `/game-a/**` `optimizedUri` values as
-registration data, and `validate:assets` checks those files under
-`apps/game-a/public`. Game A scripts and render code must still reference
-runtime asset ids only; raw public paths remain limited to manifest
-registration sources.
+`apps/game-a/src/contentManifest.ts` is a separate VN-first manifest. It
+composes generated runtime assets from `gameARuntimeAssets`; Game A scripts,
+UI config, and render code must still reference runtime asset ids only. Raw
+`/game-a/**` public paths remain limited to generated asset registration
+sources.
 
 `apps/game-harness/src/harness/contentManifest.ts` composes the harness-showcase manifest:
 
@@ -113,9 +131,10 @@ it through adapter props:
   `ContentManifest.audio.dialogueBleep` through `app-vn-runtime` before calling
   `AudioPort.playDialogueBleep`.
 - rich text font faces resolve `ContentManifest.fonts[*].sourceRef` to
-  `RuntimeAsset.kind === "font"` before app code emits controlled `@font-face`
-  CSS. Script-authored rich text stores only `fontId`, not raw CSS family names
-  or URLs.
+  `RuntimeAsset.kind === "font"` before `@v-ronpa/ui-kit` emits controlled
+  `@font-face` CSS and rich text CSS variables. `AssetRegistry` does not create
+  CSS or load fonts by itself; it only resolves the font asset URL. Script-
+  authored rich text stores only `fontId`, not raw CSS family names or URLs.
 - Pixi resolves backgrounds, character-pack entry JSON, and FX ids before
   loading textures.
 - Shader-only Pixi effects may have no FX texture entry. The rain shader path is
