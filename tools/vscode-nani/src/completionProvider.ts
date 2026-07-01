@@ -1,0 +1,84 @@
+import { collectLabels, getCompletionContext, type NaniPosition, type NaniRange } from "./documentContext";
+import { commandCompletionFacts, paramCompletionFacts } from "./languageFacts";
+
+export type NaniCompletionKind = "command" | "param" | "label" | "snippet";
+
+export interface NaniCompletion {
+  label: string;
+  insertText: string;
+  kind: NaniCompletionKind;
+  range: NaniRange;
+  detail?: string;
+  documentation?: string;
+  isSnippet: boolean;
+  sortText?: string;
+}
+
+export function getNaniCompletions(sourceText: string, position: NaniPosition): NaniCompletion[] {
+  const context = getCompletionContext(sourceText, position);
+
+  if (context.kind === "command") {
+    return commandCompletionFacts().map((fact) => ({
+      label: fact.label,
+      insertText: `${context.insertAtSign ? "@" : ""}${fact.label}`,
+      kind: "command",
+      range: context.range,
+      detail: fact.detail,
+      documentation: fact.documentation,
+      isSnippet: false,
+      sortText: fact.sortText
+    }));
+  }
+
+  if (context.kind === "param") {
+    return paramCompletionFacts(context.commandId, context.usedParams).map((fact) => ({
+      label: fact.label,
+      insertText: fact.insertText,
+      kind: "param",
+      range: context.range,
+      detail: fact.detail,
+      documentation: fact.documentation,
+      isSnippet: fact.isSnippet,
+      sortText: fact.sortText
+    }));
+  }
+
+  if (context.kind === "label") {
+    return collectLabels(sourceText)
+      .filter((label) => label.toLowerCase().startsWith(context.prefix.toLowerCase()))
+      .map((label, index) => ({
+        label: `#${label}`,
+        insertText: label,
+        kind: "label",
+        range: context.range,
+        detail: "Current file label",
+        isSnippet: false,
+        sortText: index.toString().padStart(4, "0")
+      }));
+  }
+
+  if (context.kind === "inline") {
+    return [
+      {
+        label: "[>]",
+        insertText: "[>]",
+        kind: "snippet",
+        range: context.range,
+        detail: "Inline auto-next command",
+        isSnippet: false,
+        sortText: "0"
+      },
+      {
+        label: "[< speed:0.8]",
+        insertText: "[< speed:${1:0.8}]",
+        kind: "snippet",
+        range: context.range,
+        detail: "Inline print speed command",
+        isSnippet: true,
+        sortText: "1"
+      }
+    ];
+  }
+
+  return [];
+}

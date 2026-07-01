@@ -21,6 +21,7 @@
     { "path": "packages/trial-director" },
     { "path": "packages/ui-kit" },
     { "path": "apps/game-a" },
-    { "path": "apps/game-harness" }
+    { "path": "apps/game-harness" },
+    { "path": "tools/vscode-nani" }
   ]
 }

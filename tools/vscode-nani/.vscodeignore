@@ -1,0 +1,11 @@
+node_modules
+.gitignore
+src
+scripts
+dist-types
+*.tsbuildinfo
+tsconfig.json
+vitest.config.*
+**/*.test.*
+**/*.map
+v-ronpa-nani-*.vsix

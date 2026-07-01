@@ -1,0 +1,277 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Nani",
+  "scopeName": "source.nani",
+  "patterns": [
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#label"
+    },
+    {
+      "include": "#commandLine"
+    },
+    {
+      "include": "#dialogue"
+    },
+    {
+      "include": "#textId"
+    },
+    {
+      "include": "#inlineCommand"
+    },
+    {
+      "include": "#expression"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.semicolon.nani",
+      "match": "^\\s*(;.*)$"
+    },
+    "label": {
+      "name": "entity.name.label.nani",
+      "match": "^\\s*(#)([^\\s].*)$",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.label.nani"
+        },
+        "2": {
+          "name": "entity.name.label.nani"
+        }
+      }
+    },
+    "commandLine": {
+      "name": "meta.command.line.nani",
+      "begin": "^(\\s*)(@)([A-Za-z_<>][A-Za-z0-9_<>-]*)",
+      "beginCaptures": {
+        "2": {
+          "name": "punctuation.definition.command.nani"
+        },
+        "3": {
+          "name": "support.function.command.nani"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#keyValue"
+        },
+        {
+          "include": "#flag"
+        },
+        {
+          "include": "#expression"
+        },
+        {
+          "include": "#labelReference"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#primaryArg"
+        }
+      ]
+    },
+    "dialogue": {
+      "name": "meta.dialogue.line.nani",
+      "begin": "^\\s*([A-Za-z0-9_ -]+)(?:(\\.)([A-Za-z0-9_ -]+))?\\s*(:)",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.name.speaker.nani"
+        },
+        "2": {
+          "name": "punctuation.separator.appearance.nani"
+        },
+        "3": {
+          "name": "entity.other.attribute-name.appearance.nani"
+        },
+        "4": {
+          "name": "punctuation.separator.dialogue.nani"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#textId"
+        },
+        {
+          "include": "#inlineCommand"
+        },
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "inlineCommand": {
+      "name": "meta.inline-command.nani",
+      "begin": "(\\[)\\s*([A-Za-z_<>][A-Za-z0-9_<>-]*)?",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.inline-command.begin.nani"
+        },
+        "2": {
+          "name": "support.function.command.inline.nani"
+        }
+      },
+      "end": "(\\])",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.inline-command.end.nani"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#keyValue"
+        },
+        {
+          "include": "#flag"
+        },
+        {
+          "include": "#expression"
+        },
+        {
+          "include": "#number"
+        }
+      ]
+    },
+    "keyValue": {
+      "name": "meta.parameter.nani",
+      "match": "\\b([A-Za-z_][A-Za-z0-9_-]*)(:)(\"[^\"]*\"|'[^']*'|\\{[^}]*\\}|[^\\s\\]]+)",
+      "captures": {
+        "1": {
+          "name": "variable.parameter.nani"
+        },
+        "2": {
+          "name": "punctuation.separator.key-value.nani"
+        },
+        "3": {
+          "patterns": [
+            {
+              "include": "#expression"
+            },
+            {
+              "include": "#string"
+            },
+            {
+              "include": "#number"
+            },
+            {
+              "include": "#labelReference"
+            }
+          ]
+        }
+      }
+    },
+    "flag": {
+      "patterns": [
+        {
+          "name": "constant.language.flag.false.nani",
+          "match": "(!)([A-Za-z_][A-Za-z0-9_-]*)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.flag.nani"
+            },
+            "2": {
+              "name": "variable.parameter.flag.nani"
+            }
+          }
+        },
+        {
+          "name": "constant.language.flag.true.nani",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_-]*)(!)",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.flag.nani"
+            },
+            "2": {
+              "name": "keyword.operator.flag.nani"
+            }
+          }
+        }
+      ]
+    },
+    "expression": {
+      "name": "meta.expression.nani",
+      "begin": "\\{",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.expression.begin.nani"
+        }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.expression.end.nani"
+        }
+      }
+    },
+    "textId": {
+      "name": "constant.other.text-id.nani",
+      "match": "(\\|#)([A-Za-z0-9_-]*)(\\|)",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.text-id.begin.nani"
+        },
+        "2": {
+          "name": "entity.name.tag.text-id.nani"
+        },
+        "3": {
+          "name": "punctuation.definition.text-id.end.nani"
+        }
+      }
+    },
+    "labelReference": {
+      "name": "variable.other.label-reference.nani",
+      "match": "#[A-Za-z0-9:_./-]+"
+    },
+    "string": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.nani",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.nani"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.nani",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.nani"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        }
+      ]
+    },
+    "number": {
+      "name": "constant.numeric.nani",
+      "match": "(?<![A-Za-z0-9_])-?\\d+(?:\\.\\d+)?"
+    },
+    "primaryArg": {
+      "name": "variable.other.primary-arg.nani",
+      "match": "(?<=\\s)[^\\s\\[\\]]+"
+    }
+  }
+}

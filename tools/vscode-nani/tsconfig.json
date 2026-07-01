@@ -1,0 +1,28 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist-types",
+    "rootDir": "src",
+    "types": [
+      "node",
+      "vscode"
+    ]
+  },
+  "references": [
+    {
+      "path": "../../packages/contracts"
+    },
+    {
+      "path": "../../packages/nani-parser"
+    },
+    {
+      "path": "../../packages/nani-runtime-compiler"
+    }
+  ],
+  "include": [
+    "src"
+  ]
+}
