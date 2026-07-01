@@ -1,9 +1,9 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createAssetRegistry, type AssetResolver } from "@v-ronpa/asset-registry";
-import type { VnDialogViewModel } from "@v-ronpa/app-vn-shell";
+import type { VnCommandBarViewModel, VnDialogViewModel } from "@v-ronpa/app-vn-shell";
 import { gameAContentManifest } from "../contentManifest";
-import { createGameASurfaces, GameADialogSurface } from "./GameASurfaces";
+import { createGameASurfaces, GameACommandBar, GameADialogSurface } from "./GameASurfaces";
 import { gameAUiConfig } from "./gameAUiConfig";
 import { resolveGameAUiAssets } from "./resolveGameAUiAssets";
 
@@ -26,7 +26,7 @@ describe("game-a interaction surfaces", () => {
     ]);
   });
 
-  it("resolves the configured dialog frame asset and applies it to the dialog surface", () => {
+  it("resolves the configured dialog frame asset while keeping the dialog frame CSS-only", () => {
     const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
     const element = GameADialogSurface({
       actions: {},
@@ -41,8 +41,28 @@ describe("game-a interaction surfaces", () => {
     expect(assets.diagnostics).toEqual([]);
     expect(root?.props).toMatchObject({ "data-frame": "resolved" });
     expect((root?.props as { style?: Record<string, string> }).style).toMatchObject({
-      "--game-a-dialog-frame": "url(/game-a/ui/dialog-frame.png)",
       pointerEvents: "none"
+    });
+  });
+
+  it("renders a reference-style floating speaker plate while keeping state text screen-reader only", () => {
+    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
+    const element = GameADialogSurface({
+      actions: {},
+      assets,
+      config: gameAUiConfig,
+      model: createDialogModel()
+    });
+    const speaker = findElementByTestId(element, "vn-dialog-speaker");
+    const state = findElementByTestId(element, "vn-dialog-state");
+
+    expect(speaker?.props).toMatchObject({
+      className: "game-a-dialog-speaker",
+      children: "[MIRA]"
+    });
+    expect(state?.props).toMatchObject({
+      className: "game-a-dialog-state game-a-screen-reader-only",
+      children: "阅读中"
     });
   });
 
@@ -72,6 +92,22 @@ describe("game-a interaction surfaces", () => {
     expect(root?.props).toMatchObject({ "data-frame": "fallback" });
     expect(findElementByTestId(element, "vn-dialog-text")).toBeDefined();
   });
+
+  it("skins command labels without changing dispatched command actions", () => {
+    const dispatch = vi.fn();
+    const element = GameACommandBar({
+      actions: { dispatch },
+      model: createCommandBarModel()
+    });
+    const settings = findElementByTestId(element, "vn-command-settings");
+
+    expect(settings?.props).toMatchObject({
+      "data-action": "open-settings",
+      children: "SETTINGS"
+    });
+    (settings?.props as { onClick?: () => void }).onClick?.();
+    expect(dispatch).toHaveBeenCalledWith("open-settings");
+  });
 });
 
 function createDialogModel(): VnDialogViewModel {
@@ -82,6 +118,32 @@ function createDialogModel(): VnDialogViewModel {
     text: "The corridor light flickers once.",
     state: "line",
     display: { textSize: "medium", textboxOpacity: 0.92, textSpeed: 0.5 }
+  };
+}
+
+function createCommandBarModel(): VnCommandBarViewModel {
+  return {
+    visible: true,
+    capabilities: {
+      canStartNewGame: false,
+      canSave: true,
+      canLoad: true,
+      canOpenSettings: true,
+      canOpenBacklog: true,
+      canOpenPauseMenu: true,
+      canAuto: true,
+      canSkip: true,
+      canReturnTitle: true
+    },
+    activeActions: {},
+    commands: [
+      { action: "open-backlog", label: "LOG", enabled: true, active: false, testId: "vn-command-backlog", toggle: false },
+      { action: "toggle-skip", label: "SKIP", enabled: true, active: false, testId: "vn-command-skip", toggle: true },
+      { action: "toggle-auto", label: "AUTO", enabled: true, active: false, testId: "vn-command-auto", toggle: true },
+      { action: "open-save", label: "SAVE", enabled: true, active: false, testId: "vn-command-save", toggle: false },
+      { action: "open-load", label: "LOAD", enabled: true, active: false, testId: "vn-command-load", toggle: false },
+      { action: "open-settings", label: "SETTING", enabled: true, active: false, testId: "vn-command-settings", toggle: false }
+    ]
   };
 }
 

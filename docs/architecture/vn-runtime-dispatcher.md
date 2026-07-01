@@ -110,6 +110,14 @@ VN runtime output is split across shared app-layer packages and render surfaces:
   types or read full runtime/flow state.
 - Pixi owns VN/trial 2D effects, backgrounds, layered characters, filters,
   particles, and fast 2D overlays.
+- Pixi also owns layout-only relayout for objects inside its own host/canvas
+  rectangle when that rectangle resizes. This relayout updates Pixi geometry and
+  shader/filter dimensions against the current host size, but does not replay
+  VN runtime commands, mutate `PixiStageSnapshot`, clear active wait tasks, or
+  define app DOM layout. Dialog, command bar, choices, and shell overlays remain
+  DOM surface responsibilities. A shared app/Pixi virtual viewport, if needed,
+  must be introduced as an app-layer bridge rather than as a Pixi-only
+  alternate layout policy.
 - R3F owns 3D staging, camera rigs, and spatial interaction.
 - Media, Pixi, R3F, and UI/evidence image references all resolve through the
   app-created `AssetRegistry`. `app-vn-runtime` resolves VN media ids before

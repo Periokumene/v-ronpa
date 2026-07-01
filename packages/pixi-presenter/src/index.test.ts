@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Application } from "pixi.js";
 import type { NaniCommandCategory, NaniCommandSource, NaniCommandStatus, RuntimeCommand, RuntimeValue } from "@v-ronpa/contracts";
 import {
   INNER_BACKGROUND_ID,
@@ -6,9 +7,15 @@ import {
   createPixiPresenter,
   reducePixiRuntimeCommand
 } from "./index";
+import { ActorSystem } from "./internal/systems";
 import { resolveRainSettingsFromCommandParams } from "./internal/rain/settings";
 
 describe("pixi presenter port", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it("queues snapshot reconciliation before mount without requiring Pixi memory behavior", () => {
     const host = {
       clientWidth: 960,
@@ -21,6 +28,72 @@ describe("pixi presenter port", () => {
 
     expect(() => presenter.reconcile(createInitialPixiStageSnapshot())).not.toThrow();
     expect(() => presenter.clear()).not.toThrow();
+  });
+
+  it("coalesces host resize into layout-only relayout and cancels pending resize work on destroy", async () => {
+    const frameCallbacks = new Map<number, FrameRequestCallback>();
+    let nextFrame = 1;
+    const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      const frame = nextFrame;
+      nextFrame += 1;
+      frameCallbacks.set(frame, callback);
+      return frame;
+    });
+    const cancelAnimationFrame = vi.fn((frame: number) => {
+      frameCallbacks.delete(frame);
+    });
+    const observerInstances: TestResizeObserver[] = [];
+    class TestResizeObserver {
+      readonly observe = vi.fn();
+      readonly disconnect = vi.fn();
+
+      constructor(readonly callback: ResizeObserverCallback) {
+        observerInstances.push(this);
+      }
+    }
+
+    vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+    vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+    vi.stubGlobal("ResizeObserver", TestResizeObserver);
+    vi.spyOn(Application.prototype, "init").mockImplementation(async function (this: Application) {
+      Object.defineProperty(this, "renderer", { configurable: true, value: { width: 960, height: 540 } });
+      Object.defineProperty(this, "ticker", { configurable: true, value: { add: vi.fn(), remove: vi.fn() } });
+      Object.defineProperty(this, "canvas", { configurable: true, value: { dataset: {} } });
+    });
+    vi.spyOn(Application.prototype, "destroy").mockImplementation(() => undefined);
+    const reconcile = vi.spyOn(ActorSystem.prototype, "reconcile");
+    const relayout = vi.spyOn(ActorSystem.prototype, "relayoutViewport");
+    let hostWidth = 960;
+    const host = {
+      get clientWidth() {
+        return hostWidth;
+      },
+      clientHeight: 540,
+      appendChild: vi.fn()
+    } as unknown as HTMLElement;
+    const presenter = createPixiPresenter({ host });
+
+    await presenter.mount();
+    presenter.reconcile(createInitialPixiStageSnapshot());
+    hostWidth = 1200;
+    observerInstances[0]?.callback([], observerInstances[0] as unknown as ResizeObserver);
+    flushFrames(frameCallbacks);
+
+    expect(observerInstances[0]?.observe).toHaveBeenCalledWith(host);
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(relayout).toHaveBeenCalledTimes(1);
+
+    hostWidth = 1280;
+    observerInstances[0]?.callback([], observerInstances[0] as unknown as ResizeObserver);
+    expect(frameCallbacks.size).toBe(1);
+    presenter.destroy();
+    observerInstances[0]?.callback([], observerInstances[0] as unknown as ResizeObserver);
+    flushFrames(frameCallbacks);
+
+    expect(observerInstances[0]?.disconnect).toHaveBeenCalledTimes(1);
+    expect(cancelAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(relayout).toHaveBeenCalledTimes(1);
   });
 
   it("reduces persistent VN commands into a terminal Pixi stage snapshot", () => {
@@ -636,6 +709,13 @@ describe("pixi presenter port", () => {
     expect(noSnow.waitTasks).toEqual([{ kind: "weather-transition", target: "snow", revision: noSnow.snapshot.revision }]);
   });
 });
+
+function flushFrames(frameCallbacks: Map<number, FrameRequestCallback>): void {
+  for (const [frame, callback] of [...frameCallbacks]) {
+    frameCallbacks.delete(frame);
+    callback(16);
+  }
+}
 
 function runtimeCommand(
   commandId: string,

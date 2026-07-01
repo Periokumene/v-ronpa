@@ -1,4 +1,4 @@
-import type { CSSProperties, FormEvent, ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 import type {
   BacklogOverlayActions,
   BacklogOverlayViewModel,
@@ -55,9 +55,6 @@ export function GameADialogSurface({
   assets: GameAUiAssets;
   config: GameAUiConfig;
 }) {
-  const frameStyle = {
-    "--game-a-dialog-frame": assets.dialogFrameUri ? `url(${assets.dialogFrameUri})` : undefined
-  } as CSSProperties;
   return (
     <SurfaceFrame
       aria-label="视觉小说对话"
@@ -67,21 +64,20 @@ export function GameADialogSurface({
       data-testid="vn-dialog-surface"
       role="region"
       className="game-a-dialog-surface"
-      style={frameStyle}
     >
-      <div className="game-a-dialog-header">
-        {config.dialog.showSpeakerName && model.speakerLabel ? (
-          <div data-testid="vn-dialog-speaker" className="game-a-dialog-speaker">
-            {model.speakerLabel}
-          </div>
-        ) : null}
-        <div aria-live="polite" data-testid="vn-dialog-state" className="game-a-dialog-state">
-          {model.state === "ended" ? "已结束" : model.state === "choices" ? "等待选择" : "阅读中"}
+      {config.dialog.showSpeakerName && model.speakerLabel ? (
+        <div data-testid="vn-dialog-speaker" className="game-a-dialog-speaker">
+          {formatGameASpeakerLabel(model.speakerLabel)}
         </div>
+      ) : null}
+      <div aria-live="polite" data-testid="vn-dialog-state" className="game-a-dialog-state game-a-screen-reader-only">
+        {model.state === "ended" ? "已结束" : model.state === "choices" ? "等待选择" : "阅读中"}
       </div>
-      <p data-testid="vn-dialog-text" className={`game-a-dialog-text game-a-dialog-text-${model.display?.textSize ?? "medium"}`}>
-        <RichTextRenderer document={model.richText} fallbackText={model.text} />
-      </p>
+      <div className="game-a-dialog-copy">
+        <p data-testid="vn-dialog-text" className={`game-a-dialog-text game-a-dialog-text-${model.display?.textSize ?? "medium"}`}>
+          <RichTextRenderer document={model.richText} fallbackText={model.text} />
+        </p>
+      </div>
     </SurfaceFrame>
   );
 }
@@ -109,7 +105,7 @@ function GameAChoiceOverlay({ actions, model }: SurfaceSlotProps<VnChoicesViewMo
   );
 }
 
-function GameACommandBar({ actions, model }: SurfaceSlotProps<VnCommandBarViewModel, VnCommandBarActions>) {
+export function GameACommandBar({ actions, model }: SurfaceSlotProps<VnCommandBarViewModel, VnCommandBarActions>) {
   if (!model.visible) return null;
   return (
     <nav aria-label="VN command bar" data-testid="vn-command-bar" className="game-a-command-bar">
@@ -117,17 +113,26 @@ function GameACommandBar({ actions, model }: SurfaceSlotProps<VnCommandBarViewMo
         <button
           {...(command.toggle ? { "aria-pressed": command.active } : {})}
           className={command.active ? "game-a-command-button game-a-command-button-active" : "game-a-command-button"}
+          data-action={command.action}
           data-testid={command.testId}
           disabled={!command.enabled}
           key={command.testId}
           onClick={() => actions.dispatch(command.action)}
           type="button"
         >
-          {command.label}
+          {formatGameACommandLabel(command.label)}
         </button>
       ))}
     </nav>
   );
+}
+
+function formatGameASpeakerLabel(label: string): string {
+  return `[${label.toUpperCase()}]`;
+}
+
+function formatGameACommandLabel(label: string): string {
+  return label === "SETTING" ? "SETTINGS" : label;
 }
 
 function GameATitleSurface({ actions, config, model }: SurfaceSlotProps<TitleViewModel, TitleActions> & { config: GameAUiConfig }) {

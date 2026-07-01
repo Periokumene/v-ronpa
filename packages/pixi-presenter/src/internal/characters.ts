@@ -42,6 +42,7 @@ export class CharacterSystem {
   private readonly packs = new Map<string, Promise<LoadedCharacterPack>>();
   private readonly metadata = new Map<string, Promise<LayeredCharacterLayerMetadata>>();
   private readonly textures = new Map<string, Promise<Texture>>();
+  private readonly renderHeights = new WeakMap<Container, number>();
 
   constructor(private readonly options: CharacterSystemOptions) {}
 
@@ -94,12 +95,21 @@ export class CharacterSystem {
         if (!isCurrent()) return;
         const content = new Container({ label: `layered-character:${actor.id}:${generation}` });
         this.drawLayers(content, pack, textures);
+        this.renderHeights.set(content, this.options.height());
         this.replaceContent(container, content);
       })
       .catch((error) => {
         this.emitLoadFailed(actor, error);
         if (isCurrent()) this.replaceContent(container, new Container({ label: `empty-character:${actor.id}` }));
       });
+  }
+
+  relayout(container: Container): void {
+    const content = container.children[0];
+    if (!(content instanceof Container)) return;
+    const renderHeight = this.renderHeights.get(content);
+    if (!renderHeight) return;
+    content.scale.set(this.options.height() / renderHeight);
   }
 
   private loadPack(entryUri: string): Promise<LoadedCharacterPack> {
