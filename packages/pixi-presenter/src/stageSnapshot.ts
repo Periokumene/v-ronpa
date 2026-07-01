@@ -1,11 +1,13 @@
-import type {
-  PixiActorSnapshot,
-  PixiRainCommandParams,
-  PixiStageSnapshot,
-  PixiWeatherKind,
-  RuntimeCommand,
-  RuntimeValue,
-  StoryPresentationWaitTask
+import {
+  PIXI_INNER_BACKGROUND_ID,
+  PIXI_MAIN_BACKGROUND_ID,
+  type PixiActorSnapshot,
+  type PixiRainCommandParams,
+  type PixiStageSnapshot,
+  type PixiWeatherKind,
+  type RuntimeCommand,
+  type RuntimeValue,
+  type StoryPresentationWaitTask
 } from "@v-ronpa/contracts";
 import {
   DEFAULT_RAIN_COMMAND_PARAMS,
@@ -93,13 +95,15 @@ export interface NormalizedActorTransform {
   transition: PixiActorSnapshot["transition"];
 }
 
-export const MAIN_BACKGROUND_ID = "MainBackground";
+export const MAIN_BACKGROUND_ID = PIXI_MAIN_BACKGROUND_ID;
+export const INNER_BACKGROUND_ID = PIXI_INNER_BACKGROUND_ID;
 
 export function createInitialPixiStageSnapshot(): PixiStageSnapshot {
   return {
-    version: 4,
+    version: 5,
     revision: 0,
     backgroundsById: {},
+    innerBackgroundsById: {},
     charactersById: {},
     actorOrder: [],
     weather: {},
@@ -216,6 +220,8 @@ export function reducePixiRuntimeCommand(
       }
     case "glitchfilter":
       return reduceGlitchFilter(snapshot, command);
+    case "inback":
+      return reduceInback(snapshot, command);
     case "trialkeyword":
       return reduceTrialKeyword(snapshot, command);
     default:
@@ -224,7 +230,7 @@ export function reducePixiRuntimeCommand(
 }
 
 export function resolvePixiActorTarget(target: string | undefined, stage: PixiStageSnapshot): string[] {
-  if (!target || target === "MainBackground") return stage.backgroundsById[MAIN_BACKGROUND_ID] ? [MAIN_BACKGROUND_ID] : [];
+  if (!target || target === MAIN_BACKGROUND_ID) return stage.backgroundsById[MAIN_BACKGROUND_ID] ? [MAIN_BACKGROUND_ID] : [];
   if (target === "*") {
     return [
       ...Object.values(stage.backgroundsById).filter((actor) => actor.visible).map((actor) => actor.id),
@@ -301,6 +307,48 @@ function reduceBack(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiR
     ...snapshot,
     backgroundsById: { ...snapshot.backgroundsById, [target]: actor },
     actorOrder: ensureActorOrder(snapshot.actorOrder, target)
+  }), "actor-transition", [target]);
+}
+
+function reduceInback(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
+  const target = INNER_BACKGROUND_ID;
+  const previous = snapshot.innerBackgroundsById[target];
+  const transition = timingTransition(command);
+  const visible = booleanParam(command, "visible");
+  if (visible === false) {
+    if (!previous) return emptyReduction(snapshot);
+    return withWaitTasks(command, changedSnapshot({
+      ...snapshot,
+      innerBackgroundsById: {
+        ...snapshot.innerBackgroundsById,
+        [target]: {
+          ...previous,
+          visible: false,
+          transition
+        }
+      }
+    }), "actor-transition", [target]);
+  }
+
+  const appearance = stringParam(command, "appearance") ?? previous?.appearance;
+  if (!appearance) return unsupportedPixiParams(snapshot, command, "missing required params: appearance");
+  const actor: PixiActorSnapshot = {
+    id: target,
+    kind: "background",
+    appearance,
+    appearanceExpression: "",
+    visible: visible ?? previous?.visible ?? true,
+    alpha: previous?.alpha ?? 1,
+    z: previous?.z ?? 0,
+    filters: previous?.filters ?? {},
+    transition
+  };
+  return withWaitTasks(command, changedSnapshot({
+    ...snapshot,
+    innerBackgroundsById: {
+      ...snapshot.innerBackgroundsById,
+      [target]: actor
+    }
   }), "actor-transition", [target]);
 }
 

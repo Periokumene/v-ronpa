@@ -1,8 +1,9 @@
 export const harnessShowcaseScript = `#Start
 @set route:"intro"
 @back bg:harness effect:fade time:0.15
+@inback bg:inner-academy-hall effect:fade time:0.15
 @char Ema pos:50
-Narrator: CHECKPOINT 00 - baseline。视觉小说联调剧本：这是测试入口，不是剧情样例。请先确认背景和 Ema 默认 layered character 可见。[>]
+Narrator: CHECKPOINT 00 - baseline。视觉小说联调剧本：这是测试入口，不是剧情样例。请先确认主背景、inner background frame 和 Ema 默认 layered character 可见。[>]
 Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command showcase；分支 2 保持完整 Pixi 命令视觉验收。
 @choice "临时选项：应被 clearChoice 清除" id:temp-clear goto:#TemporaryChoiceShouldNotAppear
 @clearChoice temp-clear
@@ -130,8 +131,11 @@ Narrator: CHECKPOINT 01B-L4 - snow storm。黑底压力档：大雪、强重力�
 @back bg:harness effect:fade time:0.12
 @sun power:0.3 time:0.2 pos:12,88 scale:1.1,1.1,1
 @blur actorId:MainBackground power:0.12 time:0.2
-Narrator: CHECKPOINT 01C - sun + blur。右上应出现柔和光束，背景轻微虚化；雨雪此时应已关闭。
+Narrator: CHECKPOINT 01C - sun + blur。右上应出现柔和光束，主背景轻微虚化；雨雪此时应已关闭。inner background 仍在 snapshot 中，但会被 weather-back 的 sun 层覆盖或洗亮。
 @blur actorId:MainBackground power:0 time:0.12
+@sun power:0 time:0.12 wait!
+@inback bg:inner-snow-outskirts effect:fade time:0.2 wait!
+Narrator: CHECKPOINT 01D - inback switch。inner background frame 应从 academy hall 切换为 snow outskirts 真实图片；主背景仍保持 bg:harness。
 @char Ema pos:50
 Narrator: CHECKPOINT 02A - char default composition。Ema 应回到 Default 展开结果；右侧 Pixi Chars 应显示 Ema/default。
 @char Ema.Pensive1 pos:50

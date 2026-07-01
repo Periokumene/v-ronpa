@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PIXI_INNER_BACKGROUND_ID, PIXI_MAIN_BACKGROUND_ID } from "@v-ronpa/contracts";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "./index";
 
@@ -77,7 +78,11 @@ describe("nani runtime compiler", () => {
 
   it("normalizes visual runtime params without producing downstream command shapes", () => {
     const { scenario } = parseScenario({
-      sourceText: ["@back bg:harness effect:fade", "@flash color:#fff duration:120"].join("\n"),
+      sourceText: [
+        "@back bg:harness effect:fade",
+        "@inback bg:framed-room effect:fade time:0.2 easing:linear wait!",
+        "@flash color:#fff duration:120"
+      ].join("\n"),
       scriptPath: "presentation.nani"
     });
     const result = compileRuntimeScript(scenario);
@@ -86,7 +91,18 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands).toEqual([
       expect.objectContaining({
         commandId: "back",
-        params: expect.objectContaining({ target: "MainBackground", appearance: "bg:harness", transition: "fade" })
+        params: expect.objectContaining({ target: PIXI_MAIN_BACKGROUND_ID, appearance: "bg:harness", transition: "fade" })
+      }),
+      expect.objectContaining({
+        commandId: "inback",
+        params: expect.objectContaining({
+          target: PIXI_INNER_BACKGROUND_ID,
+          appearance: "bg:framed-room",
+          transition: "fade",
+          durationMs: 200,
+          easing: "linear",
+          wait: true
+        })
       }),
       expect.objectContaining({
         commandId: "flash",
@@ -94,7 +110,46 @@ describe("nani runtime compiler", () => {
       })
     ]);
     expect(result.script.commands[0]?.params).not.toHaveProperty("backgroundId");
-    expect(result.script.commands[1]?.params).not.toHaveProperty("duration");
+    expect(result.script.commands[1]?.params).not.toHaveProperty("id");
+    expect(result.script.commands[2]?.params).not.toHaveProperty("duration");
+  });
+
+  it("warns on unsupported inner background transform params without adding v1 public surface", () => {
+    const { scenario } = parseScenario({
+      sourceText: "@inback bg:framed-room pos:50 scale:1.2 dissolve:fade",
+      scriptPath: "inback-unsupported-params.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.script.commands[0]).toEqual(
+      expect.objectContaining({
+        commandId: "inback",
+        params: expect.objectContaining({
+          target: PIXI_INNER_BACKGROUND_ID,
+          appearance: "bg:framed-room"
+        })
+      })
+    );
+    expect(result.script.commands[0]?.params).not.toHaveProperty("pos");
+    expect(result.script.commands[0]?.params).not.toHaveProperty("scale");
+    expect(result.script.commands[0]?.params).not.toHaveProperty("dissolve");
+    expect(result.diagnostics).toEqual([
+      {
+        code: "invalid-command-param",
+        message: "@inback does not declare parameter pos; commandCatalog is the authority.",
+        severity: "warning"
+      },
+      {
+        code: "invalid-command-param",
+        message: "@inback does not declare parameter scale; commandCatalog is the authority.",
+        severity: "warning"
+      },
+      {
+        code: "invalid-command-param",
+        message: "@inback does not declare parameter dissolve; commandCatalog is the authority.",
+        severity: "warning"
+      }
+    ]);
   });
 
   it("normalizes shader weather params while leaving rain and snow controls separate", () => {

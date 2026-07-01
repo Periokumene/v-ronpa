@@ -42,6 +42,7 @@ const commandAssetKinds: Record<string, string> = {
   sfx: "sfx",
   voice: "voice",
   back: "background",
+  inback: "background",
   video: "video"
 };
 

@@ -34,10 +34,10 @@ describe("harness showcase save adapter", () => {
     });
 
     expect(save).toMatchObject({
-      version: 3,
+      version: 4,
       mode: "navi",
       pixiStage: {
-        version: 4,
+        version: 5,
         revision: 1,
         backgroundsById: {
           MainBackground: { appearance: "bg:harness" }

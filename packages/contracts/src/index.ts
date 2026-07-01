@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const IdSchema = z.string().min(1).regex(/^[a-zA-Z0-9:_./-]+$/);
+export const PIXI_MAIN_BACKGROUND_ID = "MainBackground" as const;
+export const PIXI_INNER_BACKGROUND_ID = "InnerBackground" as const;
 
 export const GameModeSchema = z.enum(["loading", "title", "vn", "navi", "trial", "paused", "saving"]);
 export type GameMode = z.infer<typeof GameModeSchema>;
@@ -302,6 +304,7 @@ const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
   glitch: "pixi-presentation",
   glitchfilter: "pixi-presentation",
   hidechars: "pixi-presentation",
+  inback: "pixi-presentation",
   rain: "pixi-presentation",
   shake: "pixi-presentation",
   slide: "pixi-presentation",
@@ -764,6 +767,16 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
   ),
   vRonpa("flash", "effect", [param("color", "string"), param("duration", "decimal"), param("wait", "boolean")]),
   vRonpa("focus", "effect", [param("target", "string"), param("duration", "decimal")]),
+  vRonpa("inback", "scene", [
+    param("appearanceAndTransition", "named string"),
+    param("appearance", "string"),
+    param("via", "string"),
+    param("effect", "string"),
+    param("visible", "boolean"),
+    param("easing", "string"),
+    param("time", "decimal"),
+    param("wait", "boolean")
+  ]),
   vRonpa("trialkeyword", "ui", [param("id", "string"), param("text", "string"), param("speaker", "string"), param("evidence", "string")], [
     "trial-keyword"
   ])
@@ -1434,10 +1447,26 @@ export const PixiScreenFiltersSnapshotSchema = z
   .default({});
 export type PixiScreenFiltersSnapshot = z.infer<typeof PixiScreenFiltersSnapshotSchema>;
 
+const PixiInnerBackgroundActorMapSchema = z
+  .record(IdSchema, PixiActorSnapshotSchema)
+  .superRefine((actors, ctx) => {
+    for (const [id, actor] of Object.entries(actors)) {
+      if (actor.kind !== "background") {
+        ctx.addIssue({
+          code: "custom",
+          path: [id, "kind"],
+          message: "Inner background actors must use kind 'background'."
+        });
+      }
+    }
+  })
+  .default({});
+
 export const PixiStageSnapshotSchema = z.object({
-  version: z.literal(4),
+  version: z.literal(5),
   revision: z.number().int().nonnegative().default(0),
   backgroundsById: z.record(IdSchema, PixiActorSnapshotSchema).default({}),
+  innerBackgroundsById: PixiInnerBackgroundActorMapSchema,
   charactersById: z.record(IdSchema, PixiActorSnapshotSchema).default({}),
   actorOrder: z.array(IdSchema).default([]),
   weather: PixiWeatherSnapshotMapSchema,
@@ -1804,7 +1833,7 @@ export const SaveableVnStateSchema = z
 export type SaveableVnState = z.infer<typeof SaveableVnStateSchema>;
 
 export const SaveDataSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
   savedAt: z.string(),
   mode: GameModeSchema,
   vn: SaveableVnStateSchema.optional(),

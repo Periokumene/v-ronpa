@@ -1,8 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Assets, Container, Rectangle, Sprite, Texture, TilingSprite, type Filter, type Ticker } from "pixi.js";
 import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "@v-ronpa/contracts";
-import { createInitialPixiStageSnapshot } from "../stageSnapshot";
-import { ActorSystem, FilterSystem, RootFilterStack, TransientEffectSystem, TweenSystem, WeatherSystem } from "./systems";
+import { INNER_BACKGROUND_ID, createInitialPixiStageSnapshot } from "../stageSnapshot";
+import {
+  ActorSystem,
+  FilterSystem,
+  RootFilterStack,
+  TransientEffectSystem,
+  TweenSystem,
+  WeatherSystem,
+  resolveInnerBackgroundFrameRect
+} from "./systems";
 import { PresentationTaskController } from "./presentationTasks";
 import type { PixiAssetResolver, PixiPresenterDiagnostic } from "./assetResolver";
 import { CharacterSystem } from "./characters";
@@ -78,6 +86,61 @@ describe("pixi presentation task system integration", () => {
     expect(fetch).not.toHaveBeenCalledWith("https://assets.test/characters/Ema/metadata/FaceNormal.json");
   });
 
+  it("renders inner backgrounds in a dedicated framed layer between main backgrounds and weather", async () => {
+    const load = vi.spyOn(Assets, "load").mockResolvedValue(Texture.WHITE as never);
+    const { actors, root } = createSystems({
+      assetResolver: {
+        resolve(input) {
+          return { uri: `/resolved/${input.id}.png` };
+        }
+      }
+    });
+
+    actors.reconcile(stageWithInnerBackground(), false);
+
+    const layers = root.children.filter((child): child is Container => child instanceof Container);
+    expect(layers.map((layer) => [layer.label, layer.zIndex])).toEqual(
+      expect.arrayContaining([
+        ["backgrounds", 0],
+        ["inner-backgrounds", 2],
+        ["weather-back", 5],
+        ["characters", 10],
+        ["weather-front", 20]
+      ])
+    );
+    const innerLayer = layers.find((layer) => layer.label === "inner-backgrounds");
+    const innerActor = innerLayer?.children.find((child): child is Container => child instanceof Container && child.label === `actor:${INNER_BACKGROUND_ID}`);
+    expect(innerActor).toBeDefined();
+    const frameRoot = findDescendant(innerActor, `inner-background-frame:${INNER_BACKGROUND_ID}`, Container);
+    const content = findDescendant(innerActor, `inner-background-content:${INNER_BACKGROUND_ID}`, Container);
+    const mask = findDescendant(innerActor, `inner-background-mask:${INNER_BACKGROUND_ID}`);
+    const stroke = findDescendant(innerActor, "inner-background-stroke");
+    const fallback = findDescendant(innerActor, `fallback:${INNER_BACKGROUND_ID}`, Container);
+
+    expect(frameRoot).toBeDefined();
+    expect(content?.mask).toBe(mask);
+    expect(stroke).toBeDefined();
+    expect(fallback?.visible).toBe(true);
+    expect(load).toHaveBeenCalledWith("/resolved/bg:test.png");
+    expect(load).toHaveBeenCalledWith("/resolved/bg:inner.png");
+
+    const frame = resolveInnerBackgroundFrameRect(960, 540);
+    await waitFor(() => {
+      const sprite = findFirstDescendant(content, Sprite);
+      expect(sprite?.visible).toBe(true);
+      expect(sprite?.x).toBeLessThanOrEqual(frame.x);
+      expect(sprite?.y).toBeLessThanOrEqual(frame.y);
+      expect((sprite?.x ?? 0) + (sprite?.width ?? 0)).toBeGreaterThanOrEqual(frame.x + frame.width);
+      expect((sprite?.y ?? 0) + (sprite?.height ?? 0)).toBeGreaterThanOrEqual(frame.y + frame.height);
+      expect(fallback?.visible).toBe(false);
+    });
+  });
+
+  it("uses a stable centered 16:9 rect for inner background frames", () => {
+    expect(resolveInnerBackgroundFrameRect(960, 540)).toEqual({ x: 134, y: 76, width: 691, height: 389 });
+    expect(resolveInnerBackgroundFrameRect(1000, 1000)).toEqual({ x: 140, y: 298, width: 720, height: 405 });
+  });
+
   it("emits diagnostics for missing background and character-pack assets while keeping fallbacks", () => {
     const load = vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
     const diagnostics: PixiPresenterDiagnostic[] = [];
@@ -112,6 +175,35 @@ describe("pixi presentation task system integration", () => {
         assetId: "Ema",
         kind: "character-pack",
         message: "Ema missing"
+      }
+    ]);
+  });
+
+  it("emits diagnostics for missing inner background assets while keeping the framed fallback", () => {
+    const load = vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
+    const diagnostics: PixiPresenterDiagnostic[] = [];
+    const { actors, root } = createSystems({
+      assetResolver: {
+        resolve(input) {
+          return { diagnostic: { code: "asset-missing", severity: "error", message: `${input.id} missing` } };
+        }
+      },
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic)
+    });
+
+    actors.reconcile(stageWithInnerBackground({ includeMainBackground: false, includeCharacter: false }), false);
+
+    const innerActor = findDescendant(root, `actor:${INNER_BACKGROUND_ID}`, Container);
+    expect(load).not.toHaveBeenCalled();
+    expect(findDescendant(innerActor, `fallback:${INNER_BACKGROUND_ID}`, Container)).toBeDefined();
+    expect(diagnostics).toEqual([
+      {
+        source: "asset",
+        code: "asset-missing",
+        severity: "error",
+        assetId: "bg:inner",
+        kind: "background",
+        message: "bg:inner missing"
       }
     ]);
   });
@@ -603,6 +695,26 @@ function stageWithActors(background: PixiActorSnapshot, characters: PixiActorSna
   };
 }
 
+function stageWithInnerBackground(
+  {
+    includeMainBackground = true,
+    includeCharacter = true
+  }: { includeMainBackground?: boolean; includeCharacter?: boolean } = {}
+): PixiStageSnapshot {
+  const character = characterActor("Ema", "Pensive1");
+  return {
+    ...createInitialPixiStageSnapshot(),
+    revision: 1,
+    backgroundsById: includeMainBackground ? { MainBackground: backgroundActor({ durationMs: 0 }) } : {},
+    innerBackgroundsById: { [INNER_BACKGROUND_ID]: innerBackgroundActor({ durationMs: 0 }) },
+    charactersById: includeCharacter ? { [character.id]: character } : {},
+    actorOrder: [
+      ...(includeMainBackground ? ["MainBackground"] : []),
+      ...(includeCharacter ? [character.id] : [])
+    ]
+  };
+}
+
 function backgroundActor({ durationMs, wait = false }: { durationMs: number; wait?: boolean }): PixiActorSnapshot {
   return {
     id: "MainBackground",
@@ -628,6 +740,20 @@ function characterActor(id: string, appearanceExpression: string): PixiActorSnap
     pos: [0.5, 0],
     filters: {},
     transition: { durationMs: 0, lazy: false, wait: false }
+  };
+}
+
+function innerBackgroundActor({ durationMs, wait = false }: { durationMs: number; wait?: boolean }): PixiActorSnapshot {
+  return {
+    id: INNER_BACKGROUND_ID,
+    kind: "background",
+    appearance: "bg:inner",
+    appearanceExpression: "",
+    visible: true,
+    alpha: 1,
+    z: 0,
+    filters: {},
+    transition: { durationMs, lazy: false, wait }
   };
 }
 
@@ -672,6 +798,45 @@ function findWeatherContainer(root: Container, kind: string): Container | undefi
   for (const layer of layers) {
     const weather = layer.children.find((child): child is Container => child instanceof Container && child.label === `weather:${kind}`);
     if (weather) return weather;
+  }
+  return undefined;
+}
+
+type PixiInstanceCtor<T> = new (...args: any[]) => T;
+
+function findDescendant<T>(
+  root: Container | undefined,
+  label: string,
+  ctor?: PixiInstanceCtor<T>
+): T | undefined;
+function findDescendant(root: Container | undefined, label: string): Container | undefined;
+function findDescendant<T>(
+  root: Container | undefined,
+  label: string,
+  ctor?: PixiInstanceCtor<T>
+): T | Container | undefined {
+  if (!root) return undefined;
+  for (const child of root.children) {
+    if (child.label === label && (!ctor || child instanceof ctor)) return child as T;
+    if (child instanceof Container) {
+      const found = findDescendant(child, label, ctor);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+function findFirstDescendant<T>(
+  root: Container | undefined,
+  ctor: PixiInstanceCtor<T>
+): T | undefined {
+  if (!root) return undefined;
+  for (const child of root.children) {
+    if (child instanceof ctor) return child as T;
+    if (child instanceof Container) {
+      const found = findFirstDescendant(child, ctor);
+      if (found) return found;
+    }
   }
   return undefined;
 }

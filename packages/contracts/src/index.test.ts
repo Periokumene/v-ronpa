@@ -19,6 +19,8 @@ import {
   NaviInteractionSensorReportSchema,
   NaviInteractionViewSchema,
   NaviRuntimeStateSchema,
+  PIXI_INNER_BACKGROUND_ID,
+  PIXI_MAIN_BACKGROUND_ID,
   PixiStageSnapshotSchema,
   RichTextDocumentSchema,
   RuntimeAssetSchema,
@@ -353,11 +355,11 @@ describe("contracts", () => {
     expect(rain?.params.map((param) => param.name)).toEqual(["power", "wind", "hue", "tint", "time", "easing", "wait"]);
 
     const snapshot = PixiStageSnapshotSchema.parse({
-      version: 4,
+      version: 5,
       revision: 3,
       backgroundsById: {
-        MainBackground: {
-          id: "MainBackground",
+        [PIXI_MAIN_BACKGROUND_ID]: {
+          id: PIXI_MAIN_BACKGROUND_ID,
           kind: "background",
           appearance: "bg:harness"
         }
@@ -377,7 +379,7 @@ describe("contracts", () => {
           }
         }
       },
-      actorOrder: ["MainBackground", "Ema"],
+      actorOrder: [PIXI_MAIN_BACKGROUND_ID, "Ema"],
       weather: {
         rain: {
           kind: "rain",
@@ -396,11 +398,11 @@ describe("contracts", () => {
     });
 
     expect(snapshot).toMatchObject({
-      version: 4,
+      version: 5,
       revision: 3,
       backgroundsById: {
-        MainBackground: {
-          id: "MainBackground",
+        [PIXI_MAIN_BACKGROUND_ID]: {
+          id: PIXI_MAIN_BACKGROUND_ID,
           kind: "background",
           appearance: "bg:harness",
           visible: true,
@@ -408,6 +410,7 @@ describe("contracts", () => {
           z: 0
         }
       },
+      innerBackgroundsById: {},
       charactersById: {
         Ema: {
           id: "Ema",
@@ -423,7 +426,7 @@ describe("contracts", () => {
           visible: true
         }
       },
-      actorOrder: ["MainBackground", "Ema"],
+      actorOrder: [PIXI_MAIN_BACKGROUND_ID, "Ema"],
       weather: {
         rain: {
           kind: "rain",
@@ -446,7 +449,7 @@ describe("contracts", () => {
     expect(snapshot).not.toHaveProperty("slots");
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 3,
+        version: 4,
         revision: 0,
         backgroundsById: {},
         charactersById: {},
@@ -455,15 +458,46 @@ describe("contracts", () => {
         screenFilters: {}
       })
     ).toThrow();
+    expect(
+      PixiStageSnapshotSchema.parse({
+        version: 5,
+        innerBackgroundsById: {
+          [PIXI_INNER_BACKGROUND_ID]: {
+            id: PIXI_INNER_BACKGROUND_ID,
+            kind: "background",
+            appearance: "bg:framed"
+          }
+        }
+      }).innerBackgroundsById[PIXI_INNER_BACKGROUND_ID]
+    ).toMatchObject({
+      id: PIXI_INNER_BACKGROUND_ID,
+      kind: "background",
+      appearance: "bg:framed",
+      visible: true,
+      alpha: 1,
+      z: 0
+    });
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 4,
+        version: 5,
+        innerBackgroundsById: {
+          [PIXI_INNER_BACKGROUND_ID]: {
+            id: PIXI_INNER_BACKGROUND_ID,
+            kind: "character",
+            appearanceExpression: "Pensive1"
+          }
+        }
+      })
+    ).toThrow();
+    expect(() =>
+      PixiStageSnapshotSchema.parse({
+        version: 5,
         slots: { left: { slot: "right", characterId: "character:mira" } }
       })
     ).toThrow();
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 4,
+        version: 5,
         charactersById: {
           Ema: {
             id: "Ema",
@@ -482,7 +516,7 @@ describe("contracts", () => {
     );
 
     const snapshot = PixiStageSnapshotSchema.parse({
-      version: 4,
+      version: 5,
       weather: {
         snow: {
           kind: "snow",
@@ -512,7 +546,7 @@ describe("contracts", () => {
     });
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 4,
+        version: 5,
         weather: { snow: { kind: "snow", density: -1, transition: { durationMs: 0 } } }
       })
     ).toThrow();
@@ -529,7 +563,7 @@ describe("contracts", () => {
     );
 
     const snapshot = PixiStageSnapshotSchema.parse({
-      version: 4,
+      version: 5,
       screenFilters: {
         glitch: {
           power: 0.4,
@@ -950,7 +984,7 @@ describe("contracts", () => {
     const officialCommands = naniCommandCatalog.filter((command) => command.source === "naninovel");
 
     expect(officialCommands).toHaveLength(78);
-    expect(naniCommandCatalog).toHaveLength(84);
+    expect(naniCommandCatalog).toHaveLength(85);
     expect(() => NaniCommandDefinitionSchema.array().parse(naniCommandCatalog)).not.toThrow();
   });
 
@@ -998,6 +1032,13 @@ describe("contracts", () => {
     });
     expect(getNaniCommandDefinition("flash")).toMatchObject({
       source: "v-ronpa",
+      execution: "pixi-presentation"
+    });
+    expect(getNaniCommandDefinition("inback")).toMatchObject({
+      canonicalName: "inback",
+      category: "scene",
+      source: "v-ronpa",
+      status: "implemented",
       execution: "pixi-presentation"
     });
     expect(getNaniCommandDefinition("async")).toMatchObject({
@@ -1050,6 +1091,16 @@ describe("contracts", () => {
       type: "decimal",
       source: "v-ronpa"
     });
+    expect(getNaniCommandDefinition("inback")?.params.map((param) => param.name)).toEqual([
+      "appearanceAndTransition",
+      "appearance",
+      "via",
+      "effect",
+      "visible",
+      "easing",
+      "time",
+      "wait"
+    ]);
   });
 
   it("validates runtime commands and runtime scripts as the command dispatch bridge", () => {
@@ -1095,7 +1146,7 @@ describe("contracts", () => {
 
   it("validates versioned save data", () => {
     const save = SaveDataSchema.parse({
-      version: 3,
+      version: 4,
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "navi",
       navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
@@ -1108,11 +1159,11 @@ describe("contracts", () => {
         ended: false
       },
       pixiStage: {
-        version: 4,
+        version: 5,
         revision: 2,
         backgroundsById: {
-          MainBackground: {
-            id: "MainBackground",
+          [PIXI_MAIN_BACKGROUND_ID]: {
+            id: PIXI_MAIN_BACKGROUND_ID,
             kind: "background",
             appearance: "bg:harness"
           }
@@ -1125,7 +1176,7 @@ describe("contracts", () => {
             pos: [0.5, 0]
           }
         },
-        actorOrder: ["MainBackground", "Ema"],
+        actorOrder: [PIXI_MAIN_BACKGROUND_ID, "Ema"],
         weather: {},
         screenFilters: {}
       },
@@ -1134,8 +1185,9 @@ describe("contracts", () => {
       characters: {}
     });
 
-    expect(save.version).toBe(3);
-    expect(save.pixiStage.backgroundsById.MainBackground?.appearance).toBe("bg:harness");
+    expect(save.version).toBe(4);
+    expect(save.pixiStage.innerBackgroundsById).toEqual({});
+    expect(save.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
     expect(save.pixiStage.charactersById.Ema?.appearanceExpression).toBe("Pensive1,ArmR3");
     expect(save).not.toHaveProperty("summary");
   });
@@ -1143,7 +1195,7 @@ describe("contracts", () => {
   it("rejects old save and Pixi stage versions", () => {
     expect(() =>
       SaveDataSchema.parse({
-        version: 2,
+        version: 3,
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "navi",
         story: {
@@ -1154,7 +1206,26 @@ describe("contracts", () => {
           pendingChoices: [],
           ended: false
         },
-        pixiStage: { version: 3, revision: 0, backgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
+        pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
+        inventory: { items: {} },
+        evidence: { ownedEvidenceIds: [] },
+        characters: {}
+      })
+    ).toThrow();
+    expect(() =>
+      SaveDataSchema.parse({
+        version: 4,
+        savedAt: "2026-06-14T00:00:00.000Z",
+        mode: "navi",
+        story: {
+          currentScriptPath: "opening.nani",
+          instructionPointer: 2,
+          variables: {},
+          backlog: [],
+          pendingChoices: [],
+          ended: false
+        },
+        pixiStage: { version: 4, revision: 0, backgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
         inventory: { items: {} },
         evidence: { ownedEvidenceIds: [] },
         characters: {}
@@ -1162,10 +1233,10 @@ describe("contracts", () => {
     ).toThrow();
   });
 
-  it("rejects v3 save data without a Pixi stage snapshot", () => {
+  it("rejects v4 save data without a Pixi stage snapshot", () => {
     expect(() =>
       SaveDataSchema.parse({
-        version: 3,
+        version: 4,
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "navi",
         story: {
@@ -1185,7 +1256,7 @@ describe("contracts", () => {
 
   it("does not persist runtime command streams in save data", () => {
     const save = SaveDataSchema.parse({
-      version: 3,
+      version: 4,
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "navi",
       story: {
@@ -1197,7 +1268,7 @@ describe("contracts", () => {
         ended: false,
         emittedRuntimeCommands: []
       },
-      pixiStage: { version: 4, revision: 0, backgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
+      pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
       inventory: { items: {} },
       evidence: { ownedEvidenceIds: [] },
       characters: {}

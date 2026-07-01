@@ -52,13 +52,15 @@ fallback.
 StoryEngine state stores story semantics only: script path, instruction pointer,
 variables, backlog, pending choices, and end state. It returns the current
 step's emitted runtime commands as an incremental stream. For Pixi, emitted
-commands such as `back`, `char`, `shake`, `flash`, `focus`, and
+commands such as `back`, `inback`, `char`, `shake`, `flash`, `focus`, and
 `trialkeyword` are reduced into `PixiStageSnapshot` plus transient render hints
 before React rendering. Saves store the snapshot and story/gameplay state, not
 the runtime command stream or presenter trace.
 
 Asset ids inside these commands are semantic ids. For example,
-`@back bg:harness` writes a background asset id into the Pixi snapshot, while
+`@back bg:harness` writes a full-stage background asset id into
+`backgroundsById`, `@inback bg:classroom` writes a framed inner background asset
+id into `innerBackgroundsById`, while
 `@char Ema.Pensive1,ArmR3` writes character id `Ema` plus semantic
 `appearanceExpression`. Pixi then asks the injected resolver for the
 `background` or `character-pack` entry URL and loads pack-internal files itself.

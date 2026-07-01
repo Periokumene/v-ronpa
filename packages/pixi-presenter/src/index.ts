@@ -15,6 +15,7 @@ import { PresentationTaskController, type PixiPresentationTaskSnapshot } from ".
 import { type PixiStageRenderHint } from "./stageSnapshot";
 
 export {
+  INNER_BACKGROUND_ID,
   MAIN_BACKGROUND_ID,
   createInitialPixiStageSnapshot,
   normalizeActorTransformParams,

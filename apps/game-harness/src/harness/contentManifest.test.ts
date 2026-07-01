@@ -18,6 +18,9 @@ describe("harness content manifest", () => {
     expect(registry.diagnostics).toEqual([]);
     expect(registry.validateReferences()).toEqual([]);
     expect(registry.resolve({ id: "bg:harness", kind: "background" }).uri).toBe("/harness/backgrounds/harness.png");
+    expect(registry.resolve({ id: "bg:classroom", kind: "background" }).uri).toBe("/harness/backgrounds/classroom.png");
+    expect(registry.resolve({ id: "bg:inner-academy-hall", kind: "background" }).uri).toBe("/harness/backgrounds/inner-academy-hall.png");
+    expect(registry.resolve({ id: "bg:inner-snow-outskirts", kind: "background" }).uri).toBe("/harness/backgrounds/inner-snow-outskirts.png");
     expect(registry.resolve({ id: "bleep:dialogue-default", kind: "bleep" }).uri).toBe("/harness/media/bleep/dialogue-default.ogg");
     expect(registry.resolve({ id: "bleep:dialogue-felix", kind: "bleep" }).uri).toBe("/harness/media/bleep/dialogue-felix.ogg");
     expect(registry.resolve({ id: "Ema", kind: "character-pack" }).uri).toBe("/harness/characters/Ema/character.json");

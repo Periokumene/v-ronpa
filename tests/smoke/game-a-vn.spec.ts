@@ -9,6 +9,7 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.removeItem("v-ronpa:game-a:settings:v1");
     localStorage.removeItem("v-ronpa:game-a:saves:v1");
+    localStorage.removeItem("v-ronpa:game-a:saves:v2");
   });
   await page.goto("/");
 
@@ -37,7 +38,8 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
     .toContain("/game-a/ui/dialog-frame.png");
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toHaveClass(/game-a-command-bar/);
-  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-background", "bg:game-a-room");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-background", "bg:game-a-academy-hall-fullscreen");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg:game-a-snow-outskirts-frame");
   await page.screenshot({ path: "test-results/game-a-vn-dialog.png", fullPage: true });
 
   await page.getByTestId("vn-command-backlog").click();
@@ -55,11 +57,10 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await page.getByTestId("vn-command-auto").click();
   await page.getByTestId("vn-command-skip").click();
   await expect(page.getByTestId("vn-command-skip")).toHaveAttribute("aria-pressed", "true");
-  await page.getByTestId("vn-command-skip").click();
 
-  await clickDialogSurface(page);
   await expect(page.getByTestId("vn-dialog-text")).toContainText("第一层验证");
   await expect(page.getByTestId("vn-choice-overlay")).toBeVisible();
+  await expect(page.getByTestId("vn-command-skip")).toBeDisabled();
   await page.getByTestId("vn-choice-0").click();
   await expect(page.getByTestId("vn-dialog-text")).toContainText("记录了房间里的异常光线");
 
