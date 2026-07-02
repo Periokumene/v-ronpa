@@ -25,6 +25,11 @@ export interface ParamCompletionFact {
   sortText: string;
 }
 
+export interface DocumentationFact {
+  detail: string;
+  documentation: string;
+}
+
 export function commandCompletionFacts(): CommandCompletionFact[] {
   return naniCommandCatalog.flatMap((definition, definitionIndex) => {
     const names = [definition.canonicalName, ...(definition.aliases ?? [])];
@@ -79,16 +84,27 @@ export function paramCompletionFacts(commandId: string, usedParams: Set<string> 
 }
 
 function commandDocumentation(definition: NaniCommandDefinition): string {
+  const zh = definition.docs?.zh ? `${definition.docs.zh}\n\n` : "";
   const aliases = definition.aliases && definition.aliases.length > 0 ? `\nAliases: ${definition.aliases.join(", ")}` : "";
   const params = definition.params.length > 0 ? `\nParams: ${definition.params.map((param) => `${param.name}:${param.type}`).join(", ")}` : "";
-  return `Source: ${definition.source}\nExecution: ${definition.execution}${aliases}${params}`;
+  const examples = definition.docs?.examples?.length ? `\nExamples:\n${definition.docs.examples.map((example) => `- ${example}`).join("\n")}` : "";
+  const runtimeNote = definition.docs?.runtimeNoteZh ? `\nRuntime: ${definition.docs.runtimeNoteZh}` : "";
+  return `${zh}Source: ${definition.source}\nExecution: ${definition.execution}${aliases}${params}${runtimeNote}${examples}`;
 }
 
 function paramDocumentation(param: NaniCommandParamSpec): string {
+  const docs = param.docs;
+  const zh = docs?.zh ? `${docs.zh}\n\n` : "";
+  const defaultValue = docs?.defaultValue !== undefined ? `\nDefault: ${String(docs.defaultValue)}` : "";
+  const recommendedRange = docs?.recommendedRange ? `\nRecommended: ${formatRecommendedRange(docs.recommendedRange)}` : "";
+  const allowedValues = docs?.allowedValues?.length ? `\nAllowed: ${docs.allowedValues.join(", ")}` : "";
+  const examples = docs?.examples?.length ? `\nExamples:\n${docs.examples.map((example) => `- ${example}`).join("\n")}` : "";
+  const runtimeSupport = docs?.runtimeSupport ? `\nRuntime support: ${docs.runtimeSupport}` : "";
+  const runtimeNote = docs?.runtimeNoteZh ? `\nRuntime: ${docs.runtimeNoteZh}` : "";
   const required = param.required ? "\nRequired." : "";
   const repeatable = param.repeatable ? "\nRepeatable." : "";
   const source = param.source ? `\nSource: ${param.source}.` : "";
-  return `${param.description ?? param.type}.${required}${repeatable}${source}`;
+  return `${zh}Type: ${param.type}.${required}${repeatable}${source}${defaultValue}${recommendedRange}${allowedValues}${runtimeSupport}${runtimeNote}${examples}`;
 }
 
 function placeholderForParam(param: NaniCommandParamSpec): string {
@@ -100,4 +116,59 @@ function placeholderForParam(param: NaniCommandParamSpec): string {
   if (param.name.toLowerCase().includes("goto")) return "#${1:Label}";
   if (param.name.toLowerCase().includes("expression")) return "{${1:condition}}";
   return "${1:value}";
+}
+
+export function commandDocumentationFact(commandId: string): DocumentationFact | undefined {
+  const definition = getNaniCommandDefinition(commandId);
+  if (!definition) return undefined;
+  return {
+    detail: `${definition.canonicalName} · ${definition.category} · ${definition.status}`,
+    documentation: commandDocumentation(definition)
+  };
+}
+
+export function paramDocumentationFact(commandId: string, paramName: string): DocumentationFact | undefined {
+  const definition = getNaniCommandDefinition(commandId);
+  if (!definition) return undefined;
+  const param = definition.params.find((candidate) => normalize(candidate.name) === normalize(paramName) || candidate.aliases?.some((alias) => normalize(alias) === normalize(paramName)));
+  if (!param) return undefined;
+  return {
+    detail: `${definition.canonicalName} parameter · ${param.type}`,
+    documentation: paramDocumentation(param)
+  };
+}
+
+export function inlineDocumentationFact(commandId: string, paramName?: string): DocumentationFact | undefined {
+  if (commandId === ">") {
+    return {
+      detail: "Inline auto-next command",
+      documentation: "当前文本行显示完成后自动推进到下一步。"
+    };
+  }
+  if (commandId !== "<") return undefined;
+  if (!paramName) {
+    return {
+      detail: "Inline print control command",
+      documentation: "调整当前文本行的显示参数。首轮支持 `speed:<decimal>`。"
+    };
+  }
+  if (normalize(paramName) !== "speed") return undefined;
+  return {
+    detail: "Inline print speed parameter · decimal",
+    documentation: "设置当前文本行的显示速度倍率。\n\nType: decimal.\nRecommended: 0..2. 0 表示立即显示；建议 0.5 到 1.5 之间微调。\nExamples:\n- speed:0.8"
+  };
+}
+
+function formatRecommendedRange(range: NonNullable<NaniCommandParamSpec["docs"]>["recommendedRange"]): string {
+  if (!range) return "";
+  const min = range.min !== undefined ? String(range.min) : "";
+  const max = range.max !== undefined ? String(range.max) : "";
+  const bounds = min || max ? `${min}..${max}` : "see note";
+  const unit = range.unit ? ` ${range.unit}` : "";
+  const note = range.noteZh ? `. ${range.noteZh}` : "";
+  return `${bounds}${unit}${note}`;
+}
+
+function normalize(value: string): string {
+  return value.trim().toLowerCase();
 }

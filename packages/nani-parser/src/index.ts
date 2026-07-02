@@ -88,6 +88,16 @@ interface ActiveRichTextTag {
   style: RichTextRunStyleIR;
 }
 
+interface CommandPartDiagnostic {
+  severity: Diagnostic["severity"];
+  message: string;
+}
+
+interface SplitCommandPartsResult {
+  parts: string[];
+  diagnostics: CommandPartDiagnostic[];
+}
+
 export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
   const diagnostics: Diagnostic[] = [];
   const statements: StatementIR[] = [];
@@ -120,7 +130,7 @@ export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
     }
 
     if (trimmed.startsWith("@")) {
-      const command = parseCommand(trimmed.slice(1), loc);
+      const command = parseCommand(trimmed.slice(1), loc, diagnostics);
       attachCommandRichText(command, diagnostics);
       collectCommandMetadata(command, assets, dependencies);
       statements.push(command);
@@ -395,7 +405,7 @@ function parseText(line: string, loc: SourceLocation, diagnostics: Diagnostic[])
   const body = speakerMatch?.[2] ?? line;
   const [speaker, appearance] = speakerDirective ? splitSpeaker(speakerDirective) : [undefined, undefined];
   const bodyStart = Math.max(0, line.indexOf(body));
-  const tokens = parseInlineTokens(body, { ...loc, column: loc.column + bodyStart });
+  const tokens = parseInlineTokens(body, { ...loc, column: loc.column + bodyStart }, diagnostics);
   const printParams: Record<string, NaniValue> = {};
   const textIdResult = extractTextIdFromTokens(tokens);
 
@@ -437,7 +447,7 @@ function splitSpeaker(value: string): [string | undefined, string | undefined] {
   return [value.slice(0, dot), value.slice(dot + 1)];
 }
 
-function parseInlineTokens(text: string, loc: SourceLocation): TextToken[] {
+function parseInlineTokens(text: string, loc: SourceLocation, diagnostics: Diagnostic[]): TextToken[] {
   const tokens: TextToken[] = [];
   let buffer = "";
   let i = 0;
@@ -460,7 +470,8 @@ function parseInlineTokens(text: string, loc: SourceLocation): TextToken[] {
           buffer = "";
         }
         const inlineSource = text.slice(i + 1, close).trim() || "noop";
-        const command = parseCommand(inlineSource, { ...loc, column: loc.column + i });
+        const command = parseCommand(inlineSource, { ...loc, column: loc.column + i }, diagnostics, { inline: true });
+        collectInlineCommandDiagnostics(command, diagnostics);
         command.inlineIndex = tokens.length;
         tokens.push({ kind: "inline-command", command });
         i = close + 1;
@@ -518,8 +529,17 @@ function findClosingBracket(text: string, start: number): number {
   return -1;
 }
 
-function parseCommand(source: string, loc: SourceLocation): CommandIR {
-  const parts = splitCommandParts(source);
+function parseCommand(
+  source: string,
+  loc: SourceLocation,
+  diagnostics?: Diagnostic[],
+  options: { inline?: boolean } = {}
+): CommandIR {
+  const split = splitCommandParts(source);
+  const parts = split.parts;
+  for (const diagnostic of split.diagnostics) {
+    diagnostics?.push({ severity: diagnostic.severity, message: diagnostic.message, loc });
+  }
   const commandId = (parts.shift() ?? "noop").toLowerCase();
   const args: CommandArgIR[] = [];
   const params: Record<string, NaniValue> = {};
@@ -575,7 +595,49 @@ function parseCommand(source: string, loc: SourceLocation): CommandIR {
   if (primary) command.primary = primary;
   if (condition) command.condition = condition;
   if (unless) command.unless = unless;
+  if (options.inline) command.loc = loc;
   return command;
+}
+
+function collectInlineCommandDiagnostics(command: CommandIR, diagnostics: Diagnostic[]): void {
+  if (command.commandId !== ">" && command.commandId !== "<") {
+    diagnostics.push({
+      severity: "error",
+      message: `Unsupported inline .nani command: [${command.commandId}]. Inline commands currently support [>] and [< speed:<decimal>].`,
+      loc: command.loc
+    });
+    return;
+  }
+
+  if (command.commandId === ">") {
+    if (command.args.length > 0) {
+      diagnostics.push({
+        severity: "error",
+        message: "Inline auto-next command [>] does not accept parameters.",
+        loc: command.loc
+      });
+    }
+    return;
+  }
+
+  for (const arg of command.args) {
+    if (arg.kind !== "param" || arg.key !== "speed") {
+      diagnostics.push({
+        severity: "error",
+        message: `Unsupported inline print parameter: ${arg.raw}. Inline [< ...] currently supports speed:<decimal>.`,
+        loc: command.loc
+      });
+      continue;
+    }
+
+    if (arg.value.type !== "number" && arg.value.type !== "expression") {
+      diagnostics.push({
+        severity: "error",
+        message: "Inline print parameter speed expected decimal.",
+        loc: command.loc
+      });
+    }
+  }
 }
 
 function attachCommandRichText(command: CommandIR, diagnostics: Diagnostic[]): void {
@@ -603,8 +665,9 @@ function isRichTextCommandParam(commandId: string, key: string): boolean {
   return false;
 }
 
-function splitCommandParts(source: string): string[] {
+function splitCommandParts(source: string): SplitCommandPartsResult {
   const parts: string[] = [];
+  const diagnostics = collectCommandSpacingDiagnostics(source);
   let current = "";
   let quote: string | undefined;
   let braceDepth = 0;
@@ -646,7 +709,44 @@ function splitCommandParts(source: string): string[] {
   }
 
   if (current.length > 0) parts.push(current);
-  return parts;
+  if (quote) {
+    diagnostics.push({
+      severity: "error",
+      message: `Unclosed quoted command argument.`
+    });
+  }
+  if (braceDepth > 0) {
+    diagnostics.push({
+      severity: "error",
+      message: "Unclosed command expression brace."
+    });
+  }
+  return { parts, diagnostics };
+}
+
+function collectCommandSpacingDiagnostics(source: string): CommandPartDiagnostic[] {
+  const diagnostics: CommandPartDiagnostic[] = [];
+  const leftWhitespace = source.matchAll(/(?:^|\s)([A-Za-z_][A-Za-z0-9_-]*)\s+:/gu);
+  for (const match of leftWhitespace) {
+    const key = match[1];
+    if (!key) continue;
+    diagnostics.push({
+      severity: "warning",
+      message: `Parameter ${key} has whitespace before ":"; use ${key}:<value> so it is parsed as a parameter.`
+    });
+  }
+
+  const rightWhitespace = source.matchAll(/(?:^|\s)([A-Za-z_][A-Za-z0-9_-]*):\s+\S/gu);
+  for (const match of rightWhitespace) {
+    const key = match[1];
+    if (!key) continue;
+    diagnostics.push({
+      severity: "warning",
+      message: `Parameter ${key} has whitespace after ":"; use ${key}:<value> so it is parsed as a parameter.`
+    });
+  }
+
+  return diagnostics;
 }
 
 function parseValue(raw: string): NaniValue {

@@ -26,4 +26,16 @@ describe("language facts", () => {
     expect(labels).not.toContain("wait!");
     expect(labels).not.toContain("!wait");
   });
+
+  it("includes Chinese command and parameter docs with range and runtime support notes", () => {
+    const bgm = commandCompletionFacts().find((fact) => fact.label === "bgm");
+    const volume = paramCompletionFacts("bgm").find((fact) => fact.label === "volume:");
+    const intro = paramCompletionFacts("bgm").find((fact) => fact.label === "intro:");
+
+    expect(bgm?.documentation).toContain("播放背景音乐");
+    expect(volume?.documentation).toContain("播放音量倍率");
+    expect(volume?.documentation).toContain("Recommended: 0..1");
+    expect(intro?.documentation).toContain("declared-not-consumed");
+    expect(intro?.documentation).toContain("暂未消费");
+  });
 });

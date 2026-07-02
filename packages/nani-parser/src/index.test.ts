@@ -922,6 +922,89 @@ describe("nani parser", () => {
       { kind: "flag", raw: "!lazy", key: "lazy", value: false }
     ]);
   });
+
+  it("warns when whitespace prevents command params from parsing normally without changing IR", () => {
+    const result = parseScenario({
+      sourceText: ["@bgm Piano volume :0.8", "@sfx Door volume: 0.5"].join("\n"),
+      scriptPath: "param-spacing.nani"
+    });
+
+    expect(result.diagnostics.map(({ severity, message }) => ({ severity, message }))).toEqual([
+      {
+        severity: "warning",
+        message: 'Parameter volume has whitespace before ":"; use volume:<value> so it is parsed as a parameter.'
+      },
+      {
+        severity: "warning",
+        message: 'Parameter volume has whitespace after ":"; use volume:<value> so it is parsed as a parameter.'
+      }
+    ]);
+    expect(result.scenario.statements.filter(isCommand).map(commandSummary)).toEqual([
+      {
+        line: 1,
+        commandId: "bgm",
+        primary: "Piano",
+        params: {}
+      },
+      {
+        line: 2,
+        commandId: "sfx",
+        primary: "Door",
+        params: {
+          volume: ""
+        }
+      }
+    ]);
+  });
+
+  it("reports unclosed command quotes and expression braces while preserving partial commands", () => {
+    const result = parseScenario({
+      sourceText: ['@bgm "Piano volume:0.8', "@print Hello if:{ready"].join("\n"),
+      scriptPath: "unclosed-command-syntax.nani"
+    });
+
+    expect(result.diagnostics.map(({ severity, message }) => ({ severity, message }))).toEqual([
+      { severity: "error", message: "Unclosed quoted command argument." },
+      { severity: "error", message: "Unclosed command expression brace." }
+    ]);
+    expect(result.scenario.statements.filter(isCommand).map(commandSummary)).toEqual([
+      {
+        line: 1,
+        commandId: "bgm",
+        primary: undefined,
+        params: {
+          "Piano volume": 0.8
+        }
+      },
+      {
+        line: 2,
+        commandId: "print",
+        primary: "Hello",
+        params: {}
+      }
+    ]);
+  });
+
+  it("diagnoses unsupported inline commands and invalid inline print speed", () => {
+    const result = parseScenario({
+      sourceText: "Felix: Hello [bogus] and [< speed:fast] world[>]",
+      scriptPath: "inline-diagnostics.nani"
+    });
+
+    expect(result.diagnostics.map(({ severity, message }) => ({ severity, message }))).toEqual([
+      {
+        severity: "error",
+        message: "Unsupported inline .nani command: [bogus]. Inline commands currently support [>] and [< speed:<decimal>]."
+      },
+      {
+        severity: "error",
+        message: "Inline print parameter speed expected decimal."
+      }
+    ]);
+    const text = result.scenario.statements[0] as TextIR;
+    expect(text.tokens.filter((token) => token.kind === "inline-command")).toHaveLength(3);
+    expect(text.printParams).toEqual({ speed: { type: "string", value: "fast" } });
+  });
 });
 
 function parseFixture(name: string): ParseScenarioResult {

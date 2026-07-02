@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { getNaniCompletions, type NaniCompletionKind } from "./completionProvider";
 import { computeNaniDiagnostics, type NaniDiagnostic } from "./diagnostics";
+import { getNaniHover } from "./hoverProvider";
 import { NANI_LANGUAGE_ID } from "./languageFacts";
 import type { NaniRange } from "./documentContext";
 
@@ -26,6 +27,21 @@ export function activate(context: vscode.ExtensionContext): void {
       "#",
       "[",
       "!"
+    )
+  );
+  context.subscriptions.push(
+    vscode.languages.registerHoverProvider(
+      { language: NANI_LANGUAGE_ID },
+      {
+        provideHover(document, position) {
+          const hover = getNaniHover(document.getText(), {
+            line: position.line,
+            character: position.character
+          });
+          if (!hover) return undefined;
+          return new vscode.Hover(new vscode.MarkdownString(hover.contents), toVscodeRange(hover.range));
+        }
+      }
     )
   );
 

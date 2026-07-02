@@ -61,4 +61,31 @@ describe("diagnostics", () => {
       end: { line: 0, character: 1 }
     });
   });
+
+  it("surfaces high-signal parser diagnostics for command spacing and inline commands", () => {
+    const diagnostics = computeNaniDiagnostics(
+      ["@bgm Piano volume :0.8", "Felix: Hello [bogus] and [< speed:fast]"].join("\n"),
+      "parser-diagnostics.nani"
+    );
+
+    expect(diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "nani-parser",
+          severity: "warning",
+          message: 'Parameter volume has whitespace before ":"; use volume:<value> so it is parsed as a parameter.'
+        }),
+        expect.objectContaining({
+          source: "nani-parser",
+          severity: "error",
+          message: "Unsupported inline .nani command: [bogus]. Inline commands currently support [>] and [< speed:<decimal>]."
+        }),
+        expect.objectContaining({
+          source: "nani-parser",
+          severity: "error",
+          message: "Inline print parameter speed expected decimal."
+        })
+      ])
+    );
+  });
 });

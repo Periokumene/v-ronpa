@@ -1008,19 +1008,46 @@ describe("contracts", () => {
   });
 
   it("preserves official Naninovel parameter type names in metadata", () => {
-    expect(getNaniCommandDefinition("back")?.params).toContainEqual({
+    expect(getNaniCommandDefinition("back")?.params).toContainEqual(expect.objectContaining({
       name: "time",
       type: "decimal"
-    });
-    expect(getNaniCommandDefinition("arrange")?.params).toContainEqual({
+    }));
+    expect(getNaniCommandDefinition("arrange")?.params).toContainEqual(expect.objectContaining({
       name: "characterPositions",
       type: "named decimal list"
-    });
-    expect(getNaniCommandDefinition("format")?.params).toContainEqual({
+    }));
+    expect(getNaniCommandDefinition("format")?.params).toContainEqual(expect.objectContaining({
       name: "templates",
       type: "named string list"
-    });
+    }));
     expect(NaniCommandStatusSchema.parse("stubbed")).toBe("stubbed");
+  });
+
+  it("adds Chinese command and parameter docs for every implemented command", () => {
+    const implemented = naniCommandCatalog.filter((command) => command.status === "implemented");
+
+    expect(implemented.length).toBeGreaterThan(0);
+    for (const command of implemented) {
+      expect(command.docs?.zh, command.id).toBeTruthy();
+      for (const paramSpec of command.params) {
+        expect(paramSpec.docs?.zh, `${command.id}.${paramSpec.name}`).toBeTruthy();
+      }
+    }
+  });
+
+  it("marks declared but currently unconsumed implemented params in command docs", () => {
+    expect(getNaniCommandDefinition("bgm")?.params.find((paramSpec) => paramSpec.name === "intro")?.docs).toMatchObject({
+      runtimeSupport: "declared-not-consumed",
+      runtimeNoteZh: expect.stringContaining("暂未消费")
+    });
+    expect(getNaniCommandDefinition("hideUI")?.params.find((paramSpec) => paramSpec.name === "allowToggle")?.docs).toMatchObject({
+      runtimeSupport: "declared-not-consumed",
+      runtimeNoteZh: expect.stringContaining("暂未消费")
+    });
+    expect(getNaniCommandDefinition("bgm")?.params.find((paramSpec) => paramSpec.name === "volume")?.docs).toMatchObject({
+      runtimeSupport: "consumed",
+      recommendedRange: { min: 0, max: 1 }
+    });
   });
 
   it("marks command execution boundaries for Pixi waits and declared-only Naninovel tracks", () => {
@@ -1076,21 +1103,21 @@ describe("contracts", () => {
   });
 
   it("marks migrated V-Ronpa compatibility params without pretending they are official Naninovel params", () => {
-    expect(getNaniCommandDefinition("back")?.params).toContainEqual({
+    expect(getNaniCommandDefinition("back")?.params).toContainEqual(expect.objectContaining({
       name: "effect",
       type: "string",
       source: "v-ronpa"
-    });
-    expect(getNaniCommandDefinition("shake")?.params).toContainEqual({
+    }));
+    expect(getNaniCommandDefinition("shake")?.params).toContainEqual(expect.objectContaining({
       name: "intensity",
       type: "decimal",
       source: "v-ronpa"
-    });
-    expect(getNaniCommandDefinition("shake")?.params).toContainEqual({
+    }));
+    expect(getNaniCommandDefinition("shake")?.params).toContainEqual(expect.objectContaining({
       name: "duration",
       type: "decimal",
       source: "v-ronpa"
-    });
+    }));
     expect(getNaniCommandDefinition("inback")?.params.map((param) => param.name)).toEqual([
       "appearanceAndTransition",
       "appearance",

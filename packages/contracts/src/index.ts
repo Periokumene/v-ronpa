@@ -210,6 +210,31 @@ export const NaniCommandExecutionSchema = z.enum([
 ]);
 export type NaniCommandExecution = z.infer<typeof NaniCommandExecutionSchema>;
 
+export interface NaniCommandRecommendedRange {
+  min?: number;
+  max?: number;
+  unit?: string;
+  noteZh?: string;
+}
+
+export type NaniCommandParamRuntimeSupport = "consumed" | "declared-not-consumed";
+
+export interface NaniCommandParamDocs {
+  zh: string;
+  defaultValue?: string | number | boolean;
+  recommendedRange?: NaniCommandRecommendedRange;
+  allowedValues?: string[];
+  examples?: string[];
+  runtimeSupport?: NaniCommandParamRuntimeSupport;
+  runtimeNoteZh?: string;
+}
+
+export interface NaniCommandDocs {
+  zh: string;
+  examples?: string[];
+  runtimeNoteZh?: string;
+}
+
 export interface NaniCommandParamSpec {
   name: string;
   type: string;
@@ -218,6 +243,7 @@ export interface NaniCommandParamSpec {
   repeatable?: boolean;
   aliases?: string[];
   description?: string;
+  docs?: NaniCommandParamDocs;
 }
 
 export interface NaniCommandDefinition {
@@ -230,7 +256,45 @@ export interface NaniCommandDefinition {
   supportsChildren: boolean;
   params: NaniCommandParamSpec[];
   aliases?: string[];
+  docs?: NaniCommandDocs;
 }
+
+export const NaniCommandRecommendedRangeSchema = z
+  .object({
+    min: z.number().optional(),
+    max: z.number().optional(),
+    unit: z.string().min(1).optional(),
+    noteZh: z.string().min(1).optional()
+  })
+  .strict();
+export type NaniCommandRecommendedRangeSpec = z.infer<typeof NaniCommandRecommendedRangeSchema>;
+
+export const NaniCommandParamRuntimeSupportSchema = z.enum(["consumed", "declared-not-consumed"]);
+export type NaniCommandParamRuntimeSupportSpec = z.infer<typeof NaniCommandParamRuntimeSupportSchema>;
+
+const NaniCommandDocScalarSchema = z.union([z.string(), z.number(), z.boolean()]);
+
+export const NaniCommandParamDocsSchema = z
+  .object({
+    zh: z.string().min(1),
+    defaultValue: NaniCommandDocScalarSchema.optional(),
+    recommendedRange: NaniCommandRecommendedRangeSchema.optional(),
+    allowedValues: z.array(z.string().min(1)).optional(),
+    examples: z.array(z.string().min(1)).optional(),
+    runtimeSupport: NaniCommandParamRuntimeSupportSchema.optional(),
+    runtimeNoteZh: z.string().min(1).optional()
+  })
+  .strict();
+export type NaniCommandParamDocsSpec = z.infer<typeof NaniCommandParamDocsSchema>;
+
+export const NaniCommandDocsSchema = z
+  .object({
+    zh: z.string().min(1),
+    examples: z.array(z.string().min(1)).optional(),
+    runtimeNoteZh: z.string().min(1).optional()
+  })
+  .strict();
+export type NaniCommandDocsSpec = z.infer<typeof NaniCommandDocsSchema>;
 
 export const NaniCommandParamSpecSchema = z
   .object({
@@ -240,7 +304,8 @@ export const NaniCommandParamSpecSchema = z
     required: z.boolean().optional(),
     repeatable: z.boolean().optional(),
     aliases: z.array(z.string().min(1)).optional(),
-    description: z.string().optional()
+    description: z.string().optional(),
+    docs: NaniCommandParamDocsSchema.optional()
   })
   .strict();
 
@@ -254,7 +319,8 @@ export const NaniCommandDefinitionSchema = z
     execution: NaniCommandExecutionSchema,
     supportsChildren: z.boolean(),
     params: z.array(NaniCommandParamSpecSchema),
-    aliases: z.array(z.string().min(1).regex(/^[a-z0-9:_./<>-]+$/)).optional()
+    aliases: z.array(z.string().min(1).regex(/^[a-z0-9:_./<>-]+$/)).optional(),
+    docs: NaniCommandDocsSchema.optional()
   })
   .strict();
 
@@ -502,7 +568,7 @@ const choiceParams = [
   param("time", "decimal")
 ];
 
-export const naniCommandCatalog: NaniCommandDefinition[] = [
+const baseNaniCommandCatalog: NaniCommandDefinition[] = [
   official("addChoice", "choice", choiceParams),
   official("append", "text", [param("text", "string"), param("printer", "string"), param("author", "string")]),
   official("arrange", "actor", [
@@ -781,6 +847,276 @@ export const naniCommandCatalog: NaniCommandDefinition[] = [
     "trial-keyword"
   ])
 ];
+
+const implementedCommandDocs: Record<string, NaniCommandDocs> = {
+  append: { zh: "向当前文本框追加一段文本，不重置当前说话人或文本框状态。", examples: ['@append "继续显示的文本"'] },
+  arrange: { zh: "按命名位置排列角色立绘，常用于快速把多个角色放到舞台预设位置。", examples: ["@arrange Felix.Left,Mira.Right wait!"] },
+  back: { zh: "切换主背景或背景演员，并可附带转场、位置、缩放和等待控制。", examples: ["@back bg:classroom effect:fade time:0.5 wait!"] },
+  bgm: { zh: "播放背景音乐，可设置音量、循环、淡入淡出和分组。", examples: ["@bgm bgm:main volume:0.6 fade:1 group:music"] },
+  blur: { zh: "对舞台或演员应用模糊效果，通常用于焦点转移或回忆演出。", examples: ["@blur stage power:0.4 time:0.3 wait!"] },
+  bokeh: { zh: "应用景深虚化效果，可调焦点、距离和强度。", examples: ["@bokeh focus:Felix power:0.6 time:0.4"] },
+  char: { zh: "显示或更新角色立绘外观，并可设置位置、表情、转场和动画时长。", examples: ["@char Felix.Happy pos:0.5,0 wait!"] },
+  choice: { zh: "添加一个剧情选项，可指定跳转标签、启用状态和选择后的变量表达式。", examples: ['@choice "调查门口" goto:#Door id:door'] },
+  clearbacklog: { zh: "清空当前剧情回看记录。", examples: ["@clearBacklog"] },
+  clearchoice: { zh: "清除当前待选项；提供 id 时只清除对应选项。", examples: ["@clearChoice id:door"] },
+  end: { zh: "结束当前脚本执行。", examples: ["@end"] },
+  flash: { zh: "播放一次屏幕闪光效果，可指定颜色、持续时间和是否等待。", examples: ["@flash color:#ffffff duration:160 wait!"] },
+  focus: { zh: "切换舞台焦点目标，供表现层做相机或滤镜聚焦。", examples: ["@focus target:Felix duration:500"] },
+  gameplay: { zh: "发出玩法状态事件，例如物品、证据、角色状态或亲密度变化。", examples: ["@gameplay grant-item item:keycard quantity:1"] },
+  glitch: { zh: "播放一次故障干扰效果，适合快速冲击演出。", examples: ["@glitch power:0.8 time:0.25"] },
+  glitchfilter: { zh: "设置持久故障滤镜参数，适合一段场景内持续干扰。", examples: ["@glitchFilter power:0.35 speed:1.2"] },
+  goto: { zh: "跳转到当前脚本内的本地标签。跨脚本跳转当前 runtime 尚未实现。", examples: ["@goto #Next"] },
+  hidechars: { zh: "隐藏当前角色立绘，并可设置动画时间和等待。", examples: ["@hideChars time:0.3 wait!"] },
+  hideui: { zh: "隐藏 runtime UI 组；未指定目标时隐藏所有 v1 UI 组。", examples: ["@hideUI commandBar time:0.2"] },
+  inback: { zh: "切换内层背景，用于对话框、框景或局部背景演出。", examples: ["@inback bg:room effect:fade time:0.2"] },
+  input: { zh: "请求玩家输入，并把结果写入剧情变量。", examples: ['@input playerName type:string summary:"你的名字？"'] },
+  movie: { zh: "播放视频资源；block 为 true 时剧情等待视频完成或跳过。", examples: ["@movie video:intro block:true"] },
+  print: { zh: "显示一行文本，可指定说话人、文本框和文本显示速度。", examples: ['@print "你好" author:Felix speed:0.8'] },
+  rain: { zh: "设置雨天粒子效果参数。", examples: ["@rain power:0.5 wind:-0.2 hue:215 tint:0.55"] },
+  resettext: { zh: "重置文本框当前文本，保留默认文本框可见状态。", examples: ["@resetText"] },
+  set: { zh: "设置剧情变量；支持动态变量名或表达式形式。", examples: ["@set route:left"] },
+  sfx: { zh: "播放音效，可设置音量、循环、淡入淡出和分组。", examples: ["@sfx sfx:door volume:0.8"] },
+  sfxfast: { zh: "播放快速音效，适合高频反馈；当前 runtime 只消费路径、音量和分组。", examples: ["@sfxFast sfx:click volume:0.8"] },
+  shake: { zh: "对舞台或目标播放震动效果，可设置次数、强度、方向和等待。", examples: ["@shake target:stage power:0.5 count:3 duration:150 wait!"] },
+  showprinter: { zh: "显示文本框或切换到指定文本打印器。", examples: ["@showPrinter default time:0.2"] },
+  showui: { zh: "显示 runtime UI 组；未指定目标时显示所有 v1 UI 组。", examples: ["@showUI commandBar visible:true"] },
+  slide: { zh: "让角色从一个位置滑动到另一个位置，并可控制可见性、缓动和等待。", examples: ["@slide Felix.Happy from:-0.5,0 to:0.5,0 wait!"] },
+  snow: { zh: "设置雪天粒子效果参数。", examples: ["@snow power:0.8 density:0.7 flakeScale:1.1"] },
+  stopbgm: { zh: "停止背景音乐，可指定路径、分组和淡出时间。", examples: ["@stopBgm group:music fade:1"] },
+  stopsfx: { zh: "停止循环音效，可指定路径、分组和淡出时间。", examples: ["@stopSfx group:rain fade:0.5"] },
+  sun: { zh: "设置阳光粒子或光效参数。", examples: ["@sun power:0.6 position:0.5,0"] },
+  toast: { zh: "显示短暂 UI 提示，可指定文本、外观和显示时长。", examples: ['@toast "已保存" time:1.2'] },
+  trialkeyword: { zh: "向 Trial 表现层展示或登记论点关键词。", examples: ['@trialKeyword id:kw:door text:"门锁" speaker:Felix'] }
+};
+
+const implementedCommandConsumedParams: Record<string, string[]> = {
+  append: ["text", "speaker", "author", "printer"],
+  arrange: ["characterPositions", "look", "time", "wait"],
+  back: ["appearanceAndTransition", "id", "appearance", "pose", "via", "params", "dissolve", "pos", "position", "rotation", "scale", "tint", "easing", "time", "lazy", "wait", "visible", "effect"],
+  bgm: ["bgmPath", "volume", "loop", "fade", "time", "group"],
+  blur: ["actorId", "power", "time", "wait"],
+  bokeh: ["focus", "dist", "power", "time", "wait"],
+  char: ["idAndAppearance", "id", "pose", "via", "params", "dissolve", "look", "avatar", "pos", "position", "rotation", "scale", "tint", "easing", "time", "lazy", "wait", "visible"],
+  choice: ["goto", "id", "enabled", "set"],
+  clearbacklog: [],
+  clearchoice: ["id"],
+  end: [],
+  flash: ["color", "duration", "wait"],
+  focus: ["target", "duration"],
+  gameplay: ["type", "quantity", "item", "itemId", "id", "evidence", "evidenceId", "character", "characterId", "status", "skill", "skillId", "delta", "affinityDelta"],
+  glitch: ["time", "power", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"],
+  glitchfilter: ["time", "easing", "power", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"],
+  goto: ["path"],
+  hidechars: ["time", "lazy", "wait"],
+  hideui: ["uINames", "target", "time"],
+  inback: ["appearanceAndTransition", "appearance", "via", "effect", "visible", "easing", "time", "wait"],
+  input: ["variableName", "type", "summary", "value"],
+  movie: ["moviePath", "time", "block"],
+  print: ["text", "speaker", "author", "as", "printer", "speed", "reset"],
+  rain: ["power", "wind", "hue", "tint", "time", "easing", "wait"],
+  resettext: ["printerId"],
+  set: ["expression"],
+  sfx: ["sfxPath", "volume", "loop", "fade", "time", "group"],
+  sfxfast: ["sfxPath", "volume", "group"],
+  shake: ["actorId", "target", "count", "loop", "time", "deltaTime", "power", "deltaPower", "hor", "ver", "wait", "intensity", "duration"],
+  showprinter: ["printerId", "time"],
+  showui: ["uINames", "target", "visible", "time"],
+  slide: ["idAndAppearance", "from", "to", "visible", "easing", "time", "lazy", "wait"],
+  snow: ["power", "time", "xSpeed", "ySpeed", "density", "flakeScale", "sway", "fog", "noise", "seed", "pos", "position", "rotation", "scale", "wait"],
+  stopbgm: ["bgmPath", "fade", "group"],
+  stopsfx: ["sfxPath", "fade", "group"],
+  sun: ["power", "time", "pos", "position", "rotation", "scale", "wait"],
+  toast: ["text", "appearance", "time"],
+  trialkeyword: ["id", "text", "speaker", "evidence"]
+};
+
+const commonParamDocs: Record<string, NaniCommandParamDocs> = {
+  actorId: { zh: "目标演员或舞台对象 ID。", examples: ["Felix", "stage"] },
+  additive: { zh: "是否以叠加方式播放或混合。", allowedValues: ["true", "false"] },
+  affinityDelta: { zh: "角色亲密度变化量，正数增加，负数减少。", defaultValue: 0 },
+  allowToggle: { zh: "是否允许玩家切换对应 UI。", allowedValues: ["true", "false"] },
+  appearance: { zh: "外观或背景资源 ID。", examples: ["bg:classroom", "Happy"] },
+  appearanceAndTransition: { zh: "主参数形式的外观和可选转场，通常写作资源 ID 或 `资源.转场`。" },
+  append: { zh: "是否追加到当前文本而不是重置文本。", allowedValues: ["true", "false"] },
+  as: { zh: "文本说话人的别名参数，等价于 author/speaker 的运行含义。" },
+  author: { zh: "文本说话人 ID。", examples: ["Felix", "Narrator"] },
+  avatar: { zh: "角色头像或头像外观 ID。" },
+  bgmPath: { zh: "背景音乐资源 ID 或路径。", examples: ["bgm:main"] },
+  block: { zh: "是否阻塞剧情直到媒体播放完成。", defaultValue: false, allowedValues: ["true", "false"] },
+  blockJump: { zh: "故障块跳动强度。", recommendedRange: { min: 0, max: 1 } },
+  burstJump: { zh: "故障爆发跳动强度。", recommendedRange: { min: 0, max: 1 } },
+  button: { zh: "选项按钮外观或样式 ID。" },
+  character: { zh: "角色 ID。", examples: ["Felix"] },
+  characterId: { zh: "角色 ID。", examples: ["Felix"] },
+  characterPositions: { zh: "角色到位置的命名列表，通常为 `角色.位置` 或 `角色:位置` 组合。" },
+  choiceSummary: { zh: "选项显示文本。", examples: ["调查门口"] },
+  color: { zh: "颜色值，建议使用十六进制颜色。", examples: ["#ffffff", "#ff5577"] },
+  colorNoise: { zh: "故障色彩噪声强度。", recommendedRange: { min: 0, max: 1 } },
+  count: { zh: "重复次数或震动次数。", recommendedRange: { min: 1 } },
+  default: { zh: "是否作为默认项。", allowedValues: ["true", "false"] },
+  delta: { zh: "数值变化量，正数增加，负数减少。", defaultValue: 0 },
+  deltaPower: { zh: "震动强度每次变化量。" },
+  deltaTime: { zh: "震动子步骤间隔。", recommendedRange: { min: 0, unit: "seconds" } },
+  density: { zh: "雪花密度。", recommendedRange: { min: 0, max: 1 } },
+  dissolve: { zh: "溶解或淡化转场名称。" },
+  dist: { zh: "景深距离参数。", recommendedRange: { min: 0 } },
+  duration: { zh: "持续时间。不同命令可能使用毫秒或 runtime 专用单位。", recommendedRange: { min: 0 } },
+  easing: { zh: "缓动函数名称。", examples: ["linear", "easeInOut"] },
+  effect: { zh: "转场或表现效果名称。", examples: ["fade"] },
+  enabled: { zh: "选项是否可选择。", defaultValue: true, allowedValues: ["true", "false"] },
+  evidence: { zh: "证据 ID。", examples: ["evidence:keycard"] },
+  evidenceId: { zh: "证据 ID。", examples: ["evidence:keycard"] },
+  expression: { zh: "变量赋值或条件表达式。" },
+  fade: { zh: "淡入或淡出时间。", recommendedRange: { min: 0, unit: "seconds" } },
+  fadeTime: { zh: "文本淡入淡出时间。", recommendedRange: { min: 0, unit: "seconds" } },
+  flakeScale: { zh: "雪花粒子缩放。", recommendedRange: { min: 0 } },
+  focus: { zh: "聚焦目标或景深焦点。", examples: ["Felix", "stage"] },
+  fog: { zh: "雪景雾化强度。", recommendedRange: { min: 0, max: 1 } },
+  from: { zh: "动画起始位置，通常是二维坐标列表。", examples: ["-0.5,0"] },
+  gosub: { zh: "子流程目标；当前 story runtime 不消费此参数。" },
+  goto: { zh: "选择后跳转的本地标签。", examples: ["#Door"] },
+  group: { zh: "媒体分组名，用于同时控制一组音频。", examples: ["music", "rain"] },
+  handler: { zh: "选项处理器 ID。" },
+  handlerId: { zh: "选项处理器 ID。" },
+  hide: { zh: "是否隐藏对应元素。", allowedValues: ["true", "false"] },
+  hold: { zh: "跳转时是否保留指定状态。", allowedValues: ["true", "false"] },
+  hor: { zh: "是否启用水平震动。", allowedValues: ["true", "false"] },
+  hue: { zh: "色相角度。", recommendedRange: { min: 0, max: 360, unit: "deg" } },
+  id: { zh: "命令目标 ID、选项 ID 或状态事件 ID，语义取决于命令。", examples: ["door", "kw:door"] },
+  idAndAppearance: { zh: "角色 ID 与外观表达式，通常写作 `角色.外观`。", examples: ["Felix.Happy"] },
+  intensity: { zh: "效果强度。", recommendedRange: { min: 0, max: 1 } },
+  intro: { zh: "BGM 前奏资源；当前 runtime 暂不消费此参数。" },
+  item: { zh: "物品 ID。", examples: ["item:keycard"] },
+  itemId: { zh: "物品 ID。", examples: ["item:keycard"] },
+  lazy: { zh: "是否允许表现层延迟或非阻塞处理。", defaultValue: false, allowedValues: ["true", "false"] },
+  lock: { zh: "选项锁定条件或锁定 ID。" },
+  look: { zh: "是否启用朝向/注视，或指定注视外观。", allowedValues: ["true", "false"] },
+  loop: { zh: "是否循环播放。", allowedValues: ["true", "false"] },
+  moviePath: { zh: "视频资源 ID 或路径。", examples: ["video:intro"] },
+  noise: { zh: "粒子或滤镜噪声强度。", recommendedRange: { min: 0, max: 1 } },
+  nostop: { zh: "是否不停止等待输入流程；当前 runtime 暂不消费此参数。", allowedValues: ["true", "false"] },
+  params: { zh: "转场或效果的数值参数列表。" },
+  path: { zh: "跳转路径或本地标签。当前 runtime 的 goto 只支持本地标签。", examples: ["#Next"] },
+  pixelScatter: { zh: "故障像素散布强度。", recommendedRange: { min: 0, max: 1 } },
+  pos: { zh: "位置参数，通常是二维坐标或预设位置。", examples: ["0.5,0"] },
+  pose: { zh: "角色姿态或表情姿态 ID。" },
+  position: { zh: "位置向量。", examples: ["0.5,0", "0.5,0,0"] },
+  power: { zh: "效果强度。", recommendedRange: { min: 0, max: 1 } },
+  printer: { zh: "文本打印器 ID。", examples: ["default"] },
+  printerId: { zh: "文本打印器 ID。", defaultValue: "default", examples: ["default"] },
+  quantity: { zh: "物品数量。", defaultValue: 1, recommendedRange: { min: 1 } },
+  release: { zh: "跳转时是否释放指定状态。", allowedValues: ["true", "false"] },
+  reset: { zh: "是否重置文本或状态。", allowedValues: ["true", "false"] },
+  restart: { zh: "是否重启音效播放。", allowedValues: ["true", "false"] },
+  rotation: { zh: "旋转向量或角度列表。" },
+  scale: { zh: "缩放向量或倍率。", recommendedRange: { min: 0 } },
+  seed: { zh: "随机种子，用于稳定粒子或滤镜结果。" },
+  set: { zh: "选择后执行的变量赋值表达式。", examples: ["route:left"] },
+  sfxPath: { zh: "音效资源 ID 或路径。", examples: ["sfx:door"] },
+  show: { zh: "是否显示对应元素。", allowedValues: ["true", "false"] },
+  skill: { zh: "技能 ID。", examples: ["skill:logic"] },
+  skillId: { zh: "技能 ID。", examples: ["skill:logic"] },
+  speaker: { zh: "说话人或关键词所属角色 ID。", examples: ["Felix"] },
+  speed: { zh: "文本显示速度倍率。", recommendedRange: { min: 0, max: 2, noteZh: "0 表示立即显示；1 附近是常规速度。" }, examples: ["0.8"] },
+  status: { zh: "角色状态 ID。", examples: ["status:alert"] },
+  summary: { zh: "输入提示摘要或 UI 文案。", examples: ["你的名字？"] },
+  sway: { zh: "雪花横向摆动强度。", recommendedRange: { min: 0, max: 1 } },
+  target: { zh: "目标 UI、舞台或演员 ID。", examples: ["dialog", "commandBar", "stage"] },
+  text: { zh: "显示文本内容。" },
+  time: { zh: "命令动画、媒体或 UI 过渡时间。", recommendedRange: { min: 0, unit: "seconds" } },
+  tint: { zh: "着色强度或颜色值，语义取决于命令。", recommendedRange: { min: 0, max: 2 } },
+  to: { zh: "动画目标位置，通常是二维坐标列表。", examples: ["0.5,0"] },
+  type: { zh: "输入值类型或玩法事件类型。", examples: ["string", "grant-item"] },
+  uINames: { zh: "UI 组名称列表。", allowedValues: ["dialog", "commandBar", "toastLayer"] },
+  value: { zh: "默认输入值或变量值。" },
+  variableName: { zh: "要写入的剧情变量名。", examples: ["playerName"] },
+  ver: { zh: "是否启用垂直震动。", allowedValues: ["true", "false"] },
+  via: { zh: "转场方式。", examples: ["fade"] },
+  visible: { zh: "是否可见。", allowedValues: ["true", "false"] },
+  volume: { zh: "播放音量倍率。", recommendedRange: { min: 0, max: 1 }, examples: ["0.6"] },
+  wait: { zh: "是否等待表现层或播放流程完成。", defaultValue: false, allowedValues: ["true", "false"] },
+  waitInput: { zh: "是否等待玩家输入继续。", allowedValues: ["true", "false"] },
+  wind: { zh: "雨或粒子的横向风力。", recommendedRange: { min: -1, max: 1 } },
+  xSpeed: { zh: "粒子横向速度。" },
+  ySpeed: { zh: "粒子纵向速度。" }
+};
+
+const commandParamDocOverrides: Record<string, Record<string, Partial<NaniCommandParamDocs>>> = {
+  flash: {
+    duration: { defaultValue: 160, recommendedRange: { min: 0, unit: "ms" } },
+    wait: { defaultValue: false }
+  },
+  focus: {
+    duration: { defaultValue: 500, recommendedRange: { min: 0, unit: "ms" } },
+    target: { defaultValue: "stage" }
+  },
+  input: {
+    type: { defaultValue: "string", allowedValues: ["string", "number", "boolean"] }
+  },
+  print: {
+    reset: { defaultValue: false },
+    speed: { recommendedRange: { min: 0, max: 2, noteZh: "0 表示立即显示；建议 0.5 到 1.5 之间微调。" } }
+  },
+  showui: {
+    visible: { defaultValue: true },
+    uINames: { allowedValues: ["dialog", "commandBar", "toastLayer"] },
+    target: { allowedValues: ["dialog", "commandBar", "toastLayer"] }
+  },
+  hideui: {
+    uINames: { allowedValues: ["dialog", "commandBar", "toastLayer"] },
+    target: { allowedValues: ["dialog", "commandBar", "toastLayer"] }
+  },
+  wait: {
+    waitMode: { zh: "等待模式。`i` 表示等待确认，数字表示秒数，`i5` 表示等待 5 秒或确认。", defaultValue: "i", examples: ["i", "1.5", "i5"] }
+  }
+};
+
+function applyNaniCommandDocs(catalog: NaniCommandDefinition[]): NaniCommandDefinition[] {
+  return catalog.map((definition) => {
+    if (definition.status !== "implemented") return definition;
+    const docs = implementedCommandDocs[definition.id] ?? { zh: `${definition.canonicalName} 命令。` };
+    return {
+      ...definition,
+      docs,
+      params: definition.params.map((paramSpec) => ({
+        ...paramSpec,
+        docs: docsForCommandParam(definition, paramSpec)
+      }))
+    };
+  });
+}
+
+function docsForCommandParam(
+  definition: NaniCommandDefinition,
+  paramSpec: NaniCommandParamSpec
+): NaniCommandParamDocs {
+  const base = commonParamDocs[paramSpec.name] ?? fallbackParamDocs(paramSpec);
+  const override = commandParamDocOverrides[definition.id]?.[paramSpec.name] ?? {};
+  const runtimeSupport = runtimeSupportForCommandParam(definition.id, paramSpec.name);
+  const runtimeNote =
+    runtimeSupport === "declared-not-consumed"
+      ? "该参数已在命令 catalog 中声明，但当前 runtime compiler 暂未消费；写入后可能没有运行效果。"
+      : undefined;
+  return {
+    ...base,
+    ...override,
+    runtimeSupport,
+    ...(runtimeNote ? { runtimeNoteZh: override.runtimeNoteZh ?? base.runtimeNoteZh ?? runtimeNote } : {})
+  };
+}
+
+function fallbackParamDocs(paramSpec: NaniCommandParamSpec): NaniCommandParamDocs {
+  return { zh: `${paramSpec.name} 参数，类型为 ${paramSpec.type}。` };
+}
+
+function runtimeSupportForCommandParam(commandId: string, paramName: string): NaniCommandParamRuntimeSupport {
+  const consumed = implementedCommandConsumedParams[commandId] ?? [];
+  return consumed.some((candidate) => normalizeNaniCommandId(candidate) === normalizeNaniCommandId(paramName))
+    ? "consumed"
+    : "declared-not-consumed";
+}
+
+export const naniCommandCatalog: NaniCommandDefinition[] = applyNaniCommandDocs(baseNaniCommandCatalog);
 
 export const commandCatalog = naniCommandCatalog;
 
