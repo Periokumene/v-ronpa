@@ -7,12 +7,17 @@
 
 @bgm bgm:game-a-main group:music volume:0.35 fade:0.1
 @sfx sfx:game-a-chime volume:0.5
-@rain power:1 wind:-1 hue:1 tint:0.8
+
 
 @hideUI dialog
 @showUI dialog time:0.5 wait!
 
 Narrator: 我很喜欢下雨 
+@rain power:0.5 wind:-1 hue:1 tint:0.8 time:5
+Narrator: 无论小雨
+@rain power:1 time:10
+Narrator: 还是那如山林倾伏的暴雨
+@rain power:0 time:5
 Narrator: 那种感觉就像是被 如瀑的暴雨隔绝在另一个世界。雨的那边是真实的世界，而这边是我一个人的孤岛
 
 

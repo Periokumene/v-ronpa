@@ -22,7 +22,7 @@ import {
 
 export type PixiStageRenderHint =
   | { type: "flash"; color: string; durationMs: number; wait?: boolean }
-  | { type: "screen-filter-remove"; kind: "glitch"; durationMs: number; easing?: string; wait?: boolean }
+  | { type: "screen-filter-remove"; kind: "bokeh" | "glitch"; durationMs: number; easing?: string; wait?: boolean }
   | { type: "weather-remove"; kind: PixiWeatherKind; durationMs: number; easing?: string; wait?: boolean }
   | {
       type: "shake";
@@ -468,7 +468,24 @@ function reduceBokeh(snapshot: PixiStageSnapshot, command: RuntimeCommand): Pixi
     const hadBokeh = Boolean(snapshot.screenFilters.bokeh);
     const { bokeh: _bokeh, ...screenFilters } = snapshot.screenFilters;
     const reduction = changedSnapshot({ ...snapshot, screenFilters });
-    return hadBokeh ? withWaitTasks(command, reduction, "screen-filter-transition", ["bokeh"]) : reduction;
+    const durationMs = durationMsParam(command, 0);
+    if (!hadBokeh) return reduction;
+    const easing = stringParam(command, "easing");
+    return {
+      ...withWaitTasks(command, reduction, "screen-filter-transition", ["bokeh"]),
+      hints:
+        durationMs > 0
+          ? [
+              {
+                type: "screen-filter-remove",
+                kind: "bokeh",
+                durationMs,
+                ...(easing ? { easing } : {}),
+                wait: booleanParam(command, "wait", false)
+              }
+            ]
+          : []
+    };
   }
   return withWaitTasks(command, changedSnapshot({
     ...snapshot,

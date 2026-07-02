@@ -98,6 +98,12 @@ transitions, transient effects, and screen/weather fades may run after
 `app-vn-runtime` has synchronously committed the latest StoryEngine step. These
 active visual lifecycles are tracked as Pixi-local `PresentationTask` snapshots
 and can be reported to app debug UI through `onTasksChanged`.
+For stateful Pixi effects such as weather, persistent screen filters, bokeh, and
+blur, the saved `PixiStageSnapshot` remains the terminal target state while
+`pixi-presenter` holds transient live parameter values. Existing `time` values
+drive those live params from their current rendered values to the target through
+the Pixi ticker and `TweenSystem`; no browser-global RAF clock or save data is
+introduced for Pixi effect interpolation.
 
 For explicit Pixi `wait!`, StoryEngine stops with `presentationWait` and
 `app-vn-dispatch` returns Pixi wait descriptors as transaction `pixiWaitTasks`.
@@ -130,9 +136,11 @@ Weather snapshots are per-kind state records rather than a shared particle bag.
 `weather.rain = { kind: "rain", commandParams, transition }`, where
 `commandParams` contains only `power`, `wind`, `hue`, and `tint`. Pixi resolves
 those public params through hardcoded rain presets into internal `rainSettings`
-before updating shader uniforms. Direct `rainSettings` coercion is limited to
-Pixi helper/tests and must not become active stage state, script syntax, save
-data, or app UI without a separate contract change.
+before updating shader uniforms. During timed transitions, Pixi derives
+intermediate `rainSettings` from transient live command params; direct
+`rainSettings` coercion is still limited to Pixi helper/tests and must not
+become active stage state, script syntax, save data, or app UI without a
+separate contract change.
 
 `trial-keyword` is a visual anchor for overlays and subtitles. It may carry
 debug metadata, but it is not the rule source for which evidence breaks which

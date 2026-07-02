@@ -576,6 +576,18 @@ describe("pixi presenter port", () => {
     expect(rainOff.hints).toEqual([{ type: "weather-remove", kind: "rain", durationMs: 300, wait: true }]);
     expect(rainOff.waitTasks).toEqual([{ kind: "weather-transition", target: "rain", revision: rainOff.snapshot.revision }]);
 
+    const bokeh = reducePixiRuntimeCommand(
+      withActor.snapshot,
+      runtimeCommand("bokeh", "effect", { power: 0.5, durationMs: 300, wait: true })
+    );
+    const bokehOff = reducePixiRuntimeCommand(
+      bokeh.snapshot,
+      runtimeCommand("bokeh", "effect", { power: 0, durationMs: 180, wait: true })
+    );
+    expect(bokehOff.snapshot.screenFilters).not.toHaveProperty("bokeh");
+    expect(bokehOff.hints).toEqual([{ type: "screen-filter-remove", kind: "bokeh", durationMs: 180, wait: true }]);
+    expect(bokehOff.waitTasks).toEqual([{ kind: "screen-filter-transition", target: "bokeh", revision: bokehOff.snapshot.revision }]);
+
     const inactiveWeatherOff = reducePixiRuntimeCommand(
       withActor.snapshot,
       runtimeCommand("snow", "effect", { power: 0, durationMs: 300, wait: true })

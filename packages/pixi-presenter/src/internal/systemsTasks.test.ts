@@ -513,6 +513,59 @@ describe("pixi presentation task system integration", () => {
     expect(firstAfter?.y).toBeLessThanOrEqual(720);
   });
 
+  it("interpolates bokeh blur and overlay power without repopulating during tween", () => {
+    const { filters, root, screenOverlays, tweens } = createSystems();
+    screenOverlays.reconcile(stageWithBokeh(0.2, 1), false);
+    filters.applyScreenFilters(stageWithBokeh(0.2, 1), false);
+    const layer = findDescendant(root, "screen-filter-overlays", Container);
+    expect(layer?.children).toHaveLength(3);
+
+    screenOverlays.reconcile(stageWithBokeh(0.8, 2, 100), true);
+    filters.applyScreenFilters(stageWithBokeh(0.8, 2, 100), true);
+    const firstAfterLayoutSwitch = layer?.children[0];
+
+    expect(layer?.children).toHaveLength(6);
+    expect(bokehFilter(root).strength).toBeCloseTo(1.6);
+
+    tick(tweens, 50);
+
+    expect(layer?.children[0]).toBe(firstAfterLayoutSwitch);
+    expect(layer?.alpha).toBeCloseTo(0.675);
+    expect((layer?.children[0] as Sprite | undefined)?.alpha).toBeCloseTo(0.49);
+    expect(bokehFilter(root).strength).toBeCloseTo(4);
+
+    tick(tweens, 60);
+
+    expect(layer?.children[0]).toBe(firstAfterLayoutSwitch);
+    expect(layer?.alpha).toBeCloseTo(0.81);
+    expect(bokehFilter(root).strength).toBeCloseTo(6.4);
+  });
+
+  it("fades bokeh overlays and root blur to zero before cleanup", () => {
+    const { filters, root, screenOverlays, tweens } = createSystems();
+    screenOverlays.reconcile(stageWithBokeh(0.8, 1), false);
+    filters.applyScreenFilters(stageWithBokeh(0.8, 1), false);
+    const layer = findDescendant(root, "screen-filter-overlays", Container);
+    const removalHints = [{ type: "screen-filter-remove" as const, kind: "bokeh" as const, durationMs: 100, easing: "linear", wait: true }];
+    const empty = { ...createInitialPixiStageSnapshot(), revision: 2 };
+
+    screenOverlays.reconcile(empty, true, removalHints);
+    filters.applyScreenFilters(empty, true, removalHints);
+
+    expect(layer?.children.length).toBeGreaterThan(0);
+    expect(root.filters).not.toBeNull();
+
+    tick(tweens, 50);
+
+    expect(layer?.alpha).toBeCloseTo(0.63);
+    expect(bokehFilter(root).strength).toBeCloseTo(3.2);
+
+    tick(tweens, 60);
+
+    expect(layer?.children).toHaveLength(0);
+    expect(root.filters).toBeNull();
+  });
+
   it("composes persistent and one-shot glitch filters without stale cleanup", () => {
     const { effects, filters: filterSystem, root, tasks, tweens } = createSystems();
     const stage = {
@@ -622,11 +675,71 @@ describe("pixi presentation task system integration", () => {
     expect(root.filters).toHaveLength(1);
     expect(tasks.snapshot()).toMatchObject([{ kind: "screen-filter-transition", target: "glitch", revision: 3, status: "running" }]);
 
-    tick(tweens, 120);
+    tick(tweens, 50);
+
+    expect(persistentUniforms.uPower).toBeCloseTo(0.225);
+    expect(root.filters).toHaveLength(1);
+
+    tick(tweens, 70);
 
     expect(tasks.snapshot()).toEqual([]);
     expect(root.filters).toBeNull();
     expect(root.filterArea).toBeUndefined();
+  });
+
+  it("interpolates persistent glitch filter params and switches seed immediately", () => {
+    const { filters: filterSystem, root, tweens } = createSystems();
+    const initial: PixiStageSnapshot = {
+      ...createInitialPixiStageSnapshot(),
+      revision: 1,
+      screenFilters: {
+        glitch: {
+          power: 0.2,
+          blockJump: 0.2,
+          speed: 0.4,
+          seed: 3,
+          transition: { durationMs: 0, easing: "linear", lazy: false, wait: false }
+        }
+      }
+    };
+    filterSystem.applyScreenFilters(initial, false);
+    const uniforms = ((root.filters as unknown as GlitchTestFilter[])[0]?.resources.glitchUniforms.uniforms);
+    expect(uniforms).toBeDefined();
+    if (!uniforms) throw new Error("expected glitch uniforms");
+
+    filterSystem.applyScreenFilters(
+      {
+        ...createInitialPixiStageSnapshot(),
+        revision: 2,
+        screenFilters: {
+          glitch: {
+            power: 0.8,
+            blockJump: 1.2,
+            speed: 1.4,
+            seed: 9,
+            transition: { durationMs: 100, easing: "linear", lazy: false, wait: true }
+          }
+        }
+      },
+      true
+    );
+
+    expect(uniforms.uSeed).toBe(9);
+    expect(uniforms.uPower).toBeCloseTo(0.2);
+    expect(uniforms.uBlockJump).toBeCloseTo(0.2);
+    expect(uniforms.uSpeed).toBeCloseTo(0.4);
+
+    tick(tweens, 50);
+
+    expect(uniforms.uPower).toBeCloseTo(0.5);
+    expect(uniforms.uBlockJump).toBeCloseTo(0.7);
+    expect(uniforms.uSpeed).toBeCloseTo(0.9);
+
+    tick(tweens, 60);
+
+    expect(uniforms.uPower).toBeCloseTo(0.8);
+    expect(uniforms.uBlockJump).toBeCloseTo(1.2);
+    expect(uniforms.uSpeed).toBeCloseTo(1.4);
   });
 
   it("creates and completes weather transition tasks for power changes", () => {
@@ -656,6 +769,128 @@ describe("pixi presentation task system integration", () => {
     tick(tweens, 120);
 
     expect(tasks.snapshot()).toEqual([]);
+  });
+
+  it("interpolates rain live shader params and alpha over the requested duration", () => {
+    const { root, tasks, tweens, weather } = createSystems();
+    weather.reconcile(stageWithWeather(weatherSnapshot({ power: 1, durationMs: 500 }), 1), true);
+    const rain = findWeatherContainer(root, "rain");
+    expect(rain?.alpha).toBeCloseTo(0);
+    expect((rainUniforms(root).uMidDensity as number[])[0]).toBeCloseTo(0);
+
+    tick(tweens, 250);
+
+    const midDensity = (rainUniforms(root).uMidDensity as number[])[0] ?? 0;
+    expect(rain?.alpha).toBeCloseTo(0.5);
+    expect(midDensity).toBeGreaterThan(0);
+    expect(midDensity).toBeLessThan(2);
+    expect(tasks.snapshot()).toMatchObject([{ kind: "weather-transition", target: "rain", revision: 1, status: "running" }]);
+
+    tick(tweens, 260);
+
+    expect(rain?.alpha).toBeCloseTo(1);
+    expect((rainUniforms(root).uMidDensity as number[])[0]).toBeCloseTo(2);
+    expect(tasks.snapshot()).toEqual([]);
+  });
+
+  it("continues interrupted rain transitions from the current live power", () => {
+    const { root, tweens, weather } = createSystems();
+    weather.reconcile(stageWithWeather(weatherSnapshot({ power: 0.8, durationMs: 1000 }), 1), true);
+    const rain = findWeatherContainer(root, "rain");
+    tick(tweens, 250);
+    expect(rain?.alpha).toBeCloseTo(0.2);
+
+    weather.reconcile(stageWithWeather(weatherSnapshot({ power: 0.4, durationMs: 500 }), 2), true);
+
+    expect(rain?.alpha).toBeCloseTo(0.2);
+    tick(tweens, 250);
+    expect(rain?.alpha).toBeCloseTo(0.3);
+  });
+
+  it("settles an interrupted rain task when the replacement transition is immediate", () => {
+    const { root, tasks, tweens, weather } = createSystems();
+    weather.reconcile(stageWithWeather(weatherSnapshot({ power: 1, durationMs: 1000 }), 1), true);
+    const rain = findWeatherContainer(root, "rain");
+    tick(tweens, 250);
+    expect(rain?.alpha).toBeCloseTo(0.25);
+    expect(tasks.snapshot()).toMatchObject([{ kind: "weather-transition", target: "rain", revision: 1, status: "running" }]);
+
+    weather.reconcile(stageWithWeather(weatherSnapshot({ power: 0.3, durationMs: 0 }), 2), true);
+
+    expect(rain?.alpha).toBeCloseTo(0.3);
+    expect(tasks.snapshot()).toEqual([]);
+  });
+
+  it("fades rain live power to zero before removing the weather record", () => {
+    const { root, tweens, weather } = createSystems();
+    weather.reconcile(stageWithWeather(weatherSnapshot({ power: 0.8, durationMs: 0 }), 1), false);
+    const rain = findWeatherContainer(root, "rain");
+    weather.reconcile(
+      { ...createInitialPixiStageSnapshot(), revision: 2 },
+      true,
+      [{ type: "weather-remove", kind: "rain", durationMs: 100, easing: "linear", wait: true }]
+    );
+
+    expect(rain?.alpha).toBeCloseTo(0.8);
+    tick(tweens, 50);
+
+    expect(rain?.alpha).toBeCloseTo(0.4);
+    expect((rainUniforms(root).uMidDensity as number[])[0]).toBeGreaterThan(0);
+
+    tick(tweens, 60);
+
+    expect(findWeatherContainer(root, "rain")).toBeUndefined();
+  });
+
+  it("interpolates shader snow controls while switching seed immediately", () => {
+    const { root, tweens, weather } = createSystems();
+    weather.reconcile(stageWithWeather(snowWeatherSnapshot({ power: 0.2, density: 0.4, seed: 7, durationMs: 0 }), 1), false);
+    weather.reconcile(stageWithWeather(snowWeatherSnapshot({ power: 0.8, density: 1.4, seed: 23, durationMs: 100 }), 2), true);
+    const uniforms = snowUniforms(root);
+
+    expect(uniforms.uSeed).toBe(23);
+    expect(uniforms.uPower).toBeCloseTo(0.2);
+    expect(uniforms.uDensity).toBeCloseTo(0.4);
+
+    tick(tweens, 50);
+
+    expect(uniforms.uSeed).toBe(23);
+    expect(uniforms.uPower).toBeCloseTo(0.5);
+    expect(uniforms.uDensity).toBeCloseTo(0.9);
+
+    tick(tweens, 60);
+
+    expect(uniforms.uPower).toBeCloseTo(0.8);
+    expect(uniforms.uDensity).toBeCloseTo(1.4);
+  });
+
+  it("interpolates sun power and scale while keeping the filter stable", () => {
+    const { root, tweens, weather } = createSystems();
+    weather.reconcile(stageWithWeather(sunWeatherSnapshot({ power: 0.2, scale: 1, durationMs: 0 }), 1), false);
+    const sun = findWeatherContainer(root, "sun");
+    const particle = sun?.children[0] as Sprite | undefined;
+    const initialFilter = sun?.filters?.[0] as { gain?: number } | undefined;
+
+    expect(sun?.alpha).toBeCloseTo(0.2);
+    expect(particle?.scale.x).toBeCloseTo(2.4);
+    expect(initialFilter?.gain).toBeCloseTo(0.35);
+
+    weather.reconcile(stageWithWeather(sunWeatherSnapshot({ power: 0.8, scale: 1.6, durationMs: 100 }), 2), true);
+    tick(tweens, 50);
+
+    const midFilter = sun?.filters?.[0] as { gain?: number } | undefined;
+    expect(midFilter).toBe(initialFilter);
+    expect(sun?.alpha).toBeCloseTo(0.5);
+    expect(midFilter?.gain).toBeCloseTo(0.5);
+    expect(particle?.scale.x).toBeCloseTo(3.12);
+
+    tick(tweens, 60);
+
+    const targetFilter = sun?.filters?.[0] as { gain?: number } | undefined;
+    expect(targetFilter).toBe(initialFilter);
+    expect(sun?.alpha).toBeCloseTo(0.8);
+    expect(targetFilter?.gain).toBeCloseTo(0.8);
+    expect(particle?.scale.x).toBeCloseTo(3.84);
   });
 
   it("renders rain through the shader renderer instead of legacy tiling sprites", () => {
@@ -764,6 +999,45 @@ describe("pixi presentation task system integration", () => {
     tick(tweens, 120);
 
     expect(tasks.snapshot()).toEqual([]);
+  });
+
+  it("interpolates actor blur filters and removes them after fading to zero", () => {
+    const { actors, root, tweens } = createSystems();
+    const blurredBackground = (durationMs: number, blur?: number): PixiActorSnapshot => {
+      const actor = backgroundActor({ durationMs });
+      return {
+        ...actor,
+        filters: blur === undefined ? {} : { blur },
+        transition: { ...actor.transition, easing: "linear" }
+      };
+    };
+    actors.reconcile(stageWithActor(blurredBackground(0, 0.2), 1), false);
+    const actor = findDescendant(root, "actor:MainBackground", Container);
+    const initialFilter = actor?.filters?.[0];
+
+    actors.reconcile(stageWithActor(blurredBackground(100, 0.8), 2), true);
+    tick(tweens, 50);
+
+    const midFilter = actor?.filters?.[0] as { strength?: number } | undefined;
+    expect(midFilter).toBe(initialFilter);
+    expect(midFilter?.strength).toBeCloseTo(3);
+
+    tick(tweens, 60);
+
+    const targetFilter = actor?.filters?.[0] as { strength?: number } | undefined;
+    expect(targetFilter).toBe(initialFilter);
+    expect(targetFilter?.strength).toBeCloseTo(4.8);
+
+    actors.reconcile(stageWithActor(blurredBackground(100), 3), true);
+    tick(tweens, 50);
+
+    const removingFilter = actor?.filters?.[0] as { strength?: number } | undefined;
+    expect(removingFilter).toBe(initialFilter);
+    expect(removingFilter?.strength).toBeCloseTo(2.4);
+
+    tick(tweens, 60);
+
+    expect(actor?.filters).toBeNull();
   });
 
   it("relayouts transient viewport effects without cancelling active tasks", () => {
@@ -876,14 +1150,14 @@ function stageWithActors(background: PixiActorSnapshot, characters: PixiActorSna
   };
 }
 
-function stageWithBokeh(power: number, revision: number): PixiStageSnapshot {
+function stageWithBokeh(power: number, revision: number, durationMs = 0): PixiStageSnapshot {
   return {
     ...createInitialPixiStageSnapshot(),
     revision,
     screenFilters: {
       bokeh: {
         power,
-        transition: { durationMs: 0, lazy: false, wait: false }
+        transition: { durationMs, easing: "linear", lazy: false, wait: durationMs > 0 }
       }
     }
   };
@@ -963,27 +1237,78 @@ function stageWithWeathers(weather: PixiStageSnapshot["weather"], revision: numb
   };
 }
 
-function weatherSnapshot({ power, durationMs }: { power: number; durationMs: number }): Extract<PixiWeatherSnapshot, { kind: "rain" }> {
+function weatherSnapshot({
+  power,
+  durationMs,
+  wind = -1,
+  hue = 215,
+  tint = 0.55
+}: {
+  power: number;
+  durationMs: number;
+  wind?: number;
+  hue?: number;
+  tint?: number;
+}): Extract<PixiWeatherSnapshot, { kind: "rain" }> {
   return {
     kind: "rain",
-    commandParams: { power, wind: -1, hue: 215, tint: 0.55 },
-    transition: { durationMs, lazy: false, wait: false }
+    commandParams: { power, wind, hue, tint },
+    transition: { durationMs, easing: "linear", lazy: false, wait: durationMs > 0 }
   };
 }
 
-function snowWeatherSnapshot({ power, durationMs }: { power: number; durationMs: number }): Extract<PixiWeatherSnapshot, { kind: "snow" }> {
+function snowWeatherSnapshot({
+  power,
+  durationMs,
+  xSpeed = -0.35,
+  ySpeed = 0.75,
+  density = 1.4,
+  flakeScale = 1.25,
+  sway = 0.85,
+  fog = 0.3,
+  noise = 0.04,
+  seed = 23
+}: {
+  power: number;
+  durationMs: number;
+  xSpeed?: number;
+  ySpeed?: number;
+  density?: number;
+  flakeScale?: number;
+  sway?: number;
+  fog?: number;
+  noise?: number;
+  seed?: number;
+}): Extract<PixiWeatherSnapshot, { kind: "snow" }> {
   return {
     kind: "snow",
     power,
-    xSpeed: -0.35,
-    ySpeed: 0.75,
-    density: 1.4,
-    flakeScale: 1.25,
-    sway: 0.85,
-    fog: 0.3,
-    noise: 0.04,
-    seed: 23,
-    transition: { durationMs, lazy: false, wait: false }
+    xSpeed,
+    ySpeed,
+    density,
+    flakeScale,
+    sway,
+    fog,
+    noise,
+    seed,
+    transition: { durationMs, easing: "linear", lazy: false, wait: durationMs > 0 }
+  };
+}
+
+function sunWeatherSnapshot({
+  power,
+  durationMs,
+  scale = 1
+}: {
+  power: number;
+  durationMs: number;
+  scale?: number;
+}): Extract<PixiWeatherSnapshot, { kind: "sun" }> {
+  return {
+    kind: "sun",
+    power,
+    scale: [scale, scale, scale],
+    transition: { durationMs, easing: "linear", lazy: false, wait: durationMs > 0 }
   };
 }
 
@@ -995,6 +1320,45 @@ function findWeatherContainer(root: Container, kind: string): Container | undefi
   }
   return undefined;
 }
+
+function rainUniforms(root: Container): Record<string, number | number[]> {
+  const rain = findWeatherContainer(root, "rain");
+  const shader = rain?.children.find((child): child is Container => child instanceof Container && child.label === "weather:rain:shader");
+  const nearSurface = shader?.children[0] as Sprite | undefined;
+  const filter = nearSurface?.filters?.[0] as { resources: { rainUniforms: { uniforms: Record<string, number | number[]> } } } | undefined;
+  const uniforms = filter?.resources.rainUniforms.uniforms;
+  if (!uniforms) throw new Error("expected rain uniforms");
+  return uniforms;
+}
+
+function snowUniforms(root: Container): SnowTestUniforms {
+  const snow = findWeatherContainer(root, "snow");
+  const surface = snow?.children.find((child) => child.label === "weather:snow:shader-surface");
+  const filter = surface?.filters?.[0] as { resources: { snowUniforms: { uniforms: SnowTestUniforms } } } | undefined;
+  const uniforms = filter?.resources.snowUniforms.uniforms;
+  if (!uniforms) throw new Error("expected snow uniforms");
+  return uniforms;
+}
+
+function bokehFilter(root: Container): { strength: number } {
+  const filter = (root.filters as unknown as Array<{ strength?: number }> | null)?.find((candidate) => typeof candidate.strength === "number");
+  if (!filter || filter.strength === undefined) throw new Error("expected bokeh filter");
+  return filter as { strength: number };
+}
+
+type SnowTestUniforms = {
+  uTime: number;
+  uResolution: Float32Array;
+  uPower: number;
+  uDensity: number;
+  uFallSpeed: number;
+  uWind: number;
+  uFlakeScale: number;
+  uSway: number;
+  uFog: number;
+  uNoise: number;
+  uSeed: number;
+};
 
 type PixiInstanceCtor<T> = new (...args: any[]) => T;
 

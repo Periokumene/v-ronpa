@@ -14,10 +14,16 @@ import {
   type Ticker
 } from "pixi.js";
 import { GodrayFilter, KawaseBlurFilter } from "pixi-filters";
-import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherKind, PixiWeatherSnapshot } from "@v-ronpa/contracts";
+import type {
+  PixiActorSnapshot,
+  PixiRainCommandParams,
+  PixiStageSnapshot,
+  PixiWeatherKind,
+  PixiWeatherSnapshot
+} from "@v-ronpa/contracts";
 import { INNER_BACKGROUND_ID, type PixiStageRenderHint } from "../stageSnapshot";
 import { getBuiltInPixiFxTexture } from "./fxAssets";
-import type { PixiPresentationTaskHandle, PresentationTaskController } from "./presentationTasks";
+import type { PixiPresentationTaskHandle, PixiPresentationTaskKind, PresentationTaskController } from "./presentationTasks";
 import { pixiAssetLoadFailed, resolvePixiAsset, type PixiAssetResolver, type PixiPresenterDiagnostic } from "./assetResolver";
 import { CharacterSystem } from "./characters";
 import { RainShaderRenderer } from "./rain/RainShaderRenderer";
@@ -39,6 +45,7 @@ interface ActorRecord {
   contentGeneration: number;
   layout?: ActorLayoutRecord;
   positionTransition?: ActorPositionTransition;
+  filterLive: NumericLiveState;
 }
 
 type ActorLayoutRecord = BackgroundLayoutRecord | InnerBackgroundLayoutRecord | CharacterLayoutRecord;
@@ -81,8 +88,11 @@ interface WeatherRecord {
   snapshot: PixiWeatherSnapshot;
   container: Container;
   particles: WeatherParticle[];
+  live: NumericLiveState;
+  transition: LiveParamTransition;
   rainShader?: RainShaderRenderer;
   snowShader?: SnowShaderRecord;
+  sunFilter?: SunFilter;
 }
 
 type WeatherParticle = Sprite;
@@ -118,7 +128,29 @@ interface GlitchShaderRecord {
 }
 
 interface PersistentGlitchRecord extends GlitchShaderRecord {
-  handle: TweenHandle | undefined;
+  live: NumericLiveState;
+  transition: LiveParamTransition;
+}
+
+interface PersistentBokehRecord {
+  filter: BokehBlurFilter;
+  live: NumericLiveState;
+  transition: LiveParamTransition;
+}
+
+interface BokehBlurFilter {
+  strength: number;
+  destroy(destroyPrograms?: boolean): void;
+}
+
+interface ActorBlurFilter {
+  strength: number;
+  destroy(destroyPrograms?: boolean): void;
+}
+
+interface SunFilter {
+  gain: number;
+  destroy(destroyPrograms?: boolean): void;
 }
 
 interface GlitchShaderFilter {
@@ -158,6 +190,8 @@ interface ViewportGraphicRecord {
 interface TweenHandle {
   stop(): void;
 }
+
+type NumericLiveState = Record<string, number>;
 
 export class TweenSystem {
   private readonly group = new Group();
@@ -207,6 +241,137 @@ export class TweenSystem {
   clear(): void {
     this.generation += 1;
     this.group.removeAll();
+  }
+}
+
+interface LiveParamTransitionInput {
+  state: NumericLiveState;
+  to: NumericLiveState;
+  animate: boolean;
+  durationMs: number;
+  easing?: string | undefined;
+  forceTask?: boolean | undefined;
+  task?: {
+    kind: PixiPresentationTaskKind;
+    target: string;
+    revision: number;
+  };
+  onUpdate?: () => void;
+  onComplete?: () => void;
+  onSettle?: () => void;
+  onCancel?: () => void;
+}
+
+interface LiveParamTransitionRecord {
+  state: NumericLiveState;
+  to: NumericLiveState;
+  handle: TweenHandle;
+  task?: PixiPresentationTaskHandle;
+  onUpdate?: () => void;
+  onComplete?: () => void;
+  onSettle?: () => void;
+  onCancel?: () => void;
+}
+
+class LiveParamTransition {
+  private active: LiveParamTransitionRecord | undefined;
+
+  constructor(
+    private readonly tweens: TweenSystem,
+    private readonly tasks: PresentationTaskController
+  ) {}
+
+  start(input: LiveParamTransitionInput): void {
+    const targetState = { ...input.to };
+    const hasDelta = hasNumericDelta(input.state, targetState);
+    const shouldAnimate = input.animate && input.durationMs > 0 && (hasDelta || Boolean(input.forceTask));
+    this.detachActive();
+
+    if (!shouldAnimate) {
+      assignLiveState(input.state, targetState);
+      input.onUpdate?.();
+      input.onComplete?.();
+      return;
+    }
+
+    const tweenState = hasDelta ? input.state : { value: 0 };
+    const tweenTarget = hasDelta ? targetState : { value: 1 };
+    const record: LiveParamTransitionRecord = {
+      state: input.state,
+      to: targetState,
+      handle: { stop: () => undefined },
+      ...(input.onUpdate ? { onUpdate: input.onUpdate } : {}),
+      ...(input.onComplete ? { onComplete: input.onComplete } : {}),
+      ...(input.onSettle ? { onSettle: input.onSettle } : {}),
+      ...(input.onCancel ? { onCancel: input.onCancel } : {})
+    };
+    this.active = record;
+
+    if (input.task) {
+      const task = this.tasks.start({
+        kind: input.task.kind,
+        target: input.task.target,
+        revision: input.task.revision,
+        durationMs: input.durationMs,
+        onCancel: () => {
+          if (this.active !== record) return;
+          record.handle.stop();
+          this.active = undefined;
+          record.onCancel?.();
+        },
+        onSettle: () => {
+          if (this.active !== record) return;
+          record.handle.stop();
+          this.finish(record, "settle");
+        }
+      });
+      record.task = task;
+    }
+
+    input.onUpdate?.();
+    record.handle = this.tweens.tween(
+      tweenState,
+      tweenTarget,
+      input.durationMs,
+      input.easing,
+      () => {
+        if (this.active !== record) return;
+        this.finish(record, "complete");
+      },
+      0,
+      hasDelta ? input.onUpdate : undefined
+    );
+  }
+
+  cancel(applyTarget = false): void {
+    const record = this.active;
+    if (!record) return;
+    record.handle.stop();
+    this.active = undefined;
+    if (applyTarget) {
+      assignLiveState(record.state, record.to);
+      record.onUpdate?.();
+    }
+  }
+
+  private detachActive(): void {
+    const record = this.active;
+    if (!record) return;
+    record.handle.stop();
+    this.active = undefined;
+    record.task?.settle();
+  }
+
+  private finish(record: LiveParamTransitionRecord, status: "complete" | "settle"): void {
+    assignLiveState(record.state, record.to);
+    record.onUpdate?.();
+    this.active = undefined;
+    if (status === "complete") {
+      record.onComplete?.();
+      if (record.task?.isCurrent()) record.task.complete();
+      return;
+    }
+    record.onSettle?.();
   }
 }
 
@@ -260,6 +425,8 @@ export class RootFilterStack {
 }
 
 export class FilterSystem {
+  private readonly actorBlurFilters = new WeakMap<Container, ActorBlurFilter>();
+  private persistentBokeh: PersistentBokehRecord | undefined;
   private persistentGlitch: PersistentGlitchRecord | undefined;
 
   constructor(
@@ -269,14 +436,23 @@ export class FilterSystem {
     private readonly tasks: PresentationTaskController
   ) {}
 
-  applyActorFilters(container: Container, actor: PixiActorSnapshot): void {
+  applyActorFilters(container: Container, actor: PixiActorSnapshot, liveFilters: Partial<Record<string, number>> = actor.filters): void {
     const filters: Filter[] = [];
-    const blur = actor.filters.blur ?? 0;
-    if (blur > 0) filters.push(new BlurFilter({ strength: Math.max(0.1, blur * 6), quality: 3 }));
+    const blur = Math.max(0, liveFilters.blur ?? actor.filters.blur ?? 0);
+    const blurFilter = this.reconcileActorBlur(container, blur);
+    if (blurFilter) filters.push(blurFilter as unknown as Filter);
     if (filters.length > 0 && this.options) {
       container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
+    } else {
+      (container as unknown as { filterArea: Rectangle | undefined }).filterArea = undefined;
     }
     container.filters = filters.length > 0 ? filters : null;
+  }
+
+  releaseActorFilters(container: Container): void {
+    this.destroyActorBlur(container);
+    container.filters = null;
+    (container as unknown as { filterArea: Rectangle | undefined }).filterArea = undefined;
   }
 
   relayoutViewport(): void {
@@ -293,8 +469,8 @@ export class FilterSystem {
 
   applyScreenFilters(snapshot: PixiStageSnapshot, animate: boolean, hints: PixiStageRenderHint[] = []): void {
     const filters: Filter[] = [];
-    const bokehPower = snapshot.screenFilters.bokeh?.power ?? 0;
-    if (bokehPower > 0) filters.push(new KawaseBlurFilter({ strength: Math.max(1, bokehPower * 8), quality: 4 }));
+    const bokeh = this.reconcilePersistentBokeh(snapshot, animate, hints);
+    if (bokeh) filters.push(bokeh.filter as unknown as Filter);
     const glitch = this.reconcilePersistentGlitch(snapshot, animate, hints);
     if (glitch) filters.push(glitch.filter as unknown as Filter);
     this.rootFilters.setScreenFilters(filters);
@@ -306,12 +482,41 @@ export class FilterSystem {
   }
 
   clear(): void {
+    this.destroyPersistentBokeh();
     this.destroyPersistentGlitch();
     this.rootFilters.setScreenFilters([]);
   }
 
-  createSunFilter(power: number): Filter {
-    return new GodrayFilter({ gain: Math.max(0.35, power), lacunarity: 2.6, parallel: true });
+  createSunFilter(power: number): SunFilter {
+    if (typeof document === "undefined") {
+      return {
+        gain: sunFilterGain(power),
+        destroy: () => undefined
+      };
+    }
+    return new GodrayFilter({ gain: sunFilterGain(power), lacunarity: 2.6, parallel: true });
+  }
+
+  private reconcileActorBlur(container: Container, power: number): ActorBlurFilter | undefined {
+    if (power <= 0.001) {
+      this.destroyActorBlur(container);
+      return undefined;
+    }
+    let filter = this.actorBlurFilters.get(container);
+    if (!filter) {
+      filter = createActorBlurFilter(power);
+      this.actorBlurFilters.set(container, filter);
+      return filter;
+    }
+    filter.strength = actorBlurStrength(power);
+    return filter;
+  }
+
+  private destroyActorBlur(container: Container): void {
+    const filter = this.actorBlurFilters.get(container);
+    if (!filter) return;
+    filter.destroy();
+    this.actorBlurFilters.delete(container);
   }
 
   private reconcilePersistentGlitch(
@@ -333,46 +538,32 @@ export class FilterSystem {
     const isNew = !this.persistentGlitch;
     if (!this.persistentGlitch) {
       const shader = createGlitchShaderFilter(width, height);
-      this.persistentGlitch = { filter: shader.filter, uniforms: shader.uniforms, handle: undefined };
+      const live = glitchLiveParams(glitch);
+      if (animate && glitch.transition.durationMs > 0) live.power = 0;
+      this.persistentGlitch = {
+        filter: shader.filter,
+        uniforms: shader.uniforms,
+        live,
+        transition: new LiveParamTransition(this.tweens, this.tasks)
+      };
     }
 
     const record = this.persistentGlitch;
     const transition = glitch.transition;
-    const targetPower = clamp01(glitch.power);
-    const shouldAnimate = animate && transition.durationMs > 0 && Math.abs(record.uniforms.uPower - targetPower) > 0.001;
-    record.handle?.stop();
-    applyGlitchUniforms(record.uniforms, glitch, {
-      power: shouldAnimate ? (isNew ? 0 : record.uniforms.uPower) : targetPower,
-      progress: 0
+    const target = glitchLiveParams(glitch);
+    record.uniforms.uSeed = glitch.seed ?? 0;
+    record.uniforms.uProgress = 0;
+    if (isNew) applyGlitchLiveUniforms(record.uniforms, record.live);
+    record.transition.start({
+      state: record.live,
+      to: target,
+      animate,
+      durationMs: transition.durationMs,
+      easing: transition.easing,
+      forceTask: transition.wait,
+      task: { kind: "screen-filter-transition", target: "glitch", revision: snapshot.revision },
+      onUpdate: () => applyGlitchLiveUniforms(record.uniforms, record.live)
     });
-
-    if (shouldAnimate) {
-      const task = this.tasks.start({
-        kind: "screen-filter-transition",
-        target: "glitch",
-        revision: snapshot.revision,
-        durationMs: transition.durationMs,
-        onCancel: () => {
-          record.handle?.stop();
-          record.uniforms.uPower = targetPower;
-        },
-        onSettle: () => {
-          record.handle?.stop();
-          record.uniforms.uPower = targetPower;
-        }
-      });
-      record.handle = this.tweens.tween(
-        record.uniforms as unknown as Record<string, number>,
-        { uPower: targetPower },
-        transition.durationMs,
-        transition.easing,
-        () => {
-          if (task.isCurrent()) task.complete();
-        }
-      );
-    } else {
-      record.handle = undefined;
-    }
 
     return record;
   }
@@ -384,37 +575,105 @@ export class FilterSystem {
   ): GlitchShaderRecord | undefined {
     const record = this.persistentGlitch;
     if (!record) return undefined;
-    record.handle?.stop();
     if (animate && removal && removal.durationMs > 0) {
-      const task = this.tasks.start({
-        kind: "screen-filter-transition",
-        target: "glitch",
-        revision,
+      record.transition.start({
+        state: record.live,
+        to: { ...record.live, power: 0 },
+        animate,
         durationMs: removal.durationMs,
-        onCancel: () => this.destroyPersistentGlitch(),
-        onSettle: () => this.destroyPersistentGlitch()
+        easing: removal.easing,
+        forceTask: removal.wait,
+        task: {
+          kind: "screen-filter-transition",
+          target: "glitch",
+          revision
+        },
+        onUpdate: () => applyGlitchLiveUniforms(record.uniforms, record.live),
+        onComplete: () => this.destroyPersistentGlitch(false),
+        onSettle: () => this.destroyPersistentGlitch(false),
+        onCancel: () => this.destroyPersistentGlitch(false)
       });
-      record.handle = this.tweens.tween(
-        record.uniforms as unknown as Record<string, number>,
-        { uPower: 0 },
-        removal.durationMs,
-        removal.easing,
-        () => {
-          if (!task.isCurrent()) return;
-          this.destroyPersistentGlitch();
-          task.complete();
-        }
-      );
       return record;
     }
     this.destroyPersistentGlitch();
     return undefined;
   }
 
-  private destroyPersistentGlitch(): void {
+  private reconcilePersistentBokeh(
+    snapshot: PixiStageSnapshot,
+    animate: boolean,
+    hints: PixiStageRenderHint[]
+  ): PersistentBokehRecord | undefined {
+    const bokeh = snapshot.screenFilters.bokeh;
+    const removal = hints.find(
+      (hint): hint is Extract<PixiStageRenderHint, { type: "screen-filter-remove" }> =>
+        hint.type === "screen-filter-remove" && hint.kind === "bokeh"
+    );
+    if (!bokeh || bokeh.power <= 0) {
+      return this.removePersistentBokeh(animate, removal);
+    }
+
+    const target = { power: clamp01(bokeh.power) };
+    if (!this.persistentBokeh) {
+      const live = { ...target };
+      if (animate && bokeh.transition.durationMs > 0) live.power = 0;
+      this.persistentBokeh = {
+        filter: createBokehBlurFilter(live.power),
+        live,
+        transition: new LiveParamTransition(this.tweens, this.tasks)
+      };
+    }
+
+    const record = this.persistentBokeh;
+    record.transition.start({
+      state: record.live,
+      to: target,
+      animate,
+      durationMs: bokeh.transition.durationMs,
+      easing: bokeh.transition.easing,
+      onUpdate: () => applyBokehFilterPower(record)
+    });
+    return record;
+  }
+
+  private removePersistentBokeh(
+    animate: boolean,
+    removal: Extract<PixiStageRenderHint, { type: "screen-filter-remove" }> | undefined
+  ): PersistentBokehRecord | undefined {
+    const record = this.persistentBokeh;
+    if (!record) return undefined;
+    if (animate && removal && removal.durationMs > 0) {
+      record.transition.start({
+        state: record.live,
+        to: { power: 0 },
+        animate,
+        durationMs: removal.durationMs,
+        easing: removal.easing,
+        onUpdate: () => applyBokehFilterPower(record),
+        onComplete: () => this.destroyPersistentBokeh(),
+        onSettle: () => this.destroyPersistentBokeh(),
+        onCancel: () => this.destroyPersistentBokeh()
+      });
+      return record;
+    }
+    this.destroyPersistentBokeh();
+    return undefined;
+  }
+
+  private destroyPersistentBokeh(): void {
+    const record = this.persistentBokeh;
+    if (!record) return;
+    record.transition.cancel(false);
+    this.rootFilters.removeScreenFilter(record.filter as unknown as Filter);
+    record.filter.destroy();
+    this.persistentBokeh = undefined;
+  }
+
+  private destroyPersistentGlitch(cancelTasks = true): void {
     const record = this.persistentGlitch;
     if (!record) return;
-    record.handle?.stop();
+    record.transition.cancel(false);
+    if (cancelTasks) this.tasks.cancelTarget("glitch");
     this.rootFilters.removeScreenFilter(record.filter as unknown as Filter);
     record.filter.destroy();
     this.persistentGlitch = undefined;
@@ -526,13 +785,22 @@ export class ActorSystem {
     }
     this.applyTransform(record.container, actor, previous, animate, transition, contentAlphaAnimated);
     if (shouldAnimate && filtersChanged) {
-      transition?.tween({ value: 0 }, { value: 1 }, actor.transition.durationMs, actor.transition.easing);
+      transition?.tween(
+        record.filterLive,
+        { blur: actor.filters.blur ?? 0 },
+        actor.transition.durationMs,
+        actor.transition.easing,
+        undefined,
+        () => this.filters.applyActorFilters(record.container, actor, record.filterLive)
+      );
+    } else {
+      record.filterLive.blur = actor.filters.blur ?? 0;
     }
     if (shouldAnimate && actor.transition.wait && transition && !transition.hasWork()) {
       transition.tween({ value: 0 }, { value: 1 }, actor.transition.durationMs, actor.transition.easing);
     }
     record.actor = actor;
-    this.filters.applyActorFilters(record.container, actor);
+    this.filters.applyActorFilters(record.container, actor, record.filterLive);
   }
 
   private ensure(actor: PixiActorSnapshot): ActorRecord {
@@ -545,7 +813,13 @@ export class ActorSystem {
         : this.backgroundLayer
       : this.characterLayer;
     layer.addChild(container);
-    const record: ActorRecord = { actor, container, contentKey: "", contentGeneration: 0 };
+    const record: ActorRecord = {
+      actor,
+      container,
+      contentKey: "",
+      contentGeneration: 0,
+      filterLive: { blur: actor.filters.blur ?? 0 }
+    };
     this.actors.set(actor.id, record);
     return record;
   }
@@ -554,6 +828,7 @@ export class ActorSystem {
     const record = this.actors.get(id);
     if (!record) return;
     this.tasks.cancelTarget(id);
+    this.filters.releaseActorFilters(record.container);
     record.container.removeFromParent();
     record.container.destroy({ children: true });
     this.actors.delete(id);
@@ -918,8 +1193,8 @@ export class WeatherSystem {
         record.rainShader.tick(this.options.renderer);
         continue;
       }
-      const speedY = weatherSpeedY(record.snapshot);
-      const speedX = weatherSpeedX(record.snapshot);
+      const speedY = weatherLiveSpeedY(record);
+      const speedX = weatherLiveSpeedX(record);
       for (const particle of record.particles) {
         particle.x += speedX * ticker.deltaMS * 0.06;
         particle.y += speedY * ticker.deltaMS * 0.06;
@@ -958,52 +1233,35 @@ export class WeatherSystem {
 
   private upsert(kind: string, snapshot: PixiWeatherSnapshot, animate: boolean, revision: number): void {
     let record = this.records.get(kind);
-    const isNew = !record;
+    const targetLive = weatherLiveParams(snapshot);
     if (!record) {
       const container = createWeatherContainer(kind);
       container.alpha = 0;
       if (kind === "sun") this.backLayer.addChild(container);
       else this.frontLayer.addChild(container);
-      record = { snapshot, container, particles: [] };
+      const live = { ...targetLive };
+      if (animate && snapshot.transition.durationMs > 0) live.power = 0;
+      record = {
+        snapshot,
+        container,
+        particles: [],
+        live,
+        transition: new LiveParamTransition(this.tweens, this.tasks)
+      };
       this.records.set(kind, record);
       this.populate(record);
     }
     record.snapshot = snapshot;
-    const targetAlpha = clamp01(weatherPower(snapshot));
-    const shouldAnimate = animate && snapshot.transition.durationMs > 0 && (isNew || Math.abs(record.container.alpha - targetAlpha) > 0.001);
-    if (shouldAnimate) {
-      let handle: TweenHandle | undefined;
-      const task = this.tasks.start({
-        kind: "weather-transition",
-        target: kind,
-        revision,
-        durationMs: snapshot.transition.durationMs,
-        onCancel: () => {
-          handle?.stop();
-          record.container.alpha = targetAlpha;
-        },
-        onSettle: () => {
-          handle?.stop();
-          record.container.alpha = targetAlpha;
-        }
-      });
-      handle = this.tweens.tween(
-        record.container as unknown as Record<string, number>,
-        { alpha: targetAlpha },
-        snapshot.transition.durationMs,
-        snapshot.transition.easing,
-        () => {
-          if (task.isCurrent()) task.complete();
-        }
-      );
-    } else {
-      record.container.alpha = targetAlpha;
-    }
-    if (kind === "sun") {
-      record.container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
-    }
-    record.container.filters = kind === "sun" ? [this.filters.createSunFilter(weatherPower(snapshot))] : null;
-    this.applyParticleStyle(record);
+    record.transition.start({
+      state: record.live,
+      to: targetLive,
+      animate,
+      durationMs: snapshot.transition.durationMs,
+      easing: snapshot.transition.easing,
+      forceTask: snapshot.transition.wait,
+      task: { kind: "weather-transition", target: kind, revision },
+      onUpdate: () => this.applyWeatherLiveState(record)
+    });
   }
 
   private populate(record: WeatherRecord): void {
@@ -1030,8 +1288,14 @@ export class WeatherSystem {
   }
 
   private applyParticleStyle(record: WeatherRecord): void {
+    this.applyWeatherLiveState(record);
+  }
+
+  private applyWeatherLiveState(record: WeatherRecord): void {
+    const power = clamp01(record.live.power ?? weatherPower(record.snapshot));
+    record.container.alpha = power;
     if (record.snapshot.kind === "rain") {
-      record.rainShader?.updateSettings(resolveRainSettingsFromCommandParams(record.snapshot.commandParams));
+      record.rainShader?.updateSettings(resolveRainSettingsFromCommandParams(liveRainCommandParams(record)));
       record.rainShader?.resize(this.options.width(), this.options.height());
       return;
     }
@@ -1039,8 +1303,12 @@ export class WeatherSystem {
       this.updateSnowShaderUniforms(record);
       return;
     }
-    const power = clamp01(weatherPower(record.snapshot));
-    const externalScale = record.snapshot.scale?.[0] ?? 1;
+    if (record.snapshot.kind === "sun") {
+      record.container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
+      const filter = this.ensureSunFilter(record, power);
+      record.container.filters = [filter as unknown as Filter];
+    }
+    const externalScale = record.live.scale ?? record.snapshot.scale?.[0] ?? 1;
     const activeCount = record.particles.length;
     record.particles.forEach((particle, index) => {
       particle.visible = index < activeCount;
@@ -1056,41 +1324,44 @@ export class WeatherSystem {
   ): void {
     const record = this.records.get(kind);
     if (!record) return;
-    let handle: TweenHandle | undefined;
     const cleanup = () => {
-      handle?.stop();
       this.remove(kind, false);
     };
-    const task = this.tasks.start({
-      kind: "weather-transition",
-      target: kind,
-      revision,
+    record.transition.start({
+      state: record.live,
+      to: { ...record.live, power: 0 },
+      animate: true,
       durationMs: hint.durationMs,
-      onCancel: cleanup,
-      onSettle: cleanup
+      easing: hint.easing,
+      forceTask: hint.wait,
+      task: { kind: "weather-transition", target: kind, revision },
+      onUpdate: () => this.applyWeatherLiveState(record),
+      onComplete: cleanup,
+      onSettle: cleanup,
+      onCancel: cleanup
     });
-    handle = this.tweens.tween(
-      record.container as unknown as Record<string, number>,
-      { alpha: 0 },
-      hint.durationMs,
-      hint.easing,
-      () => {
-        if (!task.isCurrent()) return;
-        this.remove(kind, false);
-        task.complete();
-      }
-    );
   }
 
   private remove(kind: string, cancelTasks = true): void {
     const record = this.records.get(kind);
     if (!record) return;
+    record.transition.cancel(false);
     if (cancelTasks) this.tasks.cancelTarget(kind);
     record.rainShader?.destroy();
     record.snowShader?.filter.destroy();
+    record.sunFilter?.destroy();
     record.container.removeFromParent();
     record.container.destroy({ children: true });
     this.records.delete(kind);
+  }
+
+  private ensureSunFilter(record: WeatherRecord, power: number): SunFilter {
+    if (!record.sunFilter) {
+      record.sunFilter = this.filters.createSunFilter(power);
+      return record.sunFilter;
+    }
+    record.sunFilter.gain = sunFilterGain(power);
+    return record.sunFilter;
   }
 
   private populateRainShader(record: WeatherRecord): void {
@@ -1139,65 +1410,62 @@ export class WeatherSystem {
     if (record.snapshot.kind !== "snow") return;
     const snapshot = record.snapshot;
     const uniforms = shader.uniforms;
-    uniforms.uPower = clamp01(snapshot.power);
-    uniforms.uDensity = snapshot.density ?? 1;
-    uniforms.uFallSpeed = snapshot.ySpeed ?? 0.45;
-    uniforms.uWind = snapshot.xSpeed ?? 0.25;
-    uniforms.uFlakeScale = snapshot.flakeScale ?? snapshot.scale?.[0] ?? 1;
-    uniforms.uSway = snapshot.sway ?? 1;
-    uniforms.uFog = snapshot.fog ?? 0.25;
-    uniforms.uNoise = snapshot.noise ?? 0.01;
+    uniforms.uPower = clamp01(record.live.power ?? snapshot.power);
+    uniforms.uDensity = record.live.density ?? snapshot.density ?? 1;
+    uniforms.uFallSpeed = record.live.ySpeed ?? snapshot.ySpeed ?? 0.45;
+    uniforms.uWind = record.live.xSpeed ?? snapshot.xSpeed ?? 0.25;
+    uniforms.uFlakeScale = record.live.flakeScale ?? snapshot.flakeScale ?? snapshot.scale?.[0] ?? 1;
+    uniforms.uSway = record.live.sway ?? snapshot.sway ?? 1;
+    uniforms.uFog = record.live.fog ?? snapshot.fog ?? 0.25;
+    uniforms.uNoise = record.live.noise ?? snapshot.noise ?? 0.01;
     uniforms.uSeed = snapshot.seed ?? 0;
   }
 }
 
 export class ScreenOverlaySystem {
   private readonly layer = new Container({ label: "screen-filter-overlays" });
+  private readonly bokehTransition: LiveParamTransition;
   private bokehKey = "";
   private bokehPower = 0;
+  private bokehLayoutPower = 0;
 
   constructor(
     private readonly options: PixiPresenterSystemsOptions,
     private readonly tweens: TweenSystem,
     private readonly tasks: PresentationTaskController
   ) {
+    this.bokehTransition = new LiveParamTransition(tweens, tasks);
     this.layer.zIndex = 25;
     options.root.sortableChildren = true;
     options.root.addChild(this.layer);
   }
 
-  reconcile(snapshot: PixiStageSnapshot, animate: boolean): void {
+  reconcile(snapshot: PixiStageSnapshot, animate: boolean, hints: PixiStageRenderHint[] = []): void {
     const power = clamp01(snapshot.screenFilters.bokeh?.power ?? 0);
-    this.bokehPower = power;
     const transition = snapshot.screenFilters.bokeh?.transition;
+    const removal = hints.find(
+      (hint): hint is Extract<PixiStageRenderHint, { type: "screen-filter-remove" }> =>
+        hint.type === "screen-filter-remove" && hint.kind === "bokeh"
+    );
     if (power <= 0) {
-      if (animate && transition && transition.durationMs > 0 && this.layer.children.length > 0) {
-        let handle: TweenHandle | undefined;
-        const task = this.tasks.start({
-          kind: "screen-filter-transition",
-          target: "bokeh",
-          revision: snapshot.revision,
-          durationMs: transition.durationMs,
-          onCancel: () => {
-            handle?.stop();
-            this.clear(false);
+      if (animate && removal && removal.durationMs > 0 && this.layer.children.length > 0) {
+        const live = { power: this.bokehPower };
+        this.bokehTransition.start({
+          state: live,
+          to: { power: 0 },
+          animate,
+          durationMs: removal.durationMs,
+          easing: removal.easing,
+          forceTask: removal.wait,
+          task: { kind: "screen-filter-transition", target: "bokeh", revision: snapshot.revision },
+          onUpdate: () => {
+            this.bokehPower = live.power;
+            this.applyBokehOverlayPower();
           },
-          onSettle: () => {
-            handle?.stop();
-            this.clear(false);
-          }
+          onComplete: () => this.clear(false),
+          onSettle: () => this.clear(false),
+          onCancel: () => this.clear(false)
         });
-        handle = this.tweens.tween(
-          this.layer as unknown as Record<string, number>,
-          { alpha: 0 },
-          transition.durationMs,
-          transition.easing,
-          () => {
-            if (!task.isCurrent()) return;
-            this.clear(false);
-            task.complete();
-          }
-        );
         return;
       }
       this.clear();
@@ -1206,58 +1474,52 @@ export class ScreenOverlaySystem {
 
     const key = this.bokehLayoutKey(power);
     if (key !== this.bokehKey) {
+      const hasExistingOverlay = this.bokehKey !== "" && this.layer.children.length > 0;
+      const startingPower = hasExistingOverlay ? this.bokehPower : animate && transition && transition.durationMs > 0 ? 0 : power;
       this.clear();
-      this.bokehPower = power;
+      this.bokehPower = startingPower;
+      this.bokehLayoutPower = power;
       this.populateBokeh(power);
       this.bokehKey = key;
-      if (animate && transition && transition.durationMs > 0) this.layer.alpha = 0;
     }
-    const targetAlpha = Math.min(0.96, 0.45 + power * 0.45);
-    const shouldAnimate = animate && transition && transition.durationMs > 0 && Math.abs(this.layer.alpha - targetAlpha) > 0.001;
-    if (shouldAnimate) {
-      let handle: TweenHandle | undefined;
-      const task = this.tasks.start({
-        kind: "screen-filter-transition",
-        target: "bokeh",
-        revision: snapshot.revision,
-        durationMs: transition.durationMs,
-        onCancel: () => {
-          handle?.stop();
-          this.layer.alpha = targetAlpha;
-        },
-        onSettle: () => {
-          handle?.stop();
-          this.layer.alpha = targetAlpha;
-        }
-      });
-      handle = this.tweens.tween(
-        this.layer as unknown as Record<string, number>,
-        { alpha: targetAlpha },
-        transition.durationMs,
-        transition.easing,
-        () => {
-          if (task.isCurrent()) task.complete();
-        }
-      );
-    } else {
-      this.layer.alpha = targetAlpha;
+    if (!transition) {
+      this.bokehPower = power;
+      this.applyBokehOverlayPower();
+      return;
     }
+    const live = { power: this.bokehPower };
+    this.bokehTransition.start({
+      state: live,
+      to: { power },
+      animate,
+      durationMs: transition.durationMs,
+      easing: transition.easing,
+      forceTask: transition.wait,
+      task: { kind: "screen-filter-transition", target: "bokeh", revision: snapshot.revision },
+      onUpdate: () => {
+        this.bokehPower = live.power;
+        this.applyBokehOverlayPower();
+      }
+    });
   }
 
   clear(cancelTasks = true): void {
+    this.bokehTransition.cancel(false);
     if (cancelTasks) this.tasks.cancelTarget("bokeh");
     this.layer.removeChildren().forEach((child) => child.destroy());
     this.bokehKey = "";
     this.bokehPower = 0;
+    this.bokehLayoutPower = 0;
   }
 
   relayoutViewport(): void {
     if (this.bokehPower <= 0 || this.layer.children.length === 0) return;
-    const key = this.bokehLayoutKey(this.bokehPower);
+    const key = this.bokehLayoutKey(this.bokehLayoutPower);
     if (key === this.bokehKey) return;
     this.layer.removeChildren().forEach((child) => child.destroy());
-    this.populateBokeh(this.bokehPower);
+    this.populateBokeh(this.bokehLayoutPower);
     this.bokehKey = key;
+    this.applyBokehOverlayPower();
   }
 
   private populateBokeh(power: number): void {
@@ -1282,6 +1544,15 @@ export class ScreenOverlaySystem {
       sprite.tint = index % 3 === 0 ? 0xfff4cf : index % 3 === 1 ? 0xbfe8ff : 0xffffff;
       this.layer.addChild(sprite);
     }
+    this.applyBokehOverlayPower();
+  }
+
+  private applyBokehOverlayPower(): void {
+    const power = clamp01(this.bokehPower);
+    this.layer.alpha = bokehOverlayAlpha(power);
+    this.layer.children.forEach((child) => {
+      if (child instanceof Sprite) child.alpha = 0.32 + power * 0.34;
+    });
   }
 
   private bokehLayoutKey(power: number): string {
@@ -1618,13 +1889,52 @@ function weatherPower(snapshot: PixiWeatherSnapshot): number {
   return snapshot.kind === "rain" ? snapshot.commandParams.power : snapshot.power;
 }
 
-function weatherSpeedX(snapshot: PixiWeatherSnapshot): number {
-  if (snapshot.kind === "snow") return snapshot.xSpeed ?? 0.25;
+function weatherLiveParams(snapshot: PixiWeatherSnapshot): NumericLiveState {
+  if (snapshot.kind === "rain") {
+    return {
+      power: clamp01(snapshot.commandParams.power),
+      wind: snapshot.commandParams.wind,
+      hue: snapshot.commandParams.hue,
+      tint: snapshot.commandParams.tint
+    };
+  }
+  if (snapshot.kind === "snow") {
+    return {
+      power: clamp01(snapshot.power),
+      xSpeed: snapshot.xSpeed ?? 0.25,
+      ySpeed: snapshot.ySpeed ?? 0.45,
+      density: snapshot.density ?? 1,
+      flakeScale: snapshot.flakeScale ?? snapshot.scale?.[0] ?? 1,
+      sway: snapshot.sway ?? 1,
+      fog: snapshot.fog ?? 0.25,
+      noise: snapshot.noise ?? 0.01
+    };
+  }
+  return {
+    power: clamp01(snapshot.power),
+    scale: snapshot.scale?.[0] ?? 1
+  };
+}
+
+function liveRainCommandParams(record: WeatherRecord): PixiRainCommandParams {
+  if (record.snapshot.kind !== "rain") {
+    return { power: 0, wind: -1, hue: 215, tint: 0.55 };
+  }
+  return {
+    power: clamp01(record.live.power ?? record.snapshot.commandParams.power),
+    wind: clamp(record.live.wind ?? record.snapshot.commandParams.wind, -1, 1),
+    hue: clamp(record.live.hue ?? record.snapshot.commandParams.hue, 0, 360),
+    tint: clamp(record.live.tint ?? record.snapshot.commandParams.tint, 0, 2)
+  };
+}
+
+function weatherLiveSpeedX(record: WeatherRecord): number {
+  if (record.snapshot.kind === "snow") return record.live.xSpeed ?? record.snapshot.xSpeed ?? 0.25;
   return 0.25;
 }
 
-function weatherSpeedY(snapshot: PixiWeatherSnapshot): number {
-  if (snapshot.kind === "snow") return snapshot.ySpeed ?? 0.45;
+function weatherLiveSpeedY(record: WeatherRecord): number {
+  if (record.snapshot.kind === "snow") return record.live.ySpeed ?? record.snapshot.ySpeed ?? 0.45;
   return 6;
 }
 
@@ -1749,8 +2059,77 @@ function applyGlitchUniforms(
   if (options.progress !== undefined) uniforms.uProgress = options.progress;
 }
 
+function glitchLiveParams(controls: GlitchShaderControls): NumericLiveState {
+  return {
+    power: clamp01(controls.power ?? 1),
+    blockJump: Math.max(0, controls.blockJump ?? 1),
+    burstJump: Math.max(0, controls.burstJump ?? 1),
+    pixelScatter: Math.max(0, controls.pixelScatter ?? 1),
+    colorNoise: Math.max(0, controls.colorNoise ?? 1),
+    speed: Math.max(0, controls.speed ?? 1)
+  };
+}
+
+function applyGlitchLiveUniforms(uniforms: GlitchShaderUniformValues, live: NumericLiveState): void {
+  uniforms.uPower = clamp01(live.power ?? 1);
+  uniforms.uBlockJump = Math.max(0, live.blockJump ?? 1);
+  uniforms.uBurstJump = Math.max(0, live.burstJump ?? 1);
+  uniforms.uPixelScatter = Math.max(0, live.pixelScatter ?? 1);
+  uniforms.uColorNoise = Math.max(0, live.colorNoise ?? 1);
+  uniforms.uSpeed = Math.max(0, live.speed ?? 1);
+}
+
+function bokehBlurStrength(power: number): number {
+  return Math.max(0, power) * 8;
+}
+
+function createBokehBlurFilter(power: number): BokehBlurFilter {
+  if (typeof document === "undefined") {
+    return {
+      strength: bokehBlurStrength(power),
+      destroy: () => undefined
+    };
+  }
+  return new KawaseBlurFilter({ strength: bokehBlurStrength(power), quality: 4 });
+}
+
+function actorBlurStrength(power: number): number {
+  return Math.max(0, power) * 6;
+}
+
+function sunFilterGain(power: number): number {
+  return Math.max(0.35, power);
+}
+
+function createActorBlurFilter(power: number): ActorBlurFilter {
+  if (typeof document === "undefined") {
+    return {
+      strength: actorBlurStrength(power),
+      destroy: () => undefined
+    };
+  }
+  return new BlurFilter({ strength: actorBlurStrength(power), quality: 3 });
+}
+
+function applyBokehFilterPower(record: PersistentBokehRecord): void {
+  record.filter.strength = bokehBlurStrength(record.live.power ?? 0);
+}
+
+function bokehOverlayAlpha(power: number): number {
+  const clamped = clamp01(power);
+  return clamped <= 0.001 ? 0 : Math.min(0.96, 0.45 + clamped * 0.45);
+}
+
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+function hasNumericDelta(current: NumericLiveState, target: NumericLiveState): boolean {
+  return Object.entries(target).some(([key, value]) => Math.abs((current[key] ?? 0) - value) > 0.001);
+}
+
+function assignLiveState(current: NumericLiveState, target: NumericLiveState): void {
+  for (const [key, value] of Object.entries(target)) current[key] = value;
 }
 
 const SNOW_SHADER_VERTEX = `
