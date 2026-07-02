@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commandCompletionFacts, paramCompletionFacts } from "./languageFacts";
+import { allowedValueCompletionFacts, commandCompletionFacts, paramCompletionFacts } from "./languageFacts";
 
 describe("language facts", () => {
   it("derives command completions from the shared catalog", () => {
@@ -25,6 +25,22 @@ describe("language facts", () => {
     expect(labels).not.toContain("wait:");
     expect(labels).not.toContain("wait!");
     expect(labels).not.toContain("!wait");
+  });
+
+  it("derives UI wait params and allowed target values from command specs", () => {
+    for (const commandId of ["showui", "hideui"]) {
+      const params = paramCompletionFacts(commandId);
+      const labels = params.map((fact) => fact.label);
+      const wait = params.find((fact) => fact.label === "wait:");
+
+      expect(labels).toEqual(expect.arrayContaining(["wait:", "wait!", "!wait"]));
+      expect(wait?.documentation).toContain("Runtime support: consumed");
+      expect(allowedValueCompletionFacts(commandId, "target").map((fact) => fact.label)).toEqual([
+        "dialog",
+        "commandBar",
+        "toastLayer"
+      ]);
+    }
   });
 
   it("includes Chinese command and parameter docs with range and runtime support notes", () => {

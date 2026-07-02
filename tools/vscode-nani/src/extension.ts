@@ -137,6 +137,8 @@ function completionKind(kind: NaniCompletionKind): vscode.CompletionItemKind {
       return vscode.CompletionItemKind.Function;
     case "param":
       return vscode.CompletionItemKind.Property;
+    case "value":
+      return vscode.CompletionItemKind.Value;
     case "label":
       return vscode.CompletionItemKind.Reference;
     case "snippet":

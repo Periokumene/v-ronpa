@@ -21,6 +21,13 @@ export type CompletionContext =
       usedParams: Set<string>;
     }
   | {
+      kind: "param-value";
+      commandId: string;
+      paramName: string;
+      range: NaniRange;
+      prefix: string;
+    }
+  | {
       kind: "label";
       range: NaniRange;
       prefix: string;
@@ -66,6 +73,9 @@ export function getCompletionContext(sourceText: string, position: NaniPosition)
   const commandContext = getCommandCompletionContext(before, position.line);
   if (commandContext) return commandContext;
 
+  const paramValueContext = getParamValueCompletionContext(before, position.line);
+  if (paramValueContext) return paramValueContext;
+
   const paramContext = getParamCompletionContext(before, position.line);
   if (paramContext) return paramContext;
 
@@ -104,6 +114,40 @@ function getCommandCompletionContext(before: string, line: number): CompletionCo
       end: { line, character: before.length }
     },
     insertAtSign: false
+  };
+}
+
+function getParamValueCompletionContext(before: string, line: number): CompletionContext | undefined {
+  const commandMatch = before.match(/^\s*@([A-Za-z_<>][A-Za-z0-9_<>-]*)\s+/u);
+  const commandId = commandMatch?.[1];
+  if (!commandId) return undefined;
+
+  const tokenStart = currentTokenStart(before);
+  const token = before.slice(tokenStart);
+  const colon = token.indexOf(":");
+  if (colon <= 0) return undefined;
+
+  const paramName = token.slice(0, colon);
+  if (!/^[A-Za-z_][A-Za-z0-9_-]*$/u.test(paramName)) return undefined;
+
+  const valueStart = tokenStart + colon + 1;
+  const valuePrefix = before.slice(valueStart);
+  if (valuePrefix.startsWith("{") || valuePrefix.startsWith("\"") || valuePrefix.startsWith("'")) return undefined;
+
+  const segmentStart = valuePrefix.lastIndexOf(",") + 1;
+  const replaceStart = valueStart + segmentStart;
+  const prefix = before.slice(replaceStart);
+  if (prefix.includes("{") || prefix.includes("\"") || prefix.includes("'")) return undefined;
+
+  return {
+    kind: "param-value",
+    commandId,
+    paramName,
+    range: {
+      start: { line, character: replaceStart },
+      end: { line, character: before.length }
+    },
+    prefix
   };
 }
 

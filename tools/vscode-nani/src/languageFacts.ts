@@ -25,6 +25,14 @@ export interface ParamCompletionFact {
   sortText: string;
 }
 
+export interface AllowedValueCompletionFact {
+  label: string;
+  insertText: string;
+  detail: string;
+  documentation: string;
+  sortText: string;
+}
+
 export interface DocumentationFact {
   detail: string;
   documentation: string;
@@ -83,6 +91,22 @@ export function paramCompletionFacts(commandId: string, usedParams: Set<string> 
   return facts;
 }
 
+export function allowedValueCompletionFacts(commandId: string, paramName: string): AllowedValueCompletionFact[] {
+  const definition = getNaniCommandDefinition(commandId);
+  if (!definition) return [];
+  const param = findParam(definition, paramName);
+  const allowedValues = param?.docs?.allowedValues;
+  if (!param || !allowedValues?.length) return [];
+
+  return allowedValues.map((value, index) => ({
+    label: value,
+    insertText: value,
+    detail: `${definition.canonicalName} ${param.name} value`,
+    documentation: paramDocumentation(param),
+    sortText: index.toString().padStart(4, "0")
+  }));
+}
+
 function commandDocumentation(definition: NaniCommandDefinition): string {
   const zh = definition.docs?.zh ? `${definition.docs.zh}\n\n` : "";
   const aliases = definition.aliases && definition.aliases.length > 0 ? `\nAliases: ${definition.aliases.join(", ")}` : "";
@@ -130,7 +154,7 @@ export function commandDocumentationFact(commandId: string): DocumentationFact |
 export function paramDocumentationFact(commandId: string, paramName: string): DocumentationFact | undefined {
   const definition = getNaniCommandDefinition(commandId);
   if (!definition) return undefined;
-  const param = definition.params.find((candidate) => normalize(candidate.name) === normalize(paramName) || candidate.aliases?.some((alias) => normalize(alias) === normalize(paramName)));
+  const param = findParam(definition, paramName);
   if (!param) return undefined;
   return {
     detail: `${definition.canonicalName} parameter · ${param.type}`,
@@ -167,6 +191,12 @@ function formatRecommendedRange(range: NonNullable<NaniCommandParamSpec["docs"]>
   const unit = range.unit ? ` ${range.unit}` : "";
   const note = range.noteZh ? `. ${range.noteZh}` : "";
   return `${bounds}${unit}${note}`;
+}
+
+function findParam(definition: NaniCommandDefinition, paramName: string): NaniCommandParamSpec | undefined {
+  return definition.params.find(
+    (candidate) => normalize(candidate.name) === normalize(paramName) || candidate.aliases?.some((alias) => normalize(alias) === normalize(paramName))
+  );
 }
 
 function normalize(value: string): string {

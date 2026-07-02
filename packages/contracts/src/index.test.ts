@@ -1035,6 +1035,18 @@ describe("contracts", () => {
     }
   });
 
+  it("documents stateful Pixi effect transition semantics in the shared command catalog", () => {
+    for (const commandId of ["rain", "snow", "sun", "glitchFilter", "bokeh", "blur"]) {
+      const docs = getNaniCommandDefinition(commandId)?.docs;
+
+      expect(docs?.zh, commandId).toContain("time");
+      expect(docs?.zh, commandId).toMatch(/插值|淡出/u);
+      expect(docs?.examples?.some((example) => example.includes("time:")), commandId).toBe(true);
+    }
+    expect(getNaniCommandDefinition("glitchFilter")?.docs?.zh).toContain("seed");
+    expect(getNaniCommandDefinition("snow")?.docs?.zh).toContain("seed");
+  });
+
   it("marks declared but currently unconsumed implemented params in command docs", () => {
     expect(getNaniCommandDefinition("bgm")?.params.find((paramSpec) => paramSpec.name === "intro")?.docs).toMatchObject({
       runtimeSupport: "declared-not-consumed",

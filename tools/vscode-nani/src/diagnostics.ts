@@ -1,5 +1,5 @@
-import { getNaniCommandDefinition } from "@v-ronpa/contracts";
-import { parseScenario, type CommandIR, type Diagnostic, type SourceLocation } from "@v-ronpa/nani-parser";
+import { RUNTIME_UI_GROUPS, getNaniCommandDefinition } from "@v-ronpa/contracts";
+import { parseScenario, type CommandArgIR, type CommandIR, type Diagnostic, type NaniValue, type SourceLocation } from "@v-ronpa/nani-parser";
 import {
   compileRuntimeScript,
   type RuntimeCompilerDiagnostic
@@ -10,7 +10,7 @@ export interface NaniDiagnostic {
   message: string;
   severity: "info" | "warning" | "error";
   range: NaniRange;
-  source: "nani-parser" | "nani-compiler";
+  source: "nani-parser" | "nani-compiler" | "vscode-nani";
   code?: string;
 }
 
@@ -31,8 +31,9 @@ export function computeNaniDiagnostics(sourceText: string, scriptPath: string): 
   const compilerDiagnostics = compilerResult.diagnostics.map((diagnostic, index) =>
     compilerDiagnostic(diagnostic, commandLocs, lines, index)
   );
+  const semanticDiagnostics = computeSemanticDiagnostics(parseResult.scenario.statements.filter((statement): statement is CommandIR => statement.kind === "command"));
 
-  return [...parserDiagnostics, ...compilerDiagnostics];
+  return [...parserDiagnostics, ...compilerDiagnostics, ...semanticDiagnostics];
 }
 
 export function approximateCompilerDiagnosticRange(
@@ -88,6 +89,107 @@ function commandLoc(command: CommandIR): CommandLoc {
     raw: command.loc.raw,
     range: lineRange(command.loc.line - 1, command.loc.raw)
   };
+}
+
+function computeSemanticDiagnostics(commands: CommandIR[]): NaniDiagnostic[] {
+  return commands.flatMap((command) => {
+    if (command.commandId !== "showui" && command.commandId !== "hideui") return [];
+    return uiTargetDiagnostics(command);
+  });
+}
+
+const runtimeUiTargetSet = new Set<string>(RUNTIME_UI_GROUPS);
+
+interface UiTargetCandidate {
+  target: string;
+  range: NaniRange;
+}
+
+type UiTargetArg = Extract<CommandArgIR, { kind: "value" }> | Extract<CommandArgIR, { kind: "param" }>;
+
+function uiTargetDiagnostics(command: CommandIR): NaniDiagnostic[] {
+  return uiTargetCandidates(command)
+    .filter((candidate) => !runtimeUiTargetSet.has(candidate.target))
+    .map((candidate) => ({
+      message: uiTargetDiagnosticMessage(command, candidate.target),
+      severity: "warning",
+      range: candidate.range,
+      source: "vscode-nani",
+      code: "unsupported-ui-target"
+    }));
+}
+
+function uiTargetCandidates(command: CommandIR): UiTargetCandidate[] {
+  const candidates: UiTargetCandidate[] = [];
+  const primary = command.args.find((arg) => arg.kind === "value");
+  if (primary) candidates.push(...targetsFromArg(command, primary, 0));
+  for (const arg of command.args) {
+    if (arg.kind !== "param") continue;
+    const key = normalize(arg.key);
+    if (key !== "target" && key !== "uinames") continue;
+    candidates.push(...targetsFromArg(command, arg, arg.raw.indexOf(":") + 1));
+  }
+  return candidates;
+}
+
+function targetsFromArg(command: CommandIR, arg: UiTargetArg, valueOffset: number): UiTargetCandidate[] {
+  const value = arg.value;
+  if (value.type === "expression") return [];
+  return targetsFromValue(command, arg.raw, value, valueOffset, valueOffset);
+}
+
+function targetsFromValue(
+  command: CommandIR,
+  argRaw: string,
+  value: NaniValue,
+  valueOffset: number,
+  offsetInArg: number
+): UiTargetCandidate[] {
+  if (value.type === "expression") return [];
+  if (value.type === "list") {
+    const rawValue = argRaw.slice(valueOffset);
+    const parts = rawValue.split(",");
+    let cursor = valueOffset;
+    return value.value.flatMap((item, index) => {
+      const rawPart = parts[index] ?? "";
+      const itemOffset = cursor;
+      cursor += rawPart.length + 1;
+      return targetsFromValue(command, argRaw, item, valueOffset, itemOffset);
+    });
+  }
+
+  const target = String(value.value).trim();
+  if (!target) return [];
+  return [{ target, range: argValueRange(command, argRaw, offsetInArg, target) }];
+}
+
+function argValueRange(command: CommandIR, argRaw: string, offsetInArg: number, value: string): NaniRange {
+  const argStart = findArgStart(command.loc.raw, argRaw);
+  if (argStart === undefined) return lineRange(command.loc.line - 1, command.loc.raw);
+  let start = argStart + offsetInArg;
+  if (command.loc.raw[start] === "\"" || command.loc.raw[start] === "'") start += 1;
+  return {
+    start: { line: command.loc.line - 1, character: start },
+    end: { line: command.loc.line - 1, character: Math.max(start + 1, start + value.length) }
+  };
+}
+
+function findArgStart(rawLine: string, argRaw: string): number | undefined {
+  const direct = rawLine.indexOf(argRaw);
+  if (direct >= 0) return direct;
+  const colon = argRaw.indexOf(":");
+  if (colon > 0) {
+    const keyStart = rawLine.indexOf(`${argRaw.slice(0, colon)}:`);
+    if (keyStart >= 0) return keyStart;
+  }
+  return undefined;
+}
+
+function uiTargetDiagnosticMessage(command: CommandIR, target: string): string {
+  const definition = getNaniCommandDefinition(command.commandId);
+  const commandName = definition?.canonicalName ?? command.commandId;
+  const suffix = command.flags.wait === true ? "; wait! will not create a UI presentation wait." : ".";
+  return `@${commandName} target ${target} is not a v1 runtime UI surface${suffix}`;
 }
 
 function commandNameFromMessage(message: string): string | undefined {

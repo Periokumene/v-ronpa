@@ -88,4 +88,77 @@ describe("diagnostics", () => {
       ])
     );
   });
+
+  it("does not report showUI or hideUI wait as an unsupported compiler param", () => {
+    const diagnostics = computeNaniDiagnostics("@hideUI commandBar wait!", "ui-wait.nani");
+
+    expect(diagnostics).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "nani-compiler",
+          code: "unsupported-command-param",
+          message: expect.stringContaining("@hideUI accepts wait!:boolean")
+        })
+      ])
+    );
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("reports invalid runtime UI targets with VSCode-only semantic diagnostics", () => {
+    const source = "@hideUI hud wait!";
+    const diagnostics = computeNaniDiagnostics(source, "invalid-ui-target.nani");
+
+    expect(diagnostics).toEqual([
+      {
+        source: "vscode-nani",
+        code: "unsupported-ui-target",
+        severity: "warning",
+        message: "@hideUI target hud is not a v1 runtime UI surface; wait! will not create a UI presentation wait.",
+        range: {
+          start: { line: 0, character: source.indexOf("hud") },
+          end: { line: 0, character: source.indexOf("hud") + "hud".length }
+        }
+      }
+    ]);
+  });
+
+  it("reports only invalid entries in comma-list UI target params", () => {
+    const source = "@showUI uINames:dialog,hud wait!";
+    const diagnostics = computeNaniDiagnostics(source, "invalid-ui-target-list.nani");
+
+    expect(diagnostics).toEqual([
+      expect.objectContaining({
+        source: "vscode-nani",
+        code: "unsupported-ui-target",
+        message: "@showUI target hud is not a v1 runtime UI surface; wait! will not create a UI presentation wait.",
+        range: {
+          start: { line: 0, character: source.indexOf("hud") },
+          end: { line: 0, character: source.indexOf("hud") + "hud".length }
+        }
+      })
+    ]);
+  });
+
+  it("still extracts invalid comma-list entries when target also has compiler type diagnostics", () => {
+    const source = "@showUI target:dialog,hud wait!";
+    const diagnostics = computeNaniDiagnostics(source, "invalid-ui-target-string-list.nani");
+
+    expect(diagnostics.filter((diagnostic) => diagnostic.source === "vscode-nani")).toEqual([
+      expect.objectContaining({
+        source: "vscode-nani",
+        code: "unsupported-ui-target",
+        message: "@showUI target hud is not a v1 runtime UI surface; wait! will not create a UI presentation wait.",
+        range: {
+          start: { line: 0, character: source.indexOf("hud") },
+          end: { line: 0, character: source.indexOf("hud") + "hud".length }
+        }
+      })
+    ]);
+  });
+
+  it("skips UI target semantic diagnostics for expression targets", () => {
+    const diagnostics = computeNaniDiagnostics("@showUI target:{uiTarget} wait!", "expression-ui-target.nani");
+
+    expect(diagnostics.filter((diagnostic) => diagnostic.source === "vscode-nani")).toEqual([]);
+  });
 });

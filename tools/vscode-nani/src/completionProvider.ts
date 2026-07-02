@@ -1,7 +1,7 @@
 import { collectLabels, getCompletionContext, type NaniPosition, type NaniRange } from "./documentContext";
-import { commandCompletionFacts, paramCompletionFacts } from "./languageFacts";
+import { allowedValueCompletionFacts, commandCompletionFacts, paramCompletionFacts } from "./languageFacts";
 
-export type NaniCompletionKind = "command" | "param" | "label" | "snippet";
+export type NaniCompletionKind = "command" | "param" | "value" | "label" | "snippet";
 
 export interface NaniCompletion {
   label: string;
@@ -41,6 +41,21 @@ export function getNaniCompletions(sourceText: string, position: NaniPosition): 
       isSnippet: fact.isSnippet,
       sortText: fact.sortText
     }));
+  }
+
+  if (context.kind === "param-value") {
+    return allowedValueCompletionFacts(context.commandId, context.paramName)
+      .filter((fact) => fact.label.toLowerCase().startsWith(context.prefix.toLowerCase()))
+      .map((fact) => ({
+        label: fact.label,
+        insertText: fact.insertText,
+        kind: "value",
+        range: context.range,
+        detail: fact.detail,
+        documentation: fact.documentation,
+        isSnippet: false,
+        sortText: fact.sortText
+      }));
   }
 
   if (context.kind === "label") {

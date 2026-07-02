@@ -16,10 +16,23 @@ describe("hover provider logic", () => {
   it("returns parameter docs on command params and boolean flags", () => {
     const volume = getNaniHover("@bgm bgm:main volume:0.6 wait!", { line: 0, character: "@bgm bgm:main vol".length });
     const wait = getNaniHover("@bgm bgm:main volume:0.6 wait!", { line: 0, character: "@bgm bgm:main volume:0.6 wai".length });
+    const uiWait = getNaniHover("@hideUI commandBar wait!", { line: 0, character: "@hideUI commandBar wai".length });
 
     expect(volume?.contents).toContain("播放音量倍率");
     expect(volume?.contents).toContain("Recommended: 0..1");
     expect(wait?.contents).toContain("是否等待表现层或播放流程完成");
+    expect(uiWait?.contents).toContain("是否等待表现层或播放流程完成");
+    expect(uiWait?.contents).toContain("Runtime support: consumed");
+  });
+
+  it("returns stateful Pixi effect transition docs from the shared catalog", () => {
+    const rain = getNaniHover("@rain power:0.5 time:0.3", { line: 0, character: 2 });
+    const glitchFilter = getNaniHover("@glitchFilter power:0 time:0.3", { line: 0, character: 4 });
+
+    expect(rain?.contents).toContain("插值");
+    expect(rain?.contents).toContain("power:0 time:x");
+    expect(glitchFilter?.contents).toContain("seed");
+    expect(glitchFilter?.contents).toContain("淡出移除");
   });
 
   it("returns inline command and inline speed docs", () => {

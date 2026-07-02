@@ -38,6 +38,39 @@ describe("completion provider logic", () => {
     expect(labels).toContain("wait!");
   });
 
+  it("suggests catalog allowed values in param value position", () => {
+    const source = "@showUI target:";
+    const completions = getNaniCompletions(source, { line: 0, character: source.length });
+
+    expect(completions.map((completion) => completion.label)).toEqual(["dialog", "commandBar", "toastLayer"]);
+    expect(completions[0]).toMatchObject({
+      insertText: "dialog",
+      kind: "value",
+      range: {
+        start: { line: 0, character: "@showUI target:".length },
+        end: { line: 0, character: "@showUI target:".length }
+      }
+    });
+  });
+
+  it("suggests allowed values for the current comma-list segment", () => {
+    const source = "@hideUI uINames:dialog,c";
+    const completions = getNaniCompletions(source, { line: 0, character: source.length });
+
+    expect(completions.map((completion) => completion.label)).toEqual(["commandBar"]);
+    expect(completions[0]?.range).toEqual({
+      start: { line: 0, character: "@hideUI uINames:dialog,".length },
+      end: { line: 0, character: source.length }
+    });
+  });
+
+  it("suggests boolean allowed values from catalog docs", () => {
+    const source = "@showUI visible:";
+    const completions = getNaniCompletions(source, { line: 0, character: source.length });
+
+    expect(completions.map((completion) => completion.label)).toEqual(["true", "false"]);
+  });
+
   it("suggests current file labels for goto primary targets", () => {
     const source = "#Start\n@goto #\n#End";
     const completions = getNaniCompletions(source, { line: 1, character: "@goto #".length });
