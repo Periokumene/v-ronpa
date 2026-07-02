@@ -142,6 +142,7 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
   await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-text-size", "large");
   await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-textbox-opacity", "0.5");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-ui-phase", "shown");
   await expect(page.getByTestId("pixi-layer")).toBeVisible();
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("aria-hidden", "false");
   await expect(page.getByTestId("vn-dialog-speaker")).toHaveText("旁白");
@@ -156,6 +157,7 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
   await expect(page.getByTestId("harness-showcase-pixi-characters")).toContainText("Ema/default@0.50,0.00");
   await expect(page.getByTestId("harness-showcase-pixi-tasks")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
+  await expect(page.getByTestId("vn-command-bar")).toHaveAttribute("data-ui-phase", "shown");
   await expect(page.getByTestId("vn-command-backlog")).toBeEnabled();
   await expect(page.getByTestId("vn-command-save")).toBeEnabled();
   await expect(page.getByTestId("vn-command-load")).toBeEnabled();
@@ -405,6 +407,10 @@ async function advanceMainInteractionShowcase(page: Page) {
   await advanceVn(page);
   await advanceUntilText(page, "CHECKPOINT MAIN 01B");
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-ui-phase", "shown");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveCSS("opacity", "1");
+  await expect(page.getByTestId("vn-command-bar")).toHaveAttribute("data-ui-phase", "shown");
+  await expect(page.getByTestId("vn-command-bar")).toHaveCSS("opacity", "1");
   await advanceUntilText(page, "附加文本验证");
   await advanceUntilInputPrompt(page);
   await expect(page.getByTestId("runtime-input-prompt")).toBeVisible();

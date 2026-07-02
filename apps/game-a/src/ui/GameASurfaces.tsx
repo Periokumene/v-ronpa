@@ -1,4 +1,4 @@
-import type { FormEvent, ReactNode } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import type {
   BacklogOverlayActions,
   BacklogOverlayViewModel,
@@ -61,9 +61,11 @@ export function GameADialogSurface({
       as="section"
       data-frame={assets.dialogFrameUri ? "resolved" : "fallback"}
       data-state={model.state}
+      data-ui-phase={model.presentation.phase}
       data-testid="vn-dialog-surface"
       role="region"
       className="game-a-dialog-surface"
+      style={gameADialogStyle(model)}
     >
       {config.dialog.showSpeakerName && model.speakerLabel ? (
         <div data-testid="vn-dialog-speaker" className="game-a-dialog-speaker">
@@ -108,7 +110,13 @@ function GameAChoiceOverlay({ actions, model }: SurfaceSlotProps<VnChoicesViewMo
 export function GameACommandBar({ actions, model }: SurfaceSlotProps<VnCommandBarViewModel, VnCommandBarActions>) {
   if (!model.visible) return null;
   return (
-    <nav aria-label="VN command bar" data-testid="vn-command-bar" className="game-a-command-bar">
+    <nav
+      aria-label="VN command bar"
+      data-testid="vn-command-bar"
+      data-ui-phase={model.presentation.phase}
+      className="game-a-command-bar"
+      style={{ opacity: model.presentation.opacity }}
+    >
       {model.commands.map((command) => (
         <button
           {...(command.toggle ? { "aria-pressed": command.active } : {})}
@@ -135,6 +143,13 @@ function formatGameACommandLabel(label: string): string {
   return label === "SETTING" ? "SETTINGS" : label;
 }
 
+function gameADialogStyle(model: VnDialogViewModel): CSSProperties & Record<string, string | number> {
+  return {
+    opacity: model.presentation.opacity,
+    "--dialog-opacity": model.display?.textboxOpacity ?? 0.96
+  };
+}
+
 function GameATitleSurface({ actions, config, model }: SurfaceSlotProps<TitleViewModel, TitleActions> & { config: GameAUiConfig }) {
   if (!model.visible) return null;
   return (
@@ -159,7 +174,13 @@ function GameATitleSurface({ actions, config, model }: SurfaceSlotProps<TitleVie
 function GameAToastLayer({ actions, model }: SurfaceSlotProps<RuntimeToastLayerViewModel, RuntimeToastActions>) {
   if (!model.visible || model.toasts.length === 0) return null;
   return (
-    <div aria-live="polite" data-testid="runtime-toast-layer" className="game-a-toast-layer">
+    <div
+      aria-live="polite"
+      data-testid="runtime-toast-layer"
+      data-ui-phase={model.presentation.phase}
+      className="game-a-toast-layer"
+      style={{ opacity: model.presentation.opacity }}
+    >
       {model.toasts.map((toast) => (
         <button data-testid="runtime-toast" key={toast.id} onClick={() => actions.dismiss(toast.id)} type="button">
           <RichTextRenderer document={toast.richText} fallbackText={toast.text} />

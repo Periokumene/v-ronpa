@@ -2,6 +2,7 @@ import type { RichTextDocument } from "@v-ronpa/contracts";
 import { useId } from "react";
 import type { CSSProperties } from "react";
 import { RichTextRenderer } from "./RichTextRenderer";
+import type { UiSurfacePresentationLike } from "./types";
 import { VN_UI_LAYER_Z_INDEX } from "./vnLayers";
 
 export interface VnDialogDisplaySettings {
@@ -15,6 +16,7 @@ export interface VnDialogSurfaceProps {
   text: string;
   richText?: RichTextDocument;
   displaySettings?: VnDialogDisplaySettings;
+  presentation?: UiSurfacePresentationLike;
   state?: VnDialogState;
 }
 
@@ -43,6 +45,7 @@ export function VnDialogSurface({
   text,
   richText,
   displaySettings,
+  presentation,
   state = "line"
 }: VnDialogSurfaceProps) {
   const speakerLabel = speaker ?? "旁白";
@@ -61,9 +64,10 @@ export function VnDialogSurface({
       data-text-size={textSize}
       data-text-speed={String(textSpeed)}
       data-textbox-opacity={String(textboxOpacity)}
+      data-ui-phase={presentation?.phase ?? "shown"}
       data-testid="vn-dialog-surface"
       role="region"
-      style={dialogRootStyle(textboxOpacity)}
+      style={dialogRootStyle(textboxOpacity, presentation?.opacity ?? 1)}
     >
       <div style={headerStyle}>
         <div data-testid="vn-dialog-speaker" id={speakerId} style={speakerStyle}>
@@ -110,7 +114,7 @@ const rootStyle: CSSProperties = {
   pointerEvents: "none"
 };
 
-function dialogRootStyle(textboxOpacity: number): CSSProperties {
+function dialogRootStyle(textboxOpacity: number, opacity: number): CSSProperties {
   const primaryOpacity = clamp(textboxOpacity, TEXTBOX_OPACITY_LIMITS.primaryMin, TEXTBOX_OPACITY_LIMITS.max);
   const secondaryOpacity = clamp(
     textboxOpacity * TEXTBOX_OPACITY_LIMITS.secondaryMultiplier,
@@ -119,6 +123,7 @@ function dialogRootStyle(textboxOpacity: number): CSSProperties {
   );
   return {
     ...rootStyle,
+    opacity: clamp(opacity, 0, 1),
     background: `linear-gradient(180deg, rgba(11, 16, 23, ${primaryOpacity}), rgba(13, 20, 31, ${secondaryOpacity}))`
   };
 }

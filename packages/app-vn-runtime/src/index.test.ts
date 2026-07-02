@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
-import { createVoiceAssetId, planDialogueLineAudio, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
+import { createInitialUiRuntimeState, createVoiceAssetId, planDialogueLineAudio, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
 import type {
   ContentManifest,
   RuntimeAsset,
@@ -36,7 +36,11 @@ describe("app VN runtime helpers", () => {
     const scheduled: Array<{ callback: () => void; durationMs: number }> = [];
     const dismissed: string[] = [];
     const state: UiRuntimeState = {
-      visible: { dialog: true, commandBar: true, toastLayer: false },
+      ...createInitialUiRuntimeState(),
+      surfaces: {
+        ...createInitialUiRuntimeState().surfaces,
+        toastLayer: { targetVisible: false, mounted: false, opacity: 0, phase: "hidden" }
+      },
       toasts: [{ id: "toast:1", text: "Hidden toast", durationMs: 100 }]
     };
 
@@ -108,6 +112,39 @@ describe("app VN runtime helpers", () => {
         code: "runtime-wait-cleared-on-load",
         severity: "warning",
         message: "Saved runtimeWait was cleared during restore because runtime waits are transient app state."
+      }
+    ]);
+  });
+
+  it("plans restore without carrying transient UI presentation wait state", () => {
+    const runtimeScript = compileScenario("Felix: Restore UI wait.", "restore-ui-wait-test.nani");
+    const story = {
+      ...createInitialStoryState(runtimeScript),
+      instructionPointer: 1,
+      presentationWait: {
+        channel: "ui" as const,
+        commandId: "hideui",
+        commandIndex: 0,
+        durationMs: 200,
+        targets: ["dialog" as const],
+        targetVisible: false
+      }
+    };
+
+    const plan = createVnRuntimeRestorePlan({
+      active: true,
+      pixiStage: createInitialPixiStageSnapshot(),
+      script: runtimeScript,
+      story: storyRuntimeSnapshot(story)
+    });
+
+    expect(plan.storyRuntime.state.presentationWait).toBeUndefined();
+    expect(plan.diagnostics).toEqual([
+      {
+        source: "story",
+        code: "ui-presentation-wait-cleared-on-load",
+        severity: "warning",
+        message: "Saved UI presentationWait was cleared during restore because UI transitions are transient app state."
       }
     ]);
   });
@@ -448,6 +485,25 @@ describe("app VN runtime helpers", () => {
     };
 
     expect(canAdvanceVnStoryFromSource(activeStory, "manual")).toBe(true);
+    expect(
+      canAdvanceVnStoryFromSource(
+        {
+          ...activeStory,
+          state: {
+            ...activeStory.state,
+            presentationWait: {
+              channel: "ui",
+              commandId: "hideui",
+              commandIndex: 0,
+              durationMs: 200,
+              targets: ["dialog"],
+              targetVisible: false
+            }
+          }
+        },
+        "manual"
+      )
+    ).toBe(true);
     expect(
       canAdvanceVnStoryFromSource(
         {

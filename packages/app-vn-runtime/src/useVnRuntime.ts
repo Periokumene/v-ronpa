@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AssetResolver } from "@v-ronpa/asset-registry";
 import {
   advanceDialogReveal,
+  advanceUiRuntimeTransitions,
   clearMovieOverlay,
   completeDialogReveal,
   countDialogRevealUnits,
@@ -13,6 +14,9 @@ import {
   createVnRuntimePresentationTransaction,
   deriveUiRuntimeLifecycleState,
   dismissToast,
+  hasActiveUiRuntimeTransitions,
+  isUiPresentationWait,
+  isUiPresentationWaitComplete,
   planDialogueLineAudio,
   reduceDialogueAudioLifecycle,
   selectDialogPlaybackAdvanceGate,
@@ -21,6 +25,8 @@ import {
   selectVisibleRevealText,
   shouldDriveDialogReveal,
   startMovieOverlay,
+  settleUiRuntimePresentationWait,
+  settleUiRuntimeTransitions,
   type DialogPlaybackScheduleSource,
   type DialogRevealEvent,
   type DialogRevealState,
@@ -127,7 +133,6 @@ const DEFAULT_DIALOGUE_BLEEP_SETTINGS: VnRuntimeDialogueBleepSettings = { volume
 const DEFAULT_DIALOG_REVEAL_SETTINGS: VnRuntimeDialogRevealSettings = {
   textSpeed: createDefaultSettingsSnapshot().display.textSpeed
 };
-const DIALOG_REVEAL_TICK_INTERVAL_MS = 16;
 const MAX_DIALOG_REVEAL_EVENTS = 50;
 
 export interface UseVnRuntimeOptions {
@@ -349,16 +354,35 @@ export function useVnRuntime({
     return () => window.clearTimeout(timeout);
   }, [dialogRevealRuntime.state?.lineKey, dialogRevealRuntime.state?.status, session.active, storyPlaySchedule]);
 
+  const shouldDriveVisualRuntime =
+    shouldDriveDialogReveal({ active: session.active, reveal: dialogRevealRuntime.state }) ||
+    hasActiveUiRuntimeTransitions(uiRuntime.state);
+
   useEffect(() => {
-    const reveal = dialogRevealRuntime.state;
-    if (!shouldDriveDialogReveal({ active: session.active, reveal })) return;
-    const interval = window.setInterval(() => advanceActiveDialogReveal(), DIALOG_REVEAL_TICK_INTERVAL_MS);
-    return () => window.clearInterval(interval);
-  }, [dialogRevealRuntime.state?.lineKey, dialogRevealRuntime.state?.status, session.active]);
+    if (!shouldDriveVisualRuntime) return;
+    let frame = 0;
+    const tick = () => {
+      const nowMs = readVnRuntimeNowMs();
+      advanceActiveDialogReveal(nowMs);
+      advanceActiveUiRuntimeTransitions(nowMs);
+      if (
+        shouldDriveDialogReveal({ active: sessionRef.current.active, reveal: dialogRevealRuntimeRef.current.state }) ||
+        hasActiveUiRuntimeTransitions(uiRuntimeRef.current.state)
+      ) {
+        frame = window.requestAnimationFrame(tick);
+      }
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [shouldDriveVisualRuntime]);
 
   useEffect(() => {
     const wait = session.story.presentationWait;
     if (!session.active || !wait) return;
+    if (isUiPresentationWait(wait)) {
+      completeUiPresentationWaitIfReady("system");
+      return;
+    }
     const expectedTasks = wait.expectedTasks ?? [];
     if (expectedTasks.length === 0) {
       const timeout = window.setTimeout(() => completePresentationWaitAndAdvance("system"), 0);
@@ -490,10 +514,10 @@ export function useVnRuntime({
     }
   }
 
-  function advanceActiveDialogReveal() {
+  function advanceActiveDialogReveal(nowMs = readVnRuntimeNowMs()) {
     const reveal = dialogRevealRuntimeRef.current.state;
     if (!reveal || reveal.status === "complete") return;
-    const step = advanceDialogReveal(reveal, readVnRuntimeNowMs());
+    const step = advanceDialogReveal(reveal, nowMs);
     if (
       step.events.length === 0 &&
       step.state.status === reveal.status &&
@@ -502,6 +526,21 @@ export function useVnRuntime({
       return;
     }
     appendDialogRevealEvents(step.state, step.events);
+  }
+
+  function advanceActiveUiRuntimeTransitions(nowMs: number) {
+    if (!hasActiveUiRuntimeTransitions(uiRuntimeRef.current.state)) return;
+    setUiRuntimeNow((current) => {
+      const state = advanceUiRuntimeTransitions(current.state, nowMs);
+      return state === current.state ? current : { state };
+    });
+    completeUiPresentationWaitIfReady("system");
+  }
+
+  function completeUiPresentationWaitIfReady(source: StoryPlayAdvanceSource) {
+    const wait = sessionRef.current.story.presentationWait;
+    if (!isUiPresentationWait(wait)) return;
+    if (isUiPresentationWaitComplete(uiRuntimeRef.current.state, wait)) completePresentationWaitAndAdvance(source);
   }
 
   function completeActiveDialogReveal(): boolean {
@@ -627,7 +666,7 @@ export function useVnRuntime({
     }
 
     if (current.story.presentationWait) {
-      completePresentationWaitAndAdvance(source, { settlePixi: true });
+      completePresentationWaitAndAdvance(source, { settlePixi: true, settleUi: true });
       return;
     }
 
@@ -803,7 +842,9 @@ export function useVnRuntime({
     source,
     storyDiagnostics = []
   }: CommitVnSessionStepInput) {
+    const nowMs = readVnRuntimeNowMs();
     const transaction = createVnRuntimePresentationTransaction({
+      nowMs,
       runtimeCommands,
       previousMediaState: mediaRuntimeRef.current.state,
       previousPixiStage,
@@ -814,7 +855,7 @@ export function useVnRuntime({
     setLastRuntimeCommandCount(runtimeCommands.length);
     if (transaction.gameplayEvents.length > 0) onGameplayEvents?.(transaction.gameplayEvents);
     const animatePixi = shouldAnimateVnStoryPlayPacing(pacing);
-    const nextStoryState = nextSession.story.presentationWait
+    const nextStoryState = nextSession.story.presentationWait?.channel === "pixi"
       ? {
           ...nextSession.story,
           presentationWait: {
@@ -831,7 +872,7 @@ export function useVnRuntime({
     };
     const dialogueAudio = commitDialogRevealForStoryStep({
       active,
-      dialogVisible: transaction.uiState.visible.dialog,
+      dialogVisible: transaction.uiState.surfaces.dialog.targetVisible,
       pacing,
       runtimeCommands,
       storyPlayState: sessionForCommit.play,
@@ -998,6 +1039,7 @@ export function useVnRuntime({
     const currentSession = sessionRef.current;
     const wait = currentSession.story.presentationWait;
     if (!currentSession.active || !wait) return;
+    if (wait.channel !== "pixi") return;
     const expectedTasks = wait.expectedTasks ?? [];
     if (expectedTasks.length === 0) return;
     const waitKey = vnPresentationWaitKey(wait);
@@ -1017,7 +1059,7 @@ export function useVnRuntime({
 
   function completePresentationWaitAndAdvance(
     source: StoryPlayAdvanceSource,
-    options: { settlePixi?: boolean } = {}
+    options: { settlePixi?: boolean; settleUi?: boolean } = {}
   ) {
     const current = sessionRef.current;
     const wait = current.story.presentationWait;
@@ -1028,7 +1070,7 @@ export function useVnRuntime({
     completingWaitKeyRef.current = waitKey;
     observedWaitTasksRef.current = undefined;
 
-    if (options.settlePixi) {
+    if (options.settlePixi && wait.channel === "pixi") {
       setPixiStageRuntimeNow((currentPixi) => ({
         ...currentPixi,
         hints: [],
@@ -1036,6 +1078,9 @@ export function useVnRuntime({
         animate: false,
         presentationTasks: []
       }));
+    }
+    if (options.settleUi && isUiPresentationWait(wait)) {
+      setUiRuntimeNow((currentUi) => ({ state: settleUiRuntimePresentationWait(currentUi.state, wait) }));
     }
 
     const completed = completeVnSessionPresentationWait(current);

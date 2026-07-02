@@ -279,6 +279,7 @@ describe("story engine", () => {
     expect(first.state).toMatchObject({
       instructionPointer: 1,
       presentationWait: {
+        channel: "pixi",
         commandId: "char",
         durationMs: 250,
         target: "Ema"
@@ -298,6 +299,44 @@ describe("story engine", () => {
     expect(resumed.stopReason).toBe("text");
     expect(resumed.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["print"]);
     expect(resumed.state.backlog).toEqual([{ speaker: "Felix", text: "After animation." }]);
+  });
+
+  it("stops on waitable runtime UI transitions with concrete target metadata", () => {
+    const runtimeScript = runtimeScriptFixture("ui-presentation-wait.nani", [
+      runtimeCommand("hideui", "ui", { target: "dialog", visible: false, durationMs: 200, wait: true }, { canonicalName: "hideUI" }),
+      runtimeCommand("print", "text", { speaker: "Felix", text: "After UI fade.", autoNext: false })
+    ]);
+    const first = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+
+    expect(first.stopReason).toBe("presentation-wait");
+    expect(first.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["hideui"]);
+    expect(first.state.presentationWait).toEqual({
+      channel: "ui",
+      commandId: "hideui",
+      commandIndex: 0,
+      durationMs: 200,
+      targets: ["dialog"],
+      targetVisible: false
+    });
+
+    const completed = reduceWithoutDiagnostics(first.state, { type: "PRESENTATION_COMPLETE", script: runtimeScript });
+    const resumed = advanceToNextStop(completed.state, runtimeScript);
+    expect(resumed.stopReason).toBe("text");
+    expect(resumed.state.backlog.at(-1)).toEqual({ speaker: "Felix", text: "After UI fade." });
+  });
+
+  it("does not create UI presentation waits without wait! or valid runtime UI targets", () => {
+    const runtimeScript = runtimeScriptFixture("ui-presentation-no-wait.nani", [
+      runtimeCommand("hideui", "ui", { target: "dialog", visible: false, durationMs: 200, wait: false }, { canonicalName: "hideUI" }),
+      runtimeCommand("hideui", "ui", { target: "debugPanel", visible: false, durationMs: 200, wait: true }, { canonicalName: "hideUI" }),
+      runtimeCommand("print", "text", { speaker: "Felix", text: "No UI wait.", autoNext: false })
+    ]);
+    const result = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+
+    expect(result.stopReason).toBe("text");
+    expect(result.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["hideui", "hideui", "print"]);
+    expect(result.state.presentationWait).toBeUndefined();
+    expect(result.state.backlog.at(-1)).toEqual({ speaker: "Felix", text: "No UI wait." });
   });
 
   it("resolves expression params before emitting runtime commands", () => {

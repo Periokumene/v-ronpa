@@ -1,20 +1,46 @@
 #Start
-@showUI dialog
-@showUI commandBar visible:true
-@back bg:game-a-academy-hall-fullscreen effect:fade time:0.12
-@inback bg:game-a-snow-outskirts-frame effect:fade time:0.12
+; @showUI dialog
+; @showUI commandBar visible:true
+
+; @back bg:game-a-academy-hall-fullscreen effect:fade time:0.12
+; @inback bg:game-a-snow-outskirts-frame effect:fade time:0.12
+
 @bgm bgm:game-a-main group:music volume:0.35 fade:0.1
 @sfx sfx:game-a-chime volume:0.5
+@rain power:1 wind:-1 hue:1 tint:0.8
+
+@hideUI dialog
+@showUI dialog time:0.5 wait!
+
+Narrator: 我很喜欢下雨 
+Narrator: 那种感觉就像是被 如瀑的暴雨隔绝在另一个世界。雨的那边是真实的世界，而这边是我一个人的孤岛
+
+
+@hideUI dialog time:0.8
+@hideUI commandBar time:0.8 wait!
+
+
+Narrator:  
+@rain power:0
+@showUI dialog time:0.5 wait!
+
 Narrator: Game A VN framework smoke。这个入口接入共享 VN runtime，不连接 Trial 或 3D。
 Narrator: 手动添加了一行
 Mira: 第一层验证是 DOM 对话框、Pixi 背景、BGM、SFX 和命令栏同时工作。[>]
 @choice "继续调查" goto:#Investigate
 @choice "检查设置与存档" goto:#SaveLoad
 
+
+
 #Investigate
 @set route:"investigate"
 Narrator: 你记录了房间里的异常光线。AUTO 与 SKIP 会在这里继续使用共享 runtime 调度。
 Mira: 这句没有 voice 资源，应回退到 game-a 自己的 dialogue bleep。
+@hideUI dialog time:0.2 wait!
+@hideUI commandBar time:0.2 wait!
+@showUI dialog time:0.2 wait!
+@showUI commandBar visible:true time:0.2 wait!
+Narrator: CHECKPOINT GAME-A UI FADE - custom dialog 与 command bar fade wait 已完成，UI 已恢复。
 Mira: 这句带有 textId，应播放 game-a 独立 voice 资源。|#game_a_voice_0001|
 @flash color:#ffffff time:0.18 wait!
 Narrator: CHECKPOINT GAME-A WAIT - Pixi wait! 已完成，剧情恢复推进。

@@ -187,9 +187,7 @@
   display: grid;
   align-items: center;
   padding: clamp(24px, 8vw, 96px);
-  background:
-    linear-gradient(90deg, rgba(8, 12, 17, 0.9) 0%, rgba(8, 12, 17, 0.62) 44%, rgba(8, 12, 17, 0.18) 100%),
-    linear-gradient(135deg, #10151a, #211821 58%, #182220);
+  background: #000;
   pointer-events: auto;
 }
 

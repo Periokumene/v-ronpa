@@ -12,6 +12,7 @@ import type {
 } from "@v-ronpa/contracts";
 import type { CSSProperties, ReactNode } from "react";
 import { RichTextRenderer } from "./RichTextRenderer";
+import type { UiSurfacePresentationLike } from "./types";
 
 export interface TitleSurfaceProps {
   capabilities: InteractionCapabilitySnapshot;
@@ -44,6 +45,7 @@ export function TitleSurface({ capabilities, onAction, title = "V-Ronpa" }: Titl
 export interface VnCommandBarProps {
   commands: VnCommandBarCommand[];
   onAction: (action: GameUiAction) => void;
+  presentation?: UiSurfacePresentationLike;
 }
 
 export interface VnCommandBarCommand {
@@ -55,10 +57,15 @@ export interface VnCommandBarCommand {
   toggle: boolean;
 }
 
-export function VnCommandBar({ commands, onAction }: VnCommandBarProps) {
+export function VnCommandBar({ commands, onAction, presentation }: VnCommandBarProps) {
   return (
     <Tooltip.Provider delayDuration={120}>
-      <nav aria-label="VN command bar" data-testid="vn-command-bar" style={commandBarStyle}>
+      <nav
+        aria-label="VN command bar"
+        data-testid="vn-command-bar"
+        data-ui-phase={presentation?.phase ?? "shown"}
+        style={surfacePresentationStyle(commandBarStyle, presentation)}
+      >
         {commands.map((command) => {
           const active = Boolean(command.active);
           return (
@@ -561,6 +568,13 @@ const commandBarStyle: CSSProperties = {
   justifyContent: "flex-end",
   gap: 6
 };
+
+function surfacePresentationStyle(
+  style: CSSProperties,
+  presentation: UiSurfacePresentationLike | undefined
+): CSSProperties {
+  return presentation ? { ...style, opacity: presentation.opacity } : style;
+}
 
 const commandButtonStyle: CSSProperties = {
   border: "1px solid rgba(255, 209, 102, 0.62)",

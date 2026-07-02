@@ -1044,6 +1044,12 @@ describe("contracts", () => {
       runtimeSupport: "declared-not-consumed",
       runtimeNoteZh: expect.stringContaining("暂未消费")
     });
+    expect(getNaniCommandDefinition("hideUI")?.params.find((paramSpec) => paramSpec.name === "wait")?.docs).toMatchObject({
+      runtimeSupport: "consumed"
+    });
+    expect(getNaniCommandDefinition("showUI")?.params.find((paramSpec) => paramSpec.name === "wait")?.docs).toMatchObject({
+      runtimeSupport: "consumed"
+    });
     expect(getNaniCommandDefinition("bgm")?.params.find((paramSpec) => paramSpec.name === "volume")?.docs).toMatchObject({
       runtimeSupport: "consumed",
       recommendedRange: { min: 0, max: 1 }

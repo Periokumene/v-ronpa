@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type FormEvent } from "react";
 import type { RichTextDocument } from "@v-ronpa/contracts";
 import { RichTextRenderer } from "./RichTextRenderer";
+import type { UiSurfacePresentationLike } from "./types";
 
 export interface RuntimeToastView {
   id: string;
@@ -12,12 +13,18 @@ export interface RuntimeToastLayerProps {
   visible?: boolean;
   toasts: RuntimeToastView[];
   onDismiss?: (toastId: string) => void;
+  presentation?: UiSurfacePresentationLike;
 }
 
-export function RuntimeToastLayer({ onDismiss, toasts, visible = true }: RuntimeToastLayerProps) {
+export function RuntimeToastLayer({ onDismiss, presentation, toasts, visible = true }: RuntimeToastLayerProps) {
   if (!visible || toasts.length === 0) return null;
   return (
-    <div aria-live="polite" data-testid="runtime-toast-layer" style={toastLayerStyle}>
+    <div
+      aria-live="polite"
+      data-testid="runtime-toast-layer"
+      data-ui-phase={presentation?.phase ?? "shown"}
+      style={presentation ? { ...toastLayerStyle, opacity: presentation.opacity } : toastLayerStyle}
+    >
       {toasts.map((toast) => (
         <button data-testid="runtime-toast" key={toast.id} onClick={() => onDismiss?.(toast.id)} style={toastStyle} type="button">
           <RichTextRenderer document={toast.richText} fallbackText={toast.text} />

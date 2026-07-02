@@ -43,7 +43,7 @@ export type {
   VnCommandBarCommand,
   VnCommandBarProps
 } from "./surfaces/GameInteractionSurfaces";
-export type { InspectorLiteProps, ScenarioOption } from "./surfaces/types";
+export type { InspectorLiteProps, ScenarioOption, UiSurfacePresentationLike } from "./surfaces/types";
 export type { SurfaceFrameInteraction, SurfaceFrameProps } from "./surfaces/SurfaceFrame";
 export type {
   RuntimeInputPromptProps,

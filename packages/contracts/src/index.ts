@@ -35,6 +35,10 @@ export const GameUiActionSchema = z.enum([
 ]);
 export type GameUiAction = z.infer<typeof GameUiActionSchema>;
 
+export const RUNTIME_UI_GROUPS = ["dialog", "commandBar", "toastLayer"] as const;
+export const RuntimeUiGroupSchema = z.enum(RUNTIME_UI_GROUPS);
+export type RuntimeUiGroup = z.infer<typeof RuntimeUiGroupSchema>;
+
 export const NaviSubstateSchema = z.enum(["walk", "interacting", "vn2d-overlay", "inventory", "event"]);
 export type NaviSubstate = z.infer<typeof NaviSubstateSchema>;
 
@@ -908,7 +912,7 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   glitchfilter: ["time", "easing", "power", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"],
   goto: ["path"],
   hidechars: ["time", "lazy", "wait"],
-  hideui: ["uINames", "target", "time"],
+  hideui: ["uINames", "target", "time", "wait"],
   inback: ["appearanceAndTransition", "appearance", "via", "effect", "visible", "easing", "time", "wait"],
   input: ["variableName", "type", "summary", "value"],
   movie: ["moviePath", "time", "block"],
@@ -920,7 +924,7 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   sfxfast: ["sfxPath", "volume", "group"],
   shake: ["actorId", "target", "count", "loop", "time", "deltaTime", "power", "deltaPower", "hor", "ver", "wait", "intensity", "duration"],
   showprinter: ["printerId", "time"],
-  showui: ["uINames", "target", "visible", "time"],
+  showui: ["uINames", "target", "visible", "time", "wait"],
   slide: ["idAndAppearance", "from", "to", "visible", "easing", "time", "lazy", "wait"],
   snow: ["power", "time", "xSpeed", "ySpeed", "density", "flakeScale", "sway", "fog", "noise", "seed", "pos", "position", "rotation", "scale", "wait"],
   stopbgm: ["bgmPath", "fade", "group"],
@@ -1060,11 +1064,13 @@ const commandParamDocOverrides: Record<string, Record<string, Partial<NaniComman
   showui: {
     visible: { defaultValue: true },
     uINames: { allowedValues: ["dialog", "commandBar", "toastLayer"] },
-    target: { allowedValues: ["dialog", "commandBar", "toastLayer"] }
+    target: { allowedValues: ["dialog", "commandBar", "toastLayer"] },
+    wait: { defaultValue: false }
   },
   hideui: {
     uINames: { allowedValues: ["dialog", "commandBar", "toastLayer"] },
-    target: { allowedValues: ["dialog", "commandBar", "toastLayer"] }
+    target: { allowedValues: ["dialog", "commandBar", "toastLayer"] },
+    wait: { defaultValue: false }
   },
   wait: {
     waitMode: { zh: "等待模式。`i` 表示等待确认，数字表示秒数，`i5` 表示等待 5 秒或确认。", defaultValue: "i", examples: ["i", "1.5", "i5"] }
@@ -1955,7 +1961,8 @@ export const StoryPresentationWaitTaskSchema = z.object({
 });
 export type StoryPresentationWaitTask = z.infer<typeof StoryPresentationWaitTaskSchema>;
 
-export const StoryPresentationWaitSchema = z.object({
+export const StoryPixiPresentationWaitSchema = z.object({
+  channel: z.literal("pixi"),
   commandId: z.string().min(1),
   commandIndex: z.number().int().nonnegative().optional(),
   durationMs: z.number().int().nonnegative(),
@@ -1963,6 +1970,22 @@ export const StoryPresentationWaitSchema = z.object({
   stageRevision: z.number().int().nonnegative().optional(),
   expectedTasks: z.array(StoryPresentationWaitTaskSchema).default([])
 });
+export type StoryPixiPresentationWait = z.infer<typeof StoryPixiPresentationWaitSchema>;
+
+export const StoryUiPresentationWaitSchema = z.object({
+  channel: z.literal("ui"),
+  commandId: z.string().min(1),
+  commandIndex: z.number().int().nonnegative().optional(),
+  durationMs: z.number().int().nonnegative(),
+  targets: z.array(RuntimeUiGroupSchema).min(1),
+  targetVisible: z.boolean()
+});
+export type StoryUiPresentationWait = z.infer<typeof StoryUiPresentationWaitSchema>;
+
+export const StoryPresentationWaitSchema = z.discriminatedUnion("channel", [
+  StoryPixiPresentationWaitSchema,
+  StoryUiPresentationWaitSchema
+]);
 export type StoryPresentationWait = z.infer<typeof StoryPresentationWaitSchema>;
 
 export const GameplayEventSchema = z.discriminatedUnion("type", [

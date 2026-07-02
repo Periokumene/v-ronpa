@@ -1,4 +1,4 @@
-import type { StoryRuntimeSnapshot } from "@v-ronpa/contracts";
+import type { StoryPresentationWaitTask, StoryRuntimeSnapshot } from "@v-ronpa/contracts";
 import { dismissToast, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
 import { createInitialPixiStageSnapshot, type PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
 import type { StoryPlayAdvanceSource, StoryPlayPacing, StoryPlayState } from "@v-ronpa/story-play";
@@ -92,13 +92,14 @@ export function resolveVnPresentationWaitAdvanceSource(
 }
 
 export function vnPresentationWaitKey(wait: NonNullable<StoryRuntimeSnapshot["presentationWait"]>): string {
+  if (wait.channel === "ui") {
+    return `${wait.commandIndex ?? "unknown"}:${wait.commandId}:ui:${wait.targets.join(",")}:${String(wait.targetVisible)}`;
+  }
   const tasks = (wait.expectedTasks ?? []).map(vnPresentationWaitTaskKey).join("|");
-  return `${wait.commandIndex ?? "unknown"}:${wait.commandId}:${wait.stageRevision ?? "none"}:${tasks}`;
+  return `${wait.commandIndex ?? "unknown"}:${wait.commandId}:pixi:${wait.stageRevision ?? "none"}:${tasks}`;
 }
 
-export function vnPresentationWaitTaskKey(
-  task: NonNullable<StoryRuntimeSnapshot["presentationWait"]>["expectedTasks"][number]
-): string {
+export function vnPresentationWaitTaskKey(task: StoryPresentationWaitTask): string {
   return `${task.kind}:${task.target}:${task.revision}`;
 }
 
@@ -109,4 +110,3 @@ export function vnPixiPresentationTaskKey(task: PixiPresentationTaskSnapshot): s
 export function readVnRuntimeNowMs(): number {
   return globalThis.performance?.now?.() ?? Date.now();
 }
-

@@ -9,16 +9,17 @@ VN runtime output is split across shared app-layer packages and render surfaces:
 - `createVnRuntimePresentationTransaction` fans those emitted runtime commands
   out to runtime consumers such as Pixi stage snapshots, render hints, and
   gameplay events.
-- `packages/app-vn-dispatch` also owns the pure dialog reveal, playback gate,
-  and dialogue audio planners. It does not own browser timers, React state,
-  asset resolution, or media ports.
+- `packages/app-vn-dispatch` also owns pure reducers/helpers for dialog reveal,
+  runtime UI surface presentation, playback gates, and dialogue audio planning.
+  It does not own browser timers, React state, asset resolution, or media ports.
 - `packages/app-vn-runtime` hosts the reusable VN runtime loop that app
   wrappers call. It derives transient dialog text reveal state from emitted
-  `print` plus the current Story line, owns reveal timers, AUTO/SKIP schedule
-  hosting, voice auto-advance gates, live media handles, movie overlay playback,
-  Pixi wait task observation, runtime-wait completion, and restore/reset cleanup.
-  StoryEngine continues to own the complete visible line, backlog, and save
-  snapshot.
+  `print` plus the current Story line, owns runtime UI state and the shared RAF
+  visual clock for dialog reveal/UI transitions, AUTO/SKIP schedule hosting,
+  voice auto-advance gates, live media handles, movie overlay playback, Pixi/UI
+  presentation-wait completion, runtime-wait completion, and restore/reset
+  cleanup. StoryEngine continues to own the complete visible line, backlog, and
+  save snapshot.
 - `VnRuntimeDispatcher` renders already-materialized Pixi stage state.
   `GameInteractionShell` renders DOM runtime UI surfaces such as dialog
   display, choice overlay, command bar, toast, input prompt, and movie overlay.
@@ -60,15 +61,17 @@ VN runtime output is split across shared app-layer packages and render surfaces:
   command streams, presentation logs, or transient effects.
 - `packages/app-vn-dispatch` owns shared headless fanout from emitted
   `RuntimeCommand` records: route selection, presentation transactions,
-  media/UI reducers, dialog reveal pacing, dialog playback gate selection, and
-  dialogue audio planning.
+  media/UI reducers, dialog reveal pacing helpers, dialog playback gate
+  selection, and dialogue audio planning. It defines the pure `UiRuntimeState`
+  reducer shape, but `app-vn-runtime` is the live holder of that state.
 - `VnRuntimeDispatcher` owns React rendering of the Pixi layer from committed
   runtime state and receives the app-created structural asset resolver for Pixi
   texture loads.
 - `GameInteractionShell` owns React mounting for DOM runtime UI surfaces from
-  committed app runtime state. Script-controlled `showUI` / `hideUI` visibility
-  applies only to concrete runtime UI surfaces, not shell overlays, debug
-  readouts, or Pixi.
+  committed app runtime state. Script-controlled `showUI` / `hideUI`
+  presentation applies only to concrete runtime UI surfaces (`dialog`,
+  `commandBar`, `toastLayer`), not shell overlays, debug readouts, lifecycle
+  input/movie overlays, or Pixi.
 - `GameInteractionShell` remains an orchestration layer: it updates flow
   context, handles ESC close/pause behavior, mounts the VN advance hit plane,
   gates choices, dispatches command actions, submits input prompts, dismisses
@@ -86,6 +89,11 @@ VN runtime output is split across shared app-layer packages and render surfaces:
   save data. When StoryEngine is stopped on an explicit Pixi `wait!`,
   `app-vn-runtime` matches the wait's `expectedTasks` against these snapshots to
   resume story flow on real Pixi completion.
+- UI `presentationWait` uses the same StoryEngine wait slot with
+  `channel: "ui"`, explicit `targets`, and `targetVisible`. `app-vn-runtime`
+  advances UI transitions through its visual clock and releases the wait when all
+  target surfaces reach their terminal presentation state. Manual continue or
+  SKIP settles the target UI surfaces to the wait terminal state before resuming.
 - Settings are not routed through StoryEngine or RuntimeCommand output.
   `packages/app-vn-shell` exposes the reusable settings adapter, and each app
   derives VN dialog display props and story-play timing policy from the
@@ -273,13 +281,17 @@ instantly revealing a line does not synthesize catch-up `reveal-tick` events, so
 bleep playback does not burst during manual completion, SKIP, or restore-like
 paths.
 
-Presentation wait release is task-driven. `createVnRuntimePresentationTransaction`
-returns Pixi wait descriptors, `app-vn-runtime` stores them on
+Pixi presentation wait release is task-driven.
+`createVnRuntimePresentationTransaction` returns Pixi wait descriptors,
+`app-vn-runtime` stores them on
 `StoryRuntimeState.presentationWait.expectedTasks`, and `onTasksChanged`
 completion triggers `PRESENTATION_COMPLETE` followed by immediate StoryEngine
 resume. `app-vn-runtime` timers are fallback diagnostics only, not the primary
-wait release mechanism. Manual advance during the wait settles Pixi to the
-terminal snapshot and then resumes story flow.
+Pixi wait release mechanism. UI presentation wait release is transition-driven:
+`app-vn-runtime` advances `UiRuntimeState.surfaces` on the shared visual clock
+and resumes when each target reaches the requested terminal visibility. Manual
+advance during a wait settles the relevant Pixi or UI presentation to terminal
+state and then resumes story flow.
 
 ## Game A Consumption
 
@@ -295,8 +307,9 @@ Surfaces for dialog, choices, command bar, title, backlog, save/load, settings,
 pause, toast, and input prompt. The dialog frame texture is registered as a
 `RuntimeAsset` and declared by the Game A VN entry `assetRefs`. Game A keeps the
 dialog frame asset id in app-local UI config, resolves it through its app-created
-`AssetRegistry`, then passes the resolved URL to the custom dialog Surface. Frame
-rendering details remain in Game A's app-local surface and CSS.
+`AssetRegistry`, then passes the resolved asset availability to the custom dialog
+Surface. The current Game A skin keeps frame rendering CSS-only; the resolved
+asset is an app-local resource readiness signal rather than shared runtime state.
 
 ## Harness Showcase Migration
 

@@ -116,6 +116,7 @@ describe("VN runtime presentation transaction", () => {
     });
 
     expect(advanced.state.presentationWait).toMatchObject({
+      channel: "pixi",
       commandId: "char",
       commandIndex: 0,
       durationMs: 250
@@ -209,10 +210,49 @@ describe("VN runtime presentation transaction", () => {
 
     expect(transaction.pixiStage).toBe(initialPixiStage);
     expect(transaction.mediaEffects).toEqual([]);
-    expect(transaction.uiState.visible.dialog).toBe(true);
-    expect(transaction.uiState.visible.commandBar).toBe(true);
-    expect(transaction.uiState.visible.toastLayer).toBe(false);
+    expect(transaction.uiState.surfaces.dialog).toMatchObject({ targetVisible: true, mounted: true, opacity: 1, phase: "shown" });
+    expect(transaction.uiState.surfaces.commandBar).toMatchObject({ targetVisible: true, mounted: true, opacity: 1, phase: "shown" });
+    expect(transaction.uiState.surfaces.toastLayer).toMatchObject({ targetVisible: false, mounted: false, opacity: 0, phase: "hidden" });
     expect(transaction.uiState.toasts).toEqual([{ id: "toast:1", text: "Ready", durationMs: 1200 }]);
+  });
+
+  it("routes timed UI commands into transition state for runtime-owned visual ticking", () => {
+    const runtimeScript = compileScenario(
+      ["@hideUI dialog time:0.2 wait!", "@showUI dialog time:0.2 wait!"].join("\n"),
+      "transaction-ui-transition-test.nani"
+    );
+    const advanced = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+    const initialPixiStage = createInitialPixiStageSnapshot();
+
+    const transaction = createVnRuntimePresentationTransaction({
+      runtimeCommands: advanced.emittedRuntimeCommands,
+      previousPixiStage: initialPixiStage,
+      nowMs: 1000
+    });
+
+    expect(advanced.state.presentationWait).toEqual({
+      channel: "ui",
+      commandId: "hideui",
+      commandIndex: 0,
+      durationMs: 200,
+      targets: ["dialog"],
+      targetVisible: false
+    });
+    expect(transaction.pixiStage).toBe(initialPixiStage);
+    expect(transaction.pixiWaitTasks).toEqual([]);
+    expect(transaction.uiState.surfaces.dialog).toMatchObject({
+      targetVisible: false,
+      mounted: true,
+      opacity: 1,
+      phase: "hiding",
+      transition: {
+        startedAtMs: 1000,
+        durationMs: 200,
+        fromOpacity: 1,
+        toOpacity: 0,
+        targetVisible: false
+      }
+    });
   });
 
   it("does not leak story-control commands into media or UI via category fallback", () => {

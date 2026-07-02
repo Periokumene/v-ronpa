@@ -1,4 +1,5 @@
 import type {
+  RuntimeUiGroup,
   RuntimeCommand,
   RuntimeScript,
   RuntimeValue,
@@ -8,6 +9,7 @@ import type {
   StoryRuntimeSnapshot,
   StoryScalar
 } from "@v-ronpa/contracts";
+import { RUNTIME_UI_GROUPS } from "@v-ronpa/contracts";
 
 export type BacklogEntry = StoryBacklogEntry;
 
@@ -80,6 +82,7 @@ interface RuntimeCommandResolution {
 }
 
 const DEFAULT_ADVANCE_MAX_STEPS = 100;
+const RUNTIME_UI_GROUP_SET = new Set<string>(RUNTIME_UI_GROUPS);
 const CONTROL_COMMAND_IDS = new Set([
   "append",
   "choice",
@@ -470,13 +473,7 @@ function executeCommand(
         return {
           state: {
             ...advancedState,
-            presentationWait: {
-              commandId: resolved.command.commandId,
-              commandIndex: state.instructionPointer,
-              durationMs: presentationWaitDurationMs(resolved.command),
-              expectedTasks: [],
-              ...(stringParam(resolved.command, "target") ? { target: stringParam(resolved.command, "target") } : {})
-            }
+            presentationWait: createPresentationWait(state.instructionPointer, resolved.command)
           },
           diagnostics: [],
           emittedRuntimeCommands: [resolved.command]
@@ -492,6 +489,7 @@ function executeCommand(
 
 function shouldWaitForPresentation(command: RuntimeCommand): boolean {
   if (scalarParam(command, "wait") !== true) return false;
+  if (command.commandId === "showui" || command.commandId === "hideui") return hasValidRuntimeUiTargets(command);
   return command.category === "actor" || command.category === "scene" || command.category === "effect";
 }
 
@@ -500,6 +498,29 @@ function presentationWaitDurationMs(command: RuntimeCommand): number {
   const durationMs = numberParam(command, "durationMs", numberParam(command, "duration", fallback));
   if (command.commandId !== "shake") return durationMs;
   return durationMs * Math.max(1, numberParam(command, "count", 3));
+}
+
+function createPresentationWait(commandIndex: number, command: RuntimeCommand): NonNullable<StoryRuntimeState["presentationWait"]> {
+  const durationMs = presentationWaitDurationMs(command);
+  if (command.commandId === "showui" || command.commandId === "hideui") {
+    return {
+      channel: "ui",
+      commandId: command.commandId,
+      commandIndex,
+      durationMs,
+      targets: runtimeUiTargets(command),
+      targetVisible: command.commandId === "showui" ? booleanParam(command, "visible") ?? true : false
+    };
+  }
+
+  return {
+    channel: "pixi",
+    commandId: command.commandId,
+    commandIndex,
+    durationMs,
+    expectedTasks: [],
+    ...(stringParam(command, "target") ? { target: stringParam(command, "target") } : {})
+  };
 }
 
 function shouldExecuteCommand(state: StoryRuntimeState, command: RuntimeCommand): RuntimeValueResolution {
@@ -789,6 +810,27 @@ function numberParam(command: RuntimeCommand, key: string, fallback: number): nu
 function booleanParam(command: RuntimeCommand, key: string): boolean | undefined {
   const value = scalarParam(command, key);
   return typeof value === "boolean" ? value : undefined;
+}
+
+function runtimeUiTargets(command: RuntimeCommand): RuntimeUiGroup[] {
+  const value = command.params.target;
+  if (value === undefined) return [...RUNTIME_UI_GROUPS];
+  const values = Array.isArray(value) ? value.map(runtimeValueScalar) : [runtimeValueScalar(value)];
+  const targets = values
+    .flatMap((item) => (item === undefined ? [] : String(item).split(",")))
+    .map((item) => item.trim())
+    .filter((item): item is RuntimeUiGroup => RUNTIME_UI_GROUP_SET.has(item));
+  return targets;
+}
+
+function hasValidRuntimeUiTargets(command: RuntimeCommand): boolean {
+  const value = command.params.target;
+  if (value === undefined) return true;
+  const values = Array.isArray(value) ? value.map(runtimeValueScalar) : [runtimeValueScalar(value)];
+  const targets = values
+    .flatMap((item) => (item === undefined ? [] : String(item).split(",")))
+    .map((item) => item.trim());
+  return targets.length > 0 && targets.every((target) => RUNTIME_UI_GROUP_SET.has(target));
 }
 
 function scalarParam(command: RuntimeCommand, key: string): string | number | boolean | undefined {

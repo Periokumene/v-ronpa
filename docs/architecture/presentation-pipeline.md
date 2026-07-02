@@ -111,10 +111,19 @@ the terminal Pixi snapshot with animation disabled, clears the wait through
 or wait stop. Pixi task snapshots remain unsaved renderer lifecycle data and
 must not be treated as durable story state.
 
+Runtime UI `wait!` uses the same `presentationWait` slot with `channel: "ui"`.
+`showUI` and `hideUI` waits carry concrete `targets`, `targetVisible`, and the
+normalized `durationMs`; they do not create Pixi tasks. `app-vn-runtime` is the
+live holder of `UiRuntimeState` and advances dialog reveal plus UI surface
+transitions from one RAF visual clock. A UI wait releases only after every target
+surface reaches its terminal state. Manual continue and SKIP settle the target
+surfaces to that terminal state before resuming story flow.
+
 Save/load persists the terminal `PixiStageSnapshot` only. Active
-`PresentationTask` records, tween progress, transient render hints, and overlay
-objects are not saved. `app-vn-runtime` restore/reset renders the terminal
-snapshot with animation disabled and clears transient runtime/Pixi task state.
+`PresentationTask` records, UI transition progress, tween progress, transient
+render hints, and overlay objects are not saved. `app-vn-runtime` restore/reset
+renders the terminal snapshot with animation disabled and clears transient
+runtime/Pixi/UI wait state.
 
 Weather snapshots are per-kind state records rather than a shared particle bag.
 `@rain` is the only script/save entry point for rain and stores

@@ -666,8 +666,8 @@ describe("nani runtime compiler", () => {
       "movie"
     ]);
     expect(result.script.commands[3]?.params).toMatchObject({ printerId: "default", durationMs: 200 });
-    expect(result.script.commands[4]?.params).toMatchObject({ target: "dialog", visible: true, durationMs: 100 });
-    expect(result.script.commands[5]?.params).toMatchObject({ target: "commandBar", visible: false, durationMs: 100 });
+    expect(result.script.commands[4]?.params).toMatchObject({ target: "dialog", visible: true, durationMs: 100, wait: false });
+    expect(result.script.commands[5]?.params).toMatchObject({ target: "commandBar", visible: false, durationMs: 100, wait: false });
     expect(result.script.commands[7]?.params).toEqual({ waitMode: "i5" });
     expect(result.script.commands[8]?.params).toEqual({
       variableName: "playerName",
@@ -702,8 +702,8 @@ describe("nani runtime compiler", () => {
 
     expect(result.diagnostics).toEqual([]);
     expect(result.script.commands.map((command) => command.commandId)).toEqual(["hideui", "showui"]);
-    expect(result.script.commands[0]?.params).toEqual({ visible: false });
-    expect(result.script.commands[1]?.params).toEqual({ visible: true });
+    expect(result.script.commands[0]?.params).toEqual({ visible: false, wait: false });
+    expect(result.script.commands[1]?.params).toEqual({ visible: true, wait: false });
   });
 
   it("diagnoses unsupported media wait and advanced input/UI/sfxFast params", () => {
@@ -731,10 +731,6 @@ describe("nani runtime compiler", () => {
         }),
         expect.objectContaining({
           code: "unsupported-command-param",
-          message: expect.stringContaining("@hideUI accepts wait!:boolean")
-        }),
-        expect.objectContaining({
-          code: "unsupported-command-param",
           message: expect.stringContaining("@hideUI accepts allowToggle!:boolean")
         }),
         expect.objectContaining({
@@ -747,6 +743,7 @@ describe("nani runtime compiler", () => {
         })
       ])
     );
+    expect(result.script.commands[2]?.params).toMatchObject({ target: "commandBar", visible: false, wait: true });
   });
 
 });

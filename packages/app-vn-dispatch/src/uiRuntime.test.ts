@@ -1,35 +1,157 @@
 import { describe, expect, it } from "vitest";
 import type { NaniCommandCategory, RuntimeCommand, RuntimeValue, StoryRuntimeSnapshot } from "@v-ronpa/contracts";
 import {
+  advanceUiRuntimeTransitions,
   clearMovieOverlay,
   createInitialUiRuntimeState,
   deriveUiRuntimeLifecycleState,
   dismissToast,
+  hasActiveUiRuntimeTransitions,
+  isUiPresentationWaitComplete,
   reduceUiRuntimeCommand,
   reduceUiRuntimeCommands,
+  settleUiRuntimePresentationWait,
+  settleUiRuntimeTransitions,
   startMovieOverlay
 } from "./uiRuntime";
 
 describe("UI runtime", () => {
-  it("lets showUI and hideUI control only v1 runtime UI surfaces through the same visibility state", () => {
+  it("lets showUI and hideUI control runtime UI surface presentation state", () => {
     const result = reduceUiRuntimeCommands(createInitialUiRuntimeState(), [
       runtimeCommand("hideui", "ui", { target: "dialog" }),
       runtimeCommand("showui", "ui", { target: "commandBar", visible: true }),
       runtimeCommand("hideui", "ui", { target: "toastLayer" })
     ]);
 
-    expect(result.state.visible).toEqual({ dialog: false, commandBar: true, toastLayer: false });
+    expect(result.state.surfaces.dialog).toMatchObject({ targetVisible: false, mounted: false, opacity: 0, phase: "hidden" });
+    expect(result.state.surfaces.commandBar).toMatchObject({ targetVisible: true, mounted: true, opacity: 1, phase: "shown" });
+    expect(result.state.surfaces.toastLayer).toMatchObject({ targetVisible: false, mounted: false, opacity: 0, phase: "hidden" });
     expect(result.diagnostics).toEqual([]);
   });
 
   it("uses no-target showUI and hideUI as scoped all-runtime-UI controls", () => {
     const hidden = reduceUiRuntimeCommand(createInitialUiRuntimeState(), runtimeCommand("hideui", "ui", {}));
-    expect(hidden.state.visible).toEqual({ dialog: false, commandBar: false, toastLayer: false });
+    expect(Object.values(hidden.state.surfaces).every((surface) => surface.phase === "hidden")).toBe(true);
     expect(hidden.diagnostics).toEqual([]);
 
     const shown = reduceUiRuntimeCommand(hidden.state, runtimeCommand("showui", "ui", {}));
-    expect(shown.state.visible).toEqual({ dialog: true, commandBar: true, toastLayer: true });
+    expect(Object.values(shown.state.surfaces).every((surface) => surface.phase === "shown")).toBe(true);
     expect(shown.diagnostics).toEqual([]);
+  });
+
+  it("does not churn state for no-op terminal visibility commands", () => {
+    const initial = createInitialUiRuntimeState();
+    const result = reduceUiRuntimeCommand(initial, runtimeCommand("showui", "ui", { target: "dialog" }));
+
+    expect(result.state).toBe(initial);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("keeps timed hide mounted until transition completion", () => {
+    const hiding = reduceUiRuntimeCommand(
+      createInitialUiRuntimeState(),
+      runtimeCommand("hideui", "ui", { target: "dialog", durationMs: 200 }),
+      { nowMs: 1000 }
+    ).state;
+
+    expect(hiding.surfaces.dialog).toMatchObject({
+      targetVisible: false,
+      mounted: true,
+      opacity: 1,
+      phase: "hiding",
+      transition: { startedAtMs: 1000, durationMs: 200, fromOpacity: 1, toOpacity: 0, targetVisible: false }
+    });
+
+    const midway = advanceUiRuntimeTransitions(hiding, 1100);
+    expect(midway.surfaces.dialog).toMatchObject({ mounted: true, opacity: 0.5, phase: "hiding" });
+    expect(hasActiveUiRuntimeTransitions(midway)).toBe(true);
+
+    const complete = advanceUiRuntimeTransitions(midway, 1200);
+    expect(complete.surfaces.dialog).toMatchObject({ targetVisible: false, mounted: false, opacity: 0, phase: "hidden" });
+    expect(hasActiveUiRuntimeTransitions(complete)).toBe(false);
+  });
+
+  it("reverses timed transitions from current opacity", () => {
+    const hiding = reduceUiRuntimeCommand(
+      createInitialUiRuntimeState(),
+      runtimeCommand("hideui", "ui", { target: "dialog", durationMs: 200 }),
+      { nowMs: 1000 }
+    ).state;
+    const midway = advanceUiRuntimeTransitions(hiding, 1100);
+    const showing = reduceUiRuntimeCommand(
+      midway,
+      runtimeCommand("showui", "ui", { target: "dialog", durationMs: 200 }),
+      { nowMs: 1100 }
+    ).state;
+
+    expect(showing.surfaces.dialog).toMatchObject({
+      targetVisible: true,
+      mounted: true,
+      opacity: 0.5,
+      phase: "showing",
+      transition: { startedAtMs: 1100, durationMs: 200, fromOpacity: 0.5, toOpacity: 1, targetVisible: true }
+    });
+  });
+
+  it("settles UI presentation waits across all targets", () => {
+    const hiding = reduceUiRuntimeCommand(
+      createInitialUiRuntimeState(),
+      runtimeCommand("hideui", "ui", { durationMs: 200 }),
+      { nowMs: 1000 }
+    ).state;
+
+    expect(
+      isUiPresentationWaitComplete(hiding, {
+        channel: "ui",
+        commandId: "hideui",
+        commandIndex: 0,
+        durationMs: 200,
+        targets: ["dialog", "commandBar", "toastLayer"],
+        targetVisible: false
+      })
+    ).toBe(false);
+
+    const settled = settleUiRuntimeTransitions(hiding);
+    expect(Object.values(settled.surfaces).every((surface) => surface.phase === "hidden")).toBe(true);
+    expect(
+      isUiPresentationWaitComplete(settled, {
+        channel: "ui",
+        commandId: "hideui",
+        commandIndex: 0,
+        durationMs: 200,
+        targets: ["dialog", "commandBar", "toastLayer"],
+        targetVisible: false
+      })
+    ).toBe(true);
+  });
+
+  it("settles UI presentation waits to the requested terminal state even without an active transition", () => {
+    const drifting = {
+      ...createInitialUiRuntimeState(),
+      surfaces: {
+        ...createInitialUiRuntimeState().surfaces,
+        dialog: { targetVisible: false, mounted: true, opacity: 0.35, phase: "hiding" as const }
+      }
+    };
+
+    const settled = settleUiRuntimePresentationWait(drifting, {
+      channel: "ui",
+      commandId: "hideui",
+      commandIndex: 0,
+      durationMs: 200,
+      targets: ["dialog"],
+      targetVisible: false
+    });
+
+    expect(settled.surfaces.dialog).toMatchObject({ targetVisible: false, mounted: false, opacity: 0, phase: "hidden" });
+    expect(isUiPresentationWaitComplete(settled, {
+      channel: "ui",
+      commandId: "hideui",
+      commandIndex: 0,
+      durationMs: 200,
+      targets: ["dialog"],
+      targetVisible: false
+    })).toBe(true);
   });
 
   it("rejects debug, lifecycle-owned, or trial UI targets for showUI and hideUI", () => {
@@ -54,7 +176,7 @@ describe("UI runtime", () => {
     const initial = createInitialUiRuntimeState();
     const result = reduceUiRuntimeCommand(initial, runtimeCommand("hideui", "ui", { target: "dialog", visible: true }));
 
-    expect(result.state.visible.dialog).toBe(false);
+    expect(result.state.surfaces.dialog).toMatchObject({ targetVisible: false, mounted: false, opacity: 0, phase: "hidden" });
     expect(result.diagnostics).toEqual([]);
   });
 

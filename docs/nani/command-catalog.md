@@ -42,16 +42,20 @@ Command definitions also expose an `execution` boundary:
 - `story-control`: consumed by StoryEngine and normally not emitted downstream.
 - `pixi-presentation`: emitted as presentation work and eligible for Pixi
   `wait!` task synchronization.
+- `ui-output`: emitted as runtime UI work and eligible for UI surface
+  `wait!` transition synchronization when the command supports it.
 - `gameplay`: emitted as typed gameplay event input.
 - `declared-only`: catalog-declared for compatibility, but outside the current
   execution boundary. The compiler diagnoses these commands instead of silently
   pretending to support them.
 
-Pixi `wait:true` / `wait!` follows the current V-Ronpa/Naninovel baseline:
-Wait By Default is false, only explicit wait flags block, and Complete On
-Continue is true. StoryEngine creates a `presentationWait`, app transaction
-code enriches it with Pixi `expectedTasks`, and Pixi task completion resumes the
-story. Duration is retained as a fallback diagnostic timeout, not as the primary
+Presentation `wait:true` / `wait!` follows the current V-Ronpa/Naninovel
+baseline: Wait By Default is false, only explicit wait flags block, and Complete
+On Continue is true. StoryEngine creates a `presentationWait` with a channel.
+Pixi waits use `channel:"pixi"` and are enriched with `expectedTasks`; Pixi task
+completion resumes the story. Runtime UI waits use `channel:"ui"` with concrete
+targets and `targetVisible`; UI surface transition completion resumes the story.
+Pixi duration is retained as a fallback diagnostic timeout, not as the primary
 release mechanism.
 
 ## Categories
@@ -90,9 +94,11 @@ release mechanism.
   and must not re-parse markup in StoryEngine, ui-kit, or app save adapters.
 - `showUI` / `hideUI` are implemented as a V-Ronpa runtime UI subset. Supported
   targets are `dialog`, `commandBar`, and `toastLayer`; no-target commands apply
-  to those three targets only. `hud`, debug/harness UI, shell overlays,
-  lifecycle-owned `inputPrompt` / `movieOverlay`, and multi-target `uINames`
-  parity are outside the current implementation.
+  to those three targets only. `time` is normalized to `durationMs`; missing or
+  zero duration settles immediately. `wait!` creates a UI `presentationWait` only
+  when all targets are valid. `hud`, debug/harness UI, shell overlays, and
+  lifecycle-owned `inputPrompt` / `movieOverlay` are outside the current
+  implementation.
 
 ## Official Naninovel Commands
 

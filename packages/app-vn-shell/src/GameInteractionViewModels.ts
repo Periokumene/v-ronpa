@@ -13,7 +13,13 @@ import type {
   StoryBacklogEntry,
   StoryChoiceOption
 } from "@v-ronpa/contracts";
-import type { RuntimeInputPrompt, RuntimeToast, UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
+import {
+  selectUiSurfacePresentation,
+  type RuntimeInputPrompt,
+  type RuntimeToast,
+  type UiRuntimeState,
+  type UiSurfacePresentation
+} from "@v-ronpa/app-vn-dispatch";
 import { selectCurrentStoryLine } from "@v-ronpa/story-engine";
 import type { StoryRuntimeState } from "@v-ronpa/story-engine";
 import type { StoryPlayAdvanceSource } from "@v-ronpa/story-play";
@@ -70,6 +76,7 @@ export type VnDialogState = "line" | "choices" | "ended";
 
 export interface VnDialogViewModel {
   visible: boolean;
+  presentation: UiSurfacePresentation;
   speakerId?: string | undefined;
   speakerLabel?: string | undefined;
   text: string;
@@ -98,6 +105,7 @@ export interface VnCommandBarCommandViewModel {
 
 export interface VnCommandBarViewModel {
   visible: boolean;
+  presentation: UiSurfacePresentation;
   commands: VnCommandBarCommandViewModel[];
   capabilities: InteractionCapabilitySnapshot;
   activeActions: Partial<Record<GameUiAction, boolean>>;
@@ -119,6 +127,7 @@ export interface TitleActions {
 
 export interface RuntimeToastLayerViewModel {
   visible: boolean;
+  presentation: UiSurfacePresentation;
   toasts: RuntimeToast[];
 }
 
@@ -246,10 +255,12 @@ export function createGameInteractionShellViewModels({
   runtime,
   title = "V-Ronpa"
 }: CreateGameInteractionShellViewModelsInput): GameInteractionShellViewModels {
+  const dialogPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "dialog");
+  const commandBarPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "commandBar");
+  const toastLayerPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "toastLayer");
+  const showDialog = runtime.storyRuntime.active && flow.mode !== "title" && dialogPresentation.mounted;
   const currentLine =
-    runtime.storyRuntime.active && flow.mode !== "title" && runtime.uiRuntime.state.visible.dialog
-      ? selectCurrentStoryLine(runtime.storyRuntime.state)
-      : undefined;
+    showDialog ? selectCurrentStoryLine(runtime.storyRuntime.state) : undefined;
   const storyHasChoices = runtime.storyRuntime.state.pendingChoices.length > 0;
   const dialogState: VnDialogState = runtime.storyRuntime.state.ended ? "ended" : storyHasChoices ? "choices" : "line";
   const showChoices =
@@ -258,20 +269,21 @@ export function createGameInteractionShellViewModels({
     !runtime.storyRuntime.state.ended &&
     storyHasChoices;
   const showCommandBar =
-    runtime.storyRuntime.active && flow.mode !== "title" && runtime.uiRuntime.state.visible.commandBar;
+    runtime.storyRuntime.active && flow.mode !== "title" && commandBarPresentation.mounted;
 
   return {
-    ...(currentLine
+    ...(showDialog
       ? {
           dialog: {
             visible: true,
-            ...(currentLine.speaker ? { speakerId: currentLine.speaker } : {}),
-            ...(currentLine.speaker
+            presentation: dialogPresentation,
+            ...(currentLine?.speaker ? { speakerId: currentLine.speaker } : {}),
+            ...(currentLine?.speaker
               ? { speakerLabel: formatStorySpeaker ? formatStorySpeaker(currentLine.speaker) : currentLine.speaker }
               : {}),
-            text: runtime.dialogRevealRuntime.visibleText ?? currentLine.text,
-            ...(runtime.dialogRevealRuntime.visibleRichText ?? currentLine.richText
-              ? { richText: runtime.dialogRevealRuntime.visibleRichText ?? currentLine.richText }
+            text: runtime.dialogRevealRuntime.visibleText ?? currentLine?.text ?? "",
+            ...(runtime.dialogRevealRuntime.visibleRichText ?? currentLine?.richText
+              ? { richText: runtime.dialogRevealRuntime.visibleRichText ?? currentLine?.richText }
               : {}),
             state: dialogState,
             ...(dialogDisplay ? { display: dialogDisplay } : {})
@@ -290,6 +302,7 @@ export function createGameInteractionShellViewModels({
       ? {
           commandBar: {
             visible: true,
+            presentation: commandBarPresentation,
             commands: createCommandBarCommands(flow.capabilities, runtime.storyPlayActiveActions),
             capabilities: flow.capabilities,
             activeActions: runtime.storyPlayActiveActions
@@ -297,8 +310,8 @@ export function createGameInteractionShellViewModels({
         }
       : {}),
     ...(flow.mode === "title" ? { title: { visible: true, title, capabilities: flow.capabilities } } : {}),
-    ...(runtime.uiRuntime.state.visible.toastLayer
-      ? { toastLayer: { visible: true, toasts: runtime.uiRuntime.state.toasts } }
+    ...(toastLayerPresentation.mounted
+      ? { toastLayer: { visible: true, presentation: toastLayerPresentation, toasts: runtime.uiRuntime.state.toasts } }
       : {}),
     ...(runtime.uiRuntime.state.inputPrompt
       ? { inputPrompt: { visible: true, prompt: runtime.uiRuntime.state.inputPrompt } }

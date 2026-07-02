@@ -95,7 +95,7 @@ Narrator: After presentation.
     const completed = completeVnSessionPresentationWait(waiting.session);
     const afterPresentation = advanceVnSession(completed.session, "manual");
 
-    expect(waiting.session.story.presentationWait).toMatchObject({ commandId: "char", durationMs: 250 });
+    expect(waiting.session.story.presentationWait).toMatchObject({ channel: "pixi", commandId: "char", durationMs: 250 });
     expect(completed.session.story.presentationWait).toBeUndefined();
     expect(afterPresentation.session.story.backlog.at(-1)?.text).toBe("After presentation.");
   });

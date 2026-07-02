@@ -312,18 +312,20 @@ function normalizeCommandParams(command: CommandShape, definition: NaniCommandDe
         params: compactParams({
           target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "uINames") ?? runtimeParam(command, "target"),
           visible: runtimeParam(command, "visible") ?? true,
-          durationMs: durationMsValue(runtimeParam(command, "time"))
+          durationMs: durationMsValue(runtimeParam(command, "time")),
+          wait: runtimeParam(command, "wait") ?? false
         }),
-        consumesParams: ["uINames", "target", "visible", "time"]
+        consumesParams: ["uINames", "target", "visible", "time", "wait"]
       };
     case "hideui":
       return {
         params: compactParams({
           target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "uINames") ?? runtimeParam(command, "target"),
           visible: false,
-          durationMs: durationMsValue(runtimeParam(command, "time"))
+          durationMs: durationMsValue(runtimeParam(command, "time")),
+          wait: runtimeParam(command, "wait") ?? false
         }),
-        consumesParams: ["uINames", "target", "time"]
+        consumesParams: ["uINames", "target", "time", "wait"]
       };
     case "toast":
       return {

@@ -205,7 +205,11 @@ function createRuntime(): VnShellRuntimeAdapter {
     submitStoryInput: () => undefined,
     uiRuntime: {
       state: {
-        visible: { dialog: false, commandBar: false, toastLayer: false },
+        surfaces: {
+          dialog: { targetVisible: false, mounted: false, opacity: 0, phase: "hidden" },
+          commandBar: { targetVisible: false, mounted: false, opacity: 0, phase: "hidden" },
+          toastLayer: { targetVisible: false, mounted: false, opacity: 0, phase: "hidden" }
+        },
         toasts: []
       }
     }

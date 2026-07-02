@@ -29,6 +29,7 @@ export interface VnRuntimePresentationTransactionInput {
   previousPixiStage: PixiStageSnapshot;
   previousMediaState?: MediaRuntimeState;
   previousUiState?: UiRuntimeState;
+  nowMs?: number;
   profile?: VnRuntimeProfile;
   routeTable?: VnOutputRouteTable;
 }
@@ -54,6 +55,7 @@ export interface VnRuntimeTransactionDiagnostic {
 
 export function createVnRuntimePresentationTransaction({
   runtimeCommands,
+  nowMs = 0,
   previousMediaState = createInitialMediaRuntimeState(),
   previousPixiStage,
   previousUiState = createInitialUiRuntimeState(),
@@ -91,7 +93,8 @@ export function createVnRuntimePresentationTransaction({
   );
   const uiReduction = reduceUiRuntimeCommands(
     previousUiState,
-    selectRuntimeCommandsForTarget(runtimeCommands, "ui", routeTable, routeContext).filter((command) => !hasUnresolvedExpression(command))
+    selectRuntimeCommandsForTarget(runtimeCommands, "ui", routeTable, routeContext).filter((command) => !hasUnresolvedExpression(command)),
+    { nowMs }
   );
 
   return {

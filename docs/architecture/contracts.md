@@ -72,15 +72,16 @@ and merge the change through the integration baseline first.
   Runtime handler registries bind execution only; they must not define command
   metadata independently.
 - `commandCatalog.execution` is the public boundary for whether a command is
-  StoryEngine control flow, Pixi presentation, gameplay, or declared-only
-  compatibility.
+  StoryEngine control flow, Pixi presentation, runtime media/UI output,
+  gameplay, or declared-only compatibility.
 - `NaniCommandStatus` is the command maturity signal. `implemented` means
   V-Ronpa has tested runtime behavior for the command; it is not a promise that
   every official Naninovel parameter is fully compatible.
-- Explicit Pixi `wait!` stores a `StoryPresentationWait`; `app-vn-dispatch`
-  transaction code supplies Pixi wait descriptors and `app-vn-runtime` stores
-  and observes them as `expectedTasks`. Active Pixi tasks and tween progress are
-  not save data.
+- Explicit presentation `wait!` stores a channelled `StoryPresentationWait`.
+  Pixi waits use `channel:"pixi"` with task descriptors observed as
+  `expectedTasks`; runtime UI waits use `channel:"ui"` with concrete UI targets
+  and target visibility. Active Pixi tasks, tween progress, and UI transition
+  progress are not save data.
 - Official Naninovel commands and V-Ronpa project commands are declared
   explicitly. Branch-local experiments must add catalog entries before they can
   compile to `RuntimeCommand`.

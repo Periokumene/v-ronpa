@@ -292,6 +292,7 @@ function DefaultDialogSurface({ model }: SurfaceSlotProps<VnDialogViewModel>) {
       text={model.text}
       {...(model.richText ? { richText: model.richText } : {})}
       {...(model.display ? { displaySettings: model.display } : {})}
+      presentation={model.presentation}
       state={model.state}
     />
   );
@@ -302,7 +303,7 @@ function DefaultChoicesSurface({ actions, model }: SurfaceSlotProps<VnChoicesVie
 }
 
 function DefaultCommandBarSurface({ actions, model }: SurfaceSlotProps<VnCommandBarViewModel, VnCommandBarActions>) {
-  return <VnCommandBar commands={model.commands} onAction={actions.dispatch} />;
+  return <VnCommandBar commands={model.commands} onAction={actions.dispatch} presentation={model.presentation} />;
 }
 
 function DefaultTitleSurface({ actions, model }: SurfaceSlotProps<TitleViewModel, TitleActions>) {
@@ -310,7 +311,7 @@ function DefaultTitleSurface({ actions, model }: SurfaceSlotProps<TitleViewModel
 }
 
 function DefaultToastLayerSurface({ actions, model }: SurfaceSlotProps<RuntimeToastLayerViewModel, RuntimeToastActions>) {
-  return <RuntimeToastLayer onDismiss={actions.dismiss} visible={model.visible} toasts={model.toasts} />;
+  return <RuntimeToastLayer onDismiss={actions.dismiss} presentation={model.presentation} visible={model.visible} toasts={model.toasts} />;
 }
 
 function DefaultInputPromptSurface({ actions, model }: SurfaceSlotProps<RuntimeInputPromptViewModel, RuntimeInputPromptActions>) {

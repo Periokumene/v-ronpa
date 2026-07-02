@@ -40,8 +40,10 @@ describe("game-a interaction surfaces", () => {
     expect(gameAUiConfig.dialog.frameAssetId).toBe("texture:ui:game-a-dialog-frame");
     expect(assets.diagnostics).toEqual([]);
     expect(root?.props).toMatchObject({ "data-frame": "resolved" });
-    expect((root?.props as { style?: Record<string, string> }).style).toMatchObject({
-      pointerEvents: "none"
+    expect((root?.props as { style?: Record<string, string | number> }).style).toMatchObject({
+      pointerEvents: "none",
+      opacity: 0.75,
+      "--dialog-opacity": 0.92
     });
   });
 
@@ -100,10 +102,15 @@ describe("game-a interaction surfaces", () => {
       model: createCommandBarModel()
     });
     const settings = findElementByTestId(element, "vn-command-settings");
+    const commandBar = findElementByTestId(element, "vn-command-bar");
 
     expect(settings?.props).toMatchObject({
       "data-action": "open-settings",
       children: "SETTINGS"
+    });
+    expect(commandBar?.props).toMatchObject({
+      "data-ui-phase": "showing",
+      style: { opacity: 0.5 }
     });
     (settings?.props as { onClick?: () => void }).onClick?.();
     expect(dispatch).toHaveBeenCalledWith("open-settings");
@@ -117,13 +124,15 @@ function createDialogModel(): VnDialogViewModel {
     speakerLabel: "Mira",
     text: "The corridor light flickers once.",
     state: "line",
-    display: { textSize: "medium", textboxOpacity: 0.92, textSpeed: 0.5 }
+    display: { textSize: "medium", textboxOpacity: 0.92, textSpeed: 0.5 },
+    presentation: { targetVisible: false, mounted: true, opacity: 0.75, phase: "hiding" }
   };
 }
 
 function createCommandBarModel(): VnCommandBarViewModel {
   return {
     visible: true,
+    presentation: { targetVisible: true, mounted: true, opacity: 0.5, phase: "showing" },
     capabilities: {
       canStartNewGame: false,
       canSave: true,

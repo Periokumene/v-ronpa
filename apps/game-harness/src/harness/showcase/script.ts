@@ -65,13 +65,13 @@ Narrator: CHECKPOINT RICH 05 - font face 英文同字符对比：默认 AaGgQq F
 @set route:"return"
 @clearBacklog
 @showPrinter default
-@hideUI dialog
-@hideUI commandBar
-@toast "CHECKPOINT MAIN 01A - hideUI。VN dialog 与 command bar 应隐藏；右上 toast 应出现；调试侧栏应保持可见。"
-@print "CHECKPOINT MAIN 01A - hideUI + explicit print。VN dialog 与 command bar 应隐藏；调试侧栏不属于 showUI/hideUI 控制面。" author:Narrator
-@showUI dialog
-@showUI commandBar visible:true
-@print "CHECKPOINT MAIN 01B - showUI。VN dialog 与 command bar 应恢复；下一步验证 append + wait + input。" author:Narrator
+@hideUI dialog time:0.2 wait!
+@hideUI commandBar time:0.2 wait!
+@toast "CHECKPOINT MAIN 01A - hideUI timed wait。VN dialog 与 command bar 应隐藏；右上 toast 应出现；调试侧栏应保持可见。"
+@print "CHECKPOINT MAIN 01A - hideUI timed wait + explicit print。VN dialog 与 command bar 应隐藏；调试侧栏不属于 showUI/hideUI 控制面。" author:Narrator
+@showUI dialog time:0.2 wait!
+@showUI commandBar visible:true time:0.2 wait!
+@print "CHECKPOINT MAIN 01B - showUI timed wait。VN dialog 与 command bar 应恢复；下一步验证 append + wait + input。" author:Narrator
 @append " 附加文本验证：append 应更新当前行，但不新增 backlog。"
 @wait i
 @input playerName type:string summary:"输入任意代号后继续" value:Felix

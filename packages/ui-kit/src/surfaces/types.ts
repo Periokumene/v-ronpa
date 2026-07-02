@@ -3,6 +3,13 @@ export interface ScenarioOption {
   label: string;
 }
 
+export interface UiSurfacePresentationLike {
+  targetVisible: boolean;
+  mounted: boolean;
+  opacity: number;
+  phase: "hidden" | "shown" | "showing" | "hiding";
+}
+
 export interface InspectorLiteProps {
   mode: string;
   detail?: string;

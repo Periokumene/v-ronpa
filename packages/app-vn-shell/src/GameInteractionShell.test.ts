@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { createInitialUiRuntimeState, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
 import { createDefaultSettingsSnapshot, type GameOverlayKind, type SaveSlotSummary, type StoryChoiceOption } from "@v-ronpa/contracts";
 import {
   createGameInteractionOverlayActions,
@@ -93,10 +94,61 @@ describe("GameInteractionShell view models", () => {
     });
     expect(models.toastLayer).toMatchObject({ visible: true, toasts: [{ id: "toast:1", text: "Saved" }] });
     expect(models.inputPrompt).toMatchObject({ visible: true, prompt: { variableName: "answer" } });
+    expect(models.dialog?.presentation).toMatchObject({ targetVisible: true, mounted: true, opacity: 1, phase: "shown" });
+    expect(models.commandBar?.presentation).toMatchObject({ targetVisible: true, mounted: true, opacity: 1, phase: "shown" });
+    expect(models.toastLayer?.presentation).toMatchObject({ targetVisible: true, mounted: true, opacity: 1, phase: "shown" });
 
     const titleModels = createGameInteractionShellViewModels({ flow: createFlow({ mode: "title" }), runtime });
     expect(titleModels.title).toMatchObject({ visible: true, title: "V-Ronpa" });
     expect(titleModels.dialog).toBeUndefined();
+  });
+
+  it("keeps fading-out UI mounted and omits terminal hidden UI from view models", () => {
+    const fading = createRuntime({
+      uiRuntimeState: uiRuntimeStateWithSurfaces({
+        dialog: {
+          targetVisible: false,
+          mounted: true,
+          opacity: 0.4,
+          phase: "hiding",
+          transition: { startedAtMs: 1000, durationMs: 200, fromOpacity: 1, toOpacity: 0, targetVisible: false }
+        },
+        commandBar: { targetVisible: false, mounted: false, opacity: 0, phase: "hidden" }
+      })
+    });
+
+    const models = createGameInteractionShellViewModels({ flow: createFlow({ mode: "vn" }), runtime: fading });
+
+    expect(models.dialog).toMatchObject({
+      visible: true,
+      presentation: { targetVisible: false, mounted: true, opacity: 0.4, phase: "hiding" }
+    });
+    expect(models.commandBar).toBeUndefined();
+  });
+
+  it("mounts dialog presentation before the first story line so showUI fade can render", () => {
+    const showingBeforeLine = createRuntime({
+      hasCurrentLine: false,
+      uiRuntimeState: uiRuntimeStateWithSurfaces({
+        dialog: {
+          targetVisible: true,
+          mounted: true,
+          opacity: 0.35,
+          phase: "showing",
+          transition: { startedAtMs: 1000, durationMs: 500, fromOpacity: 0, toOpacity: 1, targetVisible: true }
+        }
+      })
+    });
+
+    const models = createGameInteractionShellViewModels({ flow: createFlow({ mode: "vn" }), runtime: showingBeforeLine });
+
+    expect(models.dialog).toMatchObject({
+      visible: true,
+      text: "",
+      state: "line",
+      presentation: { targetVisible: true, mounted: true, opacity: 0.35, phase: "showing" }
+    });
+    expect(models.dialog?.speakerId).toBeUndefined();
   });
 
   it("derives first-pass overlay models while keeping save and settings data injectable", () => {
@@ -272,17 +324,26 @@ function createNoopSurfaces(): GameInteractionShellSurfaces {
 
 function createRuntime({
   backlogText,
+  hasCurrentLine = true,
   inputPrompt,
   pendingChoices = [],
   toasts = [],
+  uiRuntimeState,
   visibleText
 }: {
   backlogText?: string;
+  hasCurrentLine?: boolean;
   inputPrompt?: VnShellRuntimeAdapter["uiRuntime"]["state"]["inputPrompt"];
   pendingChoices?: StoryChoiceOption[];
   toasts?: VnShellRuntimeAdapter["uiRuntime"]["state"]["toasts"];
+  uiRuntimeState?: UiRuntimeState;
   visibleText?: string;
 }): VnShellRuntimeAdapter {
+  const baseUiRuntimeState = uiRuntimeState ?? {
+    ...createInitialUiRuntimeState(),
+    toasts,
+    ...(inputPrompt ? { inputPrompt } : {})
+  };
   return {
     advanceStory: () => undefined,
     attachMovieElement: () => undefined,
@@ -308,17 +369,23 @@ function createRuntime({
         variables: {},
         backlog: backlogText ? [{ speaker: "Mira", text: backlogText }] : [],
         pendingChoices,
-        text: { printerId: "main", visible: true, current: { speaker: "Mira", text: "Partial line" } },
+        ...(hasCurrentLine
+          ? { text: { printerId: "main", visible: true, current: { speaker: "Mira", text: "Partial line" } } }
+          : {}),
         ended: false
       }
     },
     submitStoryInput: () => undefined,
     uiRuntime: {
-      state: {
-        visible: { dialog: true, commandBar: true, toastLayer: true },
-        toasts,
-        ...(inputPrompt ? { inputPrompt } : {})
-      }
+      state: baseUiRuntimeState
     }
+  };
+}
+
+function uiRuntimeStateWithSurfaces(surfaces: Partial<UiRuntimeState["surfaces"]>): UiRuntimeState {
+  return {
+    ...createInitialUiRuntimeState(),
+    surfaces: { ...createInitialUiRuntimeState().surfaces, ...surfaces },
+    toasts: []
   };
 }
