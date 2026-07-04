@@ -86,8 +86,14 @@ export function GameADialogSurface({
 
 function GameAChoiceOverlay({ actions, model }: SurfaceSlotProps<VnChoicesViewModel, VnChoicesActions>) {
   if (!model.visible || model.choices.length === 0) return null;
+
+  function selectChoice(index: number, choice: VnChoicesViewModel["choices"][number]) {
+    if (choice.enabled === false) return;
+    actions.choose(index, choice);
+  }
+
   return (
-    <section aria-label="对话选项" data-testid="vn-choice-overlay" className="game-a-choice-overlay">
+    <section aria-label="对话选项" data-testid="vn-choice-overlay" role="group" className="game-a-choice-overlay">
       <div className="game-a-choice-list">
         {model.choices.map((choice, index) => (
           <button
@@ -96,10 +102,12 @@ function GameAChoiceOverlay({ actions, model }: SurfaceSlotProps<VnChoicesViewMo
             data-testid={`vn-choice-${index}`}
             disabled={choice.enabled === false}
             key={`${choice.id ?? choice.text}-${index}`}
-            onClick={() => actions.choose(index, choice)}
+            onClick={() => selectChoice(index, choice)}
             type="button"
           >
-            <RichTextRenderer document={choice.richText} fallbackText={choice.text} />
+            <span className="game-a-choice-copy">
+              <RichTextRenderer document={choice.richText} fallbackText={choice.text} />
+            </span>
           </button>
         ))}
       </div>

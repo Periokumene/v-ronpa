@@ -1,7 +1,7 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { createAssetRegistry, type AssetResolver } from "@v-ronpa/asset-registry";
-import type { VnCommandBarViewModel, VnDialogViewModel } from "@v-ronpa/app-vn-shell";
+import type { VnChoicesViewModel, VnCommandBarViewModel, VnDialogViewModel } from "@v-ronpa/app-vn-shell";
 import { gameAContentManifest } from "../contentManifest";
 import { createGameASurfaces, GameACommandBar, GameADialogSurface } from "./GameASurfaces";
 import { gameAUiConfig } from "./gameAUiConfig";
@@ -68,6 +68,48 @@ describe("game-a interaction surfaces", () => {
     });
   });
 
+  it("renders centered choice skin without changing choice dispatch", () => {
+    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
+    const surfaces = createGameASurfaces({ assets, config: gameAUiConfig });
+    const ChoiceSurface = surfaces.Choices;
+    const choose = vi.fn();
+    const element = <ChoiceSurface actions={{ choose }} model={createChoiceModel()} />;
+    const overlay = findElementByTestId(element, "vn-choice-overlay");
+    const firstChoice = findElementByTestId(element, "vn-choice-0");
+    const copy = findElementByClassName(element, "game-a-choice-copy");
+
+    expect(overlay?.props).toMatchObject({
+      className: "game-a-choice-overlay",
+      role: "group"
+    });
+    expect(firstChoice?.props).toMatchObject({
+      "aria-disabled": false,
+      className: "game-a-choice-button",
+      disabled: false
+    });
+    expect(copy).toBeDefined();
+
+    (firstChoice?.props as { onClick?: () => void }).onClick?.();
+    expect(choose).toHaveBeenCalledWith(0, expect.objectContaining({ text: "继续调查" }));
+  });
+
+  it("keeps disabled choices inert for game-a choice skin", () => {
+    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
+    const surfaces = createGameASurfaces({ assets, config: gameAUiConfig });
+    const ChoiceSurface = surfaces.Choices;
+    const choose = vi.fn();
+    const element = <ChoiceSurface actions={{ choose }} model={createChoiceModel([{ text: "Locked", enabled: false }])} />;
+    const lockedChoice = findElementByTestId(element, "vn-choice-0");
+
+    expect(lockedChoice?.props).toMatchObject({
+      "aria-disabled": true,
+      disabled: true
+    });
+
+    (lockedChoice?.props as { onClick?: () => void }).onClick?.();
+    expect(choose).not.toHaveBeenCalled();
+  });
+
   it("returns diagnostics and keeps the dialog renderable when the texture is missing", () => {
     const missingResolver: AssetResolver = {
       resolve: () => ({
@@ -129,6 +171,13 @@ function createDialogModel(): VnDialogViewModel {
   };
 }
 
+function createChoiceModel(choices: VnChoicesViewModel["choices"] = [{ text: "继续调查", enabled: true }]): VnChoicesViewModel {
+  return {
+    visible: true,
+    choices
+  };
+}
+
 function createCommandBarModel(): VnCommandBarViewModel {
   return {
     visible: true,
@@ -162,6 +211,16 @@ function findElementByTestId(node: ReactNode, testId: string): ReactElement | un
     if (match || !isValidElement(current)) return;
     const props = current.props as Record<string, unknown>;
     if (props["data-testid"] === testId) match = current;
+  });
+  return match;
+}
+
+function findElementByClassName(node: ReactNode, className: string): ReactElement | undefined {
+  let match: ReactElement | undefined;
+  visit(node, (current) => {
+    if (match || !isValidElement(current)) return;
+    const props = current.props as Record<string, unknown>;
+    if (props.className === className) match = current;
   });
   return match;
 }

@@ -17,6 +17,7 @@ describe("game-a content manifest", () => {
           { id: "bg:game-a-snow-outskirts-frame", kind: "background", tags: ["game-a", "vn"] },
           { id: "bgm:game-a-main", kind: "bgm", tags: ["game-a", "vn"] },
           { id: "sfx:game-a-chime", kind: "sfx", tags: ["game-a", "vn"] },
+          { id: "sfx:gentle-rain-loop", kind: "sfx", tags: ["game-a", "vn"] },
           { id: "bleep:game-a-dialogue", kind: "bleep", tags: ["game-a", "vn"] },
           { id: "voice:zh:game_a_voice_0001", kind: "voice", tags: ["game-a", "vn"] },
           { id: "video:game-a-intro", kind: "video", tags: ["game-a", "vn"] },
@@ -41,6 +42,9 @@ describe("game-a content manifest", () => {
     );
     expect(registry.url({ id: "bgm:game-a-main", kind: "bgm" })).toBe("/game-a/media/bgm/game-a-main.ogg");
     expect(registry.url({ id: "sfx:game-a-chime", kind: "sfx" })).toBe("/game-a/media/sfx/game-a-chime.ogg");
+    expect(registry.url({ id: "sfx:gentle-rain-loop", kind: "sfx" })).toBe(
+      "/game-a/media/sfx/gentle-rain-loop.mp3"
+    );
     expect(registry.url({ id: "bleep:game-a-dialogue", kind: "bleep" })).toBe("/game-a/media/bleep/game-a-dialogue.ogg");
     expect(registry.url({ id: "voice:zh:game_a_voice_0001", kind: "voice" })).toBe(
       "/game-a/media/voice/zh/game_a_voice_0001.ogg"

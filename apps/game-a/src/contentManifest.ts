@@ -16,6 +16,7 @@ export const gameAVnEntry = {
     { id: GAME_A_INNER_BACKGROUND_ID, kind: "background" as const, tags: ["game-a", "vn"] },
     { id: "bgm:game-a-main", kind: "bgm" as const, tags: ["game-a", "vn"] },
     { id: "sfx:game-a-chime", kind: "sfx" as const, tags: ["game-a", "vn"] },
+    { id: "sfx:gentle-rain-loop", kind: "sfx" as const, tags: ["game-a", "vn"] },
     { id: "bleep:game-a-dialogue", kind: "bleep" as const, tags: ["game-a", "vn"] },
     { id: "voice:zh:game_a_voice_0001", kind: "voice" as const, tags: ["game-a", "vn"] },
     { id: "video:game-a-intro", kind: "video" as const, tags: ["game-a", "vn"] },

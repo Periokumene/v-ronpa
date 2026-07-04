@@ -28,15 +28,39 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
 
   await clickByTestId(page, "title-new-game");
   await expect(page.getByTestId("game-a-mode")).toHaveText("vn");
+  await expect(page.getByTestId("vn-choice-overlay")).toBeVisible();
+  await expect(page.getByTestId("vn-choice-0")).toHaveClass(/game-a-choice-button/);
+  await expect(page.getByTestId("vn-choice-0")).toHaveText("吃下我！");
+  await expectChoiceButtonCentered(page, "vn-choice-0");
+  await page.screenshot({ path: "test-results/game-a-choice-centered.png", fullPage: true });
+  await clickByTestId(page, "vn-choice-0");
+
+  await advanceUntilChoiceText(page, "喂！", 24);
+  await clickByTestId(page, "vn-choice-0");
+  await advanceUntilChoiceText(page, "为什么？", 18);
+  await clickByTestId(page, "vn-choice-0");
+
+  await advanceUntilText(page, "Game A VN framework smoke", 24);
   await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-frame", "resolved");
   await expect(page.getByTestId("vn-dialog-surface")).toHaveClass(/game-a-dialog-surface/);
   await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-ui-phase", "shown");
+  await expect(page.getByTestId("pixi-layer")).toBeVisible();
+  await page.screenshot({ path: "test-results/game-a-vn-dialog.png", fullPage: true });
+
+  await advanceUntilText(page, "第一层验证", 4);
+  await advanceUntilChoices(page, 4);
+  await expect(page.getByTestId("vn-choice-overlay")).toBeVisible();
+  await expect(page.getByTestId("vn-choice-0")).toHaveClass(/game-a-choice-button/);
+  await page.screenshot({ path: "test-results/game-a-vn-choice.png", fullPage: true });
+  await clickByTestId(page, "vn-choice-0");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("记录了房间里的异常光线");
+
+  await advanceUntilText(page, "CHECKPOINT GAME-A UI FADE", 8);
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toHaveClass(/game-a-command-bar/);
   await expect(page.getByTestId("vn-command-bar")).toHaveAttribute("data-ui-phase", "shown");
-  await expect(page.getByTestId("pixi-layer")).toBeVisible();
-  await advanceUntilText(page, "Game A VN framework smoke", 8);
-  await page.screenshot({ path: "test-results/game-a-vn-dialog.png", fullPage: true });
+  await expect.poll(() => surfaceOpacity(page, ".game-a-dialog-surface")).toBe("1");
+  await expect.poll(() => surfaceOpacity(page, ".game-a-command-bar")).toBe("1");
 
   await clickByTestId(page, "vn-command-backlog");
   await expect(page.getByTestId("backlog-overlay")).toBeVisible();
@@ -51,16 +75,6 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await expect(page.getByTestId("vn-command-auto")).toBeEnabled();
   await expect(page.getByTestId("vn-command-skip")).toBeEnabled();
 
-  await advanceUntilText(page, "第一层验证", 4);
-  await advanceUntilChoices(page, 4);
-  await expect(page.getByTestId("vn-choice-overlay")).toBeVisible();
-  await expect(page.getByTestId("vn-command-skip")).toBeDisabled();
-  await clickByTestId(page, "vn-choice-0");
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("记录了房间里的异常光线");
-
-  await advanceUntilText(page, "CHECKPOINT GAME-A UI FADE", 8);
-  await expect.poll(() => surfaceOpacity(page, ".game-a-dialog-surface")).toBe("1");
-  await expect.poll(() => surfaceOpacity(page, ".game-a-command-bar")).toBe("1");
   await advanceUntilText(page, "CHECKPOINT GAME-A WAIT", 6);
   await advanceUntilMovie(page, 4);
   await expect(page.getByTestId("runtime-movie-overlay")).toBeVisible();
@@ -107,6 +121,22 @@ async function clickByTestId(page: Page, testId: string) {
   expect(clicked).toBe(true);
 }
 
+async function expectChoiceButtonCentered(page: Page, testId: string) {
+  const geometry = await page.evaluate((id) => {
+    const element = document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    return {
+      deltaX: Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2),
+      deltaY: Math.abs(rect.top + rect.height / 2 - window.innerHeight / 2)
+    };
+  }, testId);
+
+  expect(geometry).not.toBeNull();
+  expect(geometry?.deltaX).toBeLessThanOrEqual(4);
+  expect(geometry?.deltaY).toBeLessThanOrEqual(4);
+}
+
 async function advanceUntilChoices(page: Page, maxSteps: number) {
   for (let attempt = 0; attempt < maxSteps; attempt += 1) {
     if ((await page.getByTestId("vn-choice-overlay").count()) > 0) return;
@@ -115,6 +145,21 @@ async function advanceUntilChoices(page: Page, maxSteps: number) {
   }
 
   await expect(page.getByTestId("vn-choice-overlay")).toBeVisible();
+}
+
+async function advanceUntilChoiceText(page: Page, text: string, maxSteps: number) {
+  for (let attempt = 0; attempt < maxSteps; attempt += 1) {
+    if ((await page.getByTestId("vn-choice-overlay").count()) > 0) {
+      const currentText = ((await page.getByTestId("vn-choice-0").textContent()) ?? "").trim();
+      if (currentText === text) return;
+      await page.waitForTimeout(160);
+      continue;
+    }
+    await advanceVn(page);
+    await page.waitForTimeout(160);
+  }
+
+  await expect(page.getByTestId("vn-choice-0")).toHaveText(text);
 }
 
 async function advanceUntilMovie(page: Page, maxSteps: number) {

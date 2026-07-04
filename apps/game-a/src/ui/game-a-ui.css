@@ -1,11 +1,18 @@
+.game-a-playfield {
+  --game-a-dialog-line: rgba(229, 234, 236, 0.74);
+  --game-a-dialog-line-soft: rgba(229, 234, 236, 0.38);
+  --game-a-ui-mono-font: "Courier New", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --game-a-ui-rich-font:
+    var(--v-ronpa-rich-font-font_jinghua-laosong-gb, "Courier New"),
+    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .game-a-dialog-surface {
   --dialog-opacity: 0.96;
   --game-a-dialog-left: 11.7vw;
   --game-a-dialog-right: 11.7vw;
   --game-a-dialog-bottom: 0px;
   --game-a-dialog-height: 27.692vh;
-  --game-a-dialog-line: rgba(229, 234, 236, 0.74);
-  --game-a-dialog-line-soft: rgba(229, 234, 236, 0.38);
   --game-a-dialog-copy-left: clamp(24px, 3.2vw, 86px);
   --game-a-dialog-copy-right: clamp(48px, 4vw, 112px);
   position: absolute;
@@ -17,7 +24,7 @@
   min-height: 0;
   padding: clamp(40px, 6vh, 70px) clamp(24px, 6vw, 96px) clamp(58px, 8vh, 86px);
   color: #f1f1f1;
-  font-family: "Courier New", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--game-a-ui-mono-font);
   isolation: isolate;
 }
 
@@ -81,9 +88,7 @@
 .game-a-dialog-text {
   margin: 0;
   color: rgba(239, 239, 239, 0.88);
-  font-family:
-    var(--v-ronpa-rich-font-font_jinghua-laosong-gb, "Courier New"),
-    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--game-a-ui-rich-font);
   font-weight: 400;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -107,30 +112,75 @@
 .game-a-choice-overlay {
   position: absolute;
   z-index: 12;
-  right: clamp(28px, 8vw, 120px);
-  bottom: clamp(258px, 34vh, 340px);
-  width: min(480px, calc(100vw - 56px));
-  pointer-events: auto;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 6vw, 80px);
+  pointer-events: none;
 }
 
 .game-a-choice-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
+  width: min(520px, calc(100vw - 48px));
+  pointer-events: auto;
 }
 
 .game-a-choice-button {
+  display: flex;
+  align-items: center;
   width: 100%;
-  min-height: 48px;
+  min-height: 52px;
   justify-content: flex-start;
-  padding: 10px 16px;
-  border-color: rgba(214, 222, 211, 0.32);
-  background: linear-gradient(90deg, rgba(26, 34, 37, 0.94), rgba(34, 22, 31, 0.92));
-  color: #f7fbf4;
+  padding: 12px 18px;
+  border: 2px solid var(--game-a-dialog-line);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.9);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 1px var(--game-a-dialog-line-soft);
+  color: rgba(239, 239, 239, 0.9);
+  font-family: var(--game-a-ui-rich-font);
+  font-size: clamp(18px, 1.45vw, 26px);
+  line-height: 1.35;
   text-align: left;
+  text-shadow:
+    0 0 1px rgba(255, 255, 255, 0.46),
+    1px 1px 0 rgba(0, 0, 0, 0.9);
+  white-space: normal;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
 }
 
-.game-a-choice-button:hover {
-  border-color: #c9b56b;
+.game-a-choice-copy {
+  display: block;
+  color: inherit;
+}
+
+.game-a-choice-button:hover:not(:disabled),
+.game-a-choice-button:focus-visible:not(:disabled) {
+  border-color: rgba(246, 246, 238, 0.95);
+  background: rgba(229, 234, 236, 0.9);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 1px #c9b56b,
+    0 0 22px rgba(201, 181, 107, 0.24);
+  color: #050505;
+  outline: none;
+  text-shadow: none;
+}
+
+.game-a-choice-button:focus-visible:not(:disabled) {
+  outline: 2px solid #c9b56b;
+  outline-offset: 4px;
+}
+
+.game-a-choice-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .game-a-command-bar {
@@ -427,12 +477,6 @@
   .game-a-dialog-copy {
     width: 100%;
     margin-left: 0;
-  }
-
-  .game-a-choice-overlay {
-    right: 12px;
-    bottom: 248px;
-    width: calc(100vw - 24px);
   }
 
   .game-a-command-bar {

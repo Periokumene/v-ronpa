@@ -8,6 +8,8 @@ describe("game-a nani scripts", () => {
   it("exposes the opening .nani source as the app runtime entry", () => {
     expect(gameAOpeningNaniSource.trim().length).toBeGreaterThan(0);
     expect(gameAOpeningNaniSource).toContain("#Start");
+    expect(gameAOpeningNaniSource).toContain("@sfx sfx:gentle-rain-loop group:rain loop:true volume:0.3");
+    expect(gameAOpeningNaniSource).toContain("@stopSfx group:rain fade:0.8");
     expect(gameAOpeningNaniSource).not.toMatch(/\$\{[^}]+\}/u);
 
     expect(gameAOpeningRuntimeEntry.scriptPath).toBe(gameAVnEntry.scriptPath);
