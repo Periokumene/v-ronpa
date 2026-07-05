@@ -34,7 +34,10 @@ const harnessReferenceFiles = [
   join(repoRoot, "docs/nani/basic-p1-example.md"),
   ...fixtureNaniFiles(join(repoRoot, "packages/nani-parser/fixtures"))
 ];
-const gameAReferenceFiles = [gameAContentManifestPath];
+const gameAReferenceFiles = [
+  gameAContentManifestPath,
+  ...fixtureNaniFiles(join(repoRoot, "apps/game-a/src/nani"))
+];
 const hardcodedAssetPattern = /(["'`])(?:\/harness\/|\/game-a\/|\.\/assets\/|\.\.\/assets\/|https?:\/\/|data:image\/|blob:)[^"'`]*\.(?:json|png|webp|avif|ktx2|woff2?|ttf|otf|ogg|mp3|mp4|webm|gltf|glb)\1/u;
 const assetIdPattern = /\b(?:bg|bgm|sfx|bleep|voice|video|model|texture|fx):[a-zA-Z0-9:_./-]+/gu;
 const richTextFontFacePattern = /<font\b[^>]*\bface\s*=\s*(?:"(font:[a-zA-Z0-9:_./-]+)"|'(font:[a-zA-Z0-9:_./-]+)'|(font:[a-zA-Z0-9:_./-]+))/gu;
@@ -183,35 +186,54 @@ function checkBleepAssetLayout(root, labelPath) {
 }
 
 function checkCharacterPacks() {
-  for (const asset of collectHarnessRuntimeAssets().filter((item) => item.kind === "character-pack")) {
-    const entryPath = join(repoRoot, "apps/game-harness/public", asset.optimizedUri.replace(/^\//u, ""));
-    if (!existsSync(entryPath)) {
-      fail(`Character pack '${asset.id}' points to missing entry ${relative(repoRoot, entryPath)}.`);
-      continue;
-    }
-    const packRoot = dirname(entryPath);
-    try {
-      const character = LayeredCharacterDefinitionSchema.parse(readJsonFile(entryPath));
-      const layers = LayeredCharacterLayersSchema.parse(readJsonFile(join(packRoot, "layers.json")));
-      const compositions = LayeredCharacterCompositionsSchema.parse(readJsonFile(join(packRoot, "compositions.json")));
-      if (character.id !== asset.id) fail(`Character pack '${asset.id}' has mismatched character id '${character.id}'.`);
-      if (!compositions.tokens.Default || compositions.tokens.Default.length === 0) {
-        fail(`Character pack '${asset.id}' must define a non-empty Default composition token.`);
+  for (const config of appAssetConfigs) {
+    for (const asset of config.assets.filter((item) => item.kind === "character-pack")) {
+      const entryPath = join(repoRoot, config.publicRoot, asset.optimizedUri.replace(/^\//u, ""));
+      if (!existsSync(entryPath)) {
+        fail(`Character pack '${asset.id}' points to missing entry ${relative(repoRoot, entryPath)}.`);
+        continue;
       }
-      for (const [groupName, group] of Object.entries(layers.groups)) {
-        for (const [layerName, ref] of Object.entries(group.layers)) {
-          const texturePath = resolvePackPath(packRoot, ref.src);
-          const metadataPath = resolvePackPath(packRoot, ref.metadata);
-          if (!texturePath) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} uses out-of-pack texture path '${ref.src}'.`);
-          else if (!existsSync(texturePath)) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} texture is missing: ${ref.src}.`);
-          if (!metadataPath) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} uses out-of-pack metadata path '${ref.metadata}'.`);
-          else if (!existsSync(metadataPath)) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} metadata is missing: ${ref.metadata}.`);
-          else LayeredCharacterLayerMetadataSchema.parse(readJsonFile(metadataPath));
+      const packRoot = dirname(entryPath);
+      try {
+        const character = LayeredCharacterDefinitionSchema.parse(readJsonFile(entryPath));
+        const layers = LayeredCharacterLayersSchema.parse(readJsonFile(join(packRoot, "layers.json")));
+        const compositions = LayeredCharacterCompositionsSchema.parse(readJsonFile(join(packRoot, "compositions.json")));
+        if (character.id !== asset.id) fail(`Character pack '${asset.id}' has mismatched character id '${character.id}'.`);
+        if (!compositions.tokens.Default || compositions.tokens.Default.length === 0) {
+          fail(`Character pack '${asset.id}' must define a non-empty Default composition token.`);
         }
+        for (const [groupName, group] of Object.entries(layers.groups)) {
+          for (const [layerName, ref] of Object.entries(group.layers)) {
+            const texturePath = resolvePackPath(packRoot, ref.src);
+            const metadataPath = resolvePackPath(packRoot, ref.metadata);
+            if (!texturePath) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} uses out-of-pack texture path '${ref.src}'.`);
+            else if (!existsSync(texturePath)) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} texture is missing: ${ref.src}.`);
+            else checkPngTextureDimensions(asset.id, groupName, layerName, ref.src, texturePath);
+            if (!metadataPath) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} uses out-of-pack metadata path '${ref.metadata}'.`);
+            else if (!existsSync(metadataPath)) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} metadata is missing: ${ref.metadata}.`);
+            else LayeredCharacterLayerMetadataSchema.parse(readJsonFile(metadataPath));
+          }
+        }
+      } catch (error) {
+        fail(`Character pack '${asset.id}' failed schema validation: ${error instanceof Error ? error.message : String(error)}`);
       }
-    } catch (error) {
-      fail(`Character pack '${asset.id}' failed schema validation: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+}
+
+function checkPngTextureDimensions(assetId, groupName, layerName, src, texturePath) {
+  const buffer = readFileSync(texturePath);
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  const hasPngSignature = signature.every((byte, index) => buffer[index] === byte);
+  const firstChunkType = buffer.length >= 16 ? buffer.subarray(12, 16).toString("ascii") : "";
+  if (buffer.length < 24 || !hasPngSignature || firstChunkType !== "IHDR") {
+    fail(`Character pack '${assetId}' layer ${groupName}>${layerName} texture is not a valid PNG: ${src}.`);
+    return;
+  }
+  const width = buffer.readUInt32BE(16);
+  const height = buffer.readUInt32BE(20);
+  if (width <= 0 || height <= 0) {
+    fail(`Character pack '${assetId}' layer ${groupName}>${layerName} texture has invalid dimensions ${width}x${height}: ${src}.`);
   }
 }
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Assets, Container, Graphics, Rectangle, Sprite, Texture, TilingSprite, type Filter, type Ticker } from "pixi.js";
+import { Assets, Container, Graphics, Rectangle, Sprite, Texture, TextureSource, TilingSprite, type Filter, type Ticker } from "pixi.js";
 import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "@v-ronpa/contracts";
 import { INNER_BACKGROUND_ID, createInitialPixiStageSnapshot } from "../stageSnapshot";
 import {
@@ -331,6 +331,40 @@ describe("pixi presentation task system integration", () => {
     expect(face.alpha).toBe(0.5);
   });
 
+  it("sizes layered character sprites from loaded texture dimensions and pixelsPerUnit", async () => {
+    installCharacterPackFetch();
+    vi.spyOn(Assets, "load").mockImplementation((uri) => {
+      if (String(uri).endsWith("/FacePensive.png")) return Promise.resolve(textureWithSize(300, 600)) as never;
+      return Promise.resolve(textureWithSize(200, 400)) as never;
+    });
+    const container = new Container({ label: "actor:Ema" });
+    const system = new CharacterSystem({
+      width: () => 960,
+      height: () => 540,
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      }
+    });
+
+    system.render(container, characterActor("Ema", "Pensive1"), 1, () => true);
+
+    await waitFor(() => container.children[0]?.label === "layered-character:Ema:1");
+
+    const content = container.children[0] as Container;
+    const body = content.children[0] as Sprite;
+    const face = content.children[1] as Sprite;
+    expect(body.scale.x).toBeCloseTo(0.1);
+    expect(body.scale.y).toBeCloseTo(0.1);
+    expect(body.width).toBeCloseTo(20);
+    expect(body.height).toBeCloseTo(40);
+    expect(face.scale.x).toBeCloseTo(-0.1);
+    expect(face.scale.y).toBeCloseTo(0.1);
+    expect(face.width).toBeCloseTo(30);
+    expect(face.height).toBeCloseTo(60);
+  });
+
   it("does not require inactive metadata for layers overridden by the current expression", async () => {
     const fetch = installCharacterPackFetch({ includeInactiveMetadata: false });
     vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
@@ -387,6 +421,39 @@ describe("pixi presentation task system integration", () => {
     });
     expect(diagnostics[0]?.message).toContain("Pensive1");
     expect(diagnostics[0]?.message).toContain("FacePensive.png");
+  });
+
+  it("diagnoses active textures with invalid dimensions and keeps an empty character", async () => {
+    installCharacterPackFetch();
+    vi.spyOn(Assets, "load").mockImplementation((uri) => {
+      if (String(uri).endsWith("/FacePensive.png")) return Promise.resolve({ width: 0, height: 1 } as Texture) as never;
+      return Promise.resolve(Texture.EMPTY) as never;
+    });
+    const diagnostics: PixiPresenterDiagnostic[] = [];
+    const container = new Container({ label: "actor:Ema" });
+    const system = new CharacterSystem({
+      width: () => 960,
+      height: () => 540,
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      },
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic)
+    });
+
+    system.render(container, characterActor("Ema", "Pensive1"), 1, () => true);
+
+    await waitFor(() => diagnostics.length > 0 && container.children[0]?.label === "empty-character:Ema");
+
+    expect(diagnostics[0]).toMatchObject({
+      code: "asset-invalid-texture-dimensions",
+      severity: "error",
+      assetId: "Ema",
+      kind: "character-pack"
+    });
+    expect(diagnostics[0]?.message).toContain("FacePensive.png");
+    expect(diagnostics[0]?.message).toContain("0x1");
   });
 
   it("rejects character packs with out-of-pack layer paths before loading textures", async () => {
@@ -1491,7 +1558,7 @@ function characterPackFixture() {
     character: {
       id: "Ema",
       defaultComposition: ["Default"],
-      renderSpace: { stageScale: 10, defaultBounds: { min: [-1, 0], max: [1, 4] } }
+      renderSpace: { stageScale: 10, characterAnchor: [0, 0] }
     },
     layers: {
       groups: {
@@ -1537,9 +1604,7 @@ function layerMetadata(
   return {
     sourcePath: `Ema/${name}`,
     drawOrder,
-    texture: { fileName: `${name}.png`, mimeType: "image/png", size: { width: 100, height: 200 } },
     sprite: {
-      rect: { x: 0, y: 0, width: 100, height: 200 },
       pivot: options.pivot ?? { x: 0.5, y: 0.5 },
       pixelsPerUnit: 100
     },
@@ -1554,4 +1619,8 @@ function layerMetadata(
       flipY: false
     }
   };
+}
+
+function textureWithSize(width: number, height: number): Texture {
+  return new Texture({ source: new TextureSource({ width, height }) });
 }

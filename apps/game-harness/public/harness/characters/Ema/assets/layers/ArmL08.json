@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/ArmL/ArmL08",
   "drawOrder": 120,
-  "texture": {
-    "fileName": "ArmL08.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 444,
-      "height": 877
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 2540,
-      "y": 3979,
-      "width": 444,
-      "height": 877
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 4.44,
-      "y": 8.77
-    }
+    "flipY": false
   }
 }

@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head01/Facial01/Eyes01/Eyes01_Normal_Lifeless03",
   "drawOrder": 90,
-  "texture": {
-    "fileName": "Eyes01_Normal_Lifeless03.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 448,
-      "height": 219
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 3815,
-      "y": 3365,
-      "width": 448,
-      "height": 219
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 4.48,
-      "y": 2.19
-    }
+    "flipY": false
   }
 }

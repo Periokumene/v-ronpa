@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/ArmR/ArmR10",
   "drawOrder": 132,
-  "texture": {
-    "fileName": "ArmR10.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 592,
-      "height": 902
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 1730,
-      "y": 1752,
-      "width": 592,
-      "height": 902
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 5.92,
-      "y": 9.02
-    }
+    "flipY": false
   }
 }

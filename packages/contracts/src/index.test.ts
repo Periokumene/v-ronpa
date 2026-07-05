@@ -765,8 +765,7 @@ describe("contracts", () => {
     const metadata = {
       sourcePath: "Ema/Body",
       drawOrder: 10,
-      texture: { fileName: "Body.png", mimeType: "image/png", size: { width: 100, height: 200 } },
-      sprite: { rect: { x: 0, y: 0, width: 100, height: 200 }, pivot: { x: 0.5, y: 0.5 }, pixelsPerUnit: 100 },
+      sprite: { pivot: { x: 0.5, y: 0.5 }, pixelsPerUnit: 100 },
       localTransform: {
         position: { x: 0, y: 0, z: 0 },
         scale: { x: 1, y: 1, z: 1 },
@@ -782,9 +781,27 @@ describe("contracts", () => {
         renderer: { ...metadata.renderer, color: { ...metadata.renderer.color, a: 1.2 } }
       })
     ).toThrow();
+    expect(() =>
+      LayeredCharacterLayerMetadataSchema.parse({
+        ...metadata,
+        sprite: { ...metadata.sprite, pixelsPerUnit: 0 }
+      })
+    ).toThrow();
+    expect(() =>
+      LayeredCharacterLayerMetadataSchema.parse({
+        ...metadata,
+        sprite: { ...metadata.sprite, pixelsPerUnit: Number.POSITIVE_INFINITY }
+      })
+    ).toThrow();
+    expect(() =>
+      LayeredCharacterLayerMetadataSchema.parse({
+        ...metadata,
+        renderer: { ...metadata.renderer, size: { x: 1, y: 2 } }
+      })
+    ).toThrow();
   });
 
-  it("validates layered character pack-relative paths and render bounds", () => {
+  it("validates layered character pack-relative paths and render anchors", () => {
     expect(
       LayeredCharacterLayerRefSchema.parse({
         src: "assets/layers/Body.png",
@@ -803,11 +820,39 @@ describe("contracts", () => {
         metadata: "assets/layers/Body.json"
       })
     ).toThrow();
+    expect(
+      LayeredCharacterDefinitionSchema.parse({
+        id: "Ema",
+        defaultComposition: ["Default"],
+        renderSpace: { stageScale: 1, characterAnchor: [0, 0] }
+      }).renderSpace.characterAnchor
+    ).toEqual([0, 0]);
     expect(() =>
       LayeredCharacterDefinitionSchema.parse({
         id: "Ema",
         defaultComposition: ["Default"],
         renderSpace: { stageScale: 1, defaultBounds: { min: [2, 0], max: [1, 4] } }
+      })
+    ).toThrow();
+    expect(() =>
+      LayeredCharacterDefinitionSchema.parse({
+        id: "Ema",
+        defaultComposition: ["Default"],
+        renderSpace: { stageScale: 1, characterAnchor: [0, Number.POSITIVE_INFINITY] }
+      })
+    ).toThrow();
+    expect(() =>
+      LayeredCharacterDefinitionSchema.parse({
+        id: "Ema",
+        defaultComposition: ["Default"],
+        renderSpace: { stageScale: Number.POSITIVE_INFINITY, characterAnchor: [0, 0] }
+      })
+    ).toThrow();
+    expect(() =>
+      LayeredCharacterDefinitionSchema.parse({
+        id: "Ema",
+        defaultComposition: ["Default"],
+        renderSpace: { stageScale: 1 }
       })
     ).toThrow();
   });

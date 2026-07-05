@@ -1,21 +1,7 @@
 {
   "sourcePath": "alice/Angle01/FullBody",
   "drawOrder": 1,
-  "texture": {
-    "fileName": "FullBody.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 428,
-      "height": 1385
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 0,
-      "y": 0,
-      "width": 428,
-      "height": 1385
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 6.6875,
-      "y": 21.640625
-    }
+    "flipY": false
   }
 }

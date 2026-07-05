@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head01/Facial01/Mouth01/Mouth01_Normal_Middle",
   "drawOrder": 56,
-  "texture": {
-    "fileName": "Mouth01_Normal_Middle.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 85,
-      "height": 38
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 2386,
-      "y": 8119,
-      "width": 85,
-      "height": 38
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 0.85,
-      "y": 0.38
-    }
+    "flipY": false
   }
 }

@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/ArmL/ArmL14",
   "drawOrder": 114,
-  "texture": {
-    "fileName": "ArmL14.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 809,
-      "height": 618
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 2540,
-      "y": 904,
-      "width": 809,
-      "height": 618
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 8.09,
-      "y": 6.18
-    }
+    "flipY": false
   }
 }

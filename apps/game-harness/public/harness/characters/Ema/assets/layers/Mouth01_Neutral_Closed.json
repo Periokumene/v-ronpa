@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head01/Facial01/Mouth01/Mouth01_Neutral_Closed",
   "drawOrder": 38,
-  "texture": {
-    "fileName": "Mouth01_Neutral_Closed.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 49,
-      "height": 11
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 4193,
-      "y": 6778,
-      "width": 49,
-      "height": 11
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 0.49,
-      "y": 0.11
-    }
+    "flipY": false
   }
 }

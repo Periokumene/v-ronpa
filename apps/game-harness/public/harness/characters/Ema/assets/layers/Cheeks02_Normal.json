@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head02/Facial02/Cheeks02/Cheeks02_Normal",
   "drawOrder": 7,
-  "texture": {
-    "fileName": "Cheeks02_Normal.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 370,
-      "height": 192
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 3815,
-      "y": 6706,
-      "width": 370,
-      "height": 192
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 3.7,
-      "y": 1.92
-    }
+    "flipY": false
   }
 }

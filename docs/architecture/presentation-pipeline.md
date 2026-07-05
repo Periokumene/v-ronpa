@@ -70,7 +70,11 @@ and expression semantics. Pixi first asks that pure package for the active layer
 refs, then loads only the active metadata and textures before atomically
 swapping the actor content. App code must not import the resolver or infer layer
 paths; it only declares the character-pack entry JSON in the manifest and
-injects the asset resolver.
+injects the asset resolver. Character pack `renderSpace.characterAnchor` is a
+character-local coordinate in `pixelsPerUnit` units; Pixi places that point on
+the actor `pos` and uses the loaded PNG dimensions for each layer's rendered
+size. Layer metadata must not carry a parallel width/height or local size
+standard.
 
 Expression params such as `duration:{flashDuration}` are preserved by the
 compiler, evaluated by StoryEngine against story variables, and should be

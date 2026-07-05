@@ -7,15 +7,9 @@
   ],
   "renderSpace": {
     "stageScale": 18,
-    "defaultBounds": {
-      "min": [
-        -3.91600024,
-        3.25500012
-      ],
-      "max": [
-        4.93999982,
-        26.745
-      ]
-    }
+    "characterAnchor": [
+      0.51199979,
+      3.25500012
+    ]
   }
 }

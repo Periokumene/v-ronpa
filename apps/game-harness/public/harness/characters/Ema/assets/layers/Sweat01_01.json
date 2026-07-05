@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head01/Facial01/Sweat01/Sweat01_01",
   "drawOrder": 102,
-  "texture": {
-    "fileName": "Sweat01_01.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 8,
-      "height": 19
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 2520,
-      "y": 8085,
-      "width": 8,
-      "height": 19
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 0.08,
-      "y": 0.19
-    }
+    "flipY": false
   }
 }

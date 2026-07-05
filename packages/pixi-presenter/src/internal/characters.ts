@@ -33,11 +33,6 @@ interface CharacterRenderFrame {
   stageScale: number;
 }
 
-interface LayerTextureSize {
-  width: number;
-  height: number;
-}
-
 export class CharacterSystem {
   private readonly packs = new Map<string, Promise<LoadedCharacterPack>>();
   private readonly metadata = new Map<string, Promise<LayeredCharacterLayerMetadata>>();
@@ -87,12 +82,22 @@ export class CharacterSystem {
           return;
         }
         const textures = await Promise.all(
-          resolved.activeLayers.map(async (layer) => ({
-            layer,
-            texture: await this.loadTexture(resolvePackInternalUri(pack.entryUri, layer.src))
-          }))
+          resolved.activeLayers.map(async (layer) => {
+            const textureUri = resolvePackInternalUri(pack.entryUri, layer.src);
+            return {
+              layer,
+              textureUri,
+              texture: await this.loadTexture(textureUri)
+            };
+          })
         );
         if (!isCurrent()) return;
+        const invalidTexture = textures.find(({ texture }) => !hasPositiveTextureDimensions(texture));
+        if (invalidTexture) {
+          this.emitInvalidTextureDimensions(actor, invalidTexture.layer, invalidTexture.textureUri, invalidTexture.texture);
+          if (isCurrent()) this.replaceContent(container, new Container({ label: `empty-character:${actor.id}` }));
+          return;
+        }
         const content = new Container({ label: `layered-character:${actor.id}:${generation}` });
         this.drawLayers(content, pack, textures);
         this.renderHeights.set(content, this.options.height());
@@ -188,6 +193,23 @@ export class CharacterSystem {
     });
   }
 
+  private emitInvalidTextureDimensions(
+    actor: PixiActorSnapshot,
+    layer: ResolvedLayeredCharacterLayer,
+    textureUri: string,
+    texture: Texture
+  ): void {
+    const expression = actor.appearanceExpression?.trim() || "default";
+    this.options.onDiagnostic?.({
+      source: "asset",
+      code: "asset-invalid-texture-dimensions",
+      severity: "error",
+      assetId: actor.id,
+      kind: "character-pack",
+      message: `Layered character ${actor.id} expression '${expression}' layer '${layer.id}' loaded invalid texture dimensions ${texture.width}x${texture.height}: ${textureUri}`
+    });
+  }
+
   private drawLayers(
     content: Container,
     pack: LoadedCharacterPack,
@@ -198,7 +220,7 @@ export class CharacterSystem {
 
     for (const { layer, texture } of textures) {
       const sprite = new Sprite(texture);
-      applyLayerRenderParameters(sprite, layer, texture, frame);
+      applyLayerRenderParameters(sprite, layer, frame);
       content.addChild(sprite);
     }
   }
@@ -211,11 +233,10 @@ export class CharacterSystem {
 }
 
 // Render-affecting parameters are declared by scope: values shared by the full
-// character frame first, then per-layer texture and transform values.
+// character frame first, then per-layer transform values. Sprite(texture)
+// supplies the layer dimensions.
 function characterRenderFrame(pack: LoadedCharacterPack, viewportHeight: number): CharacterRenderFrame {
-  const bounds = pack.character.renderSpace.defaultBounds;
-  const anchorX = (bounds.min[0] + bounds.max[0]) / 2;
-  const anchorY = bounds.min[1];
+  const [anchorX, anchorY] = pack.character.renderSpace.characterAnchor;
   const viewportScale = viewportHeight / 540;
   const stageScale = pack.character.renderSpace.stageScale * viewportScale;
 
@@ -229,13 +250,11 @@ function characterRenderFrame(pack: LoadedCharacterPack, viewportHeight: number)
 function applyLayerRenderParameters(
   sprite: Sprite,
   layer: ResolvedLayeredCharacterLayer,
-  texture: Texture,
   frame: CharacterRenderFrame
 ): void {
   const { localTransform, renderer, sprite: spriteMeta } = layer.metadata;
-  const textureSize = layerTextureSize(texture, spriteMeta.rect.width, spriteMeta.rect.height);
-  const scaleX = (spriteMeta.rect.width / textureSize.width) * localTransform.scale.x * frame.stageScale / spriteMeta.pixelsPerUnit;
-  const scaleY = (spriteMeta.rect.height / textureSize.height) * localTransform.scale.y * frame.stageScale / spriteMeta.pixelsPerUnit;
+  const scaleX = localTransform.scale.x * frame.stageScale / spriteMeta.pixelsPerUnit;
+  const scaleY = localTransform.scale.y * frame.stageScale / spriteMeta.pixelsPerUnit;
 
   sprite.anchor.set(spriteMeta.pivot.x, spriteMeta.pivot.y);
   sprite.position.set(
@@ -249,11 +268,8 @@ function applyLayerRenderParameters(
   sprite.zIndex = layer.metadata.drawOrder;
 }
 
-function layerTextureSize(texture: Texture, fallbackWidth: number, fallbackHeight: number): LayerTextureSize {
-  return {
-    width: texture.width > 0 ? texture.width : fallbackWidth,
-    height: texture.height > 0 ? texture.height : fallbackHeight
-  };
+function hasPositiveTextureDimensions(texture: Texture): boolean {
+  return Number.isFinite(texture.width) && Number.isFinite(texture.height) && texture.width > 0 && texture.height > 0;
 }
 
 async function fetchJson(uri: string): Promise<unknown> {

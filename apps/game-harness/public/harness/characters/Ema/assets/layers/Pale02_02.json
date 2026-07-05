@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head02/Facial02/Pale02/Pale02_02",
   "drawOrder": 22,
-  "texture": {
-    "fileName": "Pale02_02.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 427,
-      "height": 331
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 3359,
-      "y": 4541,
-      "width": 427,
-      "height": 331
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 4.27,
-      "y": 3.31
-    }
+    "flipY": false
   }
 }

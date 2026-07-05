@@ -80,8 +80,11 @@ describe("layered character resolver", () => {
 
   it("calculates active layer bounds from sprite pivot, ppu, and local transform", () => {
     const result = resolveLayeredCharacter(fixture("Pensive1,ArmR3"));
+    const textureDimensions = Object.fromEntries(
+      result.activeLayers.map((layer) => [layer.id, { width: 100, height: 200 }])
+    );
 
-    expect(calculateLayeredCharacterBounds(result.activeLayers)).toEqual({
+    expect(calculateLayeredCharacterBounds(result.activeLayers, textureDimensions)).toEqual({
       min: [-0.5, -1],
       max: [2.5, 5]
     });
@@ -92,7 +95,7 @@ function fixture(appearanceExpression = "") {
   const character: LayeredCharacterDefinition = {
     id: "Ema",
     defaultComposition: ["ArmR1", "ArmL1", "Default"],
-    renderSpace: { stageScale: 18, defaultBounds: { min: [-0.5, -1], max: [2.5, 5] } }
+    renderSpace: { stageScale: 18, characterAnchor: [1, -1] }
   };
   const layers: LayeredCharacterLayers = {
     groups: {
@@ -154,8 +157,7 @@ function metadata(layer: string): LayeredCharacterLayerMetadata {
   return {
     sourcePath: `Ema/${layer}`,
     drawOrder: drawOrders[layer] ?? 100,
-    texture: { fileName: `${layer}.png`, mimeType: "image/png", size: { width: 100, height: 200 } },
-    sprite: { rect: { x: 0, y: 0, width: 100, height: 200 }, pivot: { x: 0.5, y: 0.5 }, pixelsPerUnit: 100 },
+    sprite: { pivot: { x: 0.5, y: 0.5 }, pixelsPerUnit: 100 },
     localTransform: {
       position: layer === "Body" ? { x: 1, y: 2, z: 0 } : { x: 1, y: 4, z: 0 },
       scale: layer === "Body" ? { x: 3, y: 3, z: 1 } : { x: 1, y: 1, z: 1 },

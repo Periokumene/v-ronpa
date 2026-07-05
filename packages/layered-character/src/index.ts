@@ -82,6 +82,13 @@ export interface LayeredCharacterLayerBounds {
   max: [number, number];
 }
 
+export interface LayeredCharacterTextureDimensions {
+  width: number;
+  height: number;
+}
+
+export type LayeredCharacterTextureDimensionsByLayerId = Record<string, LayeredCharacterTextureDimensions>;
+
 export function resolveLayeredCharacter(input: ResolveLayeredCharacterInput): ResolveLayeredCharacterResult {
   const resolvedRefs = resolveLayeredCharacterLayerRefs(input);
   const diagnostics: LayeredCharacterDiagnostic[] = [...resolvedRefs.diagnostics];
@@ -251,10 +258,14 @@ export function parseLayerExpression(expression: string): ParsedExpression | und
   return undefined;
 }
 
-export function calculateLayerBounds(layer: ResolvedLayeredCharacterLayer): LayeredCharacterLayerBounds {
+export function calculateLayerBounds(
+  layer: ResolvedLayeredCharacterLayer,
+  textureDimensions: LayeredCharacterTextureDimensions
+): LayeredCharacterLayerBounds {
   const { sprite, localTransform } = layer.metadata;
-  const width = (sprite.rect.width / sprite.pixelsPerUnit) * Math.abs(localTransform.scale.x);
-  const height = (sprite.rect.height / sprite.pixelsPerUnit) * Math.abs(localTransform.scale.y);
+  assertPositiveTextureDimensions(layer.id, textureDimensions);
+  const width = (textureDimensions.width / sprite.pixelsPerUnit) * Math.abs(localTransform.scale.x);
+  const height = (textureDimensions.height / sprite.pixelsPerUnit) * Math.abs(localTransform.scale.y);
   const x = localTransform.position.x;
   const y = localTransform.position.y;
   return {
@@ -263,13 +274,26 @@ export function calculateLayerBounds(layer: ResolvedLayeredCharacterLayer): Laye
   };
 }
 
-export function calculateLayeredCharacterBounds(layers: ResolvedLayeredCharacterLayer[]): LayeredCharacterLayerBounds | undefined {
+export function calculateLayeredCharacterBounds(
+  layers: ResolvedLayeredCharacterLayer[],
+  textureDimensionsByLayerId: LayeredCharacterTextureDimensionsByLayerId
+): LayeredCharacterLayerBounds | undefined {
   if (layers.length === 0) return undefined;
-  const bounds = layers.map(calculateLayerBounds);
+  const bounds = layers.map((layer) => {
+    const dimensions = textureDimensionsByLayerId[layer.id];
+    if (!dimensions) throw new Error(`Missing texture dimensions for layered character layer '${layer.id}'.`);
+    return calculateLayerBounds(layer, dimensions);
+  });
   return {
     min: [Math.min(...bounds.map((item) => item.min[0])), Math.min(...bounds.map((item) => item.min[1]))],
     max: [Math.max(...bounds.map((item) => item.max[0])), Math.max(...bounds.map((item) => item.max[1]))]
   };
+}
+
+function assertPositiveTextureDimensions(layerId: string, dimensions: LayeredCharacterTextureDimensions): void {
+  if (!Number.isFinite(dimensions.width) || !Number.isFinite(dimensions.height) || dimensions.width <= 0 || dimensions.height <= 0) {
+    throw new Error(`Invalid texture dimensions for layered character layer '${layerId}': ${dimensions.width}x${dimensions.height}.`);
+  }
 }
 
 function activeLayerKey(group: string, layer: string): string {

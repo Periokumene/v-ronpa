@@ -125,6 +125,13 @@ Hard gate snapshots cover:
 - Navi and Trial director runtime state
 - Pixi presentation snapshots and render hints
 
+Layered character packs are public asset contracts. Their `character.json`
+declares `renderSpace.characterAnchor` as the character-local point aligned to a
+Pixi actor position, while per-layer metadata keeps layer transform, pivot,
+`pixelsPerUnit`, renderer flags, and draw order. Layer texture dimensions are
+read from the PNG files; local width/height and size values are not duplicated
+in JSON metadata.
+
 See also:
 
 - `docs/nani/command-catalog.md`

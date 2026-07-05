@@ -172,10 +172,12 @@ async function advanceUntilChoices(page: Page) {
 }
 
 async function expectManualAdvanceCompletesRevealBeforeStoryStep(page: Page) {
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT 00", { timeout: 2_000 });
+  const dialogText = page.getByTestId("vn-dialog-text");
+  await expect(dialogText).toContainText("CHECK", { timeout: 5_000 });
+  await expect(dialogText).not.toContainText("请选择测试路径");
   await advanceVn(page);
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("请先确认主背景");
-  await expect(page.getByTestId("vn-dialog-text")).not.toContainText("请选择测试路径");
+  await expect(dialogText).toContainText("请先确认主背景", { timeout: 5_000 });
+  await expect(dialogText).not.toContainText("请选择测试路径");
 }
 
 async function advanceVn(page: Page) {

@@ -40,10 +40,11 @@ unit tests, both app builds, and smoke. It does not replace the baseline-only
 asset generation or app-cleanup residue checks unless those commands are run
 separately.
 
-`validate:assets` dry-runs harness asset generation, verifies generated
-`RuntimeAsset` files exist, checks harness asset ids resolve through registered
-assets, and rejects hardcoded runtime asset file paths in source outside the
-generator and registration allowlist.
+`validate:assets` dry-runs generated asset modules, verifies Game A and Harness
+`RuntimeAsset` files exist, checks scripted asset ids resolve through registered
+assets, validates character-pack metadata and PNG layer dimensions, and rejects
+hardcoded runtime asset file paths in source outside the generator and
+registration allowlist.
 
 ## Smoke And Evidence Gates
 

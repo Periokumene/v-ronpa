@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head01/Facial01/Mouth01/Mouth01_Confused_Open",
   "drawOrder": 35,
-  "texture": {
-    "fileName": "Mouth01_Confused_Open.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 108,
-      "height": 70
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 2289,
-      "y": 7951,
-      "width": 108,
-      "height": 70
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 1.08,
-      "y": 0.7
-    }
+    "flipY": false
   }
 }

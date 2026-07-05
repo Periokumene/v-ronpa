@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head01/HeadBase01",
   "drawOrder": 29,
-  "texture": {
-    "fileName": "HeadBase01.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 916,
-      "height": 1063
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 4,
-      "y": 3204,
-      "width": 916,
-      "height": 1063
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 9.16,
-      "y": 10.63
-    }
+    "flipY": false
   }
 }

@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head01/Facial01/Eyes01/Eyes01_Scream_Closed01",
   "drawOrder": 60,
-  "texture": {
-    "fileName": "Eyes01_Scream_Closed01.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 378,
-      "height": 160
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 3815,
-      "y": 7082,
-      "width": 378,
-      "height": 160
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 3.78,
-      "y": 1.6
-    }
+    "flipY": false
   }
 }

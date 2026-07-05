@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head02/Facial02/Mouth02/Mouth02_Surprised_Open",
   "drawOrder": 11,
-  "texture": {
-    "fileName": "Mouth02_Surprised_Open.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 100,
-      "height": 90
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 2305,
-      "y": 7849,
-      "width": 100,
-      "height": 90
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 1,
-      "y": 0.9
-    }
+    "flipY": false
   }
 }

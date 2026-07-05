@@ -1406,46 +1406,28 @@ export const FontFaceDefinitionSchema = z
 export type FontFaceDefinitionInput = z.input<typeof FontFaceDefinitionSchema>;
 export type FontFaceDefinition = z.infer<typeof FontFaceDefinitionSchema>;
 
+const LayeredCharacterNumberSchema = z.number().finite();
+const LayeredCharacterPositiveNumberSchema = LayeredCharacterNumberSchema.positive();
+
 export const LayeredCharacterObjectVector2Schema = z.object({
-  x: z.number(),
-  y: z.number()
+  x: LayeredCharacterNumberSchema,
+  y: LayeredCharacterNumberSchema
 }).strict();
 export type LayeredCharacterObjectVector2 = z.infer<typeof LayeredCharacterObjectVector2Schema>;
 
 export const LayeredCharacterObjectVector3Schema = z.object({
-  x: z.number(),
-  y: z.number(),
-  z: z.number()
+  x: LayeredCharacterNumberSchema,
+  y: LayeredCharacterNumberSchema,
+  z: LayeredCharacterNumberSchema
 }).strict();
 export type LayeredCharacterObjectVector3 = z.infer<typeof LayeredCharacterObjectVector3Schema>;
 
-export const LayeredCharacterVector2Schema = z.tuple([z.number(), z.number()]);
+export const LayeredCharacterVector2Schema = z.tuple([LayeredCharacterNumberSchema, LayeredCharacterNumberSchema]);
 export type LayeredCharacterVector2 = z.infer<typeof LayeredCharacterVector2Schema>;
 
-export const LayeredCharacterBoundsSchema = z.object({
-  min: LayeredCharacterVector2Schema,
-  max: LayeredCharacterVector2Schema
-}).strict().superRefine((bounds, ctx) => {
-  if (bounds.max[0] <= bounds.min[0]) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["max", 0],
-      message: "Layered character bounds max.x must be greater than min.x."
-    });
-  }
-  if (bounds.max[1] <= bounds.min[1]) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["max", 1],
-      message: "Layered character bounds max.y must be greater than min.y."
-    });
-  }
-});
-export type LayeredCharacterBounds = z.infer<typeof LayeredCharacterBoundsSchema>;
-
 export const LayeredCharacterRenderSpaceSchema = z.object({
-  stageScale: z.number().positive(),
-  defaultBounds: LayeredCharacterBoundsSchema
+  stageScale: LayeredCharacterPositiveNumberSchema,
+  characterAnchor: LayeredCharacterVector2Schema
 }).strict();
 export type LayeredCharacterRenderSpace = z.infer<typeof LayeredCharacterRenderSpaceSchema>;
 
@@ -1481,31 +1463,9 @@ export const LayeredCharacterCompositionsSchema = z.object({
 }).strict();
 export type LayeredCharacterCompositions = z.infer<typeof LayeredCharacterCompositionsSchema>;
 
-export const LayeredCharacterTextureSizeSchema = z.object({
-  width: z.number().positive(),
-  height: z.number().positive()
-}).strict();
-export type LayeredCharacterTextureSize = z.infer<typeof LayeredCharacterTextureSizeSchema>;
-
-export const LayeredCharacterTextureSchema = z.object({
-  fileName: z.string().min(1),
-  mimeType: z.string().min(1),
-  size: LayeredCharacterTextureSizeSchema
-}).strict();
-export type LayeredCharacterTexture = z.infer<typeof LayeredCharacterTextureSchema>;
-
-export const LayeredCharacterRectSchema = z.object({
-  x: z.number(),
-  y: z.number(),
-  width: z.number().positive(),
-  height: z.number().positive()
-}).strict();
-export type LayeredCharacterRect = z.infer<typeof LayeredCharacterRectSchema>;
-
 export const LayeredCharacterSpriteSchema = z.object({
-  rect: LayeredCharacterRectSchema,
   pivot: LayeredCharacterObjectVector2Schema,
-  pixelsPerUnit: z.number().positive()
+  pixelsPerUnit: LayeredCharacterPositiveNumberSchema
 }).strict();
 export type LayeredCharacterSprite = z.infer<typeof LayeredCharacterSpriteSchema>;
 
@@ -1518,21 +1478,19 @@ export type LayeredCharacterTransform = z.infer<typeof LayeredCharacterTransform
 
 export const LayeredCharacterRendererSchema = z.object({
   color: z.object({
-    r: z.number().min(0).max(1),
-    g: z.number().min(0).max(1),
-    b: z.number().min(0).max(1),
-    a: z.number().min(0).max(1)
+    r: LayeredCharacterNumberSchema.min(0).max(1),
+    g: LayeredCharacterNumberSchema.min(0).max(1),
+    b: LayeredCharacterNumberSchema.min(0).max(1),
+    a: LayeredCharacterNumberSchema.min(0).max(1)
   }).strict(),
   flipX: z.boolean(),
-  flipY: z.boolean(),
-  size: LayeredCharacterObjectVector2Schema.optional()
+  flipY: z.boolean()
 }).strict();
 export type LayeredCharacterRenderer = z.infer<typeof LayeredCharacterRendererSchema>;
 
 export const LayeredCharacterLayerMetadataSchema = z.object({
   sourcePath: z.string().min(1),
-  drawOrder: z.number(),
-  texture: LayeredCharacterTextureSchema,
+  drawOrder: LayeredCharacterNumberSchema,
   sprite: LayeredCharacterSpriteSchema,
   localTransform: LayeredCharacterTransformSchema,
   renderer: LayeredCharacterRendererSchema

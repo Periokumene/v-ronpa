@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head01/Facial01/Mouth01/Mouth01_Normal_Closed",
   "drawOrder": 55,
-  "texture": {
-    "fileName": "Mouth01_Normal_Closed.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 89,
-      "height": 24
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 2282,
-      "y": 8164,
-      "width": 89,
-      "height": 24
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 0.89,
-      "y": 0.24
-    }
+    "flipY": false
   }
 }

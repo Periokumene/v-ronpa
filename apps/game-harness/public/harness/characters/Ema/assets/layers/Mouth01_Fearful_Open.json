@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head01/Facial01/Mouth01/Mouth01_Fearful_Open",
   "drawOrder": 39,
-  "texture": {
-    "fileName": "Mouth01_Fearful_Open.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 36,
-      "height": 13
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 4193,
-      "y": 6815,
-      "width": 36,
-      "height": 13
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 0.36,
-      "y": 0.13
-    }
+    "flipY": false
   }
 }

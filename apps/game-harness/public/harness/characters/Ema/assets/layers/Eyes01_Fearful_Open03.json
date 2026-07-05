@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head01/Facial01/Eyes01/Eyes01_Fearful_Open03",
   "drawOrder": 62,
-  "texture": {
-    "fileName": "Eyes01_Fearful_Open03.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 448,
-      "height": 252
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 3359,
-      "y": 7491,
-      "width": 448,
-      "height": 252
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 4.48,
-      "y": 2.52
-    }
+    "flipY": false
   }
 }

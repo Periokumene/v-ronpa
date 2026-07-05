@@ -146,7 +146,13 @@ it through adapter props:
   fetching per-layer metadata and PNGs. Layer paths inside `layers.json` must be
   pack-relative paths; absolute URLs and parent-directory escapes are contract
   failures. Unused layer metadata is not a required dependency for the current
-  render.
+  render. Character packs use one PNG per layer; atlas rects are not part of the
+  current contract.
+- Layered character metadata stores transform, pivot, draw order, renderer
+  flags, and `pixelsPerUnit` only. Texture dimensions come from the loaded PNG at
+  runtime, and `renderSpace.characterAnchor` is the character-local point placed
+  on the Pixi actor `pos`. Width/height and local size fields must not be
+  duplicated in layer metadata.
 - R3F resolves `WorldMapDef.assetRefs` model ids before probing or loading
   glTF assets.
 - UI/evidence image references are validated even when the current harness does

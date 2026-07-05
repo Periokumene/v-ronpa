@@ -1,21 +1,7 @@
 {
   "sourcePath": "Ema/Angle01/Head01/Facial01/Eyes01/Eyes01_Cry_Closed01",
   "drawOrder": 74,
-  "texture": {
-    "fileName": "Eyes01_Cry_Closed01.png",
-    "mimeType": "image/png",
-    "size": {
-      "width": 428,
-      "height": 465
-    }
-  },
   "sprite": {
-    "rect": {
-      "x": 2540,
-      "y": 7690,
-      "width": 428,
-      "height": 465
-    },
     "pivot": {
       "x": 0.5,
       "y": 0.5
@@ -47,10 +33,6 @@
       "a": 1
     },
     "flipX": false,
-    "flipY": false,
-    "size": {
-      "x": 4.28,
-      "y": 4.65
-    }
+    "flipY": false
   }
 }
