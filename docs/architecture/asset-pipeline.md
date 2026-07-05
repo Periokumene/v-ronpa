@@ -161,6 +161,9 @@ it through adapter props:
 Missing assets must produce diagnostics and keep the existing visible fallback.
 They must not crash the app and must not fail silently.
 
+See `docs/architecture/app-vn-integration.md` for how app packages pass their
+asset registries into VN runtime, shell, Pixi, R3F, UI skin, and debug wiring.
+
 ## Collision Proxies
 
 `CollisionProxy` covers `box`, `sphere`, `capsule`, `convex-mesh`, `trimesh`,

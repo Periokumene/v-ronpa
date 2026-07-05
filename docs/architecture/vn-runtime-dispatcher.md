@@ -293,86 +293,12 @@ and resumes when each target reaches the requested terminal visibility. Manual
 advance during a wait settles the relevant Pixi or UI presentation to terminal
 state and then resumes story flow.
 
-## Game A Consumption
+## App Integration Boundary
 
-`apps/game-a` uses `app-vn-runtime`, `GameInteractionShell`,
-`VnRuntimeDispatcher`, and an app-created `AssetRegistry` for a standalone VN2D
-entry. It does not mount Navi, Trial, R3F, or harness debug controls, and it no
-longer imports `app-vn-session`, `app-vn-dispatch`, `story-play`, StoryEngine,
-or Pixi runtime helpers from app source. Its save adapter is localStorage-backed
-and stores VN story plus Pixi stage snapshots for the Game A entry. Game A owns
-its own minimal bgm/sfx/bleep/voice/video resources under `apps/game-a/public`.
-Game A's development-only `?vnStart=<label>` shortcut is app startup policy, not
-`VnRuntimeDispatcher` behavior: the app translates the URL into the VN entry
-`startLabel`, still boots through `useVnRuntime`, and enters VN through the
-normal app flow event. `app-vn-runtime` only reports invalid start-label
-diagnostics and does not persist or migrate debug launch state.
-Active Game A `.nani` references that resolve media, Pixi backgrounds, video,
-or character-pack assets must be declared by the Game A VN entry `assetRefs` so
-`AssetRegistry.validateReferences()` covers the entry-level loading contract.
-Game A also owns an app UI skin layer that creates custom `GameInteractionShell`
-Surfaces for dialog, choices, command bar, title, backlog, save/load, settings,
-pause, toast, and input prompt. The dialog frame texture is registered as a
-`RuntimeAsset` and declared by the Game A VN entry `assetRefs`. Game A keeps the
-dialog frame asset id in app-local UI config, resolves it through its app-created
-`AssetRegistry`, then passes the resolved asset availability to the custom dialog
-Surface. The current Game A skin keeps frame rendering CSS-only; the resolved
-asset is an app-local resource readiness signal rather than shared runtime state.
-
-## Harness Showcase Migration
-
-The harness-showcase harness uses:
-
-- `app-vn-runtime` for VN boot, stepping, reveal, AUTO/SKIP, voice, media,
-  movie, Pixi wait, runtime wait, and restore cleanup.
-- `harnessContentManifest` plus `AssetRegistry` for all media, Pixi, R3F, and
-  UI/evidence asset ids.
-- `VnRuntimeDispatcher` for Pixi snapshot rendering.
-- `GameInteractionShell` for VN advance hit plane, dialog display, choice
-  overlay, command bar, toast, input prompt, movie overlay, and durable shell
-  overlay mounting.
-- The default `GameInteractionShell` Surface preset; the harness does not pass
-  game-specific custom Surfaces and remains the compatibility baseline for apps
-  that do not customize UI skin slots.
-- `PixiStageSnapshot` as the saveable terminal state for VN 2D staging.
-- `InspectorLite` debug counters derived from the latest emitted command batch,
-  not from a cumulative presentation log.
-
-Scenario code should not manually filter runtime commands by renderer. Add or
-update `VnOutputRouteTable` routes and pass the desired `profile` / `routeTable`
-into the runtime adapter instead.
-
-VN dialog and toolbar actions are intentionally outside `VnRuntimeDispatcher`.
-LOG, SKIP, AUTO, SAVE, LOAD, and SETTING are shell UI actions derived from
-`InteractionCapabilitySnapshot`; they should enter the app through
-`GameInteractionShell` and an app-provided overlay/page adapter such as the
-harness `useOverlayPageAdapters`. AUTO/SKIP actions are routed from those
-adapters into `app-vn-runtime`, which hosts web timers and delegates playback
-rules to `story-play`. The Pixi active task debug list must not be used to
-enable or disable these controls.
-
-`vnShellActions` contains pure action-to-overlay and save/load model helpers.
-App-owned overlay/page adapters provide app save/settings data as overlay
-ViewModel inputs and bind app-specific actions such as save, load, settings
-patches, and title return. `GameInteractionShell` derives the final overlay
-ViewModels, selects the active overlay Surface slot, and mounts it with the
-adapter-provided actions.
-
-`apps/game-harness/src/interaction` is harness-only wiring:
-`useGameFlowActor` adapts `game-flow-machine`,
-`useHarnessShowcaseRuntimeAdapter` binds showcase fixtures to shared VN runtime,
-Navi, Trial, R3F, and debug state, `useHarnessShowcaseSaveAdapter` owns harness
-save collection and slot policy, and `useOverlayPageAdapters` provides
-overlay ViewModel inputs and app-specific overlay actions. These
-hooks must not move into `packages/app-vn-runtime`, `packages/app-vn-dispatch`,
-or `packages/app-vn-shell`; shared VN loop behavior belongs in
-`packages/app-vn-runtime`.
-
-Settings overlay edits update app-owned canonical settings immediately and are
-debounced to localStorage by the app adapter. The overlay does not own draft
-state, does not render dialogue previews, and does not subscribe to runtime
-state. Text rendering remains in `VnDialogSurface`; settings can only affect it
-through display props.
+App-specific VN composition is outside `VnRuntimeDispatcher` and outside the
+shared runtime transaction. Game A and harness wiring for flow, save/load,
+settings, overlay adapters, UI skin slots, debug entry points, and app-created
+asset registries lives in `docs/architecture/app-vn-integration.md`.
 
 ## Future Branches
 

@@ -151,6 +151,7 @@ See also:
 
 - `docs/architecture/input-and-camera.md`
 - `docs/architecture/asset-pipeline.md`
+- `docs/architecture/app-vn-integration.md`
 
 ## Script To Presentation
 
@@ -216,6 +217,7 @@ See also:
 
 - `docs/nani/command-catalog.md`
 - `docs/architecture/vn-runtime-dispatcher.md`
+- `docs/architecture/app-vn-integration.md`
 
 ## Evidence And Trial Rules
 
