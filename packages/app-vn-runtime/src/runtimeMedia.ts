@@ -132,10 +132,21 @@ export async function applyVnRuntimeMediaEffects({
           continue;
         }
         handles.bgm[effect.key]?.stop();
-        handles.bgm[effect.key] = audioPort.playBgm(effect.key, resolved.uri, {
+        handles.bgm[effect.key] = audioPort.playBgm(audioPlaybackHandleId(handles, effect.key, "bgm", effect.fadeInMs), resolved.uri, {
           loop: true,
-          ...(effect.volume !== undefined ? { volume: effect.volume } : {})
+          ...(effect.volume !== undefined ? { volume: effect.volume } : {}),
+          ...(effect.fadeInMs !== undefined ? { fadeInMs: effect.fadeInMs } : {})
         });
+        continue;
+      }
+
+      if (effect.type === "set-bgm-volume") {
+        const handle = handles.bgm[effect.key];
+        if (!handle) {
+          diagnostics.push(createVnMediaHandleMissingDiagnostic(`BGM handle ${effect.key} is not active.`));
+          continue;
+        }
+        handle.fade(effect.volume, effect.durationMs ?? 0);
         continue;
       }
 
@@ -162,11 +173,22 @@ export async function applyVnRuntimeMediaEffects({
           continue;
         }
         const key = effect.key ?? `sfx:one-shot:${++handles.oneShotSequence}`;
-        const handle = audioPort.playSfx(key, resolved.uri, {
+        const handle = audioPort.playSfx(audioPlaybackHandleId(handles, key, "sfx", effect.fadeInMs), resolved.uri, {
           loop: effect.loop,
-          ...(effect.volume !== undefined ? { volume: effect.volume } : {})
+          ...(effect.volume !== undefined ? { volume: effect.volume } : {}),
+          ...(effect.fadeInMs !== undefined ? { fadeInMs: effect.fadeInMs } : {})
         });
         if (effect.loop) handles.sfx[key] = handle;
+        continue;
+      }
+
+      if (effect.type === "set-sfx-volume") {
+        const handle = handles.sfx[effect.key];
+        if (!handle) {
+          diagnostics.push(createVnMediaHandleMissingDiagnostic(`Looping SFX handle ${effect.key} is not active.`));
+          continue;
+        }
+        handle.fade(effect.volume, effect.durationMs ?? 0);
         continue;
       }
 
@@ -258,3 +280,11 @@ export function stopAllVnRuntimeMediaHandles(handles: VnRuntimeMediaHandleStore,
   return { bgm: {}, sfx: {}, oneShotSequence: handles.oneShotSequence };
 }
 
+function audioPlaybackHandleId(
+  handles: VnRuntimeMediaHandleStore,
+  key: string,
+  kind: "bgm" | "sfx",
+  fadeInMs: number | undefined
+): string {
+  return fadeInMs !== undefined && fadeInMs > 0 ? `${key}:${kind}:fade-in:${++handles.oneShotSequence}` : key;
+}

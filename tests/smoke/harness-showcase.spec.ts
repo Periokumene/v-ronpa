@@ -423,6 +423,8 @@ async function advanceMainInteractionShowcase(page: Page) {
   await page.getByTestId("runtime-input-submit").click();
   await advanceUntilText(page, "CHECKPOINT MAIN 02");
   await advanceUntilText(page, "CHECKPOINT MAIN 03");
+  await advanceUntilText(page, "CHECKPOINT MAIN 03B");
+  await advanceUntilText(page, "CHECKPOINT MAIN 03C");
   await advanceUntilText(page, "CHECKPOINT MAIN 04");
   await advanceVn(page);
   await expect(page.getByTestId("runtime-movie-overlay")).toBeVisible();

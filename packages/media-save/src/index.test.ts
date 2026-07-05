@@ -216,6 +216,18 @@ describe("media save contracts", () => {
     expect(howlerMock.instances[1]?.stop).toHaveBeenCalledTimes(1);
   });
 
+  it("fades BGM and SFX in from zero to the target volume", () => {
+    const port = createHowlerAudioPort();
+
+    port.playBgm("bgm:main", "/main.ogg", { volume: 0.7, fadeInMs: 300 });
+    port.playSfx("sfx:rain", "/rain.ogg", { loop: true, volume: 0.35, fadeInMs: 250 });
+
+    expect(howlerMock.instances[0]?.config).toMatchObject({ src: ["/main.ogg"], loop: true, volume: 0 });
+    expect(howlerMock.instances[0]?.fade).toHaveBeenCalledWith(0, 0.7, 300);
+    expect(howlerMock.instances[1]?.config).toMatchObject({ src: ["/rain.ogg"], loop: true, volume: 0 });
+    expect(howlerMock.instances[1]?.fade).toHaveBeenCalledWith(0, 0.35, 250);
+  });
+
   it("plays dialogue bleep as a looped handle until stopped", async () => {
     const port = createHowlerAudioPort();
 

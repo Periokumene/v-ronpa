@@ -80,9 +80,15 @@ Mira: CHECKPOINT BLEEP DEFAULT - nani speaker Mira 没有 override，应使用�
 Felix: CHECKPOINT BLEEP OVERRIDE - nani speaker Felix 应使用角色 override dialogue bleep 009。
 Narrator: CHECKPOINT BLEEP NULL - nani speaker Narrator 配置为 null override，应保持无 bleep。
 @bgm bgm:validation-main group:music volume:0.45 fade:0.2
-@sfx sfx:rain-inside-car-loop group:rain loop:true volume:0.35
-@sfx sfx:knock-door volume:0.9
-Narrator: CHECKPOINT MAIN 03 - audio layer。应听到 music 组 BGM、rain 组 loop SFX，并播放一次敲门 SFX。
+@sfx sfx:rain-inside-car-loop group:rain loop! volume:0.35 fade:0.2
+@sfx sfx:knock-door volume:0.9 fade:0.1
+Narrator: CHECKPOINT MAIN 03 - audio fade-in layer。应听到 music 组 BGM 淡入、rain 组 loop SFX 淡入，并播放一次敲门 SFX。
+@bgm group:music volume:0.3 time:0.4
+@sfx group:rain volume:0.15 time:0.4
+Narrator: CHECKPOINT MAIN 03B - audio volume transition。music 组 BGM 与 rain 组 loop SFX 应平滑降低音量，且不重启资源。
+@bgm bgm:validation-main group:music volume:0.38 time:0.25
+@sfx sfx:rain-inside-car-loop group:rain loop! volume:0.25 time:0.25
+Narrator: CHECKPOINT MAIN 03C - same-resource volume transition。同组同资源 BGM 与 loop SFX 应视为平滑调音量，而不是重新播放。
 @bgm bgm:validation-alt group:music volume:0.45 fade:0.5
 @bgm bgm:validation-layer group:ambient volume:0.25 fade:0.1
 @sfxFast sfx:shock-fadeout volume:0.75

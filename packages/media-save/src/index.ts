@@ -41,8 +41,8 @@ export interface AudioHandle {
 }
 
 export interface AudioPort {
-  playBgm(id: string, uri: string, options?: { loop?: boolean; volume?: number }): AudioHandle;
-  playSfx(id: string, uri: string, options?: { loop?: boolean; volume?: number }): AudioHandle;
+  playBgm(id: string, uri: string, options?: { loop?: boolean; volume?: number; fadeInMs?: number }): AudioHandle;
+  playSfx(id: string, uri: string, options?: { loop?: boolean; volume?: number; fadeInMs?: number }): AudioHandle;
   playDialogueBleep(id: string, uri: string, options?: { volume?: number }): AudioHandle;
   playVoice(id: string, uri: string, options?: { volume?: number }): AudioHandle;
   stopAll(): void;
@@ -188,7 +188,7 @@ export function createHowlerAudioPort(): AudioPort {
       },
       fade(to, durationMs) {
         if (released) return;
-        howl.fade(howl.volume(), to, durationMs);
+        howl.fade(howl.volume(), to, audioFadeDurationMs(durationMs));
       },
       fadeOutAndStop(durationMs) {
         if (released) return;
@@ -207,29 +207,37 @@ export function createHowlerAudioPort(): AudioPort {
 
   return {
     playBgm(id, uri, options) {
-      return register(
+      const targetVolume = options?.volume ?? 0.7;
+      const fadeInMs = audioFadeDurationMs(options?.fadeInMs ?? 0);
+      const handle = register(
         id,
         new Howl({
           src: [uri],
           loop: options?.loop ?? true,
-          volume: options?.volume ?? 0.7,
+          volume: fadeInMs > 0 ? 0 : targetVolume,
           html5: false
         }),
         { releaseOnEnd: false }
       );
+      if (fadeInMs > 0) handle.fade(targetVolume, fadeInMs);
+      return handle;
     },
     playSfx(id, uri, options) {
       const loop = options?.loop ?? false;
-      return register(
+      const targetVolume = options?.volume ?? 1;
+      const fadeInMs = audioFadeDurationMs(options?.fadeInMs ?? 0);
+      const handle = register(
         id,
         new Howl({
           src: [uri],
           loop,
-          volume: options?.volume ?? 1,
+          volume: fadeInMs > 0 ? 0 : targetVolume,
           html5: false
         }),
         { releaseOnEnd: !loop }
       );
+      if (fadeInMs > 0) handle.fade(targetVolume, fadeInMs);
+      return handle;
     },
     playDialogueBleep(id, uri, options) {
       return register(
@@ -261,6 +269,10 @@ export function createHowlerAudioPort(): AudioPort {
       for (const record of [...handles.values()]) record.release("stopped");
     }
   };
+}
+
+function audioFadeDurationMs(durationMs: number): number {
+  return Math.max(0, Math.floor(durationMs));
 }
 
 export function createHtmlVideoPort(): VideoPort {

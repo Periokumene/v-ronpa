@@ -186,8 +186,10 @@ describe("app VN runtime helpers", () => {
       audioPort,
       handles,
       effects: [
-        { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:main", volume: 0.4 },
-        { type: "play-sfx", key: "rain", group: "rain", sourceRef: "sfx:rain", loop: true, fast: false, volume: 0.3 },
+        { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:main", volume: 0.4, fadeInMs: 300 },
+        { type: "play-sfx", key: "rain", group: "rain", sourceRef: "sfx:rain", loop: true, fast: false, volume: 0.3, fadeInMs: 200 },
+        { type: "set-bgm-volume", key: "music", group: "music", volume: 0.2, durationMs: 500 },
+        { type: "set-sfx-volume", key: "rain", group: "rain", volume: 0.1, durationMs: 250 },
         {
           type: "play-voice",
           key: "voice:zh:line",
@@ -201,12 +203,49 @@ describe("app VN runtime helpers", () => {
       resolver: ({ sourceRef }) => ({ uri: `/resolved/${sourceRef}.ogg` })
     });
 
-    expect(playBgm.calls).toEqual([["music", "/resolved/bgm:main.ogg", { loop: true, volume: 0.4 }]]);
-    expect(playSfx.calls).toEqual([["rain", "/resolved/sfx:rain.ogg", { loop: true, volume: 0.3 }]]);
+    expect(playBgm.calls).toEqual([["music:bgm:fade-in:1", "/resolved/bgm:main.ogg", { loop: true, volume: 0.4, fadeInMs: 300 }]]);
+    expect(playSfx.calls).toEqual([["rain:sfx:fade-in:2", "/resolved/sfx:rain.ogg", { loop: true, volume: 0.3, fadeInMs: 200 }]]);
     expect(playVoice.calls).toEqual([["voice:zh:line", "/resolved/voice:zh:line.ogg", { volume: 0.6 }]]);
+    expect((bgmHandle.fade as ReturnType<typeof viFn>).calls).toEqual([[0.2, 500]]);
+    expect((sfxHandle.fade as ReturnType<typeof viFn>).calls).toEqual([[0.1, 250]]);
     expect((bgmHandle.fadeOutAndStop as ReturnType<typeof viFn>).calls).toEqual([[200]]);
     expect((sfxHandle.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
     expect(result).toEqual({ diagnostics: [], voiceHandle });
+  });
+
+  it("reports missing handles for scripted media volume transitions", async () => {
+    const audioPort: AudioPort = {
+      playBgm: viFn(),
+      playSfx: viFn(),
+      playDialogueBleep: viFn(),
+      playVoice: viFn(),
+      stopAll: viFn()
+    };
+
+    const result = await applyVnRuntimeMediaEffects({
+      audioPort,
+      handles: { bgm: {}, sfx: {}, oneShotSequence: 0 },
+      effects: [
+        { type: "set-bgm-volume", key: "music", group: "music", volume: 0.2, durationMs: 500 },
+        { type: "set-sfx-volume", key: "rain", group: "rain", volume: 0.1, durationMs: 250 }
+      ],
+      resolver: ({ sourceRef }) => ({ uri: `/resolved/${sourceRef}.ogg` })
+    });
+
+    expect(result.diagnostics).toEqual([
+      {
+        source: "media",
+        code: "media-handle-missing",
+        severity: "info",
+        message: "BGM handle music is not active."
+      },
+      {
+        source: "media",
+        code: "media-handle-missing",
+        severity: "info",
+        message: "Looping SFX handle rain is not active."
+      }
+    ]);
   });
 
   it("uses dialogue voice availability to suppress bleep and returns a gateable voice handle", async () => {

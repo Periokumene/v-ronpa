@@ -18,9 +18,11 @@ export interface MediaRuntimeState {
 }
 
 export type MediaRuntimeEffect =
-  | { type: "play-bgm"; key: string; group: string; sourceRef: string; volume?: number; fadeMs?: number }
+  | { type: "play-bgm"; key: string; group: string; sourceRef: string; volume?: number; fadeInMs?: number }
+  | { type: "set-bgm-volume"; key: string; group: string; volume: number; durationMs?: number }
   | { type: "stop-bgm"; key: string; group: string; fadeMs?: number }
-  | { type: "play-sfx"; sourceRef: string; loop: boolean; fast: boolean; key?: string; group?: string; volume?: number }
+  | { type: "play-sfx"; sourceRef: string; loop: boolean; fast: boolean; key?: string; group?: string; volume?: number; fadeInMs?: number }
+  | { type: "set-sfx-volume"; key: string; group?: string; volume: number; durationMs?: number }
   | { type: "stop-sfx"; key: string; group?: string; fadeMs?: number }
   | { type: "play-dialogue-bleep"; key: string; sourceRef: string; volume?: number }
   | { type: "stop-dialogue-bleep"; key: string }
@@ -91,12 +93,36 @@ export function reduceMediaRuntimeCommands(state: MediaRuntimeState, commands: R
 
 function reduceBgmCommand(state: MediaRuntimeState, command: RuntimeCommand): MediaRuntimeResult {
   const sourceRef = stringParam(command, "bgmPath");
-  const group = stringParam(command, "group") ?? "bgm";
-  if (!sourceRef) return missingSource(state, command, "bgmPath");
-
-  const previous = state.bgmByGroup[group];
   const fadeMs = numberParam(command, "fadeMs");
   const volume = numberParam(command, "volume");
+  const durationMs = numberParam(command, "durationMs");
+  const explicitGroup = stringParam(command, "group");
+  const group = explicitGroup ?? "bgm";
+  const previous = state.bgmByGroup[group];
+
+  if (!sourceRef) {
+    if (!explicitGroup) {
+      return volume === undefined
+        ? missingSource(state, command, "bgmPath")
+        : missingTarget(state, command, "requires group or bgmPath to modify BGM volume");
+    }
+    if (volume === undefined) return missingSource(state, command, "bgmPath");
+    if (!previous) return missingActiveBgmGroup(state, command, group);
+    return {
+      state,
+      effects: [setBgmVolumeEffect(previous, volume, durationMs)],
+      diagnostics: []
+    };
+  }
+
+  if (previous?.sourceRef === sourceRef) {
+    return {
+      state,
+      effects: volume !== undefined ? [setBgmVolumeEffect(previous, volume, durationMs)] : [],
+      diagnostics: []
+    };
+  }
+
   const nextTrack: MediaRuntimeBgmTrack = { key: group, group, sourceRef };
   const playEffect: MediaRuntimeEffect = {
     type: "play-bgm",
@@ -104,7 +130,7 @@ function reduceBgmCommand(state: MediaRuntimeState, command: RuntimeCommand): Me
     group,
     sourceRef,
     ...(volume !== undefined ? { volume } : {}),
-    ...(fadeMs !== undefined ? { fadeMs } : {})
+    ...(fadeMs !== undefined ? { fadeInMs: fadeMs } : {})
   };
   return {
     state: {
@@ -122,20 +148,7 @@ function reduceBgmCommand(state: MediaRuntimeState, command: RuntimeCommand): Me
 function reduceStopBgmCommand(state: MediaRuntimeState, command: RuntimeCommand): MediaRuntimeResult {
   const group = stringParam(command, "group") ?? "bgm";
   const previous = state.bgmByGroup[group];
-  if (!previous) {
-    return {
-      state,
-      effects: [],
-      diagnostics: [
-        {
-          code: "media-handle-missing",
-          commandId: command.commandId,
-          severity: "info",
-          message: `@${command.canonicalName} did not find active BGM group ${group}.`
-        }
-      ]
-    };
-  }
+  if (!previous) return missingActiveBgmGroup(state, command, group);
   const { [group]: _removed, ...bgmByGroup } = state.bgmByGroup;
   void _removed;
   const fadeMs = numberParam(command, "fadeMs");
@@ -148,15 +161,40 @@ function reduceStopBgmCommand(state: MediaRuntimeState, command: RuntimeCommand)
 
 function reduceSfxCommand(state: MediaRuntimeState, command: RuntimeCommand, fast: boolean): MediaRuntimeResult {
   const sourceRef = stringParam(command, "sfxPath");
-  if (!sourceRef) return missingSource(state, command, "sfxPath");
   const group = stringParam(command, "group");
+  const volume = numberParam(command, "volume");
+  const durationMs = numberParam(command, "durationMs");
+  const fadeMs = numberParam(command, "fadeMs");
+  if (!sourceRef) {
+    if (fast) return missingSource(state, command, "sfxPath");
+    if (!group) {
+      return volume === undefined
+        ? missingSource(state, command, "sfxPath")
+        : missingTarget(state, command, "requires group or sfxPath to modify looped SFX volume");
+    }
+    if (volume === undefined) return missingSource(state, command, "sfxPath");
+    const previous = state.loopingSfxByKey[group];
+    if (!previous) return missingActiveSfxLoop(state, command, group);
+    return {
+      state,
+      effects: [setSfxVolumeEffect(previous, volume, durationMs)],
+      diagnostics: []
+    };
+  }
+
   const loop = !fast && booleanParam(command, "loop") === true;
   const key = loop ? group ?? sourceRef : undefined;
   const previous = key ? state.loopingSfxByKey[key] : undefined;
+  if (previous?.sourceRef === sourceRef) {
+    return {
+      state,
+      effects: volume !== undefined ? [setSfxVolumeEffect(previous, volume, durationMs)] : [],
+      diagnostics: []
+    };
+  }
   const nextLoop: MediaRuntimeSfxLoop | undefined = loop && key ? { key, sourceRef, ...(group ? { group } : {}) } : undefined;
   const nextLoopingSfxByKey =
     nextLoop && key ? { ...state.loopingSfxByKey, [key]: nextLoop } : state.loopingSfxByKey;
-  const volume = numberParam(command, "volume");
   const playEffect: MediaRuntimeEffect = {
     type: "play-sfx",
     sourceRef,
@@ -164,7 +202,8 @@ function reduceSfxCommand(state: MediaRuntimeState, command: RuntimeCommand, fas
     fast,
     ...(key ? { key } : {}),
     ...(group ? { group } : {}),
-    ...(volume !== undefined ? { volume } : {})
+    ...(volume !== undefined ? { volume } : {}),
+    ...(fadeMs !== undefined ? { fadeInMs: fadeMs } : {})
   };
   return {
     state: {
@@ -172,7 +211,7 @@ function reduceSfxCommand(state: MediaRuntimeState, command: RuntimeCommand, fas
       loopingSfxByKey: nextLoopingSfxByKey
     },
     effects: [
-      ...(previous ? [{ type: "stop-sfx" as const, key: previous.key, ...(previous.group ? { group: previous.group } : {}) }] : []),
+      ...(previous ? [{ type: "stop-sfx" as const, key: previous.key, ...(previous.group ? { group: previous.group } : {}), ...(fadeMs !== undefined ? { fadeMs } : {}) }] : []),
       playEffect
     ],
     diagnostics: []
@@ -198,20 +237,7 @@ function reduceStopSfxCommand(state: MediaRuntimeState, command: RuntimeCommand)
     };
   }
   const previous = state.loopingSfxByKey[key];
-  if (!previous) {
-    return {
-      state,
-      effects: [],
-      diagnostics: [
-        {
-          code: "media-handle-missing",
-          commandId: command.commandId,
-          severity: "info",
-          message: `@${command.canonicalName} did not find active looping SFX ${key}.`
-        }
-      ]
-    };
-  }
+  if (!previous) return missingActiveSfxLoop(state, command, key);
   const { [key]: _removed, ...loopingSfxByKey } = state.loopingSfxByKey;
   void _removed;
   const fadeMs = numberParam(command, "fadeMs");
@@ -253,6 +279,71 @@ function missingSource(state: MediaRuntimeState, command: RuntimeCommand, param:
         message: `@${command.canonicalName} requires ${param}.`
       }
     ]
+  };
+}
+
+function missingTarget(state: MediaRuntimeState, command: RuntimeCommand, detail: string): MediaRuntimeResult {
+  return {
+    state,
+    effects: [],
+    diagnostics: [
+      {
+        code: "media-handle-missing",
+        commandId: command.commandId,
+        severity: "info",
+        message: `@${command.canonicalName} ${detail}.`
+      }
+    ]
+  };
+}
+
+function missingActiveBgmGroup(state: MediaRuntimeState, command: RuntimeCommand, group: string): MediaRuntimeResult {
+  return {
+    state,
+    effects: [],
+    diagnostics: [
+      {
+        code: "media-handle-missing",
+        commandId: command.commandId,
+        severity: "info",
+        message: `@${command.canonicalName} did not find active BGM group ${group}.`
+      }
+    ]
+  };
+}
+
+function missingActiveSfxLoop(state: MediaRuntimeState, command: RuntimeCommand, key: string): MediaRuntimeResult {
+  return {
+    state,
+    effects: [],
+    diagnostics: [
+      {
+        code: "media-handle-missing",
+        commandId: command.commandId,
+        severity: "info",
+        message: `@${command.canonicalName} did not find active looping SFX ${key}.`
+      }
+    ]
+  };
+}
+
+function setBgmVolumeEffect(track: MediaRuntimeBgmTrack, volume: number, durationMs: number | undefined): MediaRuntimeEffect {
+  return {
+    type: "set-bgm-volume",
+    key: track.key,
+    group: track.group,
+    volume,
+    ...(durationMs !== undefined ? { durationMs } : {})
+  };
+}
+
+function setSfxVolumeEffect(loop: MediaRuntimeSfxLoop, volume: number, durationMs: number | undefined): MediaRuntimeEffect {
+  return {
+    type: "set-sfx-volume",
+    key: loop.key,
+    ...(loop.group ? { group: loop.group } : {}),
+    volume,
+    ...(durationMs !== undefined ? { durationMs } : {})
   };
 }
 

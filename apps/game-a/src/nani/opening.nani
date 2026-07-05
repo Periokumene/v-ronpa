@@ -35,7 +35,8 @@ nar: 可是尽管，天气会很湿，闷的墙壁上仿佛要渗出血，雨帘
 nar: 可是尽管，路面会很滑，某个地砖会像真正的地雷那样把你从袜子到裤脚全都打湿
 nar: 可是即便如此，我还是
 nar: 我还是最、还是最、最……
-@bgm bgm:dead-fish-riffle group:music volume:0.35 fade:1
+@bgm bgm:dead-fish-riffle group:music volume:0.35 fade:5
+@sfx group:rain volume:0.3 time:2
 @rain power:1 wind:-1 hue:1 tint:0.8 time:5
 nar: 最喜欢雨天了
 nar: 即便如此在南方这些比烂的天气里，即使这个天气如此的糟糕，但我还是最喜欢雨天

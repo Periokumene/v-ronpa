@@ -8,9 +8,9 @@ import {
 } from "./mediaRuntime";
 
 describe("media runtime", () => {
-  it("tracks BGM by group and replaces only the matching group", () => {
+  it("tracks BGM by group and crossfades only the matching group", () => {
     const first = reduceMediaRuntimeCommands(createInitialMediaRuntimeState(), [
-      runtimeCommand("bgm", "media", { bgmPath: "bgm:main", group: "music", volume: 0.45 }),
+      runtimeCommand("bgm", "media", { bgmPath: "bgm:main", group: "music", volume: 0.45, fadeMs: 300 }),
       runtimeCommand("bgm", "media", { bgmPath: "bgm:layer", group: "ambient", volume: 0.25 }),
       runtimeCommand("bgm", "media", { bgmPath: "bgm:alt", group: "music", fadeMs: 500 })
     ]);
@@ -20,10 +20,48 @@ describe("media runtime", () => {
       ambient: { key: "ambient", group: "ambient", sourceRef: "bgm:layer" }
     });
     expect(first.effects).toEqual([
-      { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:main", volume: 0.45 },
+      { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:main", volume: 0.45, fadeInMs: 300 },
       { type: "play-bgm", key: "ambient", group: "ambient", sourceRef: "bgm:layer", volume: 0.25 },
       { type: "stop-bgm", key: "music", group: "music", fadeMs: 500 },
-      { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:alt", fadeMs: 500 }
+      { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:alt", fadeInMs: 500 }
+    ]);
+  });
+
+  it("adjusts active BGM volume by group without restarting playback", () => {
+    const seeded: MediaRuntimeState = {
+      ...createInitialMediaRuntimeState(),
+      bgmByGroup: {
+        music: { key: "music", group: "music", sourceRef: "bgm:main" }
+      }
+    };
+
+    const byGroup = reduceMediaRuntimeCommand(seeded, runtimeCommand("bgm", "media", { group: "music", volume: 0.4, durationMs: 1500 }));
+    expect(byGroup.state).toBe(seeded);
+    expect(byGroup.effects).toEqual([{ type: "set-bgm-volume", key: "music", group: "music", volume: 0.4, durationMs: 1500 }]);
+
+    const sameTrack = reduceMediaRuntimeCommand(
+      seeded,
+      runtimeCommand("bgm", "media", { bgmPath: "bgm:main", group: "music", volume: 0.2, durationMs: 500 })
+    );
+    expect(sameTrack.state).toBe(seeded);
+    expect(sameTrack.effects).toEqual([{ type: "set-bgm-volume", key: "music", group: "music", volume: 0.2, durationMs: 500 }]);
+  });
+
+  it("diagnoses untargeted BGM volume changes as no-ops", () => {
+    const result = reduceMediaRuntimeCommand(
+      createInitialMediaRuntimeState(),
+      runtimeCommand("bgm", "media", { volume: 0.4, durationMs: 1000 })
+    );
+
+    expect(result.state).toEqual(createInitialMediaRuntimeState());
+    expect(result.effects).toEqual([]);
+    expect(result.diagnostics).toEqual([
+      {
+        code: "media-handle-missing",
+        commandId: "bgm",
+        severity: "info",
+        message: "@bgm requires group or bgmPath to modify BGM volume."
+      }
     ]);
   });
 
@@ -57,8 +95,8 @@ describe("media runtime", () => {
 
   it("tracks only looping SFX and clears them through stopSfx", () => {
     const started = reduceMediaRuntimeCommands(createInitialMediaRuntimeState(), [
-      runtimeCommand("sfx", "media", { sfxPath: "sfx:rain", group: "rain", loop: true, volume: 0.35 }),
-      runtimeCommand("sfx", "media", { sfxPath: "sfx:door", volume: 0.9 }),
+      runtimeCommand("sfx", "media", { sfxPath: "sfx:rain", group: "rain", loop: true, volume: 0.35, fadeMs: 500 }),
+      runtimeCommand("sfx", "media", { sfxPath: "sfx:door", volume: 0.9, fadeMs: 250 }),
       runtimeCommand("sfxfast", "media", { sfxPath: "sfx:shock", volume: 0.75 })
     ]);
 
@@ -66,14 +104,52 @@ describe("media runtime", () => {
       rain: { key: "rain", group: "rain", sourceRef: "sfx:rain" }
     });
     expect(started.effects).toEqual([
-      { type: "play-sfx", sourceRef: "sfx:rain", loop: true, fast: false, key: "rain", group: "rain", volume: 0.35 },
-      { type: "play-sfx", sourceRef: "sfx:door", loop: false, fast: false, volume: 0.9 },
+      { type: "play-sfx", sourceRef: "sfx:rain", loop: true, fast: false, key: "rain", group: "rain", volume: 0.35, fadeInMs: 500 },
+      { type: "play-sfx", sourceRef: "sfx:door", loop: false, fast: false, volume: 0.9, fadeInMs: 250 },
       { type: "play-sfx", sourceRef: "sfx:shock", loop: false, fast: true, volume: 0.75 }
     ]);
 
     const stopped = reduceMediaRuntimeCommand(started.state, runtimeCommand("stopsfx", "media", { group: "rain", fadeMs: 200 }));
     expect(stopped.state.loopingSfxByKey).toEqual({});
     expect(stopped.effects).toEqual([{ type: "stop-sfx", key: "rain", group: "rain", fadeMs: 200 }]);
+  });
+
+  it("adjusts active loop SFX volume by key without restarting playback", () => {
+    const seeded: MediaRuntimeState = {
+      ...createInitialMediaRuntimeState(),
+      loopingSfxByKey: {
+        rain: { key: "rain", group: "rain", sourceRef: "sfx:rain" }
+      }
+    };
+
+    const byGroup = reduceMediaRuntimeCommand(seeded, runtimeCommand("sfx", "media", { group: "rain", volume: 0.15, durationMs: 2000 }));
+    expect(byGroup.state).toBe(seeded);
+    expect(byGroup.effects).toEqual([{ type: "set-sfx-volume", key: "rain", group: "rain", volume: 0.15, durationMs: 2000 }]);
+
+    const sameLoop = reduceMediaRuntimeCommand(
+      seeded,
+      runtimeCommand("sfx", "media", { sfxPath: "sfx:rain", group: "rain", loop: true, volume: 0.2, durationMs: 500 })
+    );
+    expect(sameLoop.state).toBe(seeded);
+    expect(sameLoop.effects).toEqual([{ type: "set-sfx-volume", key: "rain", group: "rain", volume: 0.2, durationMs: 500 }]);
+  });
+
+  it("diagnoses untargeted SFX volume changes as no-ops", () => {
+    const result = reduceMediaRuntimeCommand(
+      createInitialMediaRuntimeState(),
+      runtimeCommand("sfx", "media", { volume: 0.4, durationMs: 1000 })
+    );
+
+    expect(result.state).toEqual(createInitialMediaRuntimeState());
+    expect(result.effects).toEqual([]);
+    expect(result.diagnostics).toEqual([
+      {
+        code: "media-handle-missing",
+        commandId: "sfx",
+        severity: "info",
+        message: "@sfx requires group or sfxPath to modify looped SFX volume."
+      }
+    ]);
   });
 
   it("uses sfxPath as the loop key when group is absent and diagnoses missing stop keys", () => {

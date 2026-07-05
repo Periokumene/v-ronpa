@@ -42,10 +42,103 @@ describe("harness showcase runtime adapter glue", () => {
       "sun",
       "bgm",
       "sfx",
+      "sfxfast",
+      "stopbgm",
+      "stopsfx",
       "movie"
     ]) {
       expect(commandIds.has(commandId)).toBe(true);
     }
+    expect(
+      compiled.script.commands
+        .filter((command) => ["bgm", "sfx", "sfxfast", "stopbgm", "stopsfx"].includes(command.commandId))
+        .map((command) => ({ commandId: command.commandId, params: command.params }))
+    ).toEqual(
+      expect.arrayContaining([
+        {
+          commandId: "bgm",
+          params: expect.objectContaining({
+            bgmPath: "bgm:validation-main",
+            group: "music",
+            volume: 0.45,
+            fadeMs: 200
+          })
+        },
+        {
+          commandId: "sfx",
+          params: expect.objectContaining({
+            sfxPath: "sfx:rain-inside-car-loop",
+            group: "rain",
+            loop: true,
+            volume: 0.35,
+            fadeMs: 200
+          })
+        },
+        {
+          commandId: "sfx",
+          params: expect.objectContaining({
+            sfxPath: "sfx:knock-door",
+            volume: 0.9,
+            fadeMs: 100
+          })
+        },
+        {
+          commandId: "bgm",
+          params: expect.objectContaining({
+            bgmPath: "",
+            group: "music",
+            volume: 0.3,
+            durationMs: 400
+          })
+        },
+        {
+          commandId: "sfx",
+          params: expect.objectContaining({
+            sfxPath: "",
+            group: "rain",
+            volume: 0.15,
+            durationMs: 400
+          })
+        },
+        {
+          commandId: "bgm",
+          params: expect.objectContaining({
+            bgmPath: "bgm:validation-main",
+            group: "music",
+            volume: 0.38,
+            durationMs: 250
+          })
+        },
+        {
+          commandId: "sfx",
+          params: expect.objectContaining({
+            sfxPath: "sfx:rain-inside-car-loop",
+            group: "rain",
+            loop: true,
+            volume: 0.25,
+            durationMs: 250
+          })
+        },
+        {
+          commandId: "bgm",
+          params: expect.objectContaining({
+            bgmPath: "bgm:validation-alt",
+            group: "music",
+            volume: 0.45,
+            fadeMs: 500
+          })
+        },
+        {
+          commandId: "bgm",
+          params: expect.objectContaining({
+            bgmPath: "bgm:validation-layer",
+            group: "ambient",
+            volume: 0.25,
+            fadeMs: 100
+          })
+        }
+      ])
+    );
     expect(
       compiled.script.commands
         .filter((command) => command.commandId === "print" && String(command.params.text ?? "").includes("CHECKPOINT BLEEP"))
