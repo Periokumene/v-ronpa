@@ -55,12 +55,17 @@ nar: 好吧，我承认，我承认这有时候会变成一种自我陶醉和扮
 nar: 如果神明真的存在的话，它大概就会是掌管风雨的形象吧。我只是想融化在这场雨里面，融化在这个世界中那样
 nar: 比起很多努力扮演松弛的活着的人，我只是很想在雨声中寻找一场可以把自己淹没的好梦
 
-Narrator: 无论小雨
-@rain power:1 time:10
-Narrator: 还是那如山林倾伏的暴雨
-@rain power:0 time:5
-Narrator: 那种感觉就像是被 如瀑的暴雨隔绝在另一个世界。雨的那边是真实的世界，而这边是我一个人的孤岛
-@stopSfx group:rain fade:0.8
+
+#DBG_ALICE
+nar: 妈妈在喊我了
+@char alice pos:50 time:0.3 wait!
+
+; Narrator: 无论小雨
+; @rain power:1 time:10
+; Narrator: 还是那如山林倾伏的暴雨
+; @rain power:0 time:5
+; Narrator: 那种感觉就像是被 如瀑的暴雨隔绝在另一个世界。雨的那边是真实的世界，而这边是我一个人的孤岛
+; @stopSfx group:rain fade:0.8
 
 
 @hideUI dialog time:0.8

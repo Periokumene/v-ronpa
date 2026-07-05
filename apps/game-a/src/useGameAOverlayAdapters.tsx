@@ -37,8 +37,7 @@ export function useGameAOverlayAdapters({
       return;
     }
     if (action === "new-game") {
-      runtime.startNewGame();
-      flow.send({ type: "ENTER_VN" });
+      if (runtime.startNewGame()) flow.send({ type: "ENTER_VN" });
       return;
     }
     if (action === "return-title") {

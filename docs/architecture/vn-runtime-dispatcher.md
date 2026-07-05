@@ -302,6 +302,14 @@ longer imports `app-vn-session`, `app-vn-dispatch`, `story-play`, StoryEngine,
 or Pixi runtime helpers from app source. Its save adapter is localStorage-backed
 and stores VN story plus Pixi stage snapshots for the Game A entry. Game A owns
 its own minimal bgm/sfx/bleep/voice/video resources under `apps/game-a/public`.
+Game A's development-only `?vnStart=<label>` shortcut is app startup policy, not
+`VnRuntimeDispatcher` behavior: the app translates the URL into the VN entry
+`startLabel`, still boots through `useVnRuntime`, and enters VN through the
+normal app flow event. `app-vn-runtime` only reports invalid start-label
+diagnostics and does not persist or migrate debug launch state.
+Active Game A `.nani` references that resolve media, Pixi backgrounds, video,
+or character-pack assets must be declared by the Game A VN entry `assetRefs` so
+`AssetRegistry.validateReferences()` covers the entry-level loading contract.
 Game A also owns an app UI skin layer that creates custom `GameInteractionShell`
 Surfaces for dialog, choices, command bar, title, backlog, save/load, settings,
 pause, toast, and input prompt. The dialog frame texture is registered as a

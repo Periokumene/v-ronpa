@@ -1,0 +1,12 @@
+{
+  "groups": {
+    "Angle01/FullBody": {
+      "layers": {
+        "FullBody": {
+          "src": "assets/layers/FullBody.png",
+          "metadata": "assets/layers/FullBody.json"
+        }
+      }
+    }
+  }
+}

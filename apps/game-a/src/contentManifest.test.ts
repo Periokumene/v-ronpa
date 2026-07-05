@@ -15,13 +15,18 @@ describe("game-a content manifest", () => {
         assetRefs: expect.arrayContaining([
           { id: "bg:game-a-academy-hall-fullscreen", kind: "background", tags: ["game-a", "vn"] },
           { id: "bg:game-a-snow-outskirts-frame", kind: "background", tags: ["game-a", "vn"] },
+          { id: "bg:rain-street", kind: "background", tags: ["game-a", "vn"] },
+          { id: "bgm:dead-fish-riffle", kind: "bgm", tags: ["game-a", "vn"] },
           { id: "bgm:game-a-main", kind: "bgm", tags: ["game-a", "vn"] },
           { id: "sfx:game-a-chime", kind: "sfx", tags: ["game-a", "vn"] },
           { id: "sfx:gentle-rain-loop", kind: "sfx", tags: ["game-a", "vn"] },
+          { id: "sfx:glug-glug-glug", kind: "sfx", tags: ["game-a", "vn"] },
+          { id: "sfx:noise-6hz", kind: "sfx", tags: ["game-a", "vn"] },
           { id: "bleep:game-a-dialogue", kind: "bleep", tags: ["game-a", "vn"] },
           { id: "voice:zh:game_a_voice_0001", kind: "voice", tags: ["game-a", "vn"] },
           { id: "video:game-a-intro", kind: "video", tags: ["game-a", "vn"] },
-          { id: "texture:ui:game-a-dialog-frame", kind: "texture", tags: ["game-a", "ui", "vn"] }
+          { id: "texture:ui:game-a-dialog-frame", kind: "texture", tags: ["game-a", "ui", "vn"] },
+          { id: "alice", kind: "character-pack", tags: ["game-a", "vn"] }
         ])
       })
     ]);
@@ -40,11 +45,19 @@ describe("game-a content manifest", () => {
     expect(registry.url({ id: "bg:game-a-snow-outskirts-frame", kind: "background" })).toBe(
       "/game-a/backgrounds/game-a-snow-outskirts-frame.png"
     );
+    expect(registry.url({ id: "bg:rain-street", kind: "background" })).toBe("/game-a/backgrounds/rain-street.png");
+    expect(registry.url({ id: "bgm:dead-fish-riffle", kind: "bgm" })).toBe(
+      "/game-a/media/bgm/dead-fish-riffle.mp3"
+    );
     expect(registry.url({ id: "bgm:game-a-main", kind: "bgm" })).toBe("/game-a/media/bgm/game-a-main.ogg");
     expect(registry.url({ id: "sfx:game-a-chime", kind: "sfx" })).toBe("/game-a/media/sfx/game-a-chime.ogg");
     expect(registry.url({ id: "sfx:gentle-rain-loop", kind: "sfx" })).toBe(
       "/game-a/media/sfx/gentle-rain-loop.mp3"
     );
+    expect(registry.url({ id: "sfx:glug-glug-glug", kind: "sfx" })).toBe(
+      "/game-a/media/sfx/glug-glug-glug.mp3"
+    );
+    expect(registry.url({ id: "sfx:noise-6hz", kind: "sfx" })).toBe("/game-a/media/sfx/noise-6hz.mp3");
     expect(registry.url({ id: "bleep:game-a-dialogue", kind: "bleep" })).toBe("/game-a/media/bleep/game-a-dialogue.ogg");
     expect(registry.url({ id: "voice:zh:game_a_voice_0001", kind: "voice" })).toBe(
       "/game-a/media/voice/zh/game_a_voice_0001.ogg"
@@ -52,6 +65,9 @@ describe("game-a content manifest", () => {
     expect(registry.url({ id: "video:game-a-intro", kind: "video" })).toBe("/game-a/media/video/game-a-intro.mp4");
     expect(registry.url({ id: "texture:ui:game-a-dialog-frame", kind: "texture" })).toBe(
       "/game-a/ui/game-a-dialog-frame.png"
+    );
+    expect(registry.url({ id: "alice", kind: "character-pack" })).toBe(
+      "/game-a/characters/alice/character.json"
     );
     expect(registry.url({ id: "font:jinghua-laosong-gb", kind: "font" })).toBe(
       "/game-a/fonts/jinghua-laosong-gb.woff2"

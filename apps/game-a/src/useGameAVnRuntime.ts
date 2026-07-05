@@ -1,4 +1,9 @@
-import { useVnRuntime, type UseVnRuntimeOptions } from "@v-ronpa/app-vn-runtime";
+import { useMemo } from "react";
+import {
+  INVALID_VN_START_LABEL_DIAGNOSTIC_CODE,
+  useVnRuntime,
+  type UseVnRuntimeOptions
+} from "@v-ronpa/app-vn-runtime";
 import type { SaveData } from "@v-ronpa/contracts";
 import { gameAOpeningRuntimeEntry } from "./gameAScripts";
 
@@ -10,17 +15,30 @@ export type UseGameAVnRuntimeOptions = Pick<
   | "dialogueBleepSettings"
   | "storyPlayTiming"
   | "voiceSettings"
->;
+> & {
+  startLabelOverride?: string;
+};
 
-export function useGameAVnRuntime(options: UseGameAVnRuntimeOptions = {}) {
+export function useGameAVnRuntime({ startLabelOverride, ...options }: UseGameAVnRuntimeOptions = {}) {
+  const entry = useMemo(
+    () => ({
+      ...gameAOpeningRuntimeEntry,
+      ...(startLabelOverride ? { startLabel: startLabelOverride } : {})
+    }),
+    [startLabelOverride]
+  );
   const runtime = useVnRuntime({
     ...options,
-    entry: gameAOpeningRuntimeEntry,
+    entry,
     interactionMode: "vn"
   });
+  const startLabelError = runtime.runtimeDiagnostics.find(
+    (diagnostic) => diagnostic.code === INVALID_VN_START_LABEL_DIAGNOSTIC_CODE && diagnostic.severity === "error"
+  );
 
   return {
     ...runtime,
+    startLabelError,
     createSaveSnapshot: runtime.createVnSaveSnapshot,
     restoreFromSave(save: SaveData) {
       const story = save.vn?.story ?? save.story;
@@ -30,8 +48,10 @@ export function useGameAVnRuntime(options: UseGameAVnRuntimeOptions = {}) {
         pixiStage: save.vn?.pixiStage ?? save.pixiStage
       });
     },
-    startNewGame() {
+    startNewGame(): boolean {
+      if (startLabelError) return false;
       runtime.startStory();
+      return true;
     }
   };
 }

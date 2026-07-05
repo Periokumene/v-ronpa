@@ -4,6 +4,7 @@ import type {
   UiRuntimeDiagnostic,
   VnRuntimeTransactionDiagnostic
 } from "@v-ronpa/app-vn-dispatch";
+import type { RuntimeScript } from "@v-ronpa/contracts";
 import type { StoryStepperDiagnostic } from "@v-ronpa/story-engine";
 
 export type VnRuntimeDiagnosticSource = "parser" | "compiler" | "story" | "transaction" | "media" | "ui" | "asset";
@@ -37,6 +38,7 @@ export interface CollectVnRuntimeDiagnosticsInput {
 }
 
 export const MAX_VN_RUNTIME_DIAGNOSTICS = 50;
+export const INVALID_VN_START_LABEL_DIAGNOSTIC_CODE = "invalid-start-label";
 
 export function createInitialVnRuntimeDiagnostics(
   parserDiagnostics: VnRuntimeParserDiagnosticLike[],
@@ -46,6 +48,23 @@ export function createInitialVnRuntimeDiagnostics(
     ...parserDiagnostics.map(toVnParserDiagnostic),
     ...compilerDiagnostics.map(toVnCompilerDiagnostic)
   ]);
+}
+
+export function createVnRuntimeStartLabelDiagnostics(
+  script: Pick<RuntimeScript, "labels" | "scriptPath">,
+  startLabel?: string
+): VnRuntimeDiagnostic[] {
+  const normalized = normalizeVnRuntimeStartLabel(startLabel);
+  if (!normalized || script.labels[normalized] !== undefined) return [];
+
+  return [
+    {
+      source: "story",
+      code: INVALID_VN_START_LABEL_DIAGNOSTIC_CODE,
+      severity: "error",
+      message: `VN start label "${normalized}" was not found in ${script.scriptPath}.`
+    }
+  ];
 }
 
 export function collectVnRuntimeDiagnostics({
@@ -104,6 +123,13 @@ function toVnParserDiagnostic(diagnostic: VnRuntimeParserDiagnosticLike): VnRunt
     message: diagnostic.message,
     ...(diagnostic.loc ? { loc: formatDiagnosticLocation(diagnostic.loc) } : {})
   };
+}
+
+function normalizeVnRuntimeStartLabel(startLabel: string | undefined): string {
+  if (!startLabel) return "";
+  const trimmed = startLabel.trim();
+  const withoutPrefix = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
+  return withoutPrefix.trim();
 }
 
 function toVnCompilerDiagnostic(diagnostic: VnRuntimeCompilerDiagnosticLike): VnRuntimeDiagnostic {

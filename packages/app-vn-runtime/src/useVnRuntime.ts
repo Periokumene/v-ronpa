@@ -86,6 +86,7 @@ import {
   createInitialVnRuntimeDiagnostics,
   createVnMediaPortErrorDiagnostic,
   createVnRuntimeAssetDiagnostic,
+  createVnRuntimeStartLabelDiagnostics,
   limitVnRuntimeDiagnostics,
   type VnRuntimeDiagnostic
 } from "./runtimeDiagnostics";
@@ -214,12 +215,21 @@ export function useVnRuntime({
     [entry.scriptPath, entry.sourceText, entry.startLabel]
   );
   const bootSession = bootStep.session;
+  const startLabelDiagnostics = useMemo(
+    () => createVnRuntimeStartLabelDiagnostics(bootSession.script, entry.startLabel),
+    [bootSession.script, entry.startLabel]
+  );
+  const hasInvalidStartLabel = startLabelDiagnostics.some((diagnostic) => diagnostic.severity === "error");
   const runtimeProfile = profile ?? entry.profile ?? "vn2d";
   const audioPort = useMemo(() => configuredAudioPort ?? createHowlerAudioPort(), [configuredAudioPort]);
   const videoPort = useMemo(() => configuredVideoPort ?? createHtmlVideoPort(), [configuredVideoPort]);
   const initialRuntimeDiagnostics = useMemo(
-    () => createInitialVnRuntimeDiagnostics(bootSession.diagnostics.parser, bootSession.diagnostics.compiler),
-    [bootSession.diagnostics.compiler, bootSession.diagnostics.parser]
+    () =>
+      limitVnRuntimeDiagnostics([
+        ...createInitialVnRuntimeDiagnostics(bootSession.diagnostics.parser, bootSession.diagnostics.compiler),
+        ...startLabelDiagnostics
+      ]),
+    [bootSession.diagnostics.compiler, bootSession.diagnostics.parser, startLabelDiagnostics]
   );
   const [session, setSession] = useState<VnSessionState>(() => ({ ...bootSession, active: false }));
   const [pixiStageRuntime, setPixiStageRuntime] = useState<VnPixiStageRuntime>(() => createInitialVnPixiStageRuntime());
@@ -610,6 +620,11 @@ export function useVnRuntime({
   }
 
   function startStory(_options: StartVnStoryOptions = {}) {
+    if (hasInvalidStartLabel) {
+      resetRuntime({ stopMedia: true });
+      onRuntimeStatus?.({ action: "story:start", outcome: "invalid-start-label" });
+      return;
+    }
     resetRuntime({ stopMedia: true });
     const nextBoot = createVnSession({
       scriptPath: entry.scriptPath,

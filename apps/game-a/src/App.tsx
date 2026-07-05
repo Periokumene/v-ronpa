@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
@@ -11,6 +11,7 @@ import {
 } from "@v-ronpa/app-vn-shell";
 import { RichTextFontStyles } from "@v-ronpa/ui-kit";
 import { gameAContentManifest } from "./contentManifest";
+import { resolveGameAVnLaunchTarget, shouldAutoStartGameAVnLaunchTarget } from "./devVnLaunchTarget";
 import { useGameAFlowActor } from "./useGameAFlowActor";
 import { useGameAOverlayAdapters } from "./useGameAOverlayAdapters";
 import { useGameASaveAdapter } from "./useGameASaveAdapter";
@@ -21,6 +22,15 @@ import { resolveGameAUiAssets } from "./ui/resolveGameAUiAssets";
 
 export function App() {
   const flow = useGameAFlowActor();
+  const devVnLaunchTarget = useMemo(
+    () =>
+      resolveGameAVnLaunchTarget({
+        devMode: import.meta.env.DEV,
+        search: typeof window === "undefined" ? "" : window.location.search
+      }),
+    []
+  );
+  const didAutoStartDevLaunch = useRef(false);
   const settings = useGameSettingsAdapter({ storageKey: "v-ronpa:game-a:settings:v1" });
   const assetRegistry = useMemo(() => createAssetRegistry(gameAContentManifest), []);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
@@ -34,6 +44,7 @@ export function App() {
     dialogueBleepSettings,
     dialogRevealSettings,
     storyPlayTiming,
+    ...(devVnLaunchTarget.startLabelOverride ? { startLabelOverride: devVnLaunchTarget.startLabelOverride } : {}),
     voiceSettings
   });
   const save = useGameASaveAdapter({
@@ -47,10 +58,32 @@ export function App() {
     () => createGameASurfaces({ assets: gameAUiAssets, config: gameAUiConfig }),
     [gameAUiAssets]
   );
+  const startLabelError = runtime.startLabelError;
+  const startNewGame = runtime.startNewGame;
+  const sendFlowEvent = flow.send;
 
   useEffect(() => {
     gameAUiAssets.diagnostics.forEach(runtime.observeAssetDiagnostic);
   }, [gameAUiAssets.diagnostics, runtime.observeAssetDiagnostic]);
+
+  useEffect(() => {
+    if (didAutoStartDevLaunch.current) return;
+    if (
+      !shouldAutoStartGameAVnLaunchTarget({
+        target: devVnLaunchTarget,
+        hasInvalidStartLabel: Boolean(startLabelError)
+      })
+    ) {
+      return;
+    }
+
+    didAutoStartDevLaunch.current = true;
+    if (startNewGame()) sendFlowEvent({ type: "ENTER_VN" });
+  }, [devVnLaunchTarget, sendFlowEvent, startLabelError, startNewGame]);
+
+  const devVnLaunchError = devVnLaunchTarget.requested
+    ? devVnLaunchTarget.error?.message ?? startLabelError?.message
+    : undefined;
 
   return (
     <main className="game-a-shell">
@@ -89,6 +122,11 @@ export function App() {
             <small data-testid="game-a-mode">{flow.mode}</small>
           </div>
         </div>
+        {devVnLaunchError ? (
+          <div className="game-a-dev-launch-error" data-testid="game-a-dev-launch-error" role="alert">
+            {devVnLaunchError}
+          </div>
+        ) : null}
       </section>
     </main>
   );
