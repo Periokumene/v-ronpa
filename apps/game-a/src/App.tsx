@@ -16,7 +16,7 @@ import { useGameAFlowActor } from "./useGameAFlowActor";
 import { useGameAOverlayAdapters } from "./useGameAOverlayAdapters";
 import { useGameASaveAdapter } from "./useGameASaveAdapter";
 import { useGameAVnRuntime } from "./useGameAVnRuntime";
-import { createGameASurfaces } from "./ui/GameASurfaces";
+import { createGameASurfaces, type GameASurfaceNavigation } from "./ui/GameASurfaces";
 import { gameAUiConfig } from "./ui/gameAUiConfig";
 import { resolveGameAUiAssets } from "./ui/resolveGameAUiAssets";
 
@@ -54,9 +54,26 @@ export function App() {
   });
   const overlayPages = useGameAOverlayAdapters({ flow, runtime, save, settings });
   const gameAUiAssets = useMemo(() => resolveGameAUiAssets(assetRegistry, gameAUiConfig), [assetRegistry]);
+  const gameASurfaceNavigationRef = useRef<GameASurfaceNavigation | null>(null);
+  if (!gameASurfaceNavigationRef.current) {
+    gameASurfaceNavigationRef.current = {
+      activeOverlay: flow.activeOverlay,
+      capabilities: flow.capabilities,
+      dispatch: overlayPages.dispatchUiAction
+    };
+  }
+  gameASurfaceNavigationRef.current.activeOverlay = flow.activeOverlay;
+  gameASurfaceNavigationRef.current.capabilities = flow.capabilities;
+  gameASurfaceNavigationRef.current.dispatch = overlayPages.dispatchUiAction;
+  const gameASurfaceNavigation = gameASurfaceNavigationRef.current;
   const gameASurfaces = useMemo(
-    () => createGameASurfaces({ assets: gameAUiAssets, config: gameAUiConfig }),
-    [gameAUiAssets]
+    () =>
+      createGameASurfaces({
+        assets: gameAUiAssets,
+        config: gameAUiConfig,
+        navigation: gameASurfaceNavigation
+      }),
+    [gameAUiAssets, gameASurfaceNavigation]
   );
   const startLabelError = runtime.startLabelError;
   const startNewGame = runtime.startNewGame;
@@ -118,8 +135,8 @@ export function App() {
         <div className="game-a-hud">
           <div className="game-a-status">
             <span data-testid="game-a-app-id">game-a</span>
-            <strong>VN Framework</strong>
-            <small data-testid="game-a-mode">{flow.mode}</small>
+            <strong>视觉小说框架</strong>
+            <small data-testid="game-a-mode">{formatGameAMode(flow.mode)}</small>
           </div>
         </div>
         {devVnLaunchError ? (
@@ -135,4 +152,15 @@ export function App() {
 function displaySpeaker(speaker: string): string {
   if (speaker === "Narrator") return "旁白";
   return speaker;
+}
+
+function formatGameAMode(mode: string): string {
+  if (mode === "loading") return "加载中";
+  if (mode === "title") return "标题";
+  if (mode === "vn") return "视觉小说";
+  if (mode === "navi") return "探索";
+  if (mode === "trial") return "裁判";
+  if (mode === "paused") return "暂停";
+  if (mode === "saving") return "保存中";
+  return mode;
 }

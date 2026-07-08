@@ -65,6 +65,13 @@ skin asset ids resolve through the app-created `AssetRegistry`, custom
 `GameInteractionShell` Surfaces receive resolved availability, and missing skin
 assets should surface diagnostics while preserving visible fallback chrome.
 
+Game A temporarily treats the VN pause experience as app-local overlay tabs:
+`vn-backlog`, `vn-save`, `vn-load`, and `vn-settings` render inside one
+full-screen DOM shell, and `open-pause-menu` enters that shell through the log
+tab. This is intentionally not a shared pause/resume model. Navi and Trial
+pause unification should happen in a later integration pass instead of leaking
+their flow semantics into the standalone VN styling iteration.
+
 ## Game A Dev Launch Target
 
 Game A's development-only `?vnStart=<label>` shortcut is app startup policy. It

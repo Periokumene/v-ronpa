@@ -23,11 +23,16 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
 
   await clickByTestId(page, "title-settings");
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
-  await page.getByTestId("settings-display-text-size").selectOption("large");
+  await clickByTestId(page, "settings-subtab-display");
+  await expect(page.getByTestId("settings-page")).toHaveAttribute("data-settings-tab", "display");
+  await clickByTestId(page, "settings-display-text-size-next");
+  await expect(page.getByTestId("settings-page")).toHaveAttribute("data-settings-tab", "display");
+  await clickByTestId(page, "settings-display-text-speed-next");
+  await expect(page.getByTestId("settings-page")).toHaveAttribute("data-settings-tab", "display");
   await clickByTestId(page, "settings-overlay-close");
 
   await clickByTestId(page, "title-new-game");
-  await expect(page.getByTestId("game-a-mode")).toHaveText("vn");
+  await expect(page.getByTestId("game-a-mode")).toHaveText("视觉小说");
   await expect(page.getByTestId("vn-choice-overlay")).toBeVisible();
   await expect(page.getByTestId("vn-choice-0")).toHaveClass(/game-a-choice-button/);
   await expect(page.getByTestId("vn-choice-0")).toHaveText("吃下我！");
@@ -69,8 +74,9 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
   await clickByTestId(page, "settings-overlay-close");
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("pause-menu-overlay")).toBeVisible();
-  await clickByTestId(page, "pause-menu-overlay-close");
+  await expect(page.getByTestId("backlog-overlay")).toBeVisible();
+  await expect(page.getByTestId("backlog-overlay")).toHaveAttribute("data-active-tab", "log");
+  await clickByTestId(page, "backlog-overlay-close");
 
   await expect(page.getByTestId("vn-command-auto")).toBeEnabled();
   await expect(page.getByTestId("vn-command-skip")).toBeEnabled();
@@ -83,11 +89,11 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT GAME-A MOVIE");
 
   await clickByTestId(page, "vn-command-save");
-  await expect(page.getByTestId("save-load-mode")).toHaveText("save");
+  await expect(page.getByTestId("save-load-overlay")).toHaveAttribute("data-active-tab", "save");
   await clickByTestId(page, "save-slot-1");
   await clickByTestId(page, "save-load-overlay-close");
   await clickByTestId(page, "vn-command-load");
-  await expect(page.getByTestId("save-load-mode")).toHaveText("load");
+  await expect(page.getByTestId("save-load-overlay")).toHaveAttribute("data-active-tab", "load");
   await clickByTestId(page, "save-slot-1");
   await clickByTestId(page, "load-confirm");
   await expect(page.getByTestId("save-load-overlay")).toBeHidden();
@@ -99,7 +105,9 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
 
 async function advanceUntilText(page: Page, text: string, maxSteps: number) {
   for (let attempt = 0; attempt < maxSteps; attempt += 1) {
-    if (((await page.getByTestId("vn-dialog-text").textContent()) ?? "").includes(text)) return;
+    const dialogText = page.getByTestId("vn-dialog-text");
+    const currentText = (await dialogText.textContent({ timeout: 250 }).catch(() => null)) ?? "";
+    if (currentText.includes(text)) return;
     await advanceVn(page);
     await page.waitForTimeout(160);
   }

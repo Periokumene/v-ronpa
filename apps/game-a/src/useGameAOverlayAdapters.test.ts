@@ -17,29 +17,131 @@ describe("game-a overlay adapters", () => {
 
     expect(blocked.flowSend).not.toHaveBeenCalled();
   });
+
+  it("opens LOG as the game-a pause tab entry instead of the shared pause menu", () => {
+    const adapters = createAdapters({ mode: "vn", startNewGame: () => true });
+
+    adapters.dispatchUiAction("open-pause-menu");
+
+    expect(adapters.stopStoryAutomation).toHaveBeenCalledWith("overlay");
+    expect(adapters.openOverlay).toHaveBeenCalledWith("vn-backlog");
+    expect(adapters.closeAllOverlays).not.toHaveBeenCalled();
+  });
+
+  it("replaces pause tabs instead of stacking overlays", () => {
+    const adapters = createAdapters({
+      activeOverlay: "vn-backlog",
+      mode: "vn",
+      startNewGame: () => true
+    });
+
+    adapters.dispatchUiAction("open-save");
+
+    expect(adapters.replaceOverlay).toHaveBeenCalledWith("vn-save");
+    expect(adapters.openOverlay).not.toHaveBeenCalled();
+  });
+
+  it("blocks pause tab switching while a load confirmation is pending", () => {
+    const adapters = createAdapters({
+      activeOverlay: "vn-load",
+      mode: "vn",
+      pendingLoadSlot: {
+        id: "slot:game-a:1",
+        label: "Game A 1",
+        savedAt: "2026-07-08T00:00:00.000Z",
+        mode: "vn"
+      },
+      startNewGame: () => true
+    });
+
+    adapters.dispatchUiAction("open-settings");
+
+    expect(adapters.replaceOverlay).not.toHaveBeenCalled();
+    expect(adapters.openOverlay).not.toHaveBeenCalled();
+  });
+
+  it("blocks return-title while a load confirmation is pending", () => {
+    const adapters = createAdapters({
+      activeOverlay: "vn-load",
+      mode: "vn",
+      pendingLoadSlot: {
+        id: "slot:game-a:1",
+        label: "Game A 1",
+        savedAt: "2026-07-08T00:00:00.000Z",
+        mode: "vn"
+      },
+      startNewGame: () => true
+    });
+
+    adapters.dispatchUiAction("return-title");
+
+    expect(adapters.flowSend).not.toHaveBeenCalledWith({ type: "RETURN_TITLE" });
+  });
+
+  it("uses the app-local flow replacement helper for pause tab navigation", () => {
+    const adapters = createAdapters({
+      activeOverlay: "vn-settings",
+      mode: "vn",
+      startNewGame: () => true
+    });
+
+    adapters.dispatchUiAction("open-backlog");
+
+    expect(adapters.replaceOverlay).toHaveBeenCalledWith("vn-backlog");
+    expect(adapters.openOverlay).not.toHaveBeenCalled();
+  });
+
+  it("keeps return-title routed through the app flow", () => {
+    const adapters = createAdapters({ mode: "vn", startNewGame: () => true });
+
+    adapters.dispatchUiAction("return-title");
+
+    expect(adapters.flowSend).toHaveBeenCalledWith({ type: "RETURN_TITLE" });
+  });
 });
 
-function createAdapters({ startNewGame }: { startNewGame: () => boolean }) {
+function createAdapters({
+  activeOverlay,
+  mode = "title",
+  pendingLoadSlot,
+  startNewGame
+}: {
+  activeOverlay?: "vn-backlog" | "vn-save" | "vn-load" | "vn-settings";
+  mode?: "title" | "vn";
+  pendingLoadSlot?: {
+    id: string;
+    label: string;
+    savedAt: string;
+    mode: "vn";
+  };
+  startNewGame: () => boolean;
+}) {
   const flowSend = vi.fn();
+  const openOverlay = vi.fn();
+  const closeAllOverlays = vi.fn();
+  const replaceOverlay = vi.fn();
+  const stopStoryAutomation = vi.fn();
   const adapters = useGameAOverlayAdapters({
     flow: {
-      mode: "title",
-      capabilities: { canSave: false },
+      activeOverlay,
+      mode,
+      capabilities: { canSave: mode === "vn" },
       send: flowSend,
-      openOverlay: vi.fn(),
+      openOverlay,
+      replaceOverlay,
       closeTopOverlay: vi.fn(),
-      closeAllOverlays: vi.fn()
+      closeAllOverlays
     },
     runtime: {
       startNewGame,
       toggleStoryAuto: vi.fn(),
       toggleStorySkip: vi.fn(),
-      stopStoryAutomation: vi.fn()
+      stopStoryAutomation
     },
     save: {
       cancelLoadSlot: vi.fn(),
       confirmLoadSlot: vi.fn(),
-      pendingLoadSlot: undefined,
+      pendingLoadSlot,
       requestLoadSlot: vi.fn(),
       saveSlot: vi.fn(),
       slotIds: [],
@@ -52,5 +154,5 @@ function createAdapters({ startNewGame }: { startNewGame: () => boolean }) {
     }
   } as unknown as Parameters<typeof useGameAOverlayAdapters>[0]);
 
-  return { ...adapters, flowSend };
+  return { ...adapters, closeAllOverlays, flowSend, openOverlay, replaceOverlay, stopStoryAutomation };
 }

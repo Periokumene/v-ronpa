@@ -7,6 +7,11 @@ import {
   type useGameSettingsAdapter
 } from "@v-ronpa/app-vn-shell";
 import type { GameOverlayKind, GameUiAction } from "@v-ronpa/contracts";
+import {
+  GAME_A_PAUSE_ENTRY_OVERLAY,
+  GAME_A_PAUSE_LOCKED_ACTIONS,
+  isGameAPauseTabOverlay
+} from "./gameAPauseTabs";
 import type { useGameAFlowActor } from "./useGameAFlowActor";
 import type { useGameASaveAdapter } from "./useGameASaveAdapter";
 import type { useGameAVnRuntime } from "./useGameAVnRuntime";
@@ -40,13 +45,26 @@ export function useGameAOverlayAdapters({
       if (runtime.startNewGame()) flow.send({ type: "ENTER_VN" });
       return;
     }
+    if (
+      save.pendingLoadSlot &&
+      isGameAPauseTabOverlay(flow.activeOverlay) &&
+      GAME_A_PAUSE_LOCKED_ACTIONS.has(action)
+    ) {
+      return;
+    }
     if (action === "return-title") {
       flow.send({ type: "RETURN_TITLE" });
       return;
     }
-    const overlay = overlayKindForVnShellAction(action, flow.mode);
+
+    const overlay = overlayKindForGameAAction(action, flow.mode);
     if (overlay) {
       if (shouldStopVnShellAutomationForAction(action, flow.mode)) runtime.stopStoryAutomation("overlay");
+      if (overlay === flow.activeOverlay) return;
+      if (isGameAPauseTabOverlay(flow.activeOverlay) && isGameAPauseTabOverlay(overlay)) {
+        flow.replaceOverlay(overlay);
+        return;
+      }
       flow.openOverlay(overlay);
     }
   }
@@ -106,4 +124,9 @@ export function useGameAOverlayAdapters({
       return {};
     }
   };
+}
+
+function overlayKindForGameAAction(action: GameUiAction, mode: GameAFlowAdapter["mode"]): GameOverlayKind | undefined {
+  if (action === "open-pause-menu") return GAME_A_PAUSE_ENTRY_OVERLAY;
+  return overlayKindForVnShellAction(action, mode);
 }

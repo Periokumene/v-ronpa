@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { GameInteractionContext, GameOverlayKind, GameUiAction } from "@v-ronpa/contracts";
 import { gameFlowMachine, modeFromSnapshotValue } from "@v-ronpa/game-flow-machine";
 import { useMachine } from "@xstate/react";
+import { GAME_A_PAUSE_ENTRY_OVERLAY, isGameAPauseTabOverlay } from "./gameAPauseTabs";
 
 export function useGameAFlowActor() {
   const [snapshot, send] = useMachine(gameFlowMachine);
@@ -26,6 +27,10 @@ export function useGameAFlowActor() {
     openOverlay(overlay: GameOverlayKind) {
       send({ type: "OPEN_OVERLAY", overlay });
     },
+    replaceOverlay(overlay: GameOverlayKind) {
+      send({ type: "POP_OVERLAY" });
+      send({ type: "OPEN_OVERLAY", overlay });
+    },
     closeTopOverlay() {
       send({ type: "POP_OVERLAY" });
     },
@@ -34,7 +39,10 @@ export function useGameAFlowActor() {
     },
     dispatchAction(action: GameUiAction) {
       if (action === "new-game") send({ type: "ENTER_VN" });
-      if (action === "open-pause-menu") send({ type: "PAUSE" });
+      if (action === "open-pause-menu") {
+        if (isGameAPauseTabOverlay(activeOverlay)) send({ type: "POP_OVERLAY" });
+        send({ type: "OPEN_OVERLAY", overlay: GAME_A_PAUSE_ENTRY_OVERLAY });
+      }
       if (action === "return-title") send({ type: "RETURN_TITLE" });
     }
   };
