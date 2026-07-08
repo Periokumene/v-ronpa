@@ -41,11 +41,12 @@ export function useGameAVnRuntime({ startLabelOverride, ...options }: UseGameAVn
     startLabelError,
     createSaveSnapshot: runtime.createVnSaveSnapshot,
     restoreFromSave(save: SaveData) {
-      const story = save.vn?.story ?? save.story;
+      if (!save.vn) return;
+      const story = save.vn.story;
       runtime.restoreVnState({
         active: !story.ended,
         story,
-        pixiStage: save.vn?.pixiStage ?? save.pixiStage
+        pixiStage: save.vn.pixiStage
       });
     },
     startNewGame(): boolean {

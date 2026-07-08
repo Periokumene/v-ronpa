@@ -160,7 +160,8 @@ the current baseline intentionally uses the same fixed table for both.
 ## Default Targets
 
 - `print` routes to `debug` only. DOM dialog text comes from
-  `StoryRuntimeState.text.current`, with legacy backlog fallback where needed.
+  `StoryRuntimeState.text.current`, with backlog used only when a surface needs
+  a previously committed line.
 - `back`, `char`, `shake`, `flash`, `focus`, and `trialkeyword` route to
   `pixi`.
 - `charenter` routes to `debug` only as a migration stub; new scripts should
@@ -258,16 +259,18 @@ emitted print + selectCurrentStoryLine()
 ```
 
 The full line remains in `StoryRuntimeState.text.current`, backlog, save data,
-and load summaries. `VnDialogSurface` does not own timers, reveal state,
-choices, keyboard handlers, or manual advance controls; it only renders the text
-it receives. Manual advance comes from the shell hit plane. While reveal is
-active, manual advance completes the current line and returns; the following
-advance is the one that enters StoryEngine. AUTO and one-shot `autoNext` use one
-line budget from the print commit time: elapsed reveal time counts toward that
-budget, but `app-vn-runtime` will not request the voice gate or StoryEngine
-advance until reveal is complete. SKIP completes the active reveal immediately
-and then continues on the skip schedule. A `print` committed while the dialog
-surface is hidden stores a complete reveal state and does not gate advance.
+and load summaries. Saved story snapshots preserve `text.current` and truncate
+backlog to the newest 20 entries. `VnDialogSurface` does not own timers, reveal
+state, choices, keyboard handlers, or manual advance controls; it only renders
+the text it receives. Manual advance comes from the shell hit plane. While
+reveal is active, manual advance completes the current line and returns; the
+following advance is the one that enters StoryEngine. AUTO and one-shot
+`autoNext` use one line budget from the print commit time: elapsed reveal time
+counts toward that budget, but `app-vn-runtime` will not request the voice gate
+or StoryEngine advance until reveal is complete. SKIP completes the active
+reveal immediately and then continues on the skip schedule. A `print` committed
+while the dialog surface is hidden stores a complete reveal state and does not
+gate advance.
 Load, restore, reset, overlay close, and trial entry clear reveal state so
 restored lines do not replay typewriter effects.
 Reveal overlay state is scoped to the `print` step that created it; if a later

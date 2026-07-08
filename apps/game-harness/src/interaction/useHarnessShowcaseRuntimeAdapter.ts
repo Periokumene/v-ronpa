@@ -317,17 +317,19 @@ export function useHarnessShowcaseRuntimeAdapter(
     setLastOutcome("overlay-closed");
   }
 
-  function restoreFromSave(save: Pick<SaveData, "mode" | "navi" | "story" | "pixiStage" | "inventory" | "evidence" | "characters" | "trial" | "vn">) {
-    const restoredStory = save.vn?.story ?? save.story;
-    const restoredPixiStage = save.vn?.pixiStage ?? save.pixiStage;
+  function restoreFromSave(save: SaveData) {
     if (save.navi) setNavi(save.navi);
     if (save.navi?.playerPose) firstPersonBridge.issuePoseCommand(save.navi.playerPose);
     setGameplay({ inventory: save.inventory, evidence: save.evidence, characters: save.characters });
-    runtime.restoreVnState({
-      active: save.navi?.substate === "vn2d-overlay" && !restoredStory.ended,
-      story: restoredStory,
-      pixiStage: restoredPixiStage
-    });
+    if (save.vn) {
+      runtime.restoreVnState({
+        active: save.navi?.substate === "vn2d-overlay" && !save.vn.story.ended,
+        story: save.vn.story,
+        pixiStage: save.vn.pixiStage
+      });
+    } else {
+      runtime.resetRuntime({ stopMedia: true });
+    }
     setTrialRuntime(
       save.mode === "trial" && save.trial
         ? {

@@ -59,9 +59,15 @@ must not import `app-vn-session`, `app-vn-dispatch`, `story-play`,
 StoryEngine, parser/compiler packages, or Pixi presenter internals for normal VN
 runtime behavior.
 
-Game A's save adapter is localStorage-backed and stores VN story plus Pixi stage
-snapshots for the Game A entry. Game A UI skin resources are app-local config:
-skin asset ids resolve through the app-created `AssetRegistry`, custom
+Game A's save adapter is localStorage-backed and stores v5 `SaveData` in
+independent app-local slot records. Each record wraps the restore payload plus a
+text summary and a reserved preview field; the record is the source of truth,
+the index is only a cache, and summaries are normalized from `record.data`
+through the shared contracts helper when records are read. VN story and Pixi
+stage snapshots are written only to `data.vn.story` and
+`data.vn.pixiStage`; `navi` and `trial` are `null` for Game A saves. Game A UI
+skin resources are app-local config: skin asset ids
+resolve through the app-created `AssetRegistry`, custom
 `GameInteractionShell` Surfaces receive resolved availability, and missing skin
 assets should surface diagnostics while preserving visible fallback chrome.
 
@@ -118,6 +124,11 @@ Scenario code should not manually filter runtime commands by renderer. Shared
 fanout changes belong in `VnOutputRouteTable` and
 `createVnRuntimePresentationTransaction`; app adapters may pass profile or
 route table overrides into `useVnRuntime`.
+
+Harness saves continue to use `packages/media-save` with Dexie storage. The
+harness does not use Game A's record envelope. It writes v5 sections directly:
+VN story/Pixi under `vn`, Navi state under `navi`, and Trial state under
+`trial` only when Trial is active.
 
 Harness-owned interaction hooks such as `useGameFlowActor`,
 `useHarnessShowcaseRuntimeAdapter`, `useHarnessShowcaseSaveAdapter`,

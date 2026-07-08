@@ -17,7 +17,7 @@
 - State: `In Progress`
 - Owner: `Codex`
 - Created: `2026-07-01`
-- Updated: `2026-07-01`
+- Updated: `2026-07-09`
 - Completed Commit: `TBD`
 - Archive Target: `docs/archive/completed-tasks/inner-background-command.md`
 
@@ -80,8 +80,9 @@ the existing full-stage `@back` background path.
   source for reserved Pixi actor ids.
 - `PixiStageSnapshotSchema` is version `5` and includes
   `innerBackgroundsById`.
-- `SaveDataSchema` is version `4` and embeds Pixi stage v5.
-- Old Pixi v4 snapshots and SaveData v3 payloads are rejected.
+- `SaveDataSchema` is version `5`; Pixi stage v5 is stored only under
+  `SaveData.vn.pixiStage`.
+- Old Pixi v4 snapshots and SaveData payloads before v5 are rejected.
 
 ## Observability And Acceptance Matrix
 
@@ -100,12 +101,12 @@ Required regression cases:
 
 - Normal path: `@inback bg:x effect:fade time:0.2 wait!` compiles and reduces to
   `innerBackgroundsById.InnerBackground`.
-- Boundary or rejection path: unsupported v1 params warn; old SaveData v3 and
-  Pixi snapshot v4 reject.
+- Boundary or rejection path: unsupported v1 params warn; old SaveData before
+  v5 and Pixi snapshot v4 reject.
 - No-op path: `visible:false` on a missing inner background leaves the snapshot
   unchanged.
-- Serialization path: SaveData v4 embeds Pixi v5 with default
-  `innerBackgroundsById`.
+- Serialization path: SaveData v5 embeds Pixi v5 under `vn.pixiStage` with
+  default `innerBackgroundsById`.
 
 Test placement:
 
@@ -164,9 +165,11 @@ or screen effect ownership out of Pixi.
 
 ## Rollback Notes
 
-Reverting this branch removes SaveData v4/Pixi v5 and the storage key/DB name
-bumps. Development saves created with the new versions should be considered
-incompatible with the reverted branch.
+This task originally introduced Pixi snapshot v5. Current SaveData v5 ownership
+is defined by `docs/ccr/save-data-v5-vn-state-authority.md`; reverting the inner
+background task must not reintroduce top-level `story` or `pixiStage` save
+fields. Development saves created with the current versions should be
+considered incompatible with branches expecting older save shapes.
 
 ## Done When
 

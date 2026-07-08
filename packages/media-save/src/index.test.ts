@@ -40,42 +40,60 @@ const howlerMock = vi.hoisted(() => {
 vi.mock("howler", () => ({ Howl: howlerMock.Howl }));
 
 const baseSave = SaveDataSchema.parse({
-  version: 4 as const,
+  version: 5 as const,
   savedAt: "2026-06-14T00:00:00.000Z",
   mode: "navi" as const,
-  story: {
-    currentScriptPath: "opening.nani",
-    instructionPointer: 4,
-    variables: {},
-    backlog: [{ speaker: "Felix", text: "A saved line." }],
-    pendingChoices: [],
-    ended: false
-  },
-  pixiStage: {
-    version: 5 as const,
-    revision: 2,
-    backgroundsById: {
-      MainBackground: {
-        id: "MainBackground",
-        kind: "background",
-        appearance: "bg:harness"
-      }
+  vn: {
+    story: {
+      currentScriptPath: "opening.nani",
+      instructionPointer: 4,
+      variables: {},
+      backlog: [{ speaker: "Felix", text: "A saved line." }],
+      pendingChoices: [],
+      ended: false
     },
-    charactersById: {
-      Ema: {
-        id: "Ema",
-        kind: "character",
-        appearanceExpression: "Pensive1,ArmR3",
-        pos: [0.5, 0]
-      }
-    },
-    actorOrder: ["MainBackground", "Ema"],
-    weather: {},
-    screenFilters: {}
+    pixiStage: {
+      version: 5 as const,
+      revision: 2,
+      backgroundsById: {
+        MainBackground: {
+          id: "MainBackground",
+          kind: "background",
+          appearance: "bg:harness"
+        }
+      },
+      charactersById: {
+        Ema: {
+          id: "Ema",
+          kind: "character",
+          appearanceExpression: "Pensive1,ArmR3",
+          pos: [0.5, 0]
+        }
+      },
+      actorOrder: ["MainBackground", "Ema"],
+      weather: {},
+      screenFilters: {}
+    }
   },
+  navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
+  trial: null,
   inventory: { items: { "gift:coffee": 1 } },
   evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] },
   characters: {}
+});
+
+const currentTextSave = SaveDataSchema.parse({
+  ...baseSave,
+  vn: {
+    story: {
+      ...baseSave.vn!.story,
+      text: {
+        visible: true,
+        current: { speaker: "Mira", text: "Current save line." }
+      }
+    },
+    pixiStage: baseSave.vn!.pixiStage
+  }
 });
 
 describe("media save contracts", () => {
@@ -91,26 +109,29 @@ describe("media save contracts", () => {
 
   it("validates saves through the versioned migrator boundary", () => {
     const result = createSaveMigrator().migrate({
-      version: 4,
+      version: 5,
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "trial",
-      story: {
-        currentScriptPath: "trial.nani",
-        instructionPointer: 4,
-        variables: {},
-        backlog: [],
-        pendingChoices: [],
-        ended: false
+      vn: {
+        story: {
+          currentScriptPath: "trial.nani",
+          instructionPointer: 4,
+          variables: {},
+          backlog: [],
+          pendingChoices: [],
+          ended: false
+        },
+        pixiStage: {
+          version: 5,
+          revision: 0,
+          backgroundsById: {},
+          charactersById: {},
+          actorOrder: [],
+          weather: {},
+          screenFilters: {}
+        }
       },
-      pixiStage: {
-        version: 5,
-        revision: 0,
-        backgroundsById: {},
-        charactersById: {},
-        actorOrder: [],
-        weather: {},
-        screenFilters: {}
-      },
+      navi: null,
       inventory: { items: { "gift:coffee": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] },
       characters: {},
@@ -125,7 +146,7 @@ describe("media save contracts", () => {
     expect(result).toMatchObject({
       migrated: false,
       data: {
-        version: 4,
+        version: 5,
         trial: { keywordStates: {} }
       }
     });
@@ -149,6 +170,25 @@ describe("media save contracts", () => {
       speaker: "Felix",
       text: "A saved line."
     });
+    expect(createSaveSlotSummary("slot:1", "Slot 1", currentTextSave)).toMatchObject({
+      speaker: "Mira",
+      text: "Current save line."
+    });
+    expect(
+      createSaveSlotSummary(
+        "slot:navi",
+        "Navi",
+        SaveDataSchema.parse({
+          ...baseSave,
+          vn: null
+        })
+      )
+    ).toEqual({
+      id: "slot:navi",
+      label: "Navi",
+      savedAt: "2026-06-14T00:00:00.000Z",
+      mode: "navi"
+    });
   });
 
   it("lists summaries and deletes slots through the save port", async () => {
@@ -163,7 +203,7 @@ describe("media save contracts", () => {
     });
 
     await expect(port.listSummaries()).resolves.toEqual([summary]);
-    await expect(port.load("slot:1")).resolves.toMatchObject({ id: "slot:1", data: { story: { instructionPointer: 4 } } });
+    await expect(port.load("slot:1")).resolves.toMatchObject({ id: "slot:1", data: { vn: { story: { instructionPointer: 4 } } } });
 
     await port.delete("slot:1");
 

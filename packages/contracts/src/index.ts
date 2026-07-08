@@ -1972,6 +1972,15 @@ export const StoryRuntimeSnapshotSchema = z.object({
 });
 export type StoryRuntimeSnapshot = z.infer<typeof StoryRuntimeSnapshotSchema>;
 
+export const SAVE_BACKLOG_LIMIT = 20;
+
+export function createSaveableStoryRuntimeSnapshot(story: StoryRuntimeSnapshot): StoryRuntimeSnapshot {
+  return StoryRuntimeSnapshotSchema.parse({
+    ...story,
+    backlog: story.backlog.slice(-SAVE_BACKLOG_LIMIT)
+  });
+}
+
 export const GameInteractionContextSchema = z.object({
   mode: GameModeSchema,
   overlayStack: z.array(GameOverlayKindSchema).default([]),
@@ -2094,11 +2103,14 @@ export function createDefaultSettingsSnapshot(): SettingsSnapshot {
   return SettingsSnapshotSchema.parse({ version: 1 });
 }
 
+export const SaveModeSchema = z.enum(["vn", "navi", "trial"]);
+export type SaveMode = z.infer<typeof SaveModeSchema>;
+
 export const SaveSlotSummarySchema = z.object({
   id: IdSchema,
   label: z.string().min(1),
   savedAt: z.string(),
-  mode: GameModeSchema,
+  mode: SaveModeSchema,
   speaker: z.string().optional(),
   text: z.string().optional()
 });
@@ -2149,20 +2161,55 @@ export const SaveableVnStateSchema = z
   .strict();
 export type SaveableVnState = z.infer<typeof SaveableVnStateSchema>;
 
-export const SaveDataSchema = z.object({
-  version: z.literal(4),
-  savedAt: z.string(),
-  mode: GameModeSchema,
-  vn: SaveableVnStateSchema.optional(),
-  navi: NaviRuntimeStateSchema.optional(),
-  story: StoryRuntimeSnapshotSchema,
-  pixiStage: PixiStageSnapshotSchema,
-  inventory: InventoryStateSchema,
-  evidence: EvidenceStateSchema,
-  characters: z.record(IdSchema, CharacterStateSchema),
-  trial: TrialRuntimeStateSchema.optional()
-});
+export const SaveDataSchema = z
+  .object({
+    version: z.literal(5),
+    savedAt: z.string(),
+    mode: SaveModeSchema,
+    vn: SaveableVnStateSchema.nullable(),
+    navi: NaviRuntimeStateSchema.nullable(),
+    trial: TrialRuntimeStateSchema.nullable(),
+    inventory: InventoryStateSchema,
+    evidence: EvidenceStateSchema,
+    characters: z.record(IdSchema, CharacterStateSchema)
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.mode === "vn" && data.vn === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "VN saves must include vn state.",
+        path: ["vn"]
+      });
+    }
+    if (data.mode === "navi" && data.navi === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Navi saves must include navi state.",
+        path: ["navi"]
+      });
+    }
+    if (data.mode === "trial" && data.trial === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Trial saves must include trial state.",
+        path: ["trial"]
+      });
+    }
+  });
 export type SaveData = z.infer<typeof SaveDataSchema>;
+
+export function createSaveSlotSummaryFromSaveData(id: string, label: string, data: SaveData): SaveSlotSummary {
+  const latest = data.vn?.story.text?.current ?? data.vn?.story.backlog.at(-1);
+  return SaveSlotSummarySchema.parse({
+    id,
+    label,
+    savedAt: data.savedAt,
+    mode: data.mode,
+    ...(latest?.speaker ? { speaker: latest.speaker } : {}),
+    ...(latest?.text ? { text: latest.text } : {})
+  });
+}
 
 export const ContentManifestSchema = z.object({
   version: z.literal(3),

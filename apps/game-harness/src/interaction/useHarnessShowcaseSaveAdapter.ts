@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { SaveDataSchema, createSaveableStoryRuntimeSnapshot } from "@v-ronpa/contracts";
 import type {
   NaviRuntimeState,
   PixiStageSnapshot,
@@ -13,7 +14,7 @@ import type { useHarnessShowcaseRuntimeAdapter } from "./useHarnessShowcaseRunti
 
 type HarnessShowcaseRuntimeAdapter = ReturnType<typeof useHarnessShowcaseRuntimeAdapter>;
 
-const HARNESS_SHOWCASE_DB = "v-ronpa-harness-showcase-v3";
+const HARNESS_SHOWCASE_DB = "v-ronpa-harness-showcase-v5";
 export const harnessShowcaseSaveSlotIds = ["slot:harness:1", "slot:harness:2", "slot:harness:3", "slot:harness:4"];
 
 export interface HarnessShowcaseSaveDataInput {
@@ -35,21 +36,22 @@ export function createHarnessShowcaseSaveData({
   story,
   trial
 }: HarnessShowcaseSaveDataInput): SaveData {
-  const { runtimeWait: _runtimeWait, ...saveableStory } = story;
+  const { runtimeWait: _runtimeWait, ...storyWithoutRuntimeWait } = story;
   void _runtimeWait;
-  const data: SaveData = {
-    version: 4,
+  return SaveDataSchema.parse({
+    version: 5,
     savedAt,
     mode,
+    vn: {
+      story: createSaveableStoryRuntimeSnapshot(storyWithoutRuntimeWait),
+      pixiStage
+    },
     navi,
-    story: saveableStory,
-    pixiStage,
+    trial: trial ?? null,
     inventory: gameplay.inventory,
     evidence: gameplay.evidence,
     characters: gameplay.characters
-  };
-  if (trial) data.trial = trial;
-  return data;
+  });
 }
 
 export function canSaveHarnessShowcaseRuntime(runtime: Pick<HarnessShowcaseRuntimeAdapter, "storyRuntime">): boolean {
@@ -87,7 +89,9 @@ export function useHarnessShowcaseSaveAdapter(runtime: HarnessShowcaseRuntimeAda
       runtime.gameplay.inventory,
       runtime.navi,
       runtime.pixiStageRuntime.snapshot,
-      runtime.storyRuntime.state
+      runtime.storyRuntime.state,
+      runtime.trialRuntime.active,
+      runtime.trialRuntime.state
     ]
   );
 

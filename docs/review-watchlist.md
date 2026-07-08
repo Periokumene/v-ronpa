@@ -139,6 +139,31 @@ delete, split, or execute entries from it.
 - Status: Watching
 - Linked Task / ADR / CCR: TBD
 
+### RW-0011: Save Record Envelope Unification
+
+- ID: RW-0011
+- Title: Unify app save record envelopes and preview policy
+- Area: game-a, game-harness, media-save, save slot previews
+- Source / Evidence:
+  - `apps/game-a/src/useGameASaveAdapter.ts`
+  - `apps/game-harness/src/interaction/useHarnessShowcaseSaveAdapter.ts`
+  - `packages/media-save/src/index.ts`
+  - `docs/ccr/save-data-v5-vn-state-authority.md`
+- Current Observation: Game A now uses an app-local localStorage record envelope
+  with reserved preview metadata, while the harness continues to use the shared
+  `media-save` slot shape and Dexie port directly. Both carry v5 `SaveData`,
+  but record envelope, thumbnail, and storage index policy are intentionally not
+  unified yet.
+- Why Not Actionable Yet: A shared envelope would require a thumbnail capture
+  authority, storage quota policy, app migration boundary, and agreement on
+  whether `media-save` owns previews or only stores opaque app metadata.
+- Auto Action: Forbidden
+- Review Cadence: Review before implementing save thumbnails, QuickSave, or a
+  shared save-slot management UI.
+- Next Review: TBD
+- Status: Watching
+- Linked Task / ADR / CCR: TBD
+
 ### RW-0007: Complete Settings Persistence
 
 - ID: RW-0007

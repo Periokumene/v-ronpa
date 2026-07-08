@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from "dexie";
 import { Howl } from "howler";
-import { SaveDataSchema, type SaveData, type SaveSlotSummary } from "@v-ronpa/contracts";
+import { SaveDataSchema, createSaveSlotSummaryFromSaveData, type SaveData, type SaveSlotSummary } from "@v-ronpa/contracts";
 
 export interface SaveSlot {
   id: string;
@@ -75,15 +75,7 @@ export function createSaveMigrator(): SaveMigrator {
 }
 
 export function createSaveSlotSummary(id: string, label: string, data: SaveData): SaveSlotSummary {
-  const latest = data.story.backlog.at(-1);
-  return {
-    id,
-    label,
-    savedAt: data.savedAt,
-    mode: data.mode,
-    ...(latest?.speaker ? { speaker: latest.speaker } : {}),
-    ...(latest?.text ? { text: latest.text } : {})
-  };
+  return createSaveSlotSummaryFromSaveData(id, label, data);
 }
 
 function normalizeSlot(slot: SaveSlot, migrator: SaveMigrator): SaveSlot {

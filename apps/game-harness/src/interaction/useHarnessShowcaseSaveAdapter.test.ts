@@ -34,24 +34,30 @@ describe("harness showcase save adapter", () => {
     });
 
     expect(save).toMatchObject({
-      version: 4,
+      version: 5,
       mode: "navi",
-      pixiStage: {
-        version: 5,
-        revision: 1,
-        backgroundsById: {
-          MainBackground: { appearance: "bg:harness" }
+      vn: {
+        pixiStage: {
+          version: 5,
+          revision: 1,
+          backgroundsById: {
+            MainBackground: { appearance: "bg:harness" }
+          }
         }
       },
+      navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
+      trial: null,
       inventory: { items: { "gift:coffee": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"] }
     });
+    expect(save).not.toHaveProperty("story");
+    expect(save).not.toHaveProperty("pixiStage");
     expect(save).not.toHaveProperty("overlayStack");
     expect(save).not.toHaveProperty("storyPlay");
     expect(save).not.toHaveProperty("playback");
     expect(save).not.toHaveProperty("settings");
     expect(save).not.toHaveProperty("dialogRevealRuntime");
-    expect(save.story).not.toHaveProperty("dialogRevealRuntime");
+    expect(save.vn?.story).not.toHaveProperty("dialogRevealRuntime");
     expect(save).not.toHaveProperty("summary");
   });
 
@@ -79,6 +85,12 @@ describe("harness showcase save adapter", () => {
 
     expect(save).toMatchObject({
       mode: "trial",
+      vn: {
+        story: {
+          instructionPointer: 0
+        }
+      },
+      navi: { substate: "walk", activeMapId: "map:academy-hall", inputLock: "none" },
       trial: {
         trialId: "trial:door-lock",
         currentSegmentId: "debate:door-lock",
@@ -106,7 +118,7 @@ describe("harness showcase save adapter", () => {
       gameplay
     });
 
-    expect(save.story.runtimeWait).toBeUndefined();
+    expect(save.vn?.story.runtimeWait).toBeUndefined();
     expect(canSaveHarnessShowcaseRuntime({ storyRuntime: { active: true, state: story } })).toBe(false);
   });
 

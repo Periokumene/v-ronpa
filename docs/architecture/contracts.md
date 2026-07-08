@@ -20,6 +20,17 @@ and merge the change through the integration baseline first.
 - Rename and deletion require snapshot updates and migration notes.
 - Save data must include `version`.
 - Save data must store `StoryRuntimeSnapshot`, not arbitrary engine objects.
+- `SaveData.version = 5` is the current save boundary. It is strict and accepts
+  only saveable playable modes: `vn`, `navi`, and `trial`.
+- `SaveData` always carries required nullable `vn`, `navi`, and `trial`
+  sections. The active `mode` section must be non-null; other sections may also
+  be non-null when an integrated app needs contextual restore state.
+- VN story and VN Pixi stage state must only live under `SaveData.vn.story` and
+  `SaveData.vn.pixiStage`. Top-level `story` and `pixiStage` are invalid save
+  data, not compatibility fields.
+- App save adapters must use the shared saveable story helper so saved backlog
+  keeps only the newest 20 entries while preserving `story.text.current` and
+  without mutating the live runtime object.
 - Input and camera coordination must flow through `InputBindingMap`,
   `InputActionState`, `InputLockState`, and `CameraControlMode`.
 - Browser assets must declare runtime files, compression, LOD, and collision
@@ -41,8 +52,10 @@ and merge the change through the integration baseline first.
 - Interaction shell controls should use `GameOverlayKind`, `GameUiAction`,
   `GameInteractionContext`, and `InteractionCapabilitySnapshot`. App adapters
   and UI surfaces must not redefine these shapes locally.
-- Save/load lists should use `SaveSlotSummary`. `media-save` derives slot
-  summaries from save data, while app adapters collect the current runtime
+- Save/load lists should use `SaveSlotSummary`. Summary derivation belongs to
+  the shared contracts helper and reads `SaveData.vn?.story`; `media-save` and
+  app-local record envelopes should delegate to that rule instead of maintaining
+  separate text-summary standards. App adapters collect the current runtime
   snapshot. `SaveData` itself should remain the restore payload, not the list
   preview authority.
 - Settings should use the public `SettingsSnapshot` contract. The snapshot is a

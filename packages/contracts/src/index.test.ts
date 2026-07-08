@@ -26,13 +26,17 @@ import {
   RuntimeAssetSchema,
   RuntimeCommandSchema,
   RuntimeScriptSchema,
+  SAVE_BACKLOG_LIMIT,
   SaveDataSchema,
+  SaveModeSchema,
   SaveSlotSummarySchema,
   SettingsSnapshotSchema,
   StoryRuntimeSnapshotSchema,
   StoryRuntimeWaitSchema,
   StoryTextStateSchema,
   createDefaultSettingsSnapshot,
+  createSaveSlotSummaryFromSaveData,
+  createSaveableStoryRuntimeSnapshot,
   TrialDefinitionSchema,
   TrialRuntimeStateSchema,
   getNaniCommandDefinition,
@@ -933,6 +937,14 @@ describe("contracts", () => {
         text: "A saved line."
       })
     ).toMatchObject({ mode: "navi", text: "A saved line." });
+    expect(() =>
+      SaveSlotSummarySchema.parse({
+        id: "slot:vertical:bad",
+        label: "Bad Slot",
+        savedAt: "2026-06-20T00:00:00.000Z",
+        mode: "title"
+      })
+    ).toThrow();
 
   });
 
@@ -1235,59 +1247,147 @@ describe("contracts", () => {
   });
 
   it("validates versioned save data", () => {
+    expect(SaveModeSchema.parse("vn")).toBe("vn");
+    expect(() => SaveModeSchema.parse("title")).toThrow();
+
+    const story = {
+      currentScriptPath: "opening.nani",
+      instructionPointer: 2,
+      variables: { route: "objected" },
+      backlog: [{ speaker: "Felix", text: "Good." }],
+      pendingChoices: [],
+      ended: false
+    };
+    const pixiStage = {
+      version: 5 as const,
+      revision: 2,
+      backgroundsById: {
+        [PIXI_MAIN_BACKGROUND_ID]: {
+          id: PIXI_MAIN_BACKGROUND_ID,
+          kind: "background" as const,
+          appearance: "bg:harness"
+        }
+      },
+      charactersById: {
+        Ema: {
+          id: "Ema",
+          kind: "character" as const,
+          appearanceExpression: "Pensive1,ArmR3",
+          pos: [0.5, 0] as [number, number]
+        }
+      },
+      actorOrder: [PIXI_MAIN_BACKGROUND_ID, "Ema"],
+      weather: {},
+      screenFilters: {}
+    };
+
     const save = SaveDataSchema.parse({
-      version: 4,
+      version: 5,
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "navi",
+      vn: {
+        entryId: "vn:opening",
+        story,
+        pixiStage
+      },
       navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
-      story: {
-        currentScriptPath: "opening.nani",
-        instructionPointer: 2,
-        variables: { route: "objected" },
-        backlog: [{ speaker: "Felix", text: "Good." }],
-        pendingChoices: [],
-        ended: false
-      },
-      pixiStage: {
-        version: 5,
-        revision: 2,
-        backgroundsById: {
-          [PIXI_MAIN_BACKGROUND_ID]: {
-            id: PIXI_MAIN_BACKGROUND_ID,
-            kind: "background",
-            appearance: "bg:harness"
-          }
-        },
-        charactersById: {
-          Ema: {
-            id: "Ema",
-            kind: "character",
-            appearanceExpression: "Pensive1,ArmR3",
-            pos: [0.5, 0]
-          }
-        },
-        actorOrder: [PIXI_MAIN_BACKGROUND_ID, "Ema"],
-        weather: {},
-        screenFilters: {}
-      },
+      trial: null,
       inventory: { items: { "gift:coffee": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"] },
       characters: {}
     });
 
-    expect(save.version).toBe(4);
-    expect(save.pixiStage.innerBackgroundsById).toEqual({});
-    expect(save.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
-    expect(save.pixiStage.charactersById.Ema?.appearanceExpression).toBe("Pensive1,ArmR3");
+    expect(save.version).toBe(5);
+    expect(save.vn?.pixiStage.innerBackgroundsById).toEqual({});
+    expect(save.vn?.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
+    expect(save.vn?.pixiStage.charactersById.Ema?.appearanceExpression).toBe("Pensive1,ArmR3");
+    expect(save.navi?.substate).toBe("vn2d-overlay");
     expect(save).not.toHaveProperty("summary");
+    expect(save).not.toHaveProperty("story");
+    expect(save).not.toHaveProperty("pixiStage");
+    expect(createSaveSlotSummaryFromSaveData("slot:contracts:1", "Contracts 1", save)).toEqual({
+      id: "slot:contracts:1",
+      label: "Contracts 1",
+      savedAt: "2026-06-14T00:00:00.000Z",
+      mode: "navi",
+      speaker: "Felix",
+      text: "Good."
+    });
+
+    expect(
+      SaveDataSchema.parse({
+        version: 5,
+        savedAt: "2026-06-14T00:00:00.000Z",
+        mode: "vn",
+        vn: { story, pixiStage },
+        navi: null,
+        trial: null,
+        inventory: { items: {} },
+        evidence: { ownedEvidenceIds: [] },
+        characters: {}
+      }).mode
+    ).toBe("vn");
+
+    expect(
+      SaveDataSchema.parse({
+        version: 5,
+        savedAt: "2026-06-14T00:00:00.000Z",
+        mode: "navi",
+        vn: null,
+        navi: { substate: "walk", activeMapId: "map:academy-hall", inputLock: "none" },
+        trial: null,
+        inventory: { items: {} },
+        evidence: { ownedEvidenceIds: [] },
+        characters: {}
+      }).navi
+    ).toMatchObject({ substate: "walk" });
+    expect(
+      createSaveSlotSummaryFromSaveData(
+        "slot:contracts:navi",
+        "Contracts Navi",
+        SaveDataSchema.parse({
+          version: 5,
+          savedAt: "2026-06-14T00:00:00.000Z",
+          mode: "navi",
+          vn: null,
+          navi: { substate: "walk", activeMapId: "map:academy-hall", inputLock: "none" },
+          trial: null,
+          inventory: { items: {} },
+          evidence: { ownedEvidenceIds: [] },
+          characters: {}
+        })
+      )
+    ).toEqual({
+      id: "slot:contracts:navi",
+      label: "Contracts Navi",
+      savedAt: "2026-06-14T00:00:00.000Z",
+      mode: "navi"
+    });
+
+    expect(
+      SaveDataSchema.parse({
+        version: 5,
+        savedAt: "2026-06-14T00:00:00.000Z",
+        mode: "trial",
+        vn: { story, pixiStage },
+        navi: { substate: "walk", activeMapId: "map:academy-hall", inputLock: "none" },
+        trial: { trialId: "trial:case-01", currentSegmentId: "debate:door", presentation: "debate3d" },
+        inventory: { items: {} },
+        evidence: { ownedEvidenceIds: [] },
+        characters: {}
+      }).trial
+    ).toMatchObject({ keywordStates: {} });
   });
 
   it("rejects old save and Pixi stage versions", () => {
     expect(() =>
       SaveDataSchema.parse({
-        version: 3,
+        version: 4,
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "navi",
+        vn: null,
+        navi: { substate: "walk" },
+        trial: null,
         story: {
           currentScriptPath: "opening.nani",
           instructionPointer: 2,
@@ -1304,18 +1404,22 @@ describe("contracts", () => {
     ).toThrow();
     expect(() =>
       SaveDataSchema.parse({
-        version: 4,
+        version: 5,
         savedAt: "2026-06-14T00:00:00.000Z",
-        mode: "navi",
-        story: {
-          currentScriptPath: "opening.nani",
-          instructionPointer: 2,
-          variables: {},
-          backlog: [],
-          pendingChoices: [],
-          ended: false
+        mode: "vn",
+        vn: {
+          story: {
+            currentScriptPath: "opening.nani",
+            instructionPointer: 2,
+            variables: {},
+            backlog: [],
+            pendingChoices: [],
+            ended: false
+          },
+          pixiStage: { version: 4, revision: 0, backgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} }
         },
-        pixiStage: { version: 4, revision: 0, backgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
+        navi: null,
+        trial: null,
         inventory: { items: {} },
         evidence: { ownedEvidenceIds: [] },
         characters: {}
@@ -1323,12 +1427,54 @@ describe("contracts", () => {
     ).toThrow();
   });
 
-  it("rejects v4 save data without a Pixi stage snapshot", () => {
+  it("rejects v5 saves with missing sections, mismatched mode sections, or legacy top-level state", () => {
     expect(() =>
       SaveDataSchema.parse({
-        version: 4,
+        version: 5,
+        savedAt: "2026-06-14T00:00:00.000Z",
+        mode: "vn",
+        vn: null,
+        navi: null,
+        trial: null,
+        inventory: { items: {} },
+        evidence: { ownedEvidenceIds: [] },
+        characters: {}
+      })
+    ).toThrow();
+    expect(() =>
+      SaveDataSchema.parse({
+        version: 5,
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "navi",
+        vn: null,
+        navi: null,
+        trial: null,
+        inventory: { items: {} },
+        evidence: { ownedEvidenceIds: [] },
+        characters: {}
+      })
+    ).toThrow();
+    expect(() =>
+      SaveDataSchema.parse({
+        version: 5,
+        savedAt: "2026-06-14T00:00:00.000Z",
+        mode: "title",
+        vn: null,
+        navi: null,
+        trial: null,
+        inventory: { items: {} },
+        evidence: { ownedEvidenceIds: [] },
+        characters: {}
+      })
+    ).toThrow();
+    expect(() =>
+      SaveDataSchema.parse({
+        version: 5,
+        savedAt: "2026-06-14T00:00:00.000Z",
+        mode: "navi",
+        vn: null,
+        navi: { substate: "walk" },
+        trial: null,
         story: {
           currentScriptPath: "opening.nani",
           instructionPointer: 2,
@@ -1337,6 +1483,7 @@ describe("contracts", () => {
           pendingChoices: [],
           ended: false
         },
+        pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
         inventory: { items: {} },
         evidence: { ownedEvidenceIds: [] },
         characters: {}
@@ -1346,24 +1493,51 @@ describe("contracts", () => {
 
   it("does not persist runtime command streams in save data", () => {
     const save = SaveDataSchema.parse({
-      version: 4,
+      version: 5,
       savedAt: "2026-06-14T00:00:00.000Z",
-      mode: "navi",
-      story: {
-        currentScriptPath: "opening.nani",
-        instructionPointer: 2,
-        variables: {},
-        backlog: [],
-        pendingChoices: [],
-        ended: false,
-        emittedRuntimeCommands: []
+      mode: "vn",
+      vn: {
+        story: {
+          currentScriptPath: "opening.nani",
+          instructionPointer: 2,
+          variables: {},
+          backlog: [],
+          pendingChoices: [],
+          ended: false,
+          emittedRuntimeCommands: []
+        },
+        pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} }
       },
-      pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
+      navi: null,
+      trial: null,
       inventory: { items: {} },
       evidence: { ownedEvidenceIds: [] },
       characters: {}
     });
 
-    expect(save.story).not.toHaveProperty("emittedRuntimeCommands");
+    expect(save.vn?.story).not.toHaveProperty("emittedRuntimeCommands");
+  });
+
+  it("creates saveable story snapshots without mutating runtime backlog", () => {
+    const backlog = Array.from({ length: SAVE_BACKLOG_LIMIT + 5 }, (_, index) => ({
+      speaker: "Felix",
+      text: `Line ${index}`
+    }));
+    const story = StoryRuntimeSnapshotSchema.parse({
+      currentScriptPath: "opening.nani",
+      instructionPointer: 2,
+      variables: {},
+      backlog,
+      pendingChoices: [],
+      text: { visible: true, current: { speaker: "Felix", text: "Current line" } },
+      ended: false
+    });
+
+    const saveable = createSaveableStoryRuntimeSnapshot(story);
+
+    expect(saveable.backlog).toHaveLength(SAVE_BACKLOG_LIMIT);
+    expect(saveable.backlog[0]?.text).toBe("Line 5");
+    expect(saveable.text?.current?.text).toBe("Current line");
+    expect(story.backlog).toHaveLength(SAVE_BACKLOG_LIMIT + 5);
   });
 });
