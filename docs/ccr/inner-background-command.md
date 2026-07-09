@@ -1,5 +1,9 @@
 # Contract Change Request
 
+> Superseded note: storage-boundary examples in this CCR are historical. Current
+> Game A and harness save-slot storage is defined by
+> `docs/ccr/unified-media-save-slots-and-thumbnails.md`.
+
 ## Requested Change
 
 Add a public `@inback` `.nani` command and a saveable Pixi inner background

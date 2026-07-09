@@ -1,4 +1,4 @@
-import { Application, Container, type Ticker } from "pixi.js";
+import { Application, Container, Rectangle, type Ticker } from "pixi.js";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import {
   ActorSystem,
@@ -43,9 +43,33 @@ export interface PixiStageReconcileOptions {
   hints?: PixiStageRenderHint[];
 }
 
+export type PixiThumbnailMime = "image/webp" | "image/png";
+
+export interface PixiThumbnailCaptureOptions<Mime extends PixiThumbnailMime = PixiThumbnailMime> {
+  width?: number;
+  height?: number;
+  mime?: Mime;
+  quality?: number;
+}
+
+export interface PixiThumbnailCaptureResult<Mime extends PixiThumbnailMime = PixiThumbnailMime> {
+  metadata: {
+    kind: "image";
+    mime: Mime;
+    width: number;
+    height: number;
+    byteLength: number;
+    capturedAt: string;
+  };
+  blob: Blob;
+}
+
 export interface PixiPresenterPort {
   mount(): Promise<void>;
   reconcile(snapshot: PixiStageSnapshot, options?: PixiStageReconcileOptions): void;
+  captureThumbnail<Mime extends PixiThumbnailMime = "image/webp">(
+    options?: PixiThumbnailCaptureOptions<Mime>
+  ): Promise<PixiThumbnailCaptureResult<Mime> | undefined>;
   clear(): void;
   destroy(): void;
 }
@@ -160,6 +184,54 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     viewportKey = currentViewportKey();
   }
 
+  async function captureThumbnail<Mime extends PixiThumbnailMime = "image/webp">(
+    options: PixiThumbnailCaptureOptions<Mime> = {}
+  ): Promise<PixiThumbnailCaptureResult<Mime> | undefined> {
+    if (!mounted || destroyed || typeof document === "undefined") return undefined;
+    const { height = 180, quality = 0.8, width = 320 } = options;
+    const mime = options.mime ?? ("image/webp" as Mime);
+    const targetWidth = Math.max(1, Math.floor(width));
+    const targetHeight = Math.max(1, Math.floor(height));
+    const rendererWithExtract = app.renderer as typeof app.renderer & {
+      extract?: {
+        canvas(options: {
+          target: Container;
+          frame?: Rectangle;
+          resolution?: number;
+          clearColor?: [number, number, number, number];
+          antialias?: boolean;
+        }): unknown;
+      };
+    };
+    const sourceCanvas = rendererWithExtract.extract?.canvas({
+      target: stageRoot,
+      frame: new Rectangle(0, 0, size.width(), size.height()),
+      resolution: 1,
+      clearColor: [0, 0, 0, 0],
+      antialias: true
+    });
+    if (!sourceCanvas) return undefined;
+    const outputCanvas = document.createElement("canvas");
+    outputCanvas.width = targetWidth;
+    outputCanvas.height = targetHeight;
+    const context = outputCanvas.getContext("2d");
+    if (!context) return undefined;
+    context.drawImage(sourceCanvas as CanvasImageSource, 0, 0, targetWidth, targetHeight);
+    const blob = await canvasToBlob(outputCanvas, mime, quality);
+    if (!blob) return undefined;
+    return {
+      metadata: {
+        kind: "image",
+        mime,
+        width: targetWidth,
+        height: targetHeight,
+        byteLength: blob.size,
+        capturedAt: new Date().toISOString()
+      },
+      blob
+    };
+  }
+
   function relayoutViewport() {
     if (!mounted || destroyed) return;
     const nextViewportKey = currentViewportKey();
@@ -234,7 +306,13 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     mounted = false;
   }
 
-  return { mount, reconcile, clear, destroy };
+  return { mount, reconcile, captureThumbnail, clear, destroy };
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, mime: PixiThumbnailMime, quality: number): Promise<Blob | undefined> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob ?? undefined), mime, quality);
+  });
 }
 
 function requestFrame(callback: FrameRequestCallback): number {

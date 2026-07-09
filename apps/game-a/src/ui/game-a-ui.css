@@ -536,9 +536,11 @@
 .game-a-save-thumbnail {
   display: block;
   width: 100%;
+  height: auto;
   max-height: 100%;
   aspect-ratio: 16 / 9;
   border: 1px solid var(--game-a-pause-muted);
+  object-fit: cover;
   background:
     linear-gradient(135deg, transparent 48%, rgba(229, 229, 224, 0.16) 49% 51%, transparent 52%),
     repeating-linear-gradient(0deg, rgba(229, 229, 224, 0.09) 0 1px, transparent 1px 4px),
@@ -548,6 +550,15 @@
 .game-a-save-row[data-save-state="empty"] .game-a-save-thumbnail {
   border-style: dashed;
   background: rgba(0, 0, 0, 0.3);
+}
+
+.game-a-save-error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(220, 38, 38, 0.38);
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.22);
+  font-size: 12px;
 }
 
 .game-a-save-copy {

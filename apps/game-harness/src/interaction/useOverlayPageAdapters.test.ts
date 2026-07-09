@@ -51,7 +51,11 @@ describe("overlay page adapter helpers", () => {
       mode: "save",
       pendingLoadSlot: undefined,
       slotIds,
-      slots
+      slots,
+      slotPreviewsById: {},
+      busy: false,
+      activeOperation: undefined,
+      lastError: undefined
     });
 
     expect(
@@ -210,7 +214,12 @@ describe("overlay page adapter helpers", () => {
       }
     } as unknown as Parameters<typeof useOverlayPageAdapters>[0]);
 
-    expect(adapters.createCommandAvailability()).toEqual({ "quick-load": true });
+    expect(adapters.createCommandAvailability()).toEqual({
+      "open-save": true,
+      "quick-save": true,
+      "open-load": true,
+      "quick-load": true
+    });
 
     adapters.dispatchUiAction("quick-save");
     adapters.dispatchUiAction("quick-load");

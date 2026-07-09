@@ -1,5 +1,9 @@
 # Contract Change Request
 
+> Superseded note: App storage-boundary details in this CCR are superseded by
+> `docs/ccr/unified-media-save-slots-and-thumbnails.md`. The v5 `SaveData`
+> authority remains valid.
+
 ## Requested Change
 
 Move public saves to `SaveData.version = 5` and make `SaveData.vn` the only
@@ -54,6 +58,11 @@ new localStorage key prefix and the harness uses a new Dexie database boundary
 so old development data is isolated rather than read.
 
 ## App Storage Boundaries
+
+> Historical record only. The current save-slot storage boundary is
+> `docs/ccr/unified-media-save-slots-and-thumbnails.md`: Game A and the harness
+> both use `media-save` storage/policy through the shared shell controller, and
+> Game A no longer owns a localStorage save envelope.
 
 - `apps/game-a` owns an app-local localStorage record envelope around v5
   `SaveData`. The slot record is the source of truth; its index is only a

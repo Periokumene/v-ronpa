@@ -1,5 +1,9 @@
 # Contract Change Request
 
+> Superseded note: Slot-policy ownership details in this CCR are superseded by
+> `docs/ccr/unified-media-save-slots-and-thumbnails.md`. The shared quick
+> save/load actions remain valid.
+
 ## Requested Change
 
 Add shared interaction actions for quick save and quick load while keeping save

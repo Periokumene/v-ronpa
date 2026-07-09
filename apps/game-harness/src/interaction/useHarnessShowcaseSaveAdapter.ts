@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { SaveDataSchema, createSaveableStoryRuntimeSnapshot } from "@v-ronpa/contracts";
 import type {
   NaviRuntimeState,
@@ -9,15 +9,24 @@ import type {
   TrialRuntimeState
 } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
-import { createDexieSavePort, createSaveSlotSummary, type SavePort } from "@v-ronpa/media-save";
+import { useSaveSlotController } from "@v-ronpa/app-vn-shell";
+import {
+  createDexieSavePort,
+  createFortyPlusQuickSaveSlotPolicy,
+  selectManualSaveSlotSummaries,
+  selectQuickSaveSlotSummary,
+  type SavePort,
+  type SaveSlotPreview
+} from "@v-ronpa/media-save";
 import type { useHarnessShowcaseRuntimeAdapter } from "./useHarnessShowcaseRuntimeAdapter";
 
 type HarnessShowcaseRuntimeAdapter = ReturnType<typeof useHarnessShowcaseRuntimeAdapter>;
 
-const HARNESS_SHOWCASE_DB = "v-ronpa-harness-showcase-v6";
-export const harnessShowcaseManualSaveSlotCount = 40;
-export const harnessShowcaseSaveSlotIds = Array.from({ length: harnessShowcaseManualSaveSlotCount }, (_, index) => `slot:harness:${index + 1}`);
-export const harnessShowcaseQuickSaveSlotId = "slot:harness:quick";
+export const HARNESS_SHOWCASE_DB = "v-ronpa-harness-showcase-v7";
+export const harnessShowcaseSaveSlotPolicy = createFortyPlusQuickSaveSlotPolicy("harness");
+export const harnessShowcaseManualSaveSlotCount = harnessShowcaseSaveSlotPolicy.manualSlotCount;
+export const harnessShowcaseSaveSlotIds = harnessShowcaseSaveSlotPolicy.manualSlotIds;
+export const harnessShowcaseQuickSaveSlotId = harnessShowcaseSaveSlotPolicy.quickSlotId;
 
 export interface HarnessShowcaseSaveDataInput {
   mode?: SaveData["mode"];
@@ -27,6 +36,11 @@ export interface HarnessShowcaseSaveDataInput {
   pixiStage: PixiStageSnapshot;
   gameplay: GameplayState;
   trial?: TrialRuntimeState;
+}
+
+export interface HarnessShowcaseSaveAdapterOptions {
+  capturePreview?: (() => Promise<SaveSlotPreview | undefined> | SaveSlotPreview | undefined) | undefined;
+  port?: SavePort | undefined;
 }
 
 export function createHarnessShowcaseSaveData({
@@ -61,29 +75,18 @@ export function canSaveHarnessShowcaseRuntime(runtime: Pick<HarnessShowcaseRunti
 }
 
 export function selectHarnessShowcaseManualSaveSlotSummaries(summaries: SaveSlotSummary[]): SaveSlotSummary[] {
-  return summaries.filter((slot) => harnessShowcaseSaveSlotIds.includes(slot.id));
+  return selectManualSaveSlotSummaries(harnessShowcaseSaveSlotPolicy, summaries);
 }
 
 export function selectHarnessShowcaseQuickSaveSlotSummary(summaries: SaveSlotSummary[]): SaveSlotSummary | undefined {
-  return summaries.find((slot) => slot.id === harnessShowcaseQuickSaveSlotId);
+  return selectQuickSaveSlotSummary(harnessShowcaseSaveSlotPolicy, summaries);
 }
 
-export function useHarnessShowcaseSaveAdapter(runtime: HarnessShowcaseRuntimeAdapter, port?: SavePort) {
-  const savePort = useMemo(() => port ?? createDexieSavePort(HARNESS_SHOWCASE_DB), [port]);
-  const [slots, setSlots] = useState<SaveSlotSummary[]>([]);
-  const [quickSlot, setQuickSlot] = useState<SaveSlotSummary | undefined>();
-  const [pendingLoadSlot, setPendingLoadSlot] = useState<SaveSlotSummary | undefined>();
-
-  const refreshSlots = useCallback(async () => {
-    const summaries = await savePort.listSummaries();
-    setSlots(selectHarnessShowcaseManualSaveSlotSummaries(summaries));
-    setQuickSlot(selectHarnessShowcaseQuickSaveSlotSummary(summaries));
-  }, [savePort]);
-
-  useEffect(() => {
-    void refreshSlots();
-  }, [refreshSlots]);
-
+export function useHarnessShowcaseSaveAdapter(
+  runtime: HarnessShowcaseRuntimeAdapter,
+  options: HarnessShowcaseSaveAdapterOptions = {}
+) {
+  const savePort = useMemo(() => options.port ?? createDexieSavePort(HARNESS_SHOWCASE_DB), [options.port]);
   const collectSaveData = useCallback(
     (): SaveData => {
       return createHarnessShowcaseSaveData({
@@ -107,76 +110,17 @@ export function useHarnessShowcaseSaveAdapter(runtime: HarnessShowcaseRuntimeAda
       runtime.trialRuntime.state
     ]
   );
-
-  const saveSlot = useCallback(
-    async (slotId: string) => {
-      if (!harnessShowcaseSaveSlotIds.includes(slotId)) return;
-      if (!canSaveHarnessShowcaseRuntime(runtime)) return;
-      const data = collectSaveData();
-      const summary = createSaveSlotSummary(slotId, labelForSlot(slotId), data);
-      await savePort.save({ id: slotId, label: summary.label, summary, data });
-      await refreshSlots();
-    },
-    [collectSaveData, refreshSlots, runtime, savePort]
-  );
-
-  const quickSaveSlot = useCallback(async () => {
-    if (!canSaveHarnessShowcaseRuntime(runtime)) return;
-    const data = collectSaveData();
-    const summary = createSaveSlotSummary(harnessShowcaseQuickSaveSlotId, labelForSlot(harnessShowcaseQuickSaveSlotId), data);
-    await savePort.save({ id: harnessShowcaseQuickSaveSlotId, label: summary.label, summary, data });
-    await refreshSlots();
-  }, [collectSaveData, refreshSlots, runtime, savePort]);
-
-  const requestLoadSlot = useCallback(
-    async (slotId: string) => {
-      const slot = await savePort.load(slotId);
-      if (!slot) return;
-      setPendingLoadSlot(slot.summary);
-    },
-    [savePort]
-  );
-
-  const confirmLoadSlot = useCallback(async () => {
-    if (!pendingLoadSlot) return;
-    const slot = await savePort.load(pendingLoadSlot.id);
-    if (!slot) return;
-    runtime.restoreFromSave(slot.data);
-    setPendingLoadSlot(undefined);
-    await refreshSlots();
-  }, [pendingLoadSlot, refreshSlots, runtime, savePort]);
-
-  const quickLoadSlot = useCallback(async () => {
-    const slot = await savePort.load(harnessShowcaseQuickSaveSlotId);
-    if (!slot) return false;
-    runtime.restoreFromSave(slot.data);
-    setPendingLoadSlot(undefined);
-    await refreshSlots();
-    return true;
-  }, [refreshSlots, runtime, savePort]);
-
-  const cancelLoadSlot = useCallback(() => {
-    setPendingLoadSlot(undefined);
-  }, []);
+  const controller = useSaveSlotController({
+    port: savePort,
+    policy: harnessShowcaseSaveSlotPolicy,
+    collectSaveData,
+    restoreSaveData: runtime.restoreFromSave,
+    canSave: () => canSaveHarnessShowcaseRuntime(runtime),
+    ...(options.capturePreview ? { capturePreview: options.capturePreview } : {})
+  });
 
   return {
-    cancelLoadSlot,
     collectSaveData,
-    confirmLoadSlot,
-    pendingLoadSlot,
-    quickLoadSlot,
-    quickSaveSlot,
-    quickSlot,
-    refreshSlots,
-    requestLoadSlot,
-    saveSlot,
-    slotIds: harnessShowcaseSaveSlotIds,
-    slots
+    ...controller
   };
-}
-
-function labelForSlot(slotId: string): string {
-  if (slotId === harnessShowcaseQuickSaveSlotId) return "Quick Save";
-  const suffix = slotId.split(":").at(-1);
-  return suffix ? `Slot ${suffix}` : slotId;
 }

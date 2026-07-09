@@ -1,5 +1,10 @@
 # Contract Change Request
 
+> Superseded note: save-slot thumbnail and concrete app path details in this
+> CCR are historical. Current save-slot storage, preview storage, and Game A /
+> harness wiring are defined by
+> `docs/ccr/unified-media-save-slots-and-thumbnails.md`.
+
 ## Requested Change
 
 Add public interaction-shell contracts for title/overlay UI flow, capability

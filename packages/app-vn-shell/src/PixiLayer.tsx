@@ -6,8 +6,17 @@ import {
   type PixiPresenterDiagnostic,
   type PixiPresentationTaskSnapshot,
   type PixiPresenterPort,
+  type PixiThumbnailMime,
+  type PixiThumbnailCaptureOptions,
+  type PixiThumbnailCaptureResult,
   type PixiStageRenderHint
 } from "@v-ronpa/pixi-presenter";
+
+export interface PixiStageCaptureHandle {
+  captureThumbnail<Mime extends PixiThumbnailMime = "image/webp">(
+    options?: PixiThumbnailCaptureOptions<Mime>
+  ): Promise<PixiThumbnailCaptureResult<Mime> | undefined>;
+}
 
 export interface PixiLayerProps {
   // Render inputs.
@@ -24,6 +33,7 @@ export interface PixiLayerProps {
   // Render side effects.
   onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
   onTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
+  onCaptureHandleChanged?: (handle: PixiStageCaptureHandle | undefined) => void;
 }
 
 export function PixiLayer({
@@ -35,12 +45,14 @@ export function PixiLayer({
   visible,
   assetResolver,
   onDiagnostic,
+  onCaptureHandleChanged,
   onTasksChanged
 }: PixiLayerProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const presenterRef = useRef<PixiPresenterPort | null>(null);
   const onTasksChangedRef = useRef<typeof onTasksChanged>(onTasksChanged);
   const onDiagnosticRef = useRef<typeof onDiagnostic>(onDiagnostic);
+  const onCaptureHandleChangedRef = useRef<typeof onCaptureHandleChanged>(onCaptureHandleChanged);
 
   useEffect(() => {
     onTasksChangedRef.current = onTasksChanged;
@@ -49,6 +61,10 @@ export function PixiLayer({
   useEffect(() => {
     onDiagnosticRef.current = onDiagnostic;
   }, [onDiagnostic]);
+
+  useEffect(() => {
+    onCaptureHandleChangedRef.current = onCaptureHandleChanged;
+  }, [onCaptureHandleChanged]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -61,8 +77,12 @@ export function PixiLayer({
     };
     const presenter = createPixiPresenter(options);
     presenterRef.current = presenter;
+    onCaptureHandleChangedRef.current?.({
+      captureThumbnail: (captureOptions) => presenter.captureThumbnail(captureOptions)
+    });
     void presenter.mount();
     return () => {
+      onCaptureHandleChangedRef.current?.(undefined);
       presenter.destroy();
       presenterRef.current = null;
     };

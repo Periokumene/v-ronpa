@@ -10,9 +10,7 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
 
   await page.addInitScript(() => {
     localStorage.removeItem("v-ronpa:game-a:settings:v1");
-    for (const key of Object.keys(localStorage)) {
-      if (key.startsWith("v-ronpa:game-a:saves:")) localStorage.removeItem(key);
-    }
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v7");
   });
   await page.goto("/");
 
@@ -97,13 +95,19 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await expect(page.getByTestId("load-confirmation")).toHaveCount(0);
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT GAME-A MOVIE");
 
+  await expect(page.getByTestId("vn-command-save")).toBeEnabled();
   await clickByTestId(page, "vn-command-save");
   await expect(page.getByTestId("save-load-overlay")).toHaveAttribute("data-active-tab", "save");
+  await expect(page.getByTestId("save-slot-1")).toBeEnabled();
   await clickByTestId(page, "save-slot-1");
+  await expect(page.getByTestId("save-slot-1")).toContainText("CHECKPOINT GAME-A MOVIE");
+  await expect(page.getByTestId("save-slot-1-thumbnail")).toHaveAttribute("src", /^blob:/);
   await clickByTestId(page, "save-load-overlay-close");
   await clickByTestId(page, "vn-command-load");
   await expect(page.getByTestId("save-load-overlay")).toHaveAttribute("data-active-tab", "load");
+  await expect(page.getByTestId("save-slot-1")).toBeEnabled();
   await clickByTestId(page, "save-slot-1");
+  await expect(page.getByTestId("load-confirmation")).toBeVisible();
   await clickByTestId(page, "load-confirm");
   await expect(page.getByTestId("save-load-overlay")).toBeHidden();
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT GAME-A MOVIE");

@@ -2,19 +2,86 @@ import Dexie, { type EntityTable } from "dexie";
 import { Howl } from "howler";
 import { SaveDataSchema, createSaveSlotSummaryFromSaveData, type SaveData, type SaveSlotSummary } from "@v-ronpa/contracts";
 
+export type SaveOperationErrorCode = "invalid-save" | "storage-failed";
+
+export interface SaveOperationError {
+  code: SaveOperationErrorCode;
+  message: string;
+  cause?: unknown;
+}
+
+export type SaveOperationResult<T = undefined> =
+  | { ok: true; value: T }
+  | { ok: false; error: SaveOperationError };
+
+export const SAVE_SLOT_THUMBNAIL_WIDTH = 320;
+export const SAVE_SLOT_THUMBNAIL_HEIGHT = 180;
+export const SAVE_SLOT_THUMBNAIL_MIME = "image/webp";
+export const SAVE_SLOT_THUMBNAIL_QUALITY = 0.8;
+
+export type SavePreviewMime = typeof SAVE_SLOT_THUMBNAIL_MIME;
+
+export interface SaveSlotThumbnailCaptureOptions {
+  width: number;
+  height: number;
+  mime: SavePreviewMime;
+  quality: number;
+}
+
+export const SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS: SaveSlotThumbnailCaptureOptions = {
+  width: SAVE_SLOT_THUMBNAIL_WIDTH,
+  height: SAVE_SLOT_THUMBNAIL_HEIGHT,
+  mime: SAVE_SLOT_THUMBNAIL_MIME,
+  quality: SAVE_SLOT_THUMBNAIL_QUALITY
+};
+
+export interface SaveSlotPreviewMetadata {
+  kind: "image";
+  mime: SavePreviewMime;
+  width: number;
+  height: number;
+  byteLength: number;
+  capturedAt: string;
+}
+
+export interface SaveSlotPreview {
+  metadata: SaveSlotPreviewMetadata;
+  blob: Blob;
+}
+
 export interface SaveSlot {
   id: string;
   label: string;
   summary: SaveSlotSummary;
   data: SaveData;
+  preview?: SaveSlotPreview;
+}
+
+export interface SaveSlotWrite {
+  id: string;
+  label: string;
+  data: SaveData;
+  preview?: SaveSlotPreview;
+}
+
+export interface SaveSlotPolicy {
+  namespace: string;
+  manualSlotCount: number;
+  manualSlotIds: string[];
+  quickSlotId: string;
+  allSlotIds: string[];
+  isManualSlot(slotId: string): boolean;
+  isQuickSlot(slotId: string): boolean;
+  labelForSlot(slotId: string): string;
 }
 
 export interface SavePort {
-  save(slot: SaveSlot): Promise<void>;
-  load(id: string): Promise<SaveSlot | undefined>;
-  list(): Promise<SaveSlot[]>;
-  listSummaries(): Promise<SaveSlotSummary[]>;
-  delete(id: string): Promise<void>;
+  save(slot: SaveSlotWrite): Promise<SaveOperationResult<SaveSlotSummary>>;
+  load(id: string): Promise<SaveOperationResult<SaveSlot | undefined>>;
+  list(): Promise<SaveOperationResult<SaveSlot[]>>;
+  listSummaries(): Promise<SaveOperationResult<SaveSlotSummary[]>>;
+  loadPreviews(slotIds: string[]): Promise<SaveOperationResult<Record<string, SaveSlotPreview>>>;
+  delete(id: string): Promise<SaveOperationResult>;
 }
 
 export interface SaveMigrationResult {
@@ -59,8 +126,29 @@ interface ActiveHowl {
   release(reason?: AudioHandleFinishReason, stopHowl?: boolean): void;
 }
 
+interface SaveSlotIndexRecord {
+  id: string;
+  label: string;
+  summary: SaveSlotSummary;
+  savedAt: string;
+  mode: SaveData["mode"];
+}
+
+interface SaveSlotPayloadRecord {
+  slotId: string;
+  data: SaveData;
+}
+
+interface SaveSlotPreviewRecord {
+  slotId: string;
+  metadata: SaveSlotPreviewMetadata;
+  blob: Blob;
+}
+
 interface SaveDbShape extends Dexie {
-  slots: EntityTable<SaveSlot, "id">;
+  slots: EntityTable<SaveSlotIndexRecord, "id">;
+  payloads: EntityTable<SaveSlotPayloadRecord, "slotId">;
+  previews: EntityTable<SaveSlotPreviewRecord, "slotId">;
 }
 
 export function createSaveMigrator(): SaveMigrator {
@@ -78,65 +166,306 @@ export function createSaveSlotSummary(id: string, label: string, data: SaveData)
   return createSaveSlotSummaryFromSaveData(id, label, data);
 }
 
-function normalizeSlot(slot: SaveSlot, migrator: SaveMigrator): SaveSlot {
+export function createFortyPlusQuickSaveSlotPolicy(
+  namespace: string,
+  options: { manualSlotCount?: number; manualLabelPrefix?: string; quickLabel?: string } = {}
+): SaveSlotPolicy {
+  const manualSlotCount = options.manualSlotCount ?? 40;
+  const manualSlotIds = Array.from({ length: manualSlotCount }, (_, index) => `slot:${namespace}:${index + 1}`);
+  const quickSlotId = `slot:${namespace}:quick`;
+  const manualLabelPrefix = options.manualLabelPrefix ?? "Slot";
+  const quickLabel = options.quickLabel ?? "Quick Save";
+  return {
+    namespace,
+    manualSlotCount,
+    manualSlotIds,
+    quickSlotId,
+    allSlotIds: [...manualSlotIds, quickSlotId],
+    isManualSlot(slotId) {
+      return manualSlotIds.includes(slotId);
+    },
+    isQuickSlot(slotId) {
+      return slotId === quickSlotId;
+    },
+    labelForSlot(slotId) {
+      if (slotId === quickSlotId) return quickLabel;
+      const manualIndex = manualSlotIds.indexOf(slotId);
+      return manualIndex >= 0 ? `${manualLabelPrefix} ${manualIndex + 1}` : slotId;
+    }
+  };
+}
+
+export function selectManualSaveSlotSummaries(policy: SaveSlotPolicy, summaries: SaveSlotSummary[]): SaveSlotSummary[] {
+  const summariesById = new Map(summaries.map((summary) => [summary.id, summary]));
+  return policy.manualSlotIds.flatMap((slotId) => {
+    const summary = summariesById.get(slotId);
+    return summary ? [summary] : [];
+  });
+}
+
+export function selectQuickSaveSlotSummary(policy: SaveSlotPolicy, summaries: SaveSlotSummary[]): SaveSlotSummary | undefined {
+  return summaries.find((summary) => summary.id === policy.quickSlotId);
+}
+
+function normalizeSaveSlotWrite(slot: SaveSlotWrite, migrator: SaveMigrator): SaveSlot {
   const { data } = migrator.migrate(slot.data);
   const summary = createSaveSlotSummary(slot.id, slot.label, data);
   return {
-    ...slot,
+    id: slot.id,
+    label: summary.label,
     data,
-    summary
+    summary,
+    ...(slot.preview ? { preview: normalizePreview(slot.preview) } : {})
   };
 }
 
 export function createDexieSavePort(dbName = "v-ronpa-saves", migrator = createSaveMigrator()): SavePort {
   const db = new Dexie(dbName) as SaveDbShape;
   db.version(1).stores({
-    slots: "id, label"
+    slots: "id, label, savedAt, mode",
+    payloads: "slotId",
+    previews: "slotId"
   });
 
   return {
     async save(slot) {
-      await db.slots.put(normalizeSlot(slot, migrator));
+      let normalized: SaveSlot;
+      try {
+        normalized = normalizeSaveSlotWrite(slot, migrator);
+      } catch (cause) {
+        return fail(saveError(cause, "invalid-save"));
+      }
+      try {
+        await db.transaction("rw", db.slots, db.payloads, db.previews, async () => {
+          await db.slots.put(createSlotIndexRecord(normalized));
+          await db.payloads.put({ slotId: normalized.id, data: normalized.data });
+          if (normalized.preview) {
+            await db.previews.put({ slotId: normalized.id, metadata: normalized.preview.metadata, blob: normalized.preview.blob });
+          } else {
+            await db.previews.delete(normalized.id);
+          }
+        });
+        return ok(normalized.summary);
+      } catch (cause) {
+        return fail(saveError(cause, "storage-failed"));
+      }
     },
     async load(id) {
-      const slot = await db.slots.get(id);
-      if (!slot) return undefined;
-      return normalizeSlot(slot, migrator);
+      try {
+        let slot: SaveSlotIndexRecord | undefined;
+        let payload: SaveSlotPayloadRecord | undefined;
+        let preview: SaveSlotPreviewRecord | undefined;
+        await db.transaction("r", db.slots, db.payloads, db.previews, async () => {
+          [slot, payload, preview] = await Promise.all([db.slots.get(id), db.payloads.get(id), db.previews.get(id)]);
+        });
+        if (!slot) return ok(undefined);
+        if (!payload) return fail({ code: "storage-failed", message: `Save slot ${id} is missing its payload.` });
+        const data = migrator.migrate(payload.data).data;
+        const summary = createSaveSlotSummary(slot.id, slot.label, data);
+        return ok({
+          id: slot.id,
+          label: slot.label,
+          summary,
+          data,
+          ...(preview ? { preview: normalizePreview(preview) } : {})
+        });
+      } catch (cause) {
+        return fail(saveError(cause));
+      }
     },
     async list() {
-      const slots = await db.slots.toArray();
-      return slots.map((slot) => normalizeSlot(slot, migrator));
+      try {
+        let slotIndexes: SaveSlotIndexRecord[] = [];
+        let payloads: SaveSlotPayloadRecord[] = [];
+        let previews: SaveSlotPreviewRecord[] = [];
+        await db.transaction("r", db.slots, db.payloads, db.previews, async () => {
+          [slotIndexes, payloads, previews] = await Promise.all([db.slots.toArray(), db.payloads.toArray(), db.previews.toArray()]);
+        });
+        const payloadsById = new Map(payloads.map((payload) => [payload.slotId, payload]));
+        const previewsById = new Map(previews.map((preview) => [preview.slotId, preview]));
+        return ok(
+          slotIndexes.flatMap((slot) => {
+            const payload = payloadsById.get(slot.id);
+            if (!payload) return [];
+            const data = migrator.migrate(payload.data).data;
+            return [
+              {
+                id: slot.id,
+                label: slot.label,
+                summary: createSaveSlotSummary(slot.id, slot.label, data),
+                data,
+                ...(previewsById.get(slot.id) ? { preview: normalizePreview(previewsById.get(slot.id)!) } : {})
+              }
+            ];
+          })
+        );
+      } catch (cause) {
+        return fail(saveError(cause));
+      }
     },
     async listSummaries() {
-      const slots = await db.slots.toArray();
-      return slots.map((slot) => normalizeSlot(slot, migrator).summary);
+      try {
+        const slots = await db.slots.toArray();
+        return ok(slots.map((slot) => slot.summary));
+      } catch (cause) {
+        return fail(saveError(cause, "storage-failed"));
+      }
+    },
+    async loadPreviews(slotIds) {
+      try {
+        if (slotIds.length === 0) return ok({});
+        const records = await db.previews.bulkGet(slotIds);
+        return ok(
+          Object.fromEntries(
+            records.flatMap((record) => (record ? [[record.slotId, normalizePreview(record)] as const] : []))
+          )
+        );
+      } catch (cause) {
+        return fail(saveError(cause, "storage-failed"));
+      }
     },
     async delete(id) {
-      await db.slots.delete(id);
+      try {
+        await db.transaction("rw", db.slots, db.payloads, db.previews, async () => {
+          await Promise.all([db.slots.delete(id), db.payloads.delete(id), db.previews.delete(id)]);
+        });
+        return ok(undefined);
+      } catch (cause) {
+        return fail(saveError(cause, "storage-failed"));
+      }
     }
   };
 }
 
 export function createMemorySavePort(initialSlots: SaveSlot[] = [], migrator = createSaveMigrator()): SavePort {
-  const slots = new Map(initialSlots.map((slot) => [slot.id, normalizeSlot(slot, migrator)]));
+  const slots = new Map<string, SaveSlotIndexRecord>();
+  const payloads = new Map<string, SaveSlotPayloadRecord>();
+  const previews = new Map<string, SaveSlotPreviewRecord>();
+
+  for (const slot of initialSlots) {
+    const normalized = normalizeSaveSlotWrite(slot, migrator);
+    slots.set(normalized.id, createSlotIndexRecord(normalized));
+    payloads.set(normalized.id, { slotId: normalized.id, data: normalized.data });
+    if (normalized.preview) previews.set(normalized.id, { slotId: normalized.id, metadata: normalized.preview.metadata, blob: normalized.preview.blob });
+  }
 
   return {
     async save(slot) {
-      slots.set(slot.id, normalizeSlot(slot, migrator));
+      try {
+        const normalized = normalizeSaveSlotWrite(slot, migrator);
+        slots.set(normalized.id, createSlotIndexRecord(normalized));
+        payloads.set(normalized.id, { slotId: normalized.id, data: normalized.data });
+        if (normalized.preview) previews.set(normalized.id, { slotId: normalized.id, metadata: normalized.preview.metadata, blob: normalized.preview.blob });
+        else previews.delete(normalized.id);
+        return ok(normalized.summary);
+      } catch (cause) {
+        return fail(saveError(cause));
+      }
     },
     async load(id) {
-      const slot = slots.get(id);
-      return slot ? normalizeSlot(slot, migrator) : undefined;
+      try {
+        const slot = slots.get(id);
+        if (!slot) return ok(undefined);
+        const payload = payloads.get(id);
+        if (!payload) return fail({ code: "storage-failed", message: `Save slot ${id} is missing its payload.` });
+        const data = migrator.migrate(payload.data).data;
+        const preview = previews.get(id);
+        return ok({
+          id: slot.id,
+          label: slot.label,
+          summary: createSaveSlotSummary(slot.id, slot.label, data),
+          data,
+          ...(preview ? { preview: normalizePreview(preview) } : {})
+        });
+      } catch (cause) {
+        return fail(saveError(cause));
+      }
     },
     async list() {
-      return [...slots.values()].map((slot) => normalizeSlot(slot, migrator));
+      try {
+        return ok(
+          [...slots.values()].flatMap((slot) => {
+            const payload = payloads.get(slot.id);
+            if (!payload) return [];
+            const data = migrator.migrate(payload.data).data;
+            const preview = previews.get(slot.id);
+            return [
+              {
+                id: slot.id,
+                label: slot.label,
+                summary: createSaveSlotSummary(slot.id, slot.label, data),
+                data,
+                ...(preview ? { preview: normalizePreview(preview) } : {})
+              }
+            ];
+          })
+        );
+      } catch (cause) {
+        return fail(saveError(cause));
+      }
     },
     async listSummaries() {
-      return [...slots.values()].map((slot) => normalizeSlot(slot, migrator).summary);
+      return ok([...slots.values()].map((slot) => slot.summary));
+    },
+    async loadPreviews(slotIds) {
+      return ok(
+        Object.fromEntries(
+          slotIds.flatMap((slotId) => {
+            const preview = previews.get(slotId);
+            return preview ? [[slotId, normalizePreview(preview)] as const] : [];
+          })
+        )
+      );
     },
     async delete(id) {
       slots.delete(id);
+      payloads.delete(id);
+      previews.delete(id);
+      return ok(undefined);
     }
+  };
+}
+
+function createSlotIndexRecord(slot: SaveSlot): SaveSlotIndexRecord {
+  return {
+    id: slot.id,
+    label: slot.summary.label,
+    summary: slot.summary,
+    savedAt: slot.summary.savedAt,
+    mode: slot.summary.mode
+  };
+}
+
+function normalizePreview(preview: SaveSlotPreview | SaveSlotPreviewRecord): SaveSlotPreview {
+  const metadata = preview.metadata;
+  if (metadata.kind !== "image") throw new Error("Save preview metadata kind must be image.");
+  if (metadata.mime !== SAVE_SLOT_THUMBNAIL_MIME) throw new Error(`Save preview mime must be ${SAVE_SLOT_THUMBNAIL_MIME}.`);
+  if (metadata.width !== SAVE_SLOT_THUMBNAIL_WIDTH) throw new Error(`Save preview width must be ${SAVE_SLOT_THUMBNAIL_WIDTH}.`);
+  if (metadata.height !== SAVE_SLOT_THUMBNAIL_HEIGHT) throw new Error(`Save preview height must be ${SAVE_SLOT_THUMBNAIL_HEIGHT}.`);
+  if (typeof metadata.capturedAt !== "string" || metadata.capturedAt.length === 0) throw new Error("Save preview capturedAt is required.");
+  return {
+    metadata: {
+      ...metadata,
+      byteLength: preview.blob.size
+    },
+    blob: preview.blob
+  };
+}
+
+function ok<T>(value: T): SaveOperationResult<T> {
+  return { ok: true, value };
+}
+
+function fail(error: SaveOperationError): SaveOperationResult<never> {
+  return { ok: false, error };
+}
+
+function saveError(cause: unknown, fallbackCode: SaveOperationErrorCode = "invalid-save"): SaveOperationError {
+  const message = cause instanceof Error ? cause.message : "Save operation failed.";
+  return {
+    code: fallbackCode,
+    message,
+    cause
   };
 }
 

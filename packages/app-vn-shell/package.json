@@ -9,6 +9,7 @@
   "dependencies": {
     "@v-ronpa/app-vn-dispatch": "workspace:*",
     "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/media-save": "workspace:*",
     "@v-ronpa/pixi-presenter": "workspace:*",
     "@v-ronpa/story-engine": "workspace:*",
     "@v-ronpa/story-play": "workspace:*",

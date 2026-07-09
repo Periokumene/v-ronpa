@@ -9,7 +9,7 @@
 - Treat `vn`, `navi`, and `trial` as primary playable modes; keep VN2D/VN3D as VN presentation profiles or Navi/Trial substates where appropriate.
 - Keep Navi flow in `packages/navi-director` and Trial flow in `packages/trial-director`.
 - Keep VN session orchestration in `packages/app-vn-session`, VN command fanout in `packages/app-vn-dispatch`, and React VN shell mounting in `packages/app-vn-shell`.
-- Keep raw R3F/Pixi renderer code inside adapter packages or `apps/game-harness` harness code; `apps/game-a` may mount VN shell/Pixi adapter surfaces and use Pixi snapshot types for VN2D, but must not import `three`, `@react-three/*`, `pixi.js`, `@pixi/*`, `media-save`, Navi, or Trial packages.
+- Keep raw R3F/Pixi renderer code inside adapter packages or `apps/game-harness` harness code; `apps/game-a` may mount VN shell/Pixi adapter surfaces, use Pixi snapshot types for VN2D, and use `packages/media-save` save ports, but must not import `three`, `@react-three/*`, `pixi.js`, `@pixi/*`, Dexie, Howler, Navi, or Trial packages directly.
 - Keep app-specific flow/save/overlay wiring in app packages such as `apps/game-harness`; shared VN packages expose shell surfaces and headless dispatch helpers only.
 - DOM UI owns text-heavy menus, dialogs, inventory, and accessibility-sensitive interactions.
 - Pixi owns VN/trial 2D effects, portrait staging, filters, particles, and fast debate overlays.

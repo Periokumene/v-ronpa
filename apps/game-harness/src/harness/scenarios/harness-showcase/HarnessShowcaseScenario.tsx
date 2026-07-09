@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ButtonHTMLAttributes } from "react";
+import { useCallback, useMemo, useRef, useState, type ButtonHTMLAttributes } from "react";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
@@ -7,11 +7,12 @@ import {
   settingsToDialogueBleepRuntimeSettings,
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings,
-  useGameSettingsAdapter
+  useGameSettingsAdapter,
+  type PixiStageCaptureHandle
 } from "@v-ronpa/app-vn-shell";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
-import type { AudioHandle, AudioHandleFinishReason, AudioPort } from "@v-ronpa/media-save";
+import { SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS, type AudioHandle, type AudioHandleFinishReason, type AudioPort } from "@v-ronpa/media-save";
 import type { PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
 import { ExplorationStage3D, TrialRoundTableStage } from "@v-ronpa/r3f-adapter";
 import { InspectorLite, RichTextFontStyles } from "@v-ronpa/ui-kit";
@@ -39,6 +40,7 @@ export function HarnessShowcaseScenario() {
   const dialogRevealSettings = useMemo(() => ({ textSpeed: dialogDisplay.textSpeed }), [dialogDisplay.textSpeed]);
   const dialogueBleepSettings = useMemo(() => settingsToDialogueBleepRuntimeSettings(settings.settings), [settings.settings]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
+  const pixiCaptureHandleRef = useRef<PixiStageCaptureHandle | undefined>(undefined);
   const smokeAudioPort = useMemo(() => {
     const mode = selectVoiceSmokeAudioMode();
     return mode ? createVoiceSmokeAudioPort(mode) : undefined;
@@ -56,7 +58,9 @@ export function HarnessShowcaseScenario() {
     onEnterTrial: enterTrialMode,
     onEnterNavi: enterNaviMode
   });
-  const save = useHarnessShowcaseSaveAdapter(runtime);
+  const save = useHarnessShowcaseSaveAdapter(runtime, {
+    capturePreview: () => pixiCaptureHandleRef.current?.captureThumbnail(SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS)
+  });
   const overlayPages = useOverlayPageAdapters({ flow, runtime, save, settings });
   const [activeDebugTab, setActiveDebugTab] = useState<DebugTabId>("runtime");
 
@@ -89,6 +93,9 @@ export function HarnessShowcaseScenario() {
               pixiPresentationTasks={runtime.pixiStageRuntime.presentationTasks}
               pixiStage={runtime.pixiStageRuntime.snapshot}
               storySession={runtime.storySession}
+              onPixiCaptureHandleChanged={(handle) => {
+                pixiCaptureHandleRef.current = handle;
+              }}
               onPixiDiagnostic={runtime.observeAssetDiagnostic}
               onPixiTasksChanged={runtime.updatePixiPresentationTasks}
             />

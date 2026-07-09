@@ -290,18 +290,30 @@ function GameASaveLoadOverlay({
   const slotIdsKey = model.slotIds.join("\u0000");
   const slotsById = new Map(model.slots.map((slot) => [slot.id, slot]));
   const page = paginateSaveLoadSlotIds(model.slotIds, pageIndex);
+  const loadPreviews = actions.loadPreviews;
+  const pageSlotIdsKey = page.pageSlotIds.join("\u0000");
 
   useEffect(() => {
     setPageIndex(0);
   }, [model.mode, slotIdsKey]);
 
+  useEffect(() => {
+    loadPreviews?.(page.pageSlotIds);
+  }, [loadPreviews, pageSlotIdsKey]);
+
   const content = (
     <>
+      {model.lastError ? (
+        <p data-testid="save-load-error" className="game-a-save-error" role="alert">
+          {model.lastError.message}
+        </p>
+      ) : null}
       <div data-testid="save-slot-grid" className="game-a-save-grid">
         {page.pageSlotIds.map((slotId, index) => {
           const absoluteIndex = page.pageIndex * SAVE_LOAD_SLOTS_PER_PAGE + index;
           const slot = slotsById.get(slotId);
-          const disabled = model.mode === "save" ? !model.canSave : !slot;
+          const preview = model.slotPreviewsById[slotId];
+          const disabled = model.busy || (model.mode === "save" ? !model.canSave : !slot);
           return (
             <button
               className="game-a-save-row"
@@ -313,7 +325,18 @@ function GameASaveLoadOverlay({
               type="button"
             >
               <span className="game-a-save-row-number">{String(absoluteIndex + 1).padStart(2, "0")}</span>
-              <span aria-hidden="true" className="game-a-save-thumbnail" data-testid={`save-slot-${absoluteIndex + 1}-thumbnail`} />
+              {preview ? (
+                <img
+                  alt=""
+                  className="game-a-save-thumbnail"
+                  data-testid={`save-slot-${absoluteIndex + 1}-thumbnail`}
+                  src={preview.uri}
+                  width={preview.width}
+                  height={preview.height}
+                />
+              ) : (
+                <span aria-hidden="true" className="game-a-save-thumbnail" data-testid={`save-slot-${absoluteIndex + 1}-thumbnail`} />
+              )}
               <span className="game-a-save-copy">
                 <strong>{slot?.label ?? `存档 ${absoluteIndex + 1}`}</strong>
                 <span>{slot ? new Date(slot.savedAt).toLocaleString() : "< 空存档 >"}</span>
@@ -328,7 +351,7 @@ function GameASaveLoadOverlay({
         <button
           aria-label="上一页"
           data-testid="save-page-prev"
-          disabled={page.pageIndex === 0}
+          disabled={model.busy || page.pageIndex === 0}
           onClick={() => setPageIndex((current) => Math.max(0, current - 1))}
           type="button"
         >
@@ -340,7 +363,7 @@ function GameASaveLoadOverlay({
         <button
           aria-label="下一页"
           data-testid="save-page-next"
-          disabled={page.pageIndex >= page.pageCount - 1}
+          disabled={model.busy || page.pageIndex >= page.pageCount - 1}
           onClick={() => setPageIndex((current) => Math.min(page.pageCount - 1, current + 1))}
           type="button"
         >
@@ -352,10 +375,10 @@ function GameASaveLoadOverlay({
           <strong>确定读取此存档？</strong>
           <span>当前进度将被 {model.pendingLoadSlot.label} 覆盖。</span>
           <div>
-            <button data-testid="load-confirm" onClick={actions.confirmLoad} type="button">
+            <button data-testid="load-confirm" disabled={model.busy} onClick={actions.confirmLoad} type="button">
               读取
             </button>
-            <button data-testid="load-cancel" onClick={actions.cancelLoad} type="button">
+            <button data-testid="load-cancel" disabled={model.busy} onClick={actions.cancelLoad} type="button">
               取消
             </button>
           </div>

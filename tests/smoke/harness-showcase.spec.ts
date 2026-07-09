@@ -10,7 +10,7 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
 
   await page.addInitScript(() => {
     localStorage.removeItem("v-ronpa:settings:v1");
-    indexedDB.deleteDatabase("v-ronpa-harness-showcase-v6");
+    indexedDB.deleteDatabase("v-ronpa-harness-showcase-v7");
   });
   await page.goto("/");
 
@@ -204,6 +204,7 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
   await expect(page.getByTestId("save-load-mode")).toHaveText("save");
   await page.getByTestId("save-slot-1").click();
   await expect(page.getByTestId("save-slot-1")).toContainText(savedDialogExcerpt);
+  await expect(page.getByTestId("save-slot-1-thumbnail")).toHaveAttribute("src", /^blob:/);
   await page.screenshot({ path: "test-results/harness-showcase-save-load.png", fullPage: true });
   await page.getByTestId("save-load-overlay-close").click();
   await expect(page.getByTestId("save-load-overlay")).toBeHidden();

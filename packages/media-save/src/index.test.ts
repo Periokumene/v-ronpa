@@ -1,6 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SaveDataSchema } from "@v-ronpa/contracts";
-import { createHowlerAudioPort, createMemorySavePort, createSaveMigrator, createSaveSlotSummary } from "./index";
+import {
+  SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS,
+  SAVE_SLOT_THUMBNAIL_HEIGHT,
+  SAVE_SLOT_THUMBNAIL_MIME,
+  SAVE_SLOT_THUMBNAIL_QUALITY,
+  SAVE_SLOT_THUMBNAIL_WIDTH,
+  createFortyPlusQuickSaveSlotPolicy,
+  createHowlerAudioPort,
+  createMemorySavePort,
+  createSaveMigrator,
+  createSaveSlotSummary,
+  selectManualSaveSlotSummaries,
+  selectQuickSaveSlotSummary,
+  type SaveSlotPreview
+} from "./index";
 
 const howlerMock = vi.hoisted(() => {
   const playImplementations: Array<() => void> = [];
@@ -195,30 +209,32 @@ describe("media save contracts", () => {
     const port = createMemorySavePort();
     const summary = createSaveSlotSummary("slot:1", "Slot 1", baseSave);
 
-    await port.save({
+    await expect(port.save({
       id: "slot:1",
       label: "Slot 1",
-      summary,
       data: baseSave
+    })).resolves.toEqual({ ok: true, value: summary });
+
+    await expect(port.listSummaries()).resolves.toEqual({ ok: true, value: [summary] });
+    await expect(port.load("slot:1")).resolves.toMatchObject({
+      ok: true,
+      value: { id: "slot:1", data: { vn: { story: { instructionPointer: 4 } } } }
     });
 
-    await expect(port.listSummaries()).resolves.toEqual([summary]);
-    await expect(port.load("slot:1")).resolves.toMatchObject({ id: "slot:1", data: { vn: { story: { instructionPointer: 4 } } } });
+    await expect(port.delete("slot:1")).resolves.toEqual({ ok: true, value: undefined });
 
-    await port.delete("slot:1");
-
-    await expect(port.load("slot:1")).resolves.toBeUndefined();
-    await expect(port.list()).resolves.toEqual([]);
+    await expect(port.load("slot:1")).resolves.toEqual({ ok: true, value: undefined });
+    await expect(port.list()).resolves.toEqual({ ok: true, value: [] });
   });
 
   it("returns undefined for invalid slots without mutating stored summaries", async () => {
     const summary = createSaveSlotSummary("slot:1", "Slot 1", baseSave);
     const port = createMemorySavePort([{ id: "slot:1", label: "Slot 1", summary, data: baseSave }]);
 
-    await expect(port.load("slot:missing")).resolves.toBeUndefined();
-    await port.delete("slot:missing");
+    await expect(port.load("slot:missing")).resolves.toEqual({ ok: true, value: undefined });
+    await expect(port.delete("slot:missing")).resolves.toEqual({ ok: true, value: undefined });
 
-    await expect(port.listSummaries()).resolves.toEqual([summary]);
+    await expect(port.listSummaries()).resolves.toEqual({ ok: true, value: [summary] });
   });
 
   it("regenerates stale slot summaries from save data", async () => {
@@ -233,8 +249,112 @@ describe("media save contracts", () => {
     const expectedSummary = createSaveSlotSummary("slot:1", "Slot 1", baseSave);
     const port = createMemorySavePort([{ id: "slot:1", label: "Slot 1", summary: staleSummary, data: baseSave }]);
 
-    await expect(port.listSummaries()).resolves.toEqual([expectedSummary]);
-    await expect(port.load("slot:1")).resolves.toMatchObject({ summary: expectedSummary });
+    await expect(port.listSummaries()).resolves.toEqual({ ok: true, value: [expectedSummary] });
+    await expect(port.load("slot:1")).resolves.toMatchObject({ ok: true, value: { summary: expectedSummary } });
+  });
+
+  it("keeps preview blobs out of summaries and lazily loads them by slot id", async () => {
+    const port = createMemorySavePort();
+    const preview = createPreviewBlob("first-preview");
+    const summary = createSaveSlotSummary("slot:1", "Slot 1", baseSave);
+
+    await expect(port.save({ id: "slot:1", label: "Slot 1", data: baseSave, preview })).resolves.toEqual({ ok: true, value: summary });
+
+    await expect(port.listSummaries()).resolves.toEqual({ ok: true, value: [summary] });
+    const previews = await port.loadPreviews(["slot:1", "slot:missing"]);
+    expect(previews).toMatchObject({
+      ok: true,
+      value: {
+        "slot:1": {
+          metadata: {
+            kind: "image",
+            mime: SAVE_SLOT_THUMBNAIL_MIME,
+            width: SAVE_SLOT_THUMBNAIL_WIDTH,
+            height: SAVE_SLOT_THUMBNAIL_HEIGHT
+          }
+        }
+      }
+    });
+    expect(previews.ok ? previews.value["slot:1"]?.blob : undefined).toBe(preview.blob);
+    await expect(port.load("slot:1")).resolves.toMatchObject({ ok: true, value: { preview: { metadata: { byteLength: preview.blob.size } } } });
+  });
+
+  it("cleans up previews when slots are deleted or overwritten without a preview", async () => {
+    const port = createMemorySavePort();
+    const preview = createPreviewBlob("delete-me");
+
+    await port.save({ id: "slot:1", label: "Slot 1", data: baseSave, preview });
+    await expect(port.loadPreviews(["slot:1"])).resolves.toMatchObject({ ok: true, value: { "slot:1": expect.any(Object) } });
+
+    await port.save({ id: "slot:1", label: "Slot 1", data: currentTextSave });
+    await expect(port.loadPreviews(["slot:1"])).resolves.toEqual({ ok: true, value: {} });
+
+    await port.save({ id: "slot:1", label: "Slot 1", data: baseSave, preview });
+    await port.delete("slot:1");
+    await expect(port.loadPreviews(["slot:1"])).resolves.toEqual({ ok: true, value: {} });
+  });
+
+  it("returns structured errors for invalid writes without mutating existing slots", async () => {
+    const port = createMemorySavePort();
+    const summary = createSaveSlotSummary("slot:1", "Slot 1", baseSave);
+    await port.save({ id: "slot:1", label: "Slot 1", data: baseSave });
+
+    const result = await port.save({
+      id: "slot:bad",
+      label: "Bad",
+      data: { ...baseSave, version: 3 } as unknown as typeof baseSave
+    });
+
+    expect(result).toMatchObject({ ok: false, error: { code: "invalid-save" } });
+    await expect(port.listSummaries()).resolves.toEqual({ ok: true, value: [summary] });
+  });
+
+  it("rejects previews that drift from the shared thumbnail policy", async () => {
+    const port = createMemorySavePort();
+    const preview = createPreviewBlob("wrong-size");
+
+    const result = await port.save({
+      id: "slot:1",
+      label: "Slot 1",
+      data: baseSave,
+      preview: {
+        ...preview,
+        metadata: {
+          ...preview.metadata,
+          width: SAVE_SLOT_THUMBNAIL_WIDTH + 1
+        }
+      }
+    });
+
+    expect(result).toMatchObject({ ok: false, error: { code: "invalid-save" } });
+    await expect(port.listSummaries()).resolves.toEqual({ ok: true, value: [] });
+    await expect(port.loadPreviews(["slot:1"])).resolves.toEqual({ ok: true, value: {} });
+  });
+
+  it("shares forty manual slots plus one quick slot through the media-save policy helper", () => {
+    const policy = createFortyPlusQuickSaveSlotPolicy("game-a", { manualLabelPrefix: "Game A" });
+    const manual = createSaveSlotSummary("slot:game-a:1", "Game A 1", baseSave);
+    const quick = createSaveSlotSummary(policy.quickSlotId, policy.labelForSlot(policy.quickSlotId), baseSave);
+
+    expect(policy.manualSlotIds).toHaveLength(40);
+    expect(policy.manualSlotIds.slice(0, 3)).toEqual(["slot:game-a:1", "slot:game-a:2", "slot:game-a:3"]);
+    expect(policy.manualSlotIds.at(-1)).toBe("slot:game-a:40");
+    expect(policy.allSlotIds).toEqual([...policy.manualSlotIds, "slot:game-a:quick"]);
+    expect(policy.labelForSlot("slot:game-a:2")).toBe("Game A 2");
+    expect(selectManualSaveSlotSummaries(policy, [quick, manual]).map((slot) => slot.id)).toEqual(["slot:game-a:1"]);
+    expect(selectQuickSaveSlotSummary(policy, [manual, quick])).toBe(quick);
+  });
+
+  it("publishes one thumbnail capture policy for app providers", () => {
+    expect(SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS).toEqual({
+      width: 320,
+      height: 180,
+      mime: "image/webp",
+      quality: 0.8
+    });
+    expect(SAVE_SLOT_THUMBNAIL_WIDTH / SAVE_SLOT_THUMBNAIL_HEIGHT).toBeCloseTo(16 / 9);
+    expect(SAVE_SLOT_THUMBNAIL_QUALITY).toBeGreaterThan(0);
+    expect(SAVE_SLOT_THUMBNAIL_QUALITY).toBeLessThanOrEqual(1);
   });
 
   it("passes loop options through playSfx and releases one-shot handles on end", () => {
@@ -387,4 +507,19 @@ describe("media save contracts", () => {
 
 function registeredHowlerEvents(index: number): string[] {
   return howlerMock.instances[index]?.once.mock.calls.map(([event]) => event as string) ?? [];
+}
+
+function createPreviewBlob(value: string): SaveSlotPreview {
+  const blob = new Blob([value], { type: SAVE_SLOT_THUMBNAIL_MIME });
+  return {
+    metadata: {
+      kind: "image" as const,
+      mime: SAVE_SLOT_THUMBNAIL_MIME,
+      width: SAVE_SLOT_THUMBNAIL_WIDTH,
+      height: SAVE_SLOT_THUMBNAIL_HEIGHT,
+      byteLength: blob.size,
+      capturedAt: "2026-07-09T00:00:00.000Z"
+    },
+    blob
+  };
 }

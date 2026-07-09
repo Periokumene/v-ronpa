@@ -191,7 +191,18 @@ describe("GameInteractionShell view models", () => {
         },
         runtime
       }).saveLoad
-    ).toEqual({ visible: true, mode: "load", canSave: false, pendingLoadSlot: slot, slotIds: ["slot:1"], slots: [slot] });
+    ).toEqual({
+      visible: true,
+      mode: "load",
+      canSave: false,
+      pendingLoadSlot: slot,
+      slotIds: ["slot:1"],
+      slots: [slot],
+      slotPreviewsById: {},
+      busy: false,
+      activeOperation: undefined,
+      lastError: undefined
+    });
     expect(
       createGameInteractionShellViewModels({
         flow: createFlow({ mode: "title", activeOverlay: "title-settings" }),
@@ -224,7 +235,11 @@ describe("GameInteractionShell view models", () => {
       canSave: false,
       pendingLoadSlot: undefined,
       slotIds: ["slot:1"],
-      slots: []
+      slots: [],
+      slotPreviewsById: {},
+      busy: false,
+      activeOperation: undefined,
+      lastError: undefined
     };
     const actions = createGameInteractionOverlayActions({
       closeTopOverlay,
@@ -234,6 +249,7 @@ describe("GameInteractionShell view models", () => {
           cancelLoad,
           close: closeTopOverlay,
           confirmLoad,
+          loadPreviews: vi.fn(),
           requestLoad,
           save
         }

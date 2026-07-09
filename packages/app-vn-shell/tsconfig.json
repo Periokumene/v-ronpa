@@ -12,6 +12,7 @@
   "references": [
     { "path": "../app-vn-dispatch" },
     { "path": "../contracts" },
+    { "path": "../media-save" },
     { "path": "../pixi-presenter" },
     { "path": "../story-engine" },
     { "path": "../story-play" },

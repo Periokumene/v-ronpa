@@ -160,8 +160,39 @@ export interface SaveLoadOverlayViewModel {
   mode: "save" | "load";
   slotIds: string[];
   slots: SaveSlotSummary[];
+  slotPreviewsById: Record<string, SaveSlotPreviewViewModel>;
   canSave: boolean;
   pendingLoadSlot: SaveSlotSummary | undefined;
+  busy: boolean;
+  activeOperation: SaveLoadActiveOperation | undefined;
+  lastError: SaveLoadErrorViewModel | undefined;
+}
+
+export type SaveLoadOperationKind =
+  | "refresh"
+  | "save"
+  | "quick-save"
+  | "request-load"
+  | "confirm-load"
+  | "quick-load"
+  | "load-previews";
+
+export interface SaveLoadActiveOperation {
+  kind: SaveLoadOperationKind;
+  slotId?: string;
+}
+
+export interface SaveLoadErrorViewModel {
+  code?: string;
+  message: string;
+}
+
+export interface SaveSlotPreviewViewModel {
+  kind: "image";
+  uri: string;
+  mime: "image/webp";
+  width: number;
+  height: number;
 }
 
 export interface SaveLoadOverlayActions {
@@ -169,6 +200,7 @@ export interface SaveLoadOverlayActions {
   requestLoad(slotId: string): void;
   confirmLoad(): void;
   cancelLoad(): void;
+  loadPreviews?(slotIds: string[]): void;
   close(): void;
 }
 
@@ -213,8 +245,14 @@ export interface GameInteractionShellViewModels {
   pauseMenu?: PauseMenuOverlayViewModel | undefined;
 }
 
+export type SaveLoadOverlayInputModel = Omit<
+  SaveLoadOverlayViewModel,
+  "visible" | "slotPreviewsById" | "busy" | "activeOperation" | "lastError"
+> &
+  Partial<Pick<SaveLoadOverlayViewModel, "slotPreviewsById" | "busy" | "activeOperation" | "lastError">>;
+
 export interface GameInteractionOverlayViewModelInputs {
-  saveLoad?: Omit<SaveLoadOverlayViewModel, "visible"> | undefined;
+  saveLoad?: SaveLoadOverlayInputModel | undefined;
   settings?: SettingsSnapshot | undefined;
 }
 
@@ -327,7 +365,16 @@ export function createGameInteractionShellViewModels({
       : {}),
     ...((flow.activeOverlay === "vn-save" || flow.activeOverlay === "vn-load" || flow.activeOverlay === "title-load") &&
     overlayModels?.saveLoad
-      ? { saveLoad: { ...overlayModels.saveLoad, visible: true } }
+      ? {
+          saveLoad: {
+            ...overlayModels.saveLoad,
+            slotPreviewsById: overlayModels.saveLoad.slotPreviewsById ?? {},
+            busy: overlayModels.saveLoad.busy ?? false,
+            activeOperation: overlayModels.saveLoad.activeOperation,
+            lastError: overlayModels.saveLoad.lastError,
+            visible: true
+          }
+        }
       : {}),
     ...((flow.activeOverlay === "title-settings" || flow.activeOverlay === "vn-settings") && overlayModels?.settings
       ? { settings: { visible: true, settings: overlayModels.settings } }

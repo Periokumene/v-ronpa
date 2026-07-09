@@ -487,8 +487,12 @@ function createSaveLoadModel(
     mode,
     slotIds: Array.from({ length: 40 }, (_, index) => `slot:game-a:${index + 1}`),
     slots: [filledSlot],
+    slotPreviewsById: {},
     canSave: true,
-    pendingLoadSlot: pendingLoad ? filledSlot : undefined
+    pendingLoadSlot: pendingLoad ? filledSlot : undefined,
+    busy: false,
+    activeOperation: undefined,
+    lastError: undefined
   };
 }
 
@@ -497,6 +501,7 @@ function createSaveLoadActions() {
     cancelLoad: vi.fn(),
     close: vi.fn(),
     confirmLoad: vi.fn(),
+    loadPreviews: vi.fn(),
     requestLoad: vi.fn(),
     save: vi.fn()
   };

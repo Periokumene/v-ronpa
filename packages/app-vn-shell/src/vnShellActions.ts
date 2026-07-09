@@ -1,5 +1,5 @@
 import type { GameMode, GameOverlayKind, GameUiAction, SaveSlotSummary } from "@v-ronpa/contracts";
-import type { SaveLoadOverlayViewModel } from "./GameInteractionViewModels";
+import type { SaveLoadActiveOperation, SaveLoadErrorViewModel, SaveLoadOverlayViewModel, SaveSlotPreviewViewModel } from "./GameInteractionViewModels";
 
 export type VnSaveLoadOverlayModel = Omit<SaveLoadOverlayViewModel, "visible">;
 
@@ -17,15 +17,23 @@ export function shouldStopVnShellAutomationForAction(action: GameUiAction, mode:
 }
 
 export function createVnSaveLoadOverlayModel({
+  activeOperation,
+  busy = false,
   canSave,
+  lastError,
   overlay,
   pendingLoadSlot,
+  slotPreviewsById = {},
   slotIds,
   slots
 }: {
+  activeOperation?: SaveLoadActiveOperation | undefined;
+  busy?: boolean | undefined;
   canSave: boolean;
+  lastError?: SaveLoadErrorViewModel | undefined;
   overlay: GameOverlayKind;
   pendingLoadSlot: SaveSlotSummary | undefined;
+  slotPreviewsById?: Record<string, SaveSlotPreviewViewModel> | undefined;
   slotIds: string[];
   slots: SaveSlotSummary[];
 }): VnSaveLoadOverlayModel | undefined {
@@ -34,7 +42,11 @@ export function createVnSaveLoadOverlayModel({
     mode: overlay === "vn-save" ? "save" : "load",
     slotIds,
     slots,
+    slotPreviewsById,
     canSave: overlay === "vn-save" && canSave,
-    pendingLoadSlot
+    pendingLoadSlot,
+    busy,
+    activeOperation,
+    lastError
   };
 }

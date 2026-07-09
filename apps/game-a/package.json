@@ -16,6 +16,7 @@
     "@v-ronpa/contracts": "workspace:*",
     "@v-ronpa/game-flow-machine": "workspace:*",
     "@v-ronpa/gameplay": "workspace:*",
+    "@v-ronpa/media-save": "workspace:*",
     "@v-ronpa/ui-kit": "workspace:*",
     "@xstate/react": "^6.1.0",
     "react": "^19.0.0",

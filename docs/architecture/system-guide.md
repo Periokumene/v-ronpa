@@ -88,11 +88,13 @@ adapters and apps
   timer/media/voice/reveal authorities.
 - `gameplay` owns domain reducers for exploration, inventory, evidence
   ownership, character state, and pure trial rule judgments.
-- `media-save` owns the shared Dexie IndexedDB save port, v5 save parsing,
-  save-slot summary normalization through the contracts helper, Howler audio
-  playback, `AudioHandle.finished` lifecycle reporting, HTMLVideo playback, and
-  future WebAudio rhythm adapter notes. App-specific record envelopes, such as
-  Game A localStorage records, stay in app packages.
+- `media-save` owns the shared Dexie IndexedDB save port, split slot/payload/
+  preview storage, v5 save parsing, save-slot summary normalization through the
+  contracts helper, quick/manual slot policy helpers, thumbnail capture
+  defaults, Howler audio playback, `AudioHandle.finished` lifecycle reporting,
+  HTMLVideo playback, and future WebAudio rhythm adapter notes. `app-vn-shell`
+  owns the shared save-slot controller; app save adapters provide collect/
+  restore/preview-capture/flow glue only.
 - `contracts` owns RuntimeCommand and saveable runtime contracts, including
   strict `SaveData` v5. VN story and VN Pixi stage state are only valid under
   `SaveData.vn`; renderer-local hint and trace shapes stay in presenter

@@ -49,7 +49,7 @@ const allowedWorkspaceDeps = {
     "story-engine",
     "story-play"
   ],
-  "app-vn-shell": ["app-vn-dispatch", "contracts", "pixi-presenter", "story-engine", "story-play", "ui-kit"],
+  "app-vn-shell": ["app-vn-dispatch", "contracts", "media-save", "pixi-presenter", "story-engine", "story-play", "ui-kit"],
   "gameplay": ["contracts"],
   "navi-director": ["contracts", "gameplay"],
   "trial-director": ["contracts", "gameplay"],
@@ -65,6 +65,7 @@ const allowedWorkspaceDeps = {
     "contracts",
     "game-flow-machine",
     "gameplay",
+    "media-save",
     "ui-kit"
   ],
   "game-harness": [

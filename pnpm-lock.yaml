@@ -53,6 +53,9 @@ importers:
       '@v-ronpa/gameplay':
         specifier: workspace:*
         version: link:../../packages/gameplay
+      '@v-ronpa/media-save':
+        specifier: workspace:*
+        version: link:../../packages/media-save
       '@v-ronpa/ui-kit':
         specifier: workspace:*
         version: link:../../packages/ui-kit
@@ -230,6 +233,9 @@ importers:
       '@v-ronpa/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@v-ronpa/media-save':
+        specifier: workspace:*
+        version: link:../media-save
       '@v-ronpa/pixi-presenter':
         specifier: workspace:*
         version: link:../pixi-presenter

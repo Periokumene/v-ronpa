@@ -16,6 +16,7 @@
     { "path": "../../packages/contracts" },
     { "path": "../../packages/game-flow-machine" },
     { "path": "../../packages/gameplay" },
+    { "path": "../../packages/media-save" },
     { "path": "../../packages/ui-kit" }
   ],
   "include": ["src"]

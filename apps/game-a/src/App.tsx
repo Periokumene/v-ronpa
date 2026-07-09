@@ -7,8 +7,10 @@ import {
   settingsToDialogueBleepRuntimeSettings,
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings,
-  useGameSettingsAdapter
+  useGameSettingsAdapter,
+  type PixiStageCaptureHandle
 } from "@v-ronpa/app-vn-shell";
+import { SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS } from "@v-ronpa/media-save";
 import { RichTextFontStyles } from "@v-ronpa/ui-kit";
 import { gameAContentManifest } from "./contentManifest";
 import { resolveGameAVnLaunchTarget, shouldAutoStartGameAVnLaunchTarget } from "./devVnLaunchTarget";
@@ -38,6 +40,7 @@ export function App() {
   const dialogRevealSettings = useMemo(() => ({ textSpeed: dialogDisplay.textSpeed }), [dialogDisplay.textSpeed]);
   const dialogueBleepSettings = useMemo(() => settingsToDialogueBleepRuntimeSettings(settings.settings), [settings.settings]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
+  const pixiCaptureHandleRef = useRef<PixiStageCaptureHandle | undefined>(undefined);
   const runtime = useGameAVnRuntime({
     assetResolver: assetRegistry,
     ...(gameAContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: gameAContentManifest.audio.dialogueBleep } : {}),
@@ -48,6 +51,7 @@ export function App() {
     voiceSettings
   });
   const save = useGameASaveAdapter({
+    capturePreview: () => pixiCaptureHandleRef.current?.captureThumbnail(SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS),
     getPixiStage: () => runtime.pixiStageRuntime.snapshot,
     getStory: () => runtime.storyRuntime.state,
     onLoad: runtime.restoreFromSave
@@ -128,6 +132,9 @@ export function App() {
               pixiPresentationTasks={runtime.pixiStageRuntime.presentationTasks}
               pixiStage={runtime.pixiStageRuntime.snapshot}
               storySession="game-a-opening"
+              onPixiCaptureHandleChanged={(handle) => {
+                pixiCaptureHandleRef.current = handle;
+              }}
               onPixiTasksChanged={runtime.updatePixiPresentationTasks}
             />
           </div>

@@ -46,7 +46,17 @@ describe("VN shell action helpers", () => {
         slotIds: ["slot:1"],
         slots: [slot]
       })
-    ).toEqual({ mode: "save", canSave: true, pendingLoadSlot: undefined, slotIds: ["slot:1"], slots: [slot] });
+    ).toEqual({
+      mode: "save",
+      canSave: true,
+      pendingLoadSlot: undefined,
+      slotIds: ["slot:1"],
+      slots: [slot],
+      slotPreviewsById: {},
+      busy: false,
+      activeOperation: undefined,
+      lastError: undefined
+    });
     expect(
       createVnSaveLoadOverlayModel({
         canSave: true,
@@ -55,7 +65,17 @@ describe("VN shell action helpers", () => {
         slotIds: ["slot:1"],
         slots: [slot]
       })
-    ).toEqual({ mode: "load", canSave: false, pendingLoadSlot: slot, slotIds: ["slot:1"], slots: [slot] });
+    ).toEqual({
+      mode: "load",
+      canSave: false,
+      pendingLoadSlot: slot,
+      slotIds: ["slot:1"],
+      slots: [slot],
+      slotPreviewsById: {},
+      busy: false,
+      activeOperation: undefined,
+      lastError: undefined
+    });
     expect(
       createVnSaveLoadOverlayModel({
         canSave: true,

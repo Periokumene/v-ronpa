@@ -45,12 +45,14 @@ export function useOverlayPageAdapters({
     }
 
     if (action === "quick-save") {
+      if (save.busy) return;
       if (!flow.capabilities.canSave) return;
       void save.quickSaveSlot();
       return;
     }
 
     if (action === "quick-load") {
+      if (save.busy) return;
       if (!flow.capabilities.canLoad || !save.quickSlot) return;
       void save.quickLoadSlot().then((loaded) => {
         if (!loaded) return;
@@ -62,6 +64,7 @@ export function useOverlayPageAdapters({
 
     const overlay = overlayKindForVnShellAction(action, flow.mode);
     if (overlay) {
+      if (save.busy && (overlay === "vn-save" || overlay === "vn-load" || overlay === "title-load")) return;
       if (shouldStopVnShellAutomationForAction(action, flow.mode)) runtime.stopStoryAutomation("overlay");
       flow.openOverlay(overlay);
       return;
@@ -76,7 +79,12 @@ export function useOverlayPageAdapters({
   return {
     dispatchUiAction,
     createCommandAvailability() {
-      return { "quick-load": Boolean(save.quickSlot) };
+      return {
+        "open-save": !save.busy,
+        "quick-save": !save.busy,
+        "open-load": !save.busy,
+        "quick-load": Boolean(save.quickSlot) && !save.busy
+      };
     },
     createOverlayViewModelInputs(overlay: GameOverlayKind | undefined): GameInteractionOverlayViewModelInputs {
       if (!overlay) return {};
@@ -84,8 +92,12 @@ export function useOverlayPageAdapters({
         return {
           saveLoad: createVnSaveLoadOverlayModel({
             canSave: flow.capabilities.canSave,
+            activeOperation: save.activeOperation,
+            busy: save.busy,
+            lastError: save.lastError,
             overlay,
             pendingLoadSlot: save.pendingLoadSlot,
+            slotPreviewsById: save.slotPreviewsById,
             slotIds: save.slotIds,
             slots: save.slots
           })
@@ -108,9 +120,16 @@ export function useOverlayPageAdapters({
           saveLoad: {
             cancelLoad: save.cancelLoadSlot,
             close: flow.closeTopOverlay,
-            confirmLoad: save.confirmLoadSlot,
-            requestLoad: save.requestLoadSlot,
-            save: save.saveSlot
+            confirmLoad: () => {
+              void save.confirmLoadSlot();
+            },
+            loadPreviews: save.loadPreviews,
+            requestLoad: (slotId) => {
+              void save.requestLoadSlot(slotId);
+            },
+            save: (slotId) => {
+              void save.saveSlot(slotId);
+            }
           }
         };
       }
@@ -120,13 +139,20 @@ export function useOverlayPageAdapters({
           saveLoad: {
             cancelLoad: save.cancelLoadSlot,
             close: flow.closeTopOverlay,
-            confirmLoad: async () => {
-              await save.confirmLoadSlot();
-              flow.send({ type: "ENTER_NAVI" });
-              flow.closeAllOverlays();
+            confirmLoad: () => {
+              void save.confirmLoadSlot().then((loaded) => {
+                if (!loaded) return;
+                flow.send({ type: "ENTER_NAVI" });
+                flow.closeAllOverlays();
+              });
             },
-            requestLoad: save.requestLoadSlot,
-            save: save.saveSlot
+            loadPreviews: save.loadPreviews,
+            requestLoad: (slotId) => {
+              void save.requestLoadSlot(slotId);
+            },
+            save: (slotId) => {
+              void save.saveSlot(slotId);
+            }
           }
         };
       }

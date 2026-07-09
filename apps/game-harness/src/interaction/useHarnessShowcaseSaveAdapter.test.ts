@@ -6,10 +6,12 @@ import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ronpa/pixi-presenter";
 import { createInitialStoryState } from "@v-ronpa/story-engine";
 import {
+  HARNESS_SHOWCASE_DB,
   canSaveHarnessShowcaseRuntime,
   createHarnessShowcaseSaveData,
   harnessShowcaseManualSaveSlotCount,
   harnessShowcaseQuickSaveSlotId,
+  harnessShowcaseSaveSlotPolicy,
   harnessShowcaseSaveSlotIds,
   selectHarnessShowcaseManualSaveSlotSummaries,
   selectHarnessShowcaseQuickSaveSlotSummary
@@ -130,7 +132,9 @@ describe("harness showcase save adapter", () => {
     expect(canSaveHarnessShowcaseRuntime({ storyRuntime: { active: true, state: story } })).toBe(false);
   });
 
-  it("keeps forty manual slots plus an independent hidden quick slot in the app adapter layer", () => {
+  it("keeps forty manual slots plus an independent hidden quick slot through the shared media-save policy", () => {
+    expect(HARNESS_SHOWCASE_DB).toBe("v-ronpa-harness-showcase-v7");
+    expect(harnessShowcaseSaveSlotPolicy.namespace).toBe("harness");
     expect(harnessShowcaseSaveSlotIds).toHaveLength(harnessShowcaseManualSaveSlotCount);
     expect(harnessShowcaseSaveSlotIds.slice(0, 4)).toEqual([
       "slot:harness:1",
@@ -140,6 +144,8 @@ describe("harness showcase save adapter", () => {
     ]);
     expect(harnessShowcaseSaveSlotIds.at(-1)).toBe("slot:harness:40");
     expect(harnessShowcaseSaveSlotIds).not.toContain(harnessShowcaseQuickSaveSlotId);
+    expect(harnessShowcaseSaveSlotPolicy.labelForSlot("slot:harness:1")).toBe("Slot 1");
+    expect(harnessShowcaseSaveSlotPolicy.labelForSlot(harnessShowcaseQuickSaveSlotId)).toBe("Quick Save");
   });
 
   it("keeps quick slot summaries out of manual save/load pages", () => {

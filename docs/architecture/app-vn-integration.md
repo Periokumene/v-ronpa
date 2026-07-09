@@ -59,20 +59,19 @@ must not import `app-vn-session`, `app-vn-dispatch`, `story-play`,
 StoryEngine, parser/compiler packages, or Pixi presenter internals for normal VN
 runtime behavior.
 
-Game A's save adapter is localStorage-backed and stores v5 `SaveData` in
-independent app-local slot records. Each record wraps the restore payload plus a
-text summary and a reserved preview field; the record is the source of truth,
-the index is only a cache, and summaries are normalized from `record.data`
-through the shared contracts helper when records are read. VN story and Pixi
-stage snapshots are written only to `data.vn.story` and
+Game A's save adapter uses the shared `app-vn-shell` save-slot controller with
+the `media-save` Dexie port and slot policy. The app layer only collects VN
+`SaveData`, passes optional VN/Pixi thumbnail capture, and restores the VN
+runtime after a successful load. VN
+story and Pixi stage snapshots are written only to `data.vn.story` and
 `data.vn.pixiStage`; `navi` and `trial` are `null` for Game A saves. Game A UI
 skin resources are app-local config: skin asset ids
 resolve through the app-created `AssetRegistry`, custom
 `GameInteractionShell` Surfaces receive resolved availability, and missing skin
 assets should surface diagnostics while preserving visible fallback chrome.
-Game A currently exposes forty manual save slots in its app-local pages and one
-independent hidden quick slot routed by `quick-save` / `quick-load`. Quick load
-does not use the load-confirmation overlay; it immediately restores the quick
+Game A currently exposes the shared forty manual slot policy and one independent
+hidden quick slot routed by `quick-save` / `quick-load`. Quick load does not use
+the load-confirmation overlay; it immediately restores the quick
 slot when present, while the command bar disables Q.Load when that slot is
 empty.
 
@@ -130,12 +129,15 @@ fanout changes belong in `VnOutputRouteTable` and
 `createVnRuntimePresentationTransaction`; app adapters may pass profile or
 route table overrides into `useVnRuntime`.
 
-Harness saves continue to use `packages/media-save` with Dexie storage. The
-harness does not use Game A's record envelope. It writes v5 sections directly:
-VN story/Pixi under `vn`, Navi state under `navi`, and Trial state under
-`trial` only when Trial is active. The harness save adapter owns its own forty
-manual slot ids and one hidden quick slot. Dexie remains an id-addressed save
-port; it does not own slot count, pagination, or quick-slot policy.
+Game A and the harness both use `packages/media-save` as the save-slot
+authority. `media-save` owns the Dexie slot/payload/preview tables, structured
+operation results, thumbnail capture defaults, and the forty-manual-plus-quick
+policy helper. `app-vn-shell` owns the shared React save-slot controller that
+serializes operations, refreshes summaries, and lazy-loads current-page
+previews. Game A collects VN-only `SaveData`; the harness collects VN, Navi,
+and optional Trial sections. App save adapters should stay thin: collect
+runtime state, provide optional preview capture, restore app runtime state, and
+route flow after successful loads.
 
 Harness-owned interaction hooks such as `useGameFlowActor`,
 `useHarnessShowcaseRuntimeAdapter`, `useHarnessShowcaseSaveAdapter`,

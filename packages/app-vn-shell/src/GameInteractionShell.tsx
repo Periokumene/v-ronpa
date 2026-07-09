@@ -336,9 +336,13 @@ function DefaultSaveLoadOverlaySurface({ actions, model }: SurfaceSlotProps<Save
       onConfirmLoad={actions.confirmLoad}
       onRequestLoad={actions.requestLoad}
       onSave={actions.save}
+      {...(actions.loadPreviews ? { onLoadPreviews: actions.loadPreviews } : {})}
       pendingLoadSlot={model.pendingLoadSlot}
       slotIds={model.slotIds}
+      slotPreviewsById={model.slotPreviewsById}
       slots={model.slots}
+      busy={model.busy}
+      lastError={model.lastError}
     />
   );
 }

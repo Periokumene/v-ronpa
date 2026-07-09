@@ -1,6 +1,6 @@
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { PixiAssetResolver, PixiPresenterDiagnostic, PixiPresentationTaskSnapshot, PixiStageRenderHint } from "@v-ronpa/pixi-presenter";
-import { PixiLayer } from "./PixiLayer";
+import { PixiLayer, type PixiStageCaptureHandle } from "./PixiLayer";
 
 export interface VnRuntimeDispatcherProps {
   active: boolean;
@@ -13,6 +13,7 @@ export interface VnRuntimeDispatcherProps {
   storySession?: number | string;
   onPixiDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
   onPixiTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
+  onPixiCaptureHandleChanged?: (handle: PixiStageCaptureHandle | undefined) => void;
 }
 
 export function VnRuntimeDispatcher({
@@ -25,6 +26,7 @@ export function VnRuntimeDispatcher({
   pixiPresentationTasks,
   storySession = "story",
   onPixiDiagnostic,
+  onPixiCaptureHandleChanged,
   onPixiTasksChanged
 }: VnRuntimeDispatcherProps) {
   return (
@@ -35,6 +37,7 @@ export function VnRuntimeDispatcher({
       hintSequence={pixiHintSequence}
       hints={pixiHints}
       {...(onPixiDiagnostic ? { onDiagnostic: onPixiDiagnostic } : {})}
+      {...(onPixiCaptureHandleChanged ? { onCaptureHandleChanged: onPixiCaptureHandleChanged } : {})}
       {...(onPixiTasksChanged ? { onTasksChanged: onPixiTasksChanged } : {})}
       {...(pixiPresentationTasks ? { presentationTasks: pixiPresentationTasks } : {})}
       snapshot={pixiStage}

@@ -146,13 +146,28 @@ export interface SaveLoadOverlayProps {
   mode: "save" | "load";
   slotIds: string[];
   slots: SaveSlotSummary[];
+  slotPreviewsById?: Record<string, SaveLoadSlotPreview>;
   canSave: boolean;
   pendingLoadSlot: SaveSlotSummary | undefined;
+  busy?: boolean;
+  lastError?: SaveLoadOverlayError | undefined;
   onSave: (slotId: string) => void;
   onRequestLoad: (slotId: string) => void;
   onConfirmLoad: () => void;
   onCancelLoad: () => void;
+  onLoadPreviews?: (slotIds: string[]) => void;
   onClose: () => void;
+}
+
+export interface SaveLoadSlotPreview {
+  kind: "image";
+  uri: string;
+  width: number;
+  height: number;
+}
+
+export interface SaveLoadOverlayError {
+  message: string;
 }
 
 export const SAVE_LOAD_SLOTS_PER_PAGE = 5;
@@ -177,12 +192,16 @@ export function SaveLoadOverlay({
   mode,
   slotIds,
   slots,
+  slotPreviewsById = {},
   canSave,
   pendingLoadSlot,
+  busy = false,
+  lastError,
   onSave,
   onRequestLoad,
   onConfirmLoad,
   onCancelLoad,
+  onLoadPreviews,
   onClose
 }: SaveLoadOverlayProps) {
   const [pageIndex, setPageIndex] = useState(0);
@@ -190,19 +209,30 @@ export function SaveLoadOverlay({
   const slotsById = new Map(slots.map((slot) => [slot.id, slot]));
   const title = mode === "save" ? "Save Game" : "Load Game";
   const page = paginateSaveLoadSlotIds(slotIds, pageIndex);
+  const pageSlotIdsKey = page.pageSlotIds.join("\u0000");
 
   useEffect(() => {
     setPageIndex(0);
   }, [mode, slotIdsKey]);
 
+  useEffect(() => {
+    onLoadPreviews?.(page.pageSlotIds);
+  }, [onLoadPreviews, pageSlotIdsKey]);
+
   return (
     <OverlayPanel onClose={onClose} testId="save-load-overlay" title={title}>
       <div data-testid="save-load-mode" style={modeBadgeStyle}>{mode}</div>
+      {lastError ? (
+        <div data-testid="save-load-error" role="alert" style={saveLoadErrorStyle}>
+          {lastError.message}
+        </div>
+      ) : null}
       <div data-testid="save-slot-grid" style={slotGridStyle}>
         {page.pageSlotIds.map((slotId, index) => {
           const absoluteIndex = page.pageIndex * SAVE_LOAD_SLOTS_PER_PAGE + index;
           const slot = slotsById.get(slotId);
-          const disabled = mode === "save" ? !canSave : !slot;
+          const preview = slotPreviewsById[slotId];
+          const disabled = busy || (mode === "save" ? !canSave : !slot);
           return (
             <button
               data-testid={`save-slot-${absoluteIndex + 1}`}
@@ -212,6 +242,18 @@ export function SaveLoadOverlay({
               style={disabled ? disabledSlotStyle : slotStyle}
               type="button"
             >
+              {preview ? (
+                <img
+                  alt=""
+                  data-testid={`save-slot-${absoluteIndex + 1}-thumbnail`}
+                  src={preview.uri}
+                  width={preview.width}
+                  height={preview.height}
+                  style={slotThumbnailStyle}
+                />
+              ) : (
+                <span aria-hidden="true" data-testid={`save-slot-${absoluteIndex + 1}-thumbnail`} style={slotThumbnailPlaceholderStyle} />
+              )}
               <strong>{slot?.label ?? `Slot ${absoluteIndex + 1}`}</strong>
               <span>{slot ? new Date(slot.savedAt).toLocaleString() : "Empty"}</span>
               <small>{slot?.speaker ? `${slot.speaker}: ${slot.text ?? ""}` : slot?.text ?? "No data"}</small>
@@ -222,7 +264,7 @@ export function SaveLoadOverlay({
       <div data-testid="save-page-controls" style={slotPagerStyle}>
         <button
           data-testid="save-page-prev"
-          disabled={page.pageIndex === 0}
+          disabled={busy || page.pageIndex === 0}
           onClick={() => setPageIndex((current) => Math.max(0, current - 1))}
           style={secondaryButtonStyle}
           type="button"
@@ -234,7 +276,7 @@ export function SaveLoadOverlay({
         </span>
         <button
           data-testid="save-page-next"
-          disabled={page.pageIndex >= page.pageCount - 1}
+          disabled={busy || page.pageIndex >= page.pageCount - 1}
           onClick={() => setPageIndex((current) => Math.min(page.pageCount - 1, current + 1))}
           style={secondaryButtonStyle}
           type="button"
@@ -252,12 +294,12 @@ export function SaveLoadOverlay({
             </AlertDialog.Description>
             <div style={confirmActionsStyle}>
               <AlertDialog.Cancel asChild>
-                <button data-testid="load-cancel" onClick={onCancelLoad} style={secondaryButtonStyle} type="button">
+                <button data-testid="load-cancel" disabled={busy} onClick={onCancelLoad} style={secondaryButtonStyle} type="button">
                   Cancel
                 </button>
               </AlertDialog.Cancel>
               <AlertDialog.Action asChild>
-                <button data-testid="load-confirm" onClick={onConfirmLoad} style={primaryButtonStyle} type="button">
+                <button data-testid="load-confirm" disabled={busy} onClick={onConfirmLoad} style={primaryButtonStyle} type="button">
                   Load
                 </button>
               </AlertDialog.Action>
@@ -806,6 +848,15 @@ const modeBadgeStyle: CSSProperties = {
   fontSize: 12
 };
 
+const saveLoadErrorStyle: CSSProperties = {
+  border: "1px solid rgba(248,113,113,0.35)",
+  borderRadius: 6,
+  padding: "8px 10px",
+  color: "#fecaca",
+  background: "rgba(127,29,29,0.28)",
+  fontSize: 12
+};
+
 const slotGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
@@ -822,6 +873,23 @@ const slotStyle: CSSProperties = {
   background: "rgba(255,255,255,0.07)",
   color: "#f8fbff",
   textAlign: "left"
+};
+
+const slotThumbnailStyle: CSSProperties = {
+  width: "100%",
+  aspectRatio: "16 / 9",
+  height: "auto",
+  objectFit: "cover",
+  borderRadius: 4,
+  background: "rgba(0,0,0,0.22)"
+};
+
+const slotThumbnailPlaceholderStyle: CSSProperties = {
+  display: "block",
+  width: "100%",
+  aspectRatio: "16 / 9",
+  borderRadius: 4,
+  background: "linear-gradient(135deg, rgba(255,255,255,0.11), rgba(110,231,216,0.08))"
 };
 
 const disabledSlotStyle: CSSProperties = {

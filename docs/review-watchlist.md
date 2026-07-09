@@ -128,16 +128,16 @@ delete, split, or execute entries from it.
   - `docs/archive/completed-tasks/game-interaction-shell.md`
   - `packages/media-save/src/index.ts`
   - `packages/ui-kit/src/surfaces/GameInteractionSurfaces.tsx`
-- Current Observation: Save slots store text summaries only. No canvas or DOM
-  screenshot is captured.
-- Why Not Actionable Yet: Screenshot previews require a capture authority,
-  storage size policy, privacy review, and renderer synchronization between DOM,
-  Pixi, and R3F.
+- Current Observation: Superseded by VN/Pixi thumbnail capture stored through
+  `media-save` preview blobs. Full DOM/R3F/Trial composition remains future
+  provider work.
+- Why Not Actionable Yet: The initial actionable scope is complete for VN/Pixi
+  thumbnails; broader composition requires a separate provider design.
 - Auto Action: Forbidden
 - Review Cadence: Review before adding visual save previews.
-- Next Review: TBD
-- Status: Watching
-- Linked Task / ADR / CCR: TBD
+- Next Review: Before adding DOM/R3F/Trial composite thumbnail providers.
+- Status: Resolved for VN/Pixi v1
+- Linked Task / ADR / CCR: `docs/ccr/unified-media-save-slots-and-thumbnails.md`
 
 ### RW-0011: Save Record Envelope Unification
 
@@ -147,22 +147,21 @@ delete, split, or execute entries from it.
 - Source / Evidence:
   - `apps/game-a/src/useGameASaveAdapter.ts`
   - `apps/game-harness/src/interaction/useHarnessShowcaseSaveAdapter.ts`
+  - `packages/app-vn-shell/src/useSaveSlotController.ts`
   - `packages/media-save/src/index.ts`
   - `docs/ccr/save-data-v5-vn-state-authority.md`
-- Current Observation: Game A now uses an app-local localStorage record envelope
-  with reserved preview metadata, while the harness continues to use the shared
-  `media-save` slot shape and Dexie port directly. Both carry v5 `SaveData`,
-  but record envelope, thumbnail, and storage index policy are intentionally not
-  unified yet.
-- Why Not Actionable Yet: A shared envelope would require a thumbnail capture
-  authority, storage quota policy, app migration boundary, and agreement on
-  whether `media-save` owns previews or only stores opaque app metadata.
+- Current Observation: Game A and the harness now use `media-save` as the
+  unified save-slot envelope, policy, Dexie storage, and preview authority.
+- Why Not Actionable Yet: The original unification concern is complete; future
+  work should target new provider types or quota UX instead of parallel app
+  envelopes.
 - Auto Action: Forbidden
 - Review Cadence: Review before implementing save thumbnails, QuickSave, or a
   shared save-slot management UI.
-- Next Review: TBD
-- Status: Watching
-- Linked Task / ADR / CCR: TBD
+- Next Review: Before adding save quota management or alternate preview
+  providers.
+- Status: Resolved
+- Linked Task / ADR / CCR: `docs/ccr/unified-media-save-slots-and-thumbnails.md`
 
 ### RW-0007: Complete Settings Persistence
 

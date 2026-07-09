@@ -46,16 +46,19 @@ export function useGameAOverlayAdapters({
       return;
     }
     if (action === "quick-save") {
+      if (save.busy) return;
       if (!flow.capabilities.canSave) return;
-      save.quickSaveSlot();
+      void save.quickSaveSlot();
       return;
     }
     if (action === "quick-load") {
+      if (save.busy) return;
       if (!flow.capabilities.canLoad || !save.quickSlot) return;
-      if (save.quickLoadSlot()) {
+      void save.quickLoadSlot().then((loaded) => {
+        if (!loaded) return;
         flow.send({ type: "ENTER_VN" });
         flow.closeAllOverlays();
-      }
+      });
       return;
     }
     if (
@@ -72,6 +75,7 @@ export function useGameAOverlayAdapters({
 
     const overlay = overlayKindForGameAAction(action, flow.mode);
     if (overlay) {
+      if (save.busy && (overlay === "vn-save" || overlay === "vn-load" || overlay === "title-load")) return;
       if (shouldStopVnShellAutomationForAction(action, flow.mode)) runtime.stopStoryAutomation("overlay");
       if (overlay === flow.activeOverlay) return;
       if (isGameAPauseTabOverlay(flow.activeOverlay) && isGameAPauseTabOverlay(overlay)) {
@@ -85,7 +89,12 @@ export function useGameAOverlayAdapters({
   return {
     dispatchUiAction,
     createCommandAvailability() {
-      return { "quick-load": Boolean(save.quickSlot) };
+      return {
+        "open-save": !save.busy,
+        "quick-save": !save.busy,
+        "open-load": !save.busy,
+        "quick-load": Boolean(save.quickSlot) && !save.busy
+      };
     },
     createOverlayViewModelInputs(overlay: GameOverlayKind | undefined): GameInteractionOverlayViewModelInputs {
       if (!overlay) return {};
@@ -93,8 +102,12 @@ export function useGameAOverlayAdapters({
         return {
           saveLoad: createVnSaveLoadOverlayModel({
             canSave: flow.capabilities.canSave,
+            activeOperation: save.activeOperation,
+            busy: save.busy,
+            lastError: save.lastError,
             overlay,
             pendingLoadSlot: save.pendingLoadSlot,
+            slotPreviewsById: save.slotPreviewsById,
             slotIds: save.slotIds,
             slots: save.slots
           })
@@ -116,12 +129,19 @@ export function useGameAOverlayAdapters({
             cancelLoad: save.cancelLoadSlot,
             close: flow.closeTopOverlay,
             confirmLoad: () => {
-              save.confirmLoadSlot();
-              flow.send({ type: "ENTER_VN" });
-              flow.closeAllOverlays();
+              void save.confirmLoadSlot().then((loaded) => {
+                if (!loaded) return;
+                flow.send({ type: "ENTER_VN" });
+                flow.closeAllOverlays();
+              });
             },
-            requestLoad: save.requestLoadSlot,
-            save: save.saveSlot
+            loadPreviews: save.loadPreviews,
+            requestLoad: (slotId) => {
+              void save.requestLoadSlot(slotId);
+            },
+            save: (slotId) => {
+              void save.saveSlot(slotId);
+            }
           }
         };
       }

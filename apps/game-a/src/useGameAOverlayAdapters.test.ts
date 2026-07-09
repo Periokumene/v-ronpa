@@ -99,7 +99,7 @@ describe("game-a overlay adapters", () => {
     expect(adapters.flowSend).toHaveBeenCalledWith({ type: "RETURN_TITLE" });
   });
 
-  it("routes quick save and quick load without opening save/load overlays", () => {
+  it("routes quick save and quick load without opening save/load overlays", async () => {
     const adapters = createAdapters({
       mode: "vn",
       quickLoadResult: true,
@@ -112,10 +112,17 @@ describe("game-a overlay adapters", () => {
       startNewGame: () => true
     });
 
-    expect(adapters.createCommandAvailability()).toEqual({ "quick-load": true });
+    expect(adapters.createCommandAvailability()).toEqual({
+      "open-save": true,
+      "quick-save": true,
+      "open-load": true,
+      "quick-load": true
+    });
 
     adapters.dispatchUiAction("quick-save");
     adapters.dispatchUiAction("quick-load");
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(adapters.quickSaveSlot).toHaveBeenCalledOnce();
     expect(adapters.quickLoadSlot).toHaveBeenCalledOnce();
@@ -127,7 +134,12 @@ describe("game-a overlay adapters", () => {
   it("keeps quick load disabled and no-ops when the quick slot is empty", () => {
     const adapters = createAdapters({ mode: "vn", quickLoadResult: false, startNewGame: () => true });
 
-    expect(adapters.createCommandAvailability()).toEqual({ "quick-load": false });
+    expect(adapters.createCommandAvailability()).toEqual({
+      "open-save": true,
+      "quick-save": true,
+      "open-load": true,
+      "quick-load": false
+    });
 
     adapters.dispatchUiAction("quick-load");
 
@@ -174,8 +186,8 @@ function createAdapters({
   const openOverlay = vi.fn();
   const closeAllOverlays = vi.fn();
   const replaceOverlay = vi.fn();
-  const quickLoadSlot = vi.fn(() => quickLoadResult);
-  const quickSaveSlot = vi.fn();
+  const quickLoadSlot = vi.fn(async () => quickLoadResult);
+  const quickSaveSlot = vi.fn(async () => undefined);
   const stopStoryAutomation = vi.fn();
   const adapters = useGameAOverlayAdapters({
     flow: {
@@ -201,9 +213,14 @@ function createAdapters({
       quickLoadSlot,
       quickSaveSlot,
       quickSlot,
+      activeOperation: undefined,
+      busy: false,
+      lastError: undefined,
+      loadPreviews: vi.fn(),
       requestLoadSlot: vi.fn(),
       saveSlot: vi.fn(),
       slotIds: [],
+      slotPreviewsById: {},
       slots: []
     },
     settings: {
