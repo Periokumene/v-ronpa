@@ -5,7 +5,15 @@ import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ronpa/pixi-presenter";
 import { createInitialStoryState } from "@v-ronpa/story-engine";
-import { canSaveHarnessShowcaseRuntime, createHarnessShowcaseSaveData, harnessShowcaseSaveSlotIds } from "./useHarnessShowcaseSaveAdapter";
+import {
+  canSaveHarnessShowcaseRuntime,
+  createHarnessShowcaseSaveData,
+  harnessShowcaseManualSaveSlotCount,
+  harnessShowcaseQuickSaveSlotId,
+  harnessShowcaseSaveSlotIds,
+  selectHarnessShowcaseManualSaveSlotSummaries,
+  selectHarnessShowcaseQuickSaveSlotSummary
+} from "./useHarnessShowcaseSaveAdapter";
 
 describe("harness showcase save adapter", () => {
   it("collects public runtime state into versioned SaveData without UI state", () => {
@@ -122,13 +130,34 @@ describe("harness showcase save adapter", () => {
     expect(canSaveHarnessShowcaseRuntime({ storyRuntime: { active: true, state: story } })).toBe(false);
   });
 
-  it("keeps the harness-showcase slot id policy in the app adapter layer", () => {
-    expect(harnessShowcaseSaveSlotIds).toEqual([
+  it("keeps forty manual slots plus an independent hidden quick slot in the app adapter layer", () => {
+    expect(harnessShowcaseSaveSlotIds).toHaveLength(harnessShowcaseManualSaveSlotCount);
+    expect(harnessShowcaseSaveSlotIds.slice(0, 4)).toEqual([
       "slot:harness:1",
       "slot:harness:2",
       "slot:harness:3",
       "slot:harness:4"
     ]);
+    expect(harnessShowcaseSaveSlotIds.at(-1)).toBe("slot:harness:40");
+    expect(harnessShowcaseSaveSlotIds).not.toContain(harnessShowcaseQuickSaveSlotId);
+  });
+
+  it("keeps quick slot summaries out of manual save/load pages", () => {
+    const manual = {
+      id: "slot:harness:1",
+      label: "Slot 1",
+      savedAt: "2026-06-20T00:00:00.000Z",
+      mode: "navi" as const
+    };
+    const quick = {
+      id: harnessShowcaseQuickSaveSlotId,
+      label: "Quick Save",
+      savedAt: "2026-06-20T00:00:00.000Z",
+      mode: "navi" as const
+    };
+
+    expect(selectHarnessShowcaseManualSaveSlotSummaries([manual, quick])).toEqual([manual]);
+    expect(selectHarnessShowcaseQuickSaveSlotSummary([manual, quick])).toBe(quick);
   });
 });
 

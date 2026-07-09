@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import {
   createGameInteractionOverlayActions,
@@ -124,6 +124,9 @@ describe("overlay page adapter helpers", () => {
         collectSaveData: () => ({}),
         confirmLoadSlot: async () => undefined,
         pendingLoadSlot: slot,
+        quickLoadSlot: async () => false,
+        quickSaveSlot: async () => undefined,
+        quickSlot: undefined,
         refreshSlots: () => undefined,
         requestLoadSlot: () => undefined,
         saveSlot: () => undefined,
@@ -155,6 +158,125 @@ describe("overlay page adapter helpers", () => {
 
     expect(models.saveLoad).toMatchObject({ visible: true, mode: "load", pendingLoadSlot: slot });
     expect(rendered.props.model).toBe(models.saveLoad);
+  });
+
+  it("routes quick save/load immediately and narrows Q.Load availability by quick slot presence", async () => {
+    const flowSend = vi.fn();
+    const closeAllOverlays = vi.fn();
+    const quickLoadSlot = vi.fn(async () => true);
+    const quickSaveSlot = vi.fn(async () => undefined);
+    const quickSlot = {
+      id: "slot:harness:quick",
+      label: "Quick Save",
+      savedAt: "2026-06-20T00:00:00.000Z",
+      mode: "navi" as const
+    };
+    const adapters = useOverlayPageAdapters({
+      flow: {
+        activeOverlay: undefined,
+        capabilities: createCapabilities(),
+        closeAllOverlays,
+        closeTopOverlay: () => undefined,
+        dispatchAction: () => undefined,
+        mode: "navi",
+        openOverlay: () => undefined,
+        send: flowSend
+      },
+      runtime: {
+        resetShowcase: () => undefined,
+        stopStoryAutomation: () => undefined,
+        toggleStoryAuto: () => undefined,
+        toggleStorySkip: () => undefined
+      },
+      save: {
+        cancelLoadSlot: () => undefined,
+        collectSaveData: () => ({}),
+        confirmLoadSlot: async () => undefined,
+        pendingLoadSlot: undefined,
+        quickLoadSlot,
+        quickSaveSlot,
+        quickSlot,
+        refreshSlots: () => undefined,
+        requestLoadSlot: () => undefined,
+        saveSlot: () => undefined,
+        slotIds: [],
+        slots: []
+      },
+      settings: {
+        patchSettings: () => undefined,
+        resetSettings: () => undefined,
+        setSettings: () => undefined,
+        settings: createDefaultSettingsSnapshot()
+      }
+    } as unknown as Parameters<typeof useOverlayPageAdapters>[0]);
+
+    expect(adapters.createCommandAvailability()).toEqual({ "quick-load": true });
+
+    adapters.dispatchUiAction("quick-save");
+    adapters.dispatchUiAction("quick-load");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(quickSaveSlot).toHaveBeenCalledOnce();
+    expect(quickLoadSlot).toHaveBeenCalledOnce();
+    expect(flowSend).toHaveBeenCalledWith({ type: "ENTER_NAVI" });
+    expect(closeAllOverlays).toHaveBeenCalledOnce();
+  });
+
+  it("does not let quick load bypass flow capabilities or empty quick slot state", async () => {
+    const flowSend = vi.fn();
+    const closeAllOverlays = vi.fn();
+    const quickLoadSlot = vi.fn(async () => true);
+    const adapters = useOverlayPageAdapters({
+      flow: {
+        activeOverlay: undefined,
+        capabilities: { ...createCapabilities(), canLoad: false },
+        closeAllOverlays,
+        closeTopOverlay: () => undefined,
+        dispatchAction: () => undefined,
+        mode: "navi",
+        openOverlay: () => undefined,
+        send: flowSend
+      },
+      runtime: {
+        resetShowcase: () => undefined,
+        stopStoryAutomation: () => undefined,
+        toggleStoryAuto: () => undefined,
+        toggleStorySkip: () => undefined
+      },
+      save: {
+        cancelLoadSlot: () => undefined,
+        collectSaveData: () => ({}),
+        confirmLoadSlot: async () => undefined,
+        pendingLoadSlot: undefined,
+        quickLoadSlot,
+        quickSaveSlot: async () => undefined,
+        quickSlot: {
+          id: "slot:harness:quick",
+          label: "Quick Save",
+          savedAt: "2026-06-20T00:00:00.000Z",
+          mode: "navi" as const
+        },
+        refreshSlots: () => undefined,
+        requestLoadSlot: () => undefined,
+        saveSlot: () => undefined,
+        slotIds: [],
+        slots: []
+      },
+      settings: {
+        patchSettings: () => undefined,
+        resetSettings: () => undefined,
+        setSettings: () => undefined,
+        settings: createDefaultSettingsSnapshot()
+      }
+    } as unknown as Parameters<typeof useOverlayPageAdapters>[0]);
+
+    adapters.dispatchUiAction("quick-load");
+    await Promise.resolve();
+
+    expect(quickLoadSlot).not.toHaveBeenCalled();
+    expect(flowSend).not.toHaveBeenCalledWith({ type: "ENTER_NAVI" });
+    expect(closeAllOverlays).not.toHaveBeenCalled();
   });
 });
 

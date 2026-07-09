@@ -5,10 +5,14 @@ import {
   createGameASaveData,
   createGameASaveIndex,
   createGameASaveRecord,
+  gameAManualSaveSlotCount,
+  gameAQuickSaveSlotId,
   gameASaveRecordKey,
   gameASaveSlotIds,
   loadGameASaveRecords,
-  parseGameASaveRecordPayload
+  parseGameASaveRecordPayload,
+  selectGameAManualSaveSlotSummaries,
+  selectGameAQuickSaveSlotSummary
 } from "./useGameASaveAdapter";
 
 describe("game-a save adapter", () => {
@@ -47,7 +51,7 @@ describe("game-a save adapter", () => {
     const record = createGameASaveRecord("slot:game-a:1", data);
 
     expect(record).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       slotId: "slot:game-a:1",
       label: "Game A 1",
       savedAt: data.savedAt,
@@ -79,24 +83,32 @@ describe("game-a save adapter", () => {
       "slot:game-a:2",
       createGameASaveData({ story: createStory([{ speaker: "Mira", text: "Second." }]), pixiStage: createPixiStage() })
     );
+    const quick = createGameASaveRecord(
+      gameAQuickSaveSlotId,
+      createGameASaveData({ story: createStory([{ speaker: "Mira", text: "Quick." }]), pixiStage: createPixiStage() })
+    );
 
     storage.setItem(gameASaveRecordKey(first.slotId), JSON.stringify(first));
     storage.setItem(gameASaveRecordKey(second.slotId), JSON.stringify(second));
+    storage.setItem(gameASaveRecordKey(quick.slotId), JSON.stringify(quick));
     storage.setItem(GAME_A_SAVE_INDEX_KEY, JSON.stringify({ schemaVersion: 1, slotIds: [], updatedAtBySlot: {} }));
     storage.setItem("v-ronpa:game-a:saves", JSON.stringify({ slots: [first] }));
 
     const loaded = loadGameASaveRecords(storage);
 
-    expect(Object.keys(loaded)).toEqual(["slot:game-a:1", "slot:game-a:2"]);
+    expect(Object.keys(loaded)).toEqual(["slot:game-a:1", "slot:game-a:2", gameAQuickSaveSlotId]);
     expect(loaded["slot:game-a:1"]?.summary.text).toBe("First.");
     expect(loaded["slot:game-a:2"]?.summary.text).toBe("Second.");
+    expect(selectGameAManualSaveSlotSummaries(loaded).map((slot) => slot.id)).toEqual(["slot:game-a:1", "slot:game-a:2"]);
+    expect(selectGameAQuickSaveSlotSummary(loaded)).toMatchObject({ id: gameAQuickSaveSlotId, text: "Quick." });
     expect(gameASaveRecordKey("slot:game-a:1")).not.toBe(gameASaveRecordKey("slot:game-a:2"));
     expect(createGameASaveIndex(loaded)).toEqual({
-      schemaVersion: 1,
-      slotIds: ["slot:game-a:1", "slot:game-a:2"],
+      schemaVersion: 2,
+      slotIds: ["slot:game-a:1", "slot:game-a:2", gameAQuickSaveSlotId],
       updatedAtBySlot: {
         "slot:game-a:1": first.savedAt,
-        "slot:game-a:2": second.savedAt
+        "slot:game-a:2": second.savedAt,
+        [gameAQuickSaveSlotId]: quick.savedAt
       }
     });
   });
@@ -122,6 +134,8 @@ describe("game-a save adapter", () => {
 
     expect(parseGameASaveRecordPayload(JSON.stringify(valid), "slot:game-a:1")).toMatchObject({ slotId: "slot:game-a:1" });
     expect(parseGameASaveRecordPayload(JSON.stringify(valid), "slot:game-a:2")).toBeUndefined();
+    expect(parseGameASaveRecordPayload(JSON.stringify({ ...valid, slotId: "slot:game-a:41" }), "slot:game-a:41")).toBeUndefined();
+    expect(parseGameASaveRecordPayload(JSON.stringify({ ...valid, schemaVersion: 1 }), "slot:game-a:1")).toBeUndefined();
     expect(parseGameASaveRecordPayload(JSON.stringify({ ...valid, schemaVersion: 0 }), "slot:game-a:1")).toBeUndefined();
     expect(parseGameASaveRecordPayload(JSON.stringify(oldRecord), "slot:game-a:1")).toBeUndefined();
     expect(parseGameASaveRecordPayload("{", "slot:game-a:1")).toBeUndefined();
@@ -155,8 +169,11 @@ describe("game-a save adapter", () => {
     });
   });
 
-  it("keeps the current three-slot policy for game-a", () => {
-    expect(gameASaveSlotIds).toEqual(["slot:game-a:1", "slot:game-a:2", "slot:game-a:3"]);
+  it("keeps forty manual slots plus an independent hidden quick slot for game-a", () => {
+    expect(gameASaveSlotIds).toHaveLength(gameAManualSaveSlotCount);
+    expect(gameASaveSlotIds.slice(0, 3)).toEqual(["slot:game-a:1", "slot:game-a:2", "slot:game-a:3"]);
+    expect(gameASaveSlotIds.at(-1)).toBe("slot:game-a:40");
+    expect(gameASaveSlotIds).not.toContain(gameAQuickSaveSlotId);
   });
 });
 

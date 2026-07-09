@@ -17,7 +17,9 @@ export type {
 export {
   GameOverlayHost,
   PauseMenuOverlay,
+  paginateSaveLoadSlotIds,
   ReadOnlyBacklogOverlay,
+  SAVE_LOAD_SLOTS_PER_PAGE,
   SaveLoadOverlay,
   SettingsOverlay,
   TitleSurface,

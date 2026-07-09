@@ -27,6 +27,8 @@ export const GameUiActionSchema = z.enum([
   "open-settings",
   "open-backlog",
   "open-pause-menu",
+  "quick-save",
+  "quick-load",
   "close-overlay",
   "confirm-load",
   "return-title",

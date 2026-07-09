@@ -10,7 +10,7 @@ import type {
   SettingsSnapshot,
   StoryBacklogEntry
 } from "@v-ronpa/contracts";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { RichTextRenderer } from "./RichTextRenderer";
 import type { UiSurfacePresentationLike } from "./types";
 
@@ -155,6 +155,24 @@ export interface SaveLoadOverlayProps {
   onClose: () => void;
 }
 
+export const SAVE_LOAD_SLOTS_PER_PAGE = 5;
+
+export function paginateSaveLoadSlotIds(slotIds: string[], pageIndex: number): {
+  pageCount: number;
+  pageIndex: number;
+  pageSlotIds: string[];
+} {
+  const pageCount = Math.max(1, Math.ceil(slotIds.length / SAVE_LOAD_SLOTS_PER_PAGE));
+  const requestedPageIndex = Number.isFinite(pageIndex) ? Math.floor(pageIndex) : 0;
+  const clampedPageIndex = Math.min(Math.max(0, requestedPageIndex), pageCount - 1);
+  const start = clampedPageIndex * SAVE_LOAD_SLOTS_PER_PAGE;
+  return {
+    pageCount,
+    pageIndex: clampedPageIndex,
+    pageSlotIds: slotIds.slice(start, start + SAVE_LOAD_SLOTS_PER_PAGE)
+  };
+}
+
 export function SaveLoadOverlay({
   mode,
   slotIds,
@@ -167,31 +185,62 @@ export function SaveLoadOverlay({
   onCancelLoad,
   onClose
 }: SaveLoadOverlayProps) {
+  const [pageIndex, setPageIndex] = useState(0);
+  const slotIdsKey = slotIds.join("\u0000");
   const slotsById = new Map(slots.map((slot) => [slot.id, slot]));
   const title = mode === "save" ? "Save Game" : "Load Game";
+  const page = paginateSaveLoadSlotIds(slotIds, pageIndex);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [mode, slotIdsKey]);
 
   return (
     <OverlayPanel onClose={onClose} testId="save-load-overlay" title={title}>
       <div data-testid="save-load-mode" style={modeBadgeStyle}>{mode}</div>
       <div data-testid="save-slot-grid" style={slotGridStyle}>
-        {slotIds.map((slotId, index) => {
+        {page.pageSlotIds.map((slotId, index) => {
+          const absoluteIndex = page.pageIndex * SAVE_LOAD_SLOTS_PER_PAGE + index;
           const slot = slotsById.get(slotId);
           const disabled = mode === "save" ? !canSave : !slot;
           return (
             <button
-              data-testid={`save-slot-${index + 1}`}
+              data-testid={`save-slot-${absoluteIndex + 1}`}
               disabled={disabled}
               key={slotId}
               onClick={() => (mode === "save" ? onSave(slotId) : onRequestLoad(slotId))}
               style={disabled ? disabledSlotStyle : slotStyle}
               type="button"
             >
-              <strong>{slot?.label ?? `Slot ${index + 1}`}</strong>
+              <strong>{slot?.label ?? `Slot ${absoluteIndex + 1}`}</strong>
               <span>{slot ? new Date(slot.savedAt).toLocaleString() : "Empty"}</span>
               <small>{slot?.speaker ? `${slot.speaker}: ${slot.text ?? ""}` : slot?.text ?? "No data"}</small>
             </button>
           );
         })}
+      </div>
+      <div data-testid="save-page-controls" style={slotPagerStyle}>
+        <button
+          data-testid="save-page-prev"
+          disabled={page.pageIndex === 0}
+          onClick={() => setPageIndex((current) => Math.max(0, current - 1))}
+          style={secondaryButtonStyle}
+          type="button"
+        >
+          Prev
+        </button>
+        <span data-testid="save-page-indicator" style={slotPagerIndicatorStyle}>
+          Page {page.pageIndex + 1} / {page.pageCount}
+        </span>
+        <button
+          data-testid="save-page-next"
+          disabled={page.pageIndex >= page.pageCount - 1}
+          onClick={() => setPageIndex((current) => Math.min(page.pageCount - 1, current + 1))}
+          style={secondaryButtonStyle}
+          type="button"
+        >
+          Next
+        </button>
       </div>
       <AlertDialog.Root open={Boolean(pendingLoadSlot)}>
         <AlertDialog.Portal>
@@ -778,6 +827,21 @@ const slotStyle: CSSProperties = {
 const disabledSlotStyle: CSSProperties = {
   ...slotStyle,
   opacity: 0.42
+};
+
+const slotPagerStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+  marginTop: 12
+};
+
+const slotPagerIndicatorStyle: CSSProperties = {
+  minWidth: 88,
+  color: "rgba(255,255,255,0.72)",
+  fontSize: 12,
+  textAlign: "center"
 };
 
 // Load confirmation dialog.

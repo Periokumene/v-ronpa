@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type FormEvent, type ReactNode, type RefCallback } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode, type RefCallback } from "react";
 import type {
   BacklogOverlayActions,
   BacklogOverlayViewModel,
@@ -23,7 +23,7 @@ import type {
   VnDialogViewModel
 } from "@v-ronpa/app-vn-shell";
 import type { GameOverlayKind, GameUiAction, InteractionCapabilitySnapshot } from "@v-ronpa/contracts";
-import { RichTextRenderer, SurfaceFrame } from "@v-ronpa/ui-kit";
+import { paginateSaveLoadSlotIds, RichTextRenderer, SAVE_LOAD_SLOTS_PER_PAGE, SurfaceFrame } from "@v-ronpa/ui-kit";
 import {
   GAME_A_PAUSE_TABS,
   getGameAPauseTabSectionNumber,
@@ -286,28 +286,36 @@ function GameASaveLoadOverlay({
 }: SurfaceSlotProps<SaveLoadOverlayViewModel, SaveLoadOverlayActions> & {
   navigation: GameASurfaceNavigation;
 }) {
+  const [pageIndex, setPageIndex] = useState(0);
+  const slotIdsKey = model.slotIds.join("\u0000");
   const slotsById = new Map(model.slots.map((slot) => [slot.id, slot]));
+  const page = paginateSaveLoadSlotIds(model.slotIds, pageIndex);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [model.mode, slotIdsKey]);
 
   const content = (
     <>
       <div data-testid="save-slot-grid" className="game-a-save-grid">
-        {model.slotIds.map((slotId, index) => {
+        {page.pageSlotIds.map((slotId, index) => {
+          const absoluteIndex = page.pageIndex * SAVE_LOAD_SLOTS_PER_PAGE + index;
           const slot = slotsById.get(slotId);
           const disabled = model.mode === "save" ? !model.canSave : !slot;
           return (
             <button
               className="game-a-save-row"
               data-save-state={slot ? "filled" : "empty"}
-              data-testid={`save-slot-${index + 1}`}
+              data-testid={`save-slot-${absoluteIndex + 1}`}
               disabled={disabled}
               key={slotId}
               onClick={() => (model.mode === "save" ? actions.save(slotId) : actions.requestLoad(slotId))}
               type="button"
             >
-              <span className="game-a-save-row-number">{String(index + 1).padStart(2, "0")}</span>
-              <span aria-hidden="true" className="game-a-save-thumbnail" data-testid={`save-slot-${index + 1}-thumbnail`} />
+              <span className="game-a-save-row-number">{String(absoluteIndex + 1).padStart(2, "0")}</span>
+              <span aria-hidden="true" className="game-a-save-thumbnail" data-testid={`save-slot-${absoluteIndex + 1}-thumbnail`} />
               <span className="game-a-save-copy">
-                <strong>{slot?.label ?? `存档 ${index + 1}`}</strong>
+                <strong>{slot?.label ?? `存档 ${absoluteIndex + 1}`}</strong>
                 <span>{slot ? new Date(slot.savedAt).toLocaleString() : "< 空存档 >"}</span>
                 <small>{slot?.speaker ? `${slot.speaker}: ${slot.text ?? ""}` : slot?.text ?? "无数据"}</small>
               </span>
@@ -315,6 +323,29 @@ function GameASaveLoadOverlay({
             </button>
           );
         })}
+      </div>
+      <div className="game-a-save-pagination" data-testid="save-page-controls">
+        <button
+          aria-label="上一页"
+          data-testid="save-page-prev"
+          disabled={page.pageIndex === 0}
+          onClick={() => setPageIndex((current) => Math.max(0, current - 1))}
+          type="button"
+        >
+          &lt;
+        </button>
+        <span aria-live="polite" data-testid="save-page-indicator">
+          {page.pageIndex + 1} / {page.pageCount}
+        </span>
+        <button
+          aria-label="下一页"
+          data-testid="save-page-next"
+          disabled={page.pageIndex >= page.pageCount - 1}
+          onClick={() => setPageIndex((current) => Math.min(page.pageCount - 1, current + 1))}
+          type="button"
+        >
+          &gt;
+        </button>
       </div>
       {model.pendingLoadSlot ? (
         <div data-testid="load-confirmation" className="game-a-load-confirmation" role="alertdialog" aria-modal="true">

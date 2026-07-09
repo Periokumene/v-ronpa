@@ -45,6 +45,19 @@ export function useGameAOverlayAdapters({
       if (runtime.startNewGame()) flow.send({ type: "ENTER_VN" });
       return;
     }
+    if (action === "quick-save") {
+      if (!flow.capabilities.canSave) return;
+      save.quickSaveSlot();
+      return;
+    }
+    if (action === "quick-load") {
+      if (!flow.capabilities.canLoad || !save.quickSlot) return;
+      if (save.quickLoadSlot()) {
+        flow.send({ type: "ENTER_VN" });
+        flow.closeAllOverlays();
+      }
+      return;
+    }
     if (
       save.pendingLoadSlot &&
       isGameAPauseTabOverlay(flow.activeOverlay) &&
@@ -71,6 +84,9 @@ export function useGameAOverlayAdapters({
 
   return {
     dispatchUiAction,
+    createCommandAvailability() {
+      return { "quick-load": Boolean(save.quickSlot) };
+    },
     createOverlayViewModelInputs(overlay: GameOverlayKind | undefined): GameInteractionOverlayViewModelInputs {
       if (!overlay) return {};
       if (overlay === "vn-save" || overlay === "vn-load" || overlay === "title-load") {

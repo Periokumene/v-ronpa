@@ -12,9 +12,13 @@ import {
 import { createGameplayState } from "@v-ronpa/gameplay";
 import { gameAVnEntry } from "./contentManifest";
 
-const GAME_A_SAVE_STORAGE_PREFIX = "v-ronpa:game-a:saves:v5";
+const GAME_A_SAVE_STORAGE_PREFIX = "v-ronpa:game-a:saves:v6";
 export const GAME_A_SAVE_INDEX_KEY = `${GAME_A_SAVE_STORAGE_PREFIX}:index`;
-export const gameASaveSlotIds = ["slot:game-a:1", "slot:game-a:2", "slot:game-a:3"];
+export const gameAManualSaveSlotCount = 40;
+export const gameASaveSlotIds = Array.from({ length: gameAManualSaveSlotCount }, (_, index) => `slot:game-a:${index + 1}`);
+export const gameAQuickSaveSlotId = "slot:game-a:quick";
+
+const gameASaveRecordSlotIds = [...gameASaveSlotIds, gameAQuickSaveSlotId];
 
 export interface GameASaveSnapshotInput {
   pixiStage: PixiStageSnapshot;
@@ -36,7 +40,7 @@ export interface GameASavePreviewImage {
 export type GameASavePreview = GameASavePreviewNone | GameASavePreviewImage;
 
 export interface GameASaveRecord {
-  schemaVersion: 1;
+  schemaVersion: 2;
   slotId: string;
   label: string;
   savedAt: string;
@@ -46,7 +50,7 @@ export interface GameASaveRecord {
 }
 
 export interface GameASaveIndex {
-  schemaVersion: 1;
+  schemaVersion: 2;
   slotIds: string[];
   updatedAtBySlot: Record<string, string>;
 }
@@ -78,7 +82,7 @@ export function createGameASaveRecord(slotId: string, data: SaveData): GameASave
   const parsedData = SaveDataSchema.parse(data);
   const summary = toSaveSlotSummary(slotId, parsedData);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     slotId,
     label: summary.label,
     savedAt: parsedData.savedAt,
@@ -100,14 +104,11 @@ export function useGameASaveAdapter({
   const [recordsBySlot, setRecordsBySlot] = useState<Record<string, GameASaveRecord>>(() => loadGameASaveRecords());
   const [pendingLoadSlot, setPendingLoadSlot] = useState<SaveSlotSummary | undefined>(undefined);
 
-  const slots = useMemo(
-    () => gameASaveSlotIds.flatMap((slotId) => (recordsBySlot[slotId] ? [recordsBySlot[slotId].summary] : [])),
-    [recordsBySlot]
-  );
+  const slots = useMemo(() => selectGameAManualSaveSlotSummaries(recordsBySlot), [recordsBySlot]);
+  const quickSlot = useMemo(() => selectGameAQuickSaveSlotSummary(recordsBySlot), [recordsBySlot]);
 
-  const saveSlot = useCallback(
+  const persistRecordForSlot = useCallback(
     (slotId: string) => {
-      if (!gameASaveSlotIds.includes(slotId)) return;
       const data = createGameASaveData({ story: getStory(), pixiStage: getPixiStage() });
       const record = createGameASaveRecord(slotId, data);
       if (!persistGameASaveRecord(record)) return;
@@ -118,6 +119,14 @@ export function useGameASaveAdapter({
       });
     },
     [getPixiStage, getStory]
+  );
+
+  const saveSlot = useCallback(
+    (slotId: string) => {
+      if (!gameASaveSlotIds.includes(slotId)) return;
+      persistRecordForSlot(slotId);
+    },
+    [persistRecordForSlot]
   );
 
   return {
@@ -131,6 +140,17 @@ export function useGameASaveAdapter({
       setPendingLoadSlot(undefined);
     },
     pendingLoadSlot,
+    quickLoadSlot() {
+      const record = recordsBySlot[gameAQuickSaveSlotId];
+      if (!record) return false;
+      onLoad(record.data);
+      setPendingLoadSlot(undefined);
+      return true;
+    },
+    quickSaveSlot() {
+      persistRecordForSlot(gameAQuickSaveSlotId);
+    },
+    quickSlot,
     requestLoadSlot(slotId: string) {
       const record = recordsBySlot[slotId];
       if (!record) return;
@@ -143,13 +163,18 @@ export function useGameASaveAdapter({
 }
 
 function toSaveSlotSummary(id: string, save: SaveData): SaveSlotSummary {
-  return createSaveSlotSummaryFromSaveData(id, id.replace("slot:game-a:", "Game A "), save);
+  return createSaveSlotSummaryFromSaveData(id, labelForGameASaveSlot(id), save);
+}
+
+function labelForGameASaveSlot(id: string): string {
+  if (id === gameAQuickSaveSlotId) return "Quick Save";
+  return id.replace("slot:game-a:", "Game A ");
 }
 
 export function loadGameASaveRecords(storage: Storage | undefined = typeof window === "undefined" ? undefined : window.localStorage): Record<string, GameASaveRecord> {
   if (!storage) return {};
   return Object.fromEntries(
-    gameASaveSlotIds.flatMap((slotId) => {
+    gameASaveRecordSlotIds.flatMap((slotId) => {
       const raw = storage.getItem(gameASaveRecordKey(slotId));
       const record = parseGameASaveRecordPayload(raw, slotId);
       return record ? [[slotId, record]] : [];
@@ -158,9 +183,9 @@ export function loadGameASaveRecords(storage: Storage | undefined = typeof windo
 }
 
 export function createGameASaveIndex(recordsBySlot: Record<string, GameASaveRecord>): GameASaveIndex {
-  const records = gameASaveSlotIds.flatMap((slotId) => (recordsBySlot[slotId] ? [recordsBySlot[slotId]] : []));
+  const records = gameASaveRecordSlotIds.flatMap((slotId) => (recordsBySlot[slotId] ? [recordsBySlot[slotId]] : []));
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     slotIds: records.map((record) => record.slotId),
     updatedAtBySlot: Object.fromEntries(records.map((record) => [record.slotId, record.savedAt]))
   };
@@ -177,10 +202,10 @@ export function parseGameASaveRecordPayload(raw: string | null, expectedSlotId?:
 
 export function parseGameASaveRecord(value: unknown, expectedSlotId?: string): GameASaveRecord | undefined {
   if (!isObject(value)) return undefined;
-  if (value.schemaVersion !== 1) return undefined;
+  if (value.schemaVersion !== 2) return undefined;
   if (typeof value.slotId !== "string") return undefined;
   if (expectedSlotId && value.slotId !== expectedSlotId) return undefined;
-  if (!gameASaveSlotIds.includes(value.slotId)) return undefined;
+  if (!gameASaveRecordSlotIds.includes(value.slotId)) return undefined;
   if (typeof value.label !== "string" || value.label.length === 0) return undefined;
   if (typeof value.savedAt !== "string") return undefined;
   const summary = SaveSlotSummarySchema.safeParse(value.summary);
@@ -191,7 +216,7 @@ export function parseGameASaveRecord(value: unknown, expectedSlotId?: string): G
   if (!preview) return undefined;
   const normalizedSummary = toSaveSlotSummary(value.slotId, data.data);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     slotId: value.slotId,
     label: normalizedSummary.label,
     savedAt: data.data.savedAt,
@@ -199,6 +224,14 @@ export function parseGameASaveRecord(value: unknown, expectedSlotId?: string): G
     data: data.data,
     preview
   };
+}
+
+export function selectGameAManualSaveSlotSummaries(recordsBySlot: Record<string, GameASaveRecord>): SaveSlotSummary[] {
+  return gameASaveSlotIds.flatMap((slotId) => (recordsBySlot[slotId] ? [recordsBySlot[slotId].summary] : []));
+}
+
+export function selectGameAQuickSaveSlotSummary(recordsBySlot: Record<string, GameASaveRecord>): SaveSlotSummary | undefined {
+  return recordsBySlot[gameAQuickSaveSlotId]?.summary;
 }
 
 function parseGameASavePreview(value: unknown): GameASavePreview | undefined {

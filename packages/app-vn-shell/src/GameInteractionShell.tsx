@@ -18,6 +18,7 @@ import {
   createGameInteractionShellViewModels,
   type BacklogOverlayActions,
   type BacklogOverlayViewModel,
+  type GameCommandAvailability,
   type GameInteractionOverlayActions,
   type GameInteractionOverlayViewModelInputs,
   type GameFlowShellAdapter,
@@ -46,6 +47,7 @@ import {
 } from "./GameInteractionViewModels";
 
 export interface OverlayPageShellAdapter {
+  createCommandAvailability?(): GameCommandAvailability;
   createOverlayViewModelInputs?(overlay: GameOverlayKind | undefined): GameInteractionOverlayViewModelInputs;
   createOverlayActions?(overlay: GameOverlayKind | undefined): GameInteractionOverlayActions;
   dispatchUiAction(action: GameUiAction): void;
@@ -144,6 +146,7 @@ export function GameInteractionShell({
   ]);
 
   const resolvedSurfaces = resolveGameInteractionShellSurfaces(surfaces);
+  const commandAvailability = overlayPages.createCommandAvailability?.();
   const overlayModelInputs = overlayPages.createOverlayViewModelInputs?.(flow.activeOverlay);
   const overlayActions = createGameInteractionOverlayActions({
     closeTopOverlay: flow.closeTopOverlay,
@@ -151,6 +154,7 @@ export function GameInteractionShell({
     overlayActions: overlayPages.createOverlayActions?.(flow.activeOverlay)
   });
   const models = createGameInteractionShellViewModels({
+    ...(commandAvailability ? { commandAvailability } : {}),
     ...(dialogDisplay ? { dialogDisplay } : {}),
     flow,
     ...(formatStorySpeaker ? { formatStorySpeaker } : {}),

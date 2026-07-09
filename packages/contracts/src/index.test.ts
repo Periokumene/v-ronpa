@@ -865,6 +865,8 @@ describe("contracts", () => {
     expect(GameModeSchema.parse("title")).toBe("title");
     expect(GameOverlayKindSchema.parse("vn-save")).toBe("vn-save");
     expect(GameUiActionSchema.parse("open-backlog")).toBe("open-backlog");
+    expect(GameUiActionSchema.parse("quick-save")).toBe("quick-save");
+    expect(GameUiActionSchema.parse("quick-load")).toBe("quick-load");
     expect(() => GameUiActionSchema.parse("back")).toThrow();
 
     expect(
@@ -897,6 +899,7 @@ describe("contracts", () => {
       canOpenPauseMenu: false
     });
     expect(InteractionCapabilitySnapshotSchema.parse({ canBack: true })).not.toHaveProperty("canBack");
+    expect(InteractionCapabilitySnapshotSchema.parse({ canQuickSave: true })).not.toHaveProperty("canQuickSave");
 
     expect(SettingsSnapshotSchema.parse({ version: 1 })).toEqual(createDefaultSettingsSnapshot());
     expect(createDefaultSettingsSnapshot()).toMatchObject({

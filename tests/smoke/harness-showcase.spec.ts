@@ -8,7 +8,10 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
     if (message.type() === "error" && !isExpectedPointerLockError(message.text())) consoleErrors.push(message.text());
   });
 
-  await page.addInitScript(() => localStorage.removeItem("v-ronpa:settings:v1"));
+  await page.addInitScript(() => {
+    localStorage.removeItem("v-ronpa:settings:v1");
+    indexedDB.deleteDatabase("v-ronpa-harness-showcase-v6");
+  });
   await page.goto("/");
 
   await expect(page.getByTestId("playfield")).toBeVisible();
@@ -160,7 +163,9 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
   await expect(page.getByTestId("vn-command-bar")).toHaveAttribute("data-ui-phase", "shown");
   await expect(page.getByTestId("vn-command-backlog")).toBeEnabled();
   await expect(page.getByTestId("vn-command-save")).toBeEnabled();
+  await expect(page.getByTestId("vn-command-quick-save")).toBeEnabled();
   await expect(page.getByTestId("vn-command-load")).toBeEnabled();
+  await expect(page.getByTestId("vn-command-quick-load")).toBeDisabled();
   await expect(page.getByTestId("vn-command-settings")).toBeEnabled();
   const dialogTextBeforeCommandOverlay = await currentDialogText(page);
   await page.keyboard.press("Escape");
@@ -189,6 +194,11 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
   const savedDialogText = (await page.getByTestId("vn-dialog-text").textContent()) ?? "";
   expect(savedDialogText.length).toBeGreaterThan(0);
   const savedDialogExcerpt = savedDialogText.slice(0, 12);
+  await page.getByTestId("vn-command-quick-save").click();
+  await expect(page.getByTestId("vn-command-quick-load")).toBeEnabled();
+  await page.getByTestId("vn-command-quick-load").click();
+  await expect(page.getByTestId("load-confirmation")).toHaveCount(0);
+  await expect(page.getByTestId("vn-dialog-text")).toContainText(savedDialogExcerpt);
   await page.getByTestId("vn-command-save").click();
   await expect(page.getByTestId("save-load-overlay")).toBeVisible();
   await expect(page.getByTestId("save-load-mode")).toHaveText("save");

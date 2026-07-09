@@ -10,8 +10,9 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
 
   await page.addInitScript(() => {
     localStorage.removeItem("v-ronpa:game-a:settings:v1");
-    localStorage.removeItem("v-ronpa:game-a:saves:v1");
-    localStorage.removeItem("v-ronpa:game-a:saves:v2");
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("v-ronpa:game-a:saves:")) localStorage.removeItem(key);
+    }
   });
   await page.goto("/");
 
@@ -64,6 +65,8 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toHaveClass(/game-a-command-bar/);
   await expect(page.getByTestId("vn-command-bar")).toHaveAttribute("data-ui-phase", "shown");
+  await expect(page.getByTestId("vn-command-quick-save")).toBeEnabled();
+  await expect(page.getByTestId("vn-command-quick-load")).toBeDisabled();
   await expect.poll(() => surfaceOpacity(page, ".game-a-dialog-surface")).toBe("1");
   await expect.poll(() => surfaceOpacity(page, ".game-a-command-bar")).toBe("1");
 
@@ -86,6 +89,12 @@ test("game-a boots the VN-first framework path", async ({ page }) => {
   await expect(page.getByTestId("runtime-movie-overlay")).toBeVisible();
   await page.screenshot({ path: "test-results/game-a-movie.png", fullPage: true });
   await clickByTestId(page, "runtime-movie-skip");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT GAME-A MOVIE");
+
+  await clickByTestId(page, "vn-command-quick-save");
+  await expect(page.getByTestId("vn-command-quick-load")).toBeEnabled();
+  await clickByTestId(page, "vn-command-quick-load");
+  await expect(page.getByTestId("load-confirmation")).toHaveCount(0);
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT GAME-A MOVIE");
 
   await clickByTestId(page, "vn-command-save");

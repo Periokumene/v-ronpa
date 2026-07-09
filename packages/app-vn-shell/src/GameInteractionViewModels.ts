@@ -115,6 +115,8 @@ export interface VnCommandBarActions {
   dispatch(action: GameUiAction): void;
 }
 
+export type GameCommandAvailability = Partial<Record<GameUiAction, boolean>>;
+
 export interface TitleViewModel {
   visible: boolean;
   title: string;
@@ -230,6 +232,7 @@ export interface GameInteractionShellSurfaces {
 }
 
 export interface CreateGameInteractionShellViewModelsInput {
+  commandAvailability?: GameCommandAvailability | undefined;
   dialogDisplay?: VnDialogDisplaySettings | undefined;
   flow: Pick<GameFlowShellAdapter, "activeOverlay" | "capabilities" | "mode">;
   formatStorySpeaker?: ((speaker: string) => string) | undefined;
@@ -243,11 +246,14 @@ const COMMAND_BAR_COMMANDS: Array<{ action: GameUiAction; label: string; testId:
   { action: "toggle-skip", label: "SKIP", testId: "vn-command-skip" },
   { action: "toggle-auto", label: "AUTO", testId: "vn-command-auto" },
   { action: "open-save", label: "SAVE", testId: "vn-command-save" },
+  { action: "quick-save", label: "Q.SAVE", testId: "vn-command-quick-save" },
   { action: "open-load", label: "LOAD", testId: "vn-command-load" },
+  { action: "quick-load", label: "Q.LOAD", testId: "vn-command-quick-load" },
   { action: "open-settings", label: "SETTING", testId: "vn-command-settings" }
 ];
 
 export function createGameInteractionShellViewModels({
+  commandAvailability,
   dialogDisplay,
   flow,
   formatStorySpeaker,
@@ -303,7 +309,7 @@ export function createGameInteractionShellViewModels({
           commandBar: {
             visible: true,
             presentation: commandBarPresentation,
-            commands: createCommandBarCommands(flow.capabilities, runtime.storyPlayActiveActions),
+            commands: createCommandBarCommands(flow.capabilities, runtime.storyPlayActiveActions, commandAvailability),
             capabilities: flow.capabilities,
             activeActions: runtime.storyPlayActiveActions
           }
@@ -334,14 +340,16 @@ export function createGameInteractionShellViewModels({
 
 export function createCommandBarCommands(
   capabilities: InteractionCapabilitySnapshot,
-  activeActions: Partial<Record<GameUiAction, boolean>> = {}
+  activeActions: Partial<Record<GameUiAction, boolean>> = {},
+  commandAvailability: GameCommandAvailability = {}
 ): VnCommandBarCommandViewModel[] {
   return COMMAND_BAR_COMMANDS.map((command) => {
     const toggle = command.action === "toggle-auto" || command.action === "toggle-skip";
     const active = Boolean(activeActions[command.action]);
+    const baseEnabled = isCommandEnabled(command.action, capabilities) || (toggle && active);
     return {
       ...command,
-      enabled: isCommandEnabled(command.action, capabilities) || (toggle && active),
+      enabled: baseEnabled && (commandAvailability[command.action] ?? true),
       active,
       toggle
     };
@@ -353,7 +361,9 @@ function isCommandEnabled(action: GameUiAction, capabilities: InteractionCapabil
   if (action === "toggle-skip") return capabilities.canSkip;
   if (action === "toggle-auto") return capabilities.canAuto;
   if (action === "open-save") return capabilities.canSave;
+  if (action === "quick-save") return capabilities.canSave;
   if (action === "open-load") return capabilities.canLoad;
+  if (action === "quick-load") return capabilities.canLoad;
   if (action === "open-settings") return capabilities.canOpenSettings;
   return false;
 }

@@ -44,6 +44,22 @@ export function useOverlayPageAdapters({
       return;
     }
 
+    if (action === "quick-save") {
+      if (!flow.capabilities.canSave) return;
+      void save.quickSaveSlot();
+      return;
+    }
+
+    if (action === "quick-load") {
+      if (!flow.capabilities.canLoad || !save.quickSlot) return;
+      void save.quickLoadSlot().then((loaded) => {
+        if (!loaded) return;
+        flow.send({ type: "ENTER_NAVI" });
+        flow.closeAllOverlays();
+      });
+      return;
+    }
+
     const overlay = overlayKindForVnShellAction(action, flow.mode);
     if (overlay) {
       if (shouldStopVnShellAutomationForAction(action, flow.mode)) runtime.stopStoryAutomation("overlay");
@@ -59,6 +75,9 @@ export function useOverlayPageAdapters({
 
   return {
     dispatchUiAction,
+    createCommandAvailability() {
+      return { "quick-load": Boolean(save.quickSlot) };
+    },
     createOverlayViewModelInputs(overlay: GameOverlayKind | undefined): GameInteractionOverlayViewModelInputs {
       if (!overlay) return {};
       if (overlay === "vn-save" || overlay === "title-load" || overlay === "vn-load") {

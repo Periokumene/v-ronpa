@@ -86,7 +86,16 @@ describe("GameInteractionShell view models", () => {
       display: { textSize: "large", textboxOpacity: 0.5, textSpeed: 0.75 }
     });
     expect(models.choices).toMatchObject({ visible: true, choices: [choice] });
-    expect(models.commandBar?.commands.map((command) => command.testId)).toContain("vn-command-auto");
+    expect(models.commandBar?.commands.map((command) => command.testId)).toEqual([
+      "vn-command-backlog",
+      "vn-command-skip",
+      "vn-command-auto",
+      "vn-command-save",
+      "vn-command-quick-save",
+      "vn-command-load",
+      "vn-command-quick-load",
+      "vn-command-settings"
+    ]);
     expect(models.commandBar?.commands.find((command) => command.action === "toggle-auto")).toMatchObject({
       active: true,
       enabled: true,
@@ -280,6 +289,20 @@ describe("GameInteractionShell view models", () => {
       active: true,
       enabled: true
     });
+  });
+
+  it("narrows command availability without bypassing base capabilities", () => {
+    const capabilities = createFlow({ mode: "vn" }).capabilities;
+    const commands = createCommandBarCommands(
+      { ...capabilities, canLoad: true, canSave: false },
+      {},
+      { "quick-load": false, "quick-save": true }
+    );
+
+    expect(commands.find((command) => command.action === "open-load")).toMatchObject({ enabled: true });
+    expect(commands.find((command) => command.action === "quick-load")).toMatchObject({ enabled: false });
+    expect(commands.find((command) => command.action === "open-save")).toMatchObject({ enabled: false });
+    expect(commands.find((command) => command.action === "quick-save")).toMatchObject({ enabled: false });
   });
 });
 

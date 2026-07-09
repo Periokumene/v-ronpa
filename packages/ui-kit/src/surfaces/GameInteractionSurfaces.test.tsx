@@ -1,7 +1,7 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { createDefaultSettingsSnapshot } from "@v-ronpa/contracts";
-import { SettingsOverlay, VnCommandBar } from "./GameInteractionSurfaces";
+import { paginateSaveLoadSlotIds, SettingsOverlay, VnCommandBar } from "./GameInteractionSurfaces";
 
 describe("VnCommandBar", () => {
   it("renders VM-provided commands without deriving state from broader capabilities", () => {
@@ -37,6 +37,28 @@ describe("VnCommandBar", () => {
     expect((save?.props as Record<string, unknown>)["aria-pressed"]).toBeUndefined();
     (skip?.props as { onClick: () => void }).onClick();
     expect(onAction).toHaveBeenCalledWith("toggle-skip");
+  });
+});
+
+describe("SaveLoadOverlay pagination", () => {
+  it("uses fixed five-slot pages for fallback save/load surfaces", () => {
+    const slotIds = Array.from({ length: 40 }, (_, index) => `slot:${index + 1}`);
+
+    expect(paginateSaveLoadSlotIds(slotIds, 0)).toEqual({
+      pageCount: 8,
+      pageIndex: 0,
+      pageSlotIds: ["slot:1", "slot:2", "slot:3", "slot:4", "slot:5"]
+    });
+    expect(paginateSaveLoadSlotIds(slotIds, 7)).toMatchObject({
+      pageCount: 8,
+      pageIndex: 7,
+      pageSlotIds: ["slot:36", "slot:37", "slot:38", "slot:39", "slot:40"]
+    });
+    expect(paginateSaveLoadSlotIds(slotIds, 99)).toMatchObject({ pageIndex: 7 });
+    expect(paginateSaveLoadSlotIds(slotIds, Number.NaN)).toMatchObject({
+      pageIndex: 0,
+      pageSlotIds: ["slot:1", "slot:2", "slot:3", "slot:4", "slot:5"]
+    });
   });
 });
 

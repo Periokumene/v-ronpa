@@ -17,12 +17,15 @@ describe("VN shell action helpers", () => {
     expect(overlayKindForVnShellAction("open-pause-menu", "vn")).toBe("pause-menu");
     expect(overlayKindForVnShellAction("toggle-auto", "vn")).toBeUndefined();
     expect(overlayKindForVnShellAction("toggle-skip", "vn")).toBeUndefined();
+    expect(overlayKindForVnShellAction("quick-save", "vn")).toBeUndefined();
+    expect(overlayKindForVnShellAction("quick-load", "vn")).toBeUndefined();
   });
 
   it("stops story automation only when an action opens an overlay", () => {
     expect(shouldStopVnShellAutomationForAction("open-save", "vn")).toBe(true);
     expect(shouldStopVnShellAutomationForAction("open-settings", "vn")).toBe(true);
     expect(shouldStopVnShellAutomationForAction("toggle-auto", "vn")).toBe(false);
+    expect(shouldStopVnShellAutomationForAction("quick-load", "vn")).toBe(false);
     expect(shouldStopVnShellAutomationForAction("new-game", "title")).toBe(false);
   });
 

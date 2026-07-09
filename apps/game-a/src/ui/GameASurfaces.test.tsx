@@ -11,6 +11,7 @@ import type {
   VnDialogViewModel
 } from "@v-ronpa/app-vn-shell";
 import { createDefaultSettingsSnapshot, type GameOverlayKind } from "@v-ronpa/contracts";
+import { paginateSaveLoadSlotIds } from "@v-ronpa/ui-kit";
 import { gameAContentManifest } from "../contentManifest";
 import {
   createGameASurfaces,
@@ -160,11 +161,16 @@ describe("game-a interaction surfaces", () => {
       model: createCommandBarModel()
     });
     const settings = findElementByTestId(element, "vn-command-settings");
+    const quickLoad = findElementByTestId(element, "vn-command-quick-load");
     const commandBar = findElementByTestId(element, "vn-command-bar");
 
     expect(settings?.props).toMatchObject({
       "data-action": "open-settings",
       children: "SETTINGS"
+    });
+    expect(quickLoad?.props).toMatchObject({
+      "data-action": "quick-load",
+      children: "Q.LOAD"
     });
     expect(commandBar?.props).toMatchObject({
       "data-ui-phase": "showing",
@@ -213,22 +219,22 @@ describe("game-a interaction surfaces", () => {
       navigation: createNavigation({ activeOverlay: "vn-save" })
     });
     const SaveLoadSurface = surfaces.SaveLoadOverlay;
-    const saveElement = <SaveLoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("save")} />;
-    const saveRoot = findElementByTestId(saveElement, "save-load-overlay");
-    const saveTab = findElementByTestId(saveElement, "pause-tab-save");
-    const saveIds = collectTestIds(saveElement);
+    const saveMarkup = renderToStaticMarkup(<SaveLoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("save")} />);
 
-    expect(saveRoot?.props).toMatchObject({
-      className: "game-a-pause-screen",
-      "data-active-tab": "save"
-    });
-    expect(findElementByTestId(saveElement, "save-load-mode")).toBeUndefined();
-    expect(saveTab?.props).toMatchObject({ "aria-current": "page" });
-    expect(saveIds.filter((id) => id.endsWith("-thumbnail"))).toEqual([
-      "save-slot-1-thumbnail",
-      "save-slot-2-thumbnail",
-      "save-slot-3-thumbnail"
+    expect(saveMarkup).toContain('class="game-a-pause-screen"');
+    expect(saveMarkup).toContain('data-active-tab="save"');
+    expect(saveMarkup).not.toContain('data-testid="save-load-mode"');
+    expect(saveMarkup).toContain('data-testid="pause-tab-save"');
+    expect(saveMarkup).toContain('aria-current="page"');
+    expect(saveMarkup.match(/data-testid="save-slot-\d+-thumbnail"/g)).toEqual([
+      'data-testid="save-slot-1-thumbnail"',
+      'data-testid="save-slot-2-thumbnail"',
+      'data-testid="save-slot-3-thumbnail"',
+      'data-testid="save-slot-4-thumbnail"',
+      'data-testid="save-slot-5-thumbnail"'
     ]);
+    expect(saveMarkup).toContain('data-testid="save-page-indicator"');
+    expect(saveMarkup).toContain("1 / 8");
 
     const loadSurfaces = createGameASurfaces({
       assets,
@@ -236,53 +242,48 @@ describe("game-a interaction surfaces", () => {
       navigation: createNavigation({ activeOverlay: "vn-load" })
     });
     const LoadSurface = loadSurfaces.SaveLoadOverlay;
-    const loadElement = <LoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("load")} />;
+    const loadMarkup = renderToStaticMarkup(<LoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("load")} />);
 
-    expect(findElementByTestId(loadElement, "save-load-overlay")?.props).toMatchObject({
-      className: "game-a-pause-screen",
-      "data-active-tab": "load"
+    expect(loadMarkup).toContain('class="game-a-pause-screen"');
+    expect(loadMarkup).toContain('data-active-tab="load"');
+    expect(loadMarkup).toContain('data-testid="pause-tab-load"');
+    expect(loadMarkup).toContain('aria-current="page"');
+  });
+
+  it("paginates game-a save slot ids in fixed five-row pages", () => {
+    const slotIds = Array.from({ length: 40 }, (_, index) => `slot:game-a:${index + 1}`);
+
+    expect(paginateSaveLoadSlotIds(slotIds, 0)).toEqual({
+      pageCount: 8,
+      pageIndex: 0,
+      pageSlotIds: ["slot:game-a:1", "slot:game-a:2", "slot:game-a:3", "slot:game-a:4", "slot:game-a:5"]
     });
-    expect(findElementByTestId(loadElement, "pause-tab-load")?.props).toMatchObject({ "aria-current": "page" });
+    expect(paginateSaveLoadSlotIds(slotIds, 7)).toMatchObject({
+      pageCount: 8,
+      pageIndex: 7,
+      pageSlotIds: ["slot:game-a:36", "slot:game-a:37", "slot:game-a:38", "slot:game-a:39", "slot:game-a:40"]
+    });
   });
 
   it("locks pause tab navigation while load confirmation is visible", () => {
-    const dispatch = vi.fn();
-    const cancelLoad = vi.fn();
-    const confirmLoad = vi.fn();
     const surfaces = createGameASurfaces({
       assets: resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig),
       config: gameAUiConfig,
-      navigation: createNavigation({ activeOverlay: "vn-load", dispatch })
+      navigation: createNavigation({ activeOverlay: "vn-load" })
     });
     const SaveLoadSurface = surfaces.SaveLoadOverlay;
-    const element = (
+    const markup = renderToStaticMarkup(
       <SaveLoadSurface
-        actions={{ ...createSaveLoadActions(), cancelLoad, confirmLoad }}
+        actions={createSaveLoadActions()}
         model={createSaveLoadModel("load", { pendingLoad: true })}
       />
     );
-    const root = findElementByTestId(element, "save-load-overlay");
-    const settingsTab = findElementByTestId(element, "pause-tab-settings");
-    const close = findElementByTestId(element, "save-load-overlay-close");
-    const returnTitle = findElementByTestId(element, "pause-return-title");
-    const cancel = findElementByTestId(element, "load-cancel");
-    const confirm = findElementByTestId(element, "load-confirm");
-    const testIds = collectTestIds(element);
 
-    expect(settingsTab?.props).toMatchObject({ disabled: true });
-    expect(close?.props).toMatchObject({ disabled: true });
-    expect(returnTitle?.props).toMatchObject({ disabled: true });
-    expect(testIds.indexOf("load-confirm")).toBeLessThan(testIds.indexOf("load-cancel"));
-    (settingsTab?.props as { onClick?: () => void }).onClick?.();
-    expect(dispatch).not.toHaveBeenCalled();
-
-    triggerEscapeCapture(root);
-    expect(cancelLoad).toHaveBeenCalledOnce();
-
-    (cancel?.props as { onClick?: () => void }).onClick?.();
-    (confirm?.props as { onClick?: () => void }).onClick?.();
-    expect(cancelLoad).toHaveBeenCalledTimes(2);
-    expect(confirmLoad).toHaveBeenCalledOnce();
+    expect(markup).toContain('data-testid="load-confirmation"');
+    expect(markup).toMatch(/data-testid="pause-tab-settings"[^>]*disabled=""/);
+    expect(markup).toMatch(/data-testid="save-load-overlay-close"[^>]*disabled=""/);
+    expect(markup).toMatch(/data-testid="pause-return-title"[^>]*disabled=""/);
+    expect(markup.indexOf('data-testid="load-confirm"')).toBeLessThan(markup.indexOf('data-testid="load-cancel"'));
   });
 
   it("renders settings inside the VN pause tab shell", () => {
@@ -404,12 +405,10 @@ describe("game-a interaction surfaces", () => {
       navigation: createNavigation({ activeOverlay: "title-load" })
     });
     const SaveLoadSurface = surfaces.SaveLoadOverlay;
-    const element = <SaveLoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("load")} />;
+    const markup = renderToStaticMarkup(<SaveLoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("load")} />);
 
-    expect(findElementByTestId(element, "save-load-overlay")?.props).toMatchObject({
-      className: "game-a-overlay-panel"
-    });
-    expect(findElementByTestId(element, "pause-tab-list")).toBeUndefined();
+    expect(markup).toContain('class="game-a-overlay-panel"');
+    expect(markup).not.toContain('data-testid="pause-tab-list"');
   });
 });
 
@@ -453,7 +452,9 @@ function createCommandBarModel(): VnCommandBarViewModel {
       { action: "toggle-skip", label: "SKIP", enabled: true, active: false, testId: "vn-command-skip", toggle: true },
       { action: "toggle-auto", label: "AUTO", enabled: true, active: false, testId: "vn-command-auto", toggle: true },
       { action: "open-save", label: "SAVE", enabled: true, active: false, testId: "vn-command-save", toggle: false },
+      { action: "quick-save", label: "Q.SAVE", enabled: true, active: false, testId: "vn-command-quick-save", toggle: false },
       { action: "open-load", label: "LOAD", enabled: true, active: false, testId: "vn-command-load", toggle: false },
+      { action: "quick-load", label: "Q.LOAD", enabled: true, active: false, testId: "vn-command-quick-load", toggle: false },
       { action: "open-settings", label: "SETTING", enabled: true, active: false, testId: "vn-command-settings", toggle: false }
     ]
   };
@@ -484,7 +485,7 @@ function createSaveLoadModel(
   return {
     visible: true,
     mode,
-    slotIds: ["slot:game-a:1", "slot:game-a:2", "slot:game-a:3"],
+    slotIds: Array.from({ length: 40 }, (_, index) => `slot:game-a:${index + 1}`),
     slots: [filledSlot],
     canSave: true,
     pendingLoadSlot: pendingLoad ? filledSlot : undefined

@@ -52,12 +52,19 @@ and merge the change through the integration baseline first.
 - Interaction shell controls should use `GameOverlayKind`, `GameUiAction`,
   `GameInteractionContext`, and `InteractionCapabilitySnapshot`. App adapters
   and UI surfaces must not redefine these shapes locally.
+- `quick-save` and `quick-load` are shared `GameUiAction` values for command
+  bar routing. They reuse `canSave` and `canLoad`; do not add quick-specific
+  capability fields. Apps may narrow command availability for local state such
+  as an empty quick slot.
 - Save/load lists should use `SaveSlotSummary`. Summary derivation belongs to
   the shared contracts helper and reads `SaveData.vn?.story`; `media-save` and
   app-local record envelopes should delegate to that rule instead of maintaining
   separate text-summary standards. App adapters collect the current runtime
   snapshot. `SaveData` itself should remain the restore payload, not the list
   preview authority.
+- Manual save slot counts and quick slot ids are app policy. Current apps use
+  forty manual slots plus one hidden quick slot; `packages/contracts` and
+  `packages/media-save` must not encode that count or id scheme.
 - Settings should use the public `SettingsSnapshot` contract. The snapshot is a
   versioned user-preference shape grouped by system, display, sound, and
   automation. It is persisted by app adapters outside `SaveData`; `media-save`

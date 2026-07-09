@@ -70,6 +70,11 @@ skin resources are app-local config: skin asset ids
 resolve through the app-created `AssetRegistry`, custom
 `GameInteractionShell` Surfaces receive resolved availability, and missing skin
 assets should surface diagnostics while preserving visible fallback chrome.
+Game A currently exposes forty manual save slots in its app-local pages and one
+independent hidden quick slot routed by `quick-save` / `quick-load`. Quick load
+does not use the load-confirmation overlay; it immediately restores the quick
+slot when present, while the command bar disables Q.Load when that slot is
+empty.
 
 Game A temporarily treats the VN pause experience as app-local overlay tabs:
 `vn-backlog`, `vn-save`, `vn-load`, and `vn-settings` render inside one
@@ -128,7 +133,9 @@ route table overrides into `useVnRuntime`.
 Harness saves continue to use `packages/media-save` with Dexie storage. The
 harness does not use Game A's record envelope. It writes v5 sections directly:
 VN story/Pixi under `vn`, Navi state under `navi`, and Trial state under
-`trial` only when Trial is active.
+`trial` only when Trial is active. The harness save adapter owns its own forty
+manual slot ids and one hidden quick slot. Dexie remains an id-addressed save
+port; it does not own slot count, pagination, or quick-slot policy.
 
 Harness-owned interaction hooks such as `useGameFlowActor`,
 `useHarnessShowcaseRuntimeAdapter`, `useHarnessShowcaseSaveAdapter`,
