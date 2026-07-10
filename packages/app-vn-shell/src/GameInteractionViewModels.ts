@@ -1,6 +1,5 @@
 import type { ComponentType } from "react";
 import type {
-  GameInteractionContext,
   GameMode,
   GameOverlayKind,
   GameUiAction,
@@ -13,6 +12,7 @@ import type {
   StoryBacklogEntry,
   StoryChoiceOption
 } from "@v-ronpa/contracts";
+import type { VnRuntimeShellPort } from "@v-ronpa/app-vn-runtime";
 import {
   selectUiSurfacePresentation,
   type RuntimeInputPrompt,
@@ -21,8 +21,6 @@ import {
   type UiSurfacePresentation
 } from "@v-ronpa/app-vn-dispatch";
 import { selectCurrentStoryLine } from "@v-ronpa/story-engine";
-import type { StoryRuntimeState } from "@v-ronpa/story-engine";
-import type { StoryPlayAdvanceSource } from "@v-ronpa/story-play";
 
 export interface GameFlowShellAdapter {
   activeOverlay: GameOverlayKind | undefined;
@@ -30,31 +28,6 @@ export interface GameFlowShellAdapter {
   mode: GameMode;
   closeTopOverlay(): void;
   send(event: { type: string; [key: string]: unknown }): void;
-}
-
-export interface VnShellRuntimeAdapter {
-  advanceStory(source?: StoryPlayAdvanceSource): void;
-  attachMovieElement(element: HTMLVideoElement | null): void;
-  chooseStory(index: number): void;
-  completeMoviePlayback(): void;
-  dialogRevealRuntime: {
-    visibleRichText?: RichTextDocument | undefined;
-    visibleText?: string | undefined;
-  };
-  dismissRuntimeToast(toastId: string): void;
-  interactionContext: GameInteractionContext;
-  navi?: {
-    substate?: NaviSubstate | undefined;
-  };
-  storyPlayActiveActions: Partial<Record<GameUiAction, boolean>>;
-  storyRuntime: {
-    active: boolean;
-    state: StoryRuntimeState;
-  };
-  submitStoryInput(value: string | number | boolean): void;
-  uiRuntime: {
-    state: UiRuntimeState;
-  };
 }
 
 export interface VnDialogDisplaySettings {
@@ -275,7 +248,8 @@ export interface CreateGameInteractionShellViewModelsInput {
   flow: Pick<GameFlowShellAdapter, "activeOverlay" | "capabilities" | "mode">;
   formatStorySpeaker?: ((speaker: string) => string) | undefined;
   overlayModels?: GameInteractionOverlayViewModelInputs | undefined;
-  runtime: VnShellRuntimeAdapter;
+  host?: { naviSubstate?: NaviSubstate | undefined } | undefined;
+  runtime: VnRuntimeShellPort;
   title?: string | undefined;
 }
 
@@ -296,6 +270,7 @@ export function createGameInteractionShellViewModels({
   flow,
   formatStorySpeaker,
   overlayModels,
+  host,
   runtime,
   title = "V-Ronpa"
 }: CreateGameInteractionShellViewModelsInput): GameInteractionShellViewModels {
@@ -309,7 +284,7 @@ export function createGameInteractionShellViewModels({
   const dialogState: VnDialogState = runtime.storyRuntime.state.ended ? "ended" : storyHasChoices ? "choices" : "line";
   const showChoices =
     runtime.storyRuntime.active &&
-    (flow.mode === "vn" || (flow.mode === "navi" && runtime.navi?.substate === "vn2d-overlay")) &&
+    (flow.mode === "vn" || (flow.mode === "navi" && host?.naviSubstate === "vn2d-overlay")) &&
     !runtime.storyRuntime.state.ended &&
     storyHasChoices;
   const showCommandBar =

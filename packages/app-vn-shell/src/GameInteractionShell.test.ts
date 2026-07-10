@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { createInitialUiRuntimeState, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
+import type { VnRuntimeShellPort } from "@v-ronpa/app-vn-runtime";
 import { createDefaultSettingsSnapshot, type GameOverlayKind, type SaveSlotSummary, type StoryChoiceOption } from "@v-ronpa/contracts";
 import {
   createGameInteractionOverlayActions,
@@ -22,8 +23,7 @@ import {
   type SaveLoadOverlayActions,
   type SaveLoadOverlayViewModel,
   type SurfaceSlotProps,
-  type VnDialogViewModel,
-  type VnShellRuntimeAdapter
+  type VnDialogViewModel
 } from "./GameInteractionViewModels";
 
 describe("GameInteractionShell VN advance hit plane", () => {
@@ -372,12 +372,12 @@ function createRuntime({
 }: {
   backlogText?: string;
   hasCurrentLine?: boolean;
-  inputPrompt?: VnShellRuntimeAdapter["uiRuntime"]["state"]["inputPrompt"];
+  inputPrompt?: VnRuntimeShellPort["uiRuntime"]["state"]["inputPrompt"];
   pendingChoices?: StoryChoiceOption[];
-  toasts?: VnShellRuntimeAdapter["uiRuntime"]["state"]["toasts"];
+  toasts?: VnRuntimeShellPort["uiRuntime"]["state"]["toasts"];
   uiRuntimeState?: UiRuntimeState;
   visibleText?: string;
-}): VnShellRuntimeAdapter {
+}): VnRuntimeShellPort {
   const baseUiRuntimeState = uiRuntimeState ?? {
     ...createInitialUiRuntimeState(),
     toasts,
@@ -388,11 +388,9 @@ function createRuntime({
     attachMovieElement: () => undefined,
     chooseStory: () => undefined,
     completeMoviePlayback: () => undefined,
-    dialogRevealRuntime: { ...(visibleText ? { visibleText } : {}) },
+    dialogRevealRuntime: { events: [], eventSequence: 0, ...(visibleText ? { visibleText } : {}) },
     dismissRuntimeToast: () => undefined,
-    interactionContext: {
-      mode: "vn",
-      overlayStack: [],
+    interactionFacts: {
       inputLock: "dialog",
       hasActiveStory: true,
       storyHasChoices: pendingChoices.length > 0,

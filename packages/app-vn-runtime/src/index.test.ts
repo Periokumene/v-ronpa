@@ -10,25 +10,29 @@ import type {
 } from "@v-ronpa/contracts";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
-import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ronpa/pixi-presenter";
+import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ronpa/pixi-stage-model";
 import { createInitialStoryState, storyRuntimeSnapshot } from "@v-ronpa/story-engine";
 import type { AudioHandle, AudioHandleFinishResult, AudioPort, VideoPort } from "@v-ronpa/media-save";
 import {
-  VN_POST_VOICE_AUTO_ADVANCE_DELAY_MS,
   applyVnRuntimeMediaEffects,
+  resolveVnDialogueVoiceAssetAvailability,
+  resolveVnRuntimeMediaSource,
+  type VnRuntimeMediaHandleStore
+} from "./runtimeMedia";
+import { createVnRuntimeRestorePlan } from "./runtimeRestore";
+import type { VnStoryRuntime } from "./runtimeTypes";
+import {
   canAdvanceVnStoryFromSource,
   canCompleteVnPauseRuntimeWaitFromSource,
   canToggleVnStoryAutomation,
-  createVnRuntimeRestorePlan,
-  createVnVoiceAutoAdvanceGateController,
-  resolveVnDialogueVoiceAssetAvailability,
   resolveVnPresentationWaitAdvanceSource,
-  resolveVnRuntimeMediaSource,
   shouldAnimateVnStoryPlayPacing,
-  syncVnRuntimeToastDismissalTimers,
-  type VnRuntimeMediaHandleStore,
-  type VnStoryRuntime
-} from "./index";
+  syncVnRuntimeToastDismissalTimers
+} from "./runtimeUtils";
+import {
+  VN_POST_VOICE_AUTO_ADVANCE_DELAY_MS,
+  createVnVoiceAutoAdvanceGateController
+} from "./voiceGate";
 
 describe("app VN runtime helpers", () => {
   it("keeps toast dismissal timers independent from toastLayer visibility", () => {
@@ -63,13 +67,12 @@ describe("app VN runtime helpers", () => {
     expect(timeouts).toEqual({});
   });
 
-  it("plans restore without carrying transient runtime wait state", () => {
+  it("restores a stable story and terminal Pixi snapshot without animation", () => {
     const runtimeScript = compileScenario("Felix: Restore me.", "restore-test.nani");
     const story = {
       ...createInitialStoryState(runtimeScript),
       instructionPointer: 1,
-      backlog: [{ speaker: "Felix", text: "Restore me." }],
-      runtimeWait: { kind: "pause" as const, commandId: "wait" as const, commandIndex: 0, mode: "confirm" as const }
+      backlog: [{ speaker: "Felix", text: "Restore me." }]
     };
     const pixiStage = reducePixiRuntimeCommand(createInitialPixiStageSnapshot(), {
       commandId: "char",
@@ -89,7 +92,8 @@ describe("app VN runtime helpers", () => {
       active: true,
       pixiStage,
       script: runtimeScript,
-      story: storyRuntimeSnapshot(story)
+      story: storyRuntimeSnapshot(story),
+      ui: { dialog: true, commandBar: true, toastLayer: false }
     });
 
     expect(plan.storyRuntime.active).toBe(true);
@@ -106,47 +110,29 @@ describe("app VN runtime helpers", () => {
       animate: false,
       presentationTasks: []
     });
-    expect(plan.diagnostics).toEqual([
-      {
-        source: "story",
-        code: "runtime-wait-cleared-on-load",
-        severity: "warning",
-        message: "Saved runtimeWait was cleared during restore because runtime waits are transient app state."
-      }
-    ]);
+    expect(plan.diagnostics).toEqual([]);
+    expect(plan.uiRuntime.surfaces.toastLayer.targetVisible).toBe(false);
   });
 
-  it("plans restore without carrying transient UI presentation wait state", () => {
+  it("restores terminal UI visibility without creating transitions", () => {
     const runtimeScript = compileScenario("Felix: Restore UI wait.", "restore-ui-wait-test.nani");
     const story = {
       ...createInitialStoryState(runtimeScript),
-      instructionPointer: 1,
-      presentationWait: {
-        channel: "ui" as const,
-        commandId: "hideui",
-        commandIndex: 0,
-        durationMs: 200,
-        targets: ["dialog" as const],
-        targetVisible: false
-      }
+      instructionPointer: 1
     };
 
     const plan = createVnRuntimeRestorePlan({
       active: true,
       pixiStage: createInitialPixiStageSnapshot(),
       script: runtimeScript,
-      story: storyRuntimeSnapshot(story)
+      story: storyRuntimeSnapshot(story),
+      ui: { dialog: false, commandBar: true, toastLayer: true }
     });
 
-    expect(plan.storyRuntime.state.presentationWait).toBeUndefined();
-    expect(plan.diagnostics).toEqual([
-      {
-        source: "story",
-        code: "ui-presentation-wait-cleared-on-load",
-        severity: "warning",
-        message: "Saved UI presentationWait was cleared during restore because UI transitions are transient app state."
-      }
-    ]);
+    expect(plan.uiRuntime.surfaces.dialog.targetVisible).toBe(false);
+    expect(plan.uiRuntime.surfaces.commandBar.targetVisible).toBe(true);
+    expect(Object.values(plan.uiRuntime.surfaces).every((surface) => !surface.transition)).toBe(true);
+    expect(plan.diagnostics).toEqual([]);
   });
 
   it("resolves media sources through the asset registry and rejects raw URI fallback", () => {

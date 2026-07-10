@@ -11,9 +11,11 @@
   },
   "references": [
     { "path": "../app-vn-dispatch" },
+    { "path": "../app-vn-runtime" },
     { "path": "../contracts" },
     { "path": "../media-save" },
     { "path": "../pixi-presenter" },
+    { "path": "../pixi-stage-model" },
     { "path": "../story-engine" },
     { "path": "../story-play" },
     { "path": "../ui-kit" }

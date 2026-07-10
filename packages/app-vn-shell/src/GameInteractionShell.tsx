@@ -1,5 +1,6 @@
 import { useEffect, type CSSProperties, type ReactNode } from "react";
 import type { GameMode, GameOverlayKind, GameUiAction, NaviSubstate } from "@v-ronpa/contracts";
+import type { VnRuntimeShellPort } from "@v-ronpa/app-vn-runtime";
 import {
   GameOverlayHost,
   PauseMenuOverlay,
@@ -42,8 +43,7 @@ import {
   type VnCommandBarActions,
   type VnCommandBarViewModel,
   type VnDialogDisplaySettings,
-  type VnDialogViewModel,
-  type VnShellRuntimeAdapter
+  type VnDialogViewModel
 } from "./GameInteractionViewModels";
 
 export interface OverlayPageShellAdapter {
@@ -94,6 +94,7 @@ export function GameInteractionShell({
   dialogDisplay,
   flow,
   formatStorySpeaker,
+  host,
   overlayPages,
   runtime,
   surfaces
@@ -102,23 +103,11 @@ export function GameInteractionShell({
   dialogDisplay?: VnDialogDisplaySettings;
   flow: GameFlowShellAdapter;
   formatStorySpeaker?: (speaker: string) => string;
+  host?: { naviSubstate?: NaviSubstate | undefined };
   overlayPages: OverlayPageShellAdapter;
-  runtime: VnShellRuntimeAdapter;
+  runtime: VnRuntimeShellPort;
   surfaces?: Partial<GameInteractionShellSurfaces>;
 }) {
-  useEffect(() => {
-    const { overlayStack: _overlayStack, ...runtimeContext } = runtime.interactionContext;
-    void _overlayStack;
-    flow.send({
-      type: "UPDATE_CONTEXT",
-      context: {
-        ...runtimeContext,
-        mode: flow.mode,
-        inputLock: flow.activeOverlay ? "menu" : runtimeContext.inputLock
-      }
-    });
-  }, [flow.activeOverlay, flow.mode, flow.send, runtime.interactionContext]);
-
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
@@ -157,6 +146,7 @@ export function GameInteractionShell({
     ...(commandAvailability ? { commandAvailability } : {}),
     ...(dialogDisplay ? { dialogDisplay } : {}),
     flow,
+    host,
     ...(formatStorySpeaker ? { formatStorySpeaker } : {}),
     ...(overlayModelInputs ? { overlayModels: overlayModelInputs } : {}),
     runtime
@@ -167,7 +157,7 @@ export function GameInteractionShell({
     hasActiveOverlay: Boolean(flow.activeOverlay),
     hasInputPrompt: Boolean(runtime.uiRuntime.state.inputPrompt),
     hasMovieOverlay: Boolean(runtime.uiRuntime.state.movieOverlay),
-    naviSubstate: runtime.navi?.substate,
+    naviSubstate: host?.naviSubstate,
     storyActive: runtime.storyRuntime.active,
     storyEnded: runtime.storyRuntime.state.ended,
     storyHasChoices

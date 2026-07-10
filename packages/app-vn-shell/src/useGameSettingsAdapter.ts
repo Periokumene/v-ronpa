@@ -21,7 +21,7 @@ export interface GameSettingsStorage {
 
 export interface LoadedGameSettings {
   settings: SettingsSnapshot;
-  migrated: boolean;
+  normalized: boolean;
 }
 
 export interface DebouncedSettingsWriter {
@@ -82,7 +82,7 @@ export function useGameSettingsAdapter({
       writerConfigRef.current = { storage, storageKey, debounceMs };
     }
 
-    if (initialLoadRef.current?.migrated) {
+    if (initialLoadRef.current?.normalized) {
       persistGameSettings(storage, initialLoadRef.current.settings, storageKey);
       initialLoadRef.current = undefined;
     }
@@ -121,7 +121,7 @@ export function initializeGameSettings(
   storageKey = GAME_SETTINGS_STORAGE_KEY
 ): SettingsSnapshot {
   const loaded = loadGameSettings(storage, storageKey);
-  if (loaded.migrated) persistGameSettings(storage, loaded.settings, storageKey);
+  if (loaded.normalized) persistGameSettings(storage, loaded.settings, storageKey);
   return loaded.settings;
 }
 
@@ -129,32 +129,27 @@ export function loadGameSettings(
   storage: GameSettingsStorage | undefined,
   storageKey = GAME_SETTINGS_STORAGE_KEY
 ): LoadedGameSettings {
-  if (!storage) return { settings: createDefaultSettingsSnapshot(), migrated: false };
+  if (!storage) return { settings: createDefaultSettingsSnapshot(), normalized: false };
 
   let raw: string | null;
   try {
     raw = storage.getItem(storageKey);
   } catch {
-    return { settings: createDefaultSettingsSnapshot(), migrated: false };
+    return { settings: createDefaultSettingsSnapshot(), normalized: false };
   }
-  if (!raw) return { settings: createDefaultSettingsSnapshot(), migrated: false };
+  if (!raw) return { settings: createDefaultSettingsSnapshot(), normalized: false };
 
   try {
     const parsed = JSON.parse(raw) as unknown;
     const result = SettingsSnapshotSchema.safeParse(parsed);
-    if (!result.success) {
-      const legacy = stripLegacySettingsFields(parsed);
-      const legacyResult = SettingsSnapshotSchema.safeParse(legacy.value);
-      if (!legacyResult.success) return { settings: createDefaultSettingsSnapshot(), migrated: true };
-      return { settings: legacyResult.data, migrated: true };
-    }
+    if (!result.success) return { settings: createDefaultSettingsSnapshot(), normalized: true };
     const settings = result.data;
     return {
       settings,
-      migrated: JSON.stringify(settings) !== raw
+      normalized: JSON.stringify(settings) !== raw
     };
   } catch {
-    return { settings: createDefaultSettingsSnapshot(), migrated: true };
+    return { settings: createDefaultSettingsSnapshot(), normalized: true };
   }
 }
 
@@ -284,16 +279,4 @@ function settingsLanguageToVoiceLocale(language: SettingsSnapshot["system"]["lan
   if (language === "zh-CN" || language === "zh-TW") return "zh";
   if (language === "ja" || language === "en") return language;
   return "zh";
-}
-
-function stripLegacySettingsFields(value: unknown): { value: unknown; stripped: boolean } {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return { value, stripped: false };
-  const root = value as Record<string, unknown>;
-  const sound = root.sound;
-  if (!sound || typeof sound !== "object" || Array.isArray(sound) || !("voiceInterruption" in sound)) {
-    return { value, stripped: false };
-  }
-  const { voiceInterruption: _voiceInterruption, ...nextSound } = sound as Record<string, unknown>;
-  void _voiceInterruption;
-  return { value: { ...root, sound: nextSound }, stripped: true };
 }

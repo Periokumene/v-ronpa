@@ -24,12 +24,12 @@ describe("game settings adapter helpers", () => {
 
     expect(loadGameSettings(storage)).toEqual({
       settings: createDefaultSettingsSnapshot(),
-      migrated: false
+      normalized: false
     });
     expect(storage.getItem(GAME_SETTINGS_STORAGE_KEY)).toBeNull();
   });
 
-  it("fills missing settings fields and rewrites migrated values", () => {
+  it("fills current-schema defaults and writes the normalized snapshot", () => {
     const storage = createMemorySettingsStorage({
       [GAME_SETTINGS_STORAGE_KEY]: JSON.stringify({
         version: 1,
@@ -46,7 +46,7 @@ describe("game settings adapter helpers", () => {
     expect(JSON.parse(storage.getItem(GAME_SETTINGS_STORAGE_KEY) ?? "")).toEqual(settings);
   });
 
-  it("migrates legacy voice interruption without resetting other settings", () => {
+  it("rejects legacy settings fields instead of preserving an old schema", () => {
     const storage = createMemorySettingsStorage({
       [GAME_SETTINGS_STORAGE_KEY]: JSON.stringify({
         version: 1,
@@ -67,13 +67,8 @@ describe("game settings adapter helpers", () => {
 
     const settings = initializeGameSettings(storage);
 
-    expect(settings.system.language).toBe("zh-TW");
-    expect(settings.display.textSize).toBe("large");
-    expect(settings.sound.bleepVolume).toBe(1);
-    expect(settings.sound.voiceVolume).toBe(0.8);
-    expect(settings.automation.skipSpeed).toBe(0.9);
-    expect(settings.sound).not.toHaveProperty("voiceInterruption");
-    expect(JSON.parse(storage.getItem(GAME_SETTINGS_STORAGE_KEY) ?? "").sound).not.toHaveProperty("voiceInterruption");
+    expect(settings).toEqual(createDefaultSettingsSnapshot());
+    expect(JSON.parse(storage.getItem(GAME_SETTINGS_STORAGE_KEY) ?? "")).toEqual(settings);
   });
 
   it("falls back to defaults and rewrites corrupt settings", () => {
@@ -99,7 +94,7 @@ describe("game settings adapter helpers", () => {
 
     expect(loadGameSettings(throwingStorage)).toEqual({
       settings: createDefaultSettingsSnapshot(),
-      migrated: false
+      normalized: false
     });
     expect(() => initializeGameSettings(throwingStorage)).not.toThrow();
   });

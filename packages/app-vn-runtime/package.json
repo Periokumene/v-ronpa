@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./debug": "./src/debug.ts"
   },
   "dependencies": {
     "@v-ronpa/app-vn-dispatch": "workspace:*",
@@ -12,7 +13,7 @@
     "@v-ronpa/asset-registry": "workspace:*",
     "@v-ronpa/contracts": "workspace:*",
     "@v-ronpa/media-save": "workspace:*",
-    "@v-ronpa/pixi-presenter": "workspace:*",
+    "@v-ronpa/pixi-stage-model": "workspace:*",
     "@v-ronpa/story-engine": "workspace:*",
     "@v-ronpa/story-play": "workspace:*",
     "react": "^19.0.0"

@@ -8,9 +8,11 @@
   },
   "dependencies": {
     "@v-ronpa/app-vn-dispatch": "workspace:*",
+    "@v-ronpa/app-vn-runtime": "workspace:*",
     "@v-ronpa/contracts": "workspace:*",
     "@v-ronpa/media-save": "workspace:*",
     "@v-ronpa/pixi-presenter": "workspace:*",
+    "@v-ronpa/pixi-stage-model": "workspace:*",
     "@v-ronpa/story-engine": "workspace:*",
     "@v-ronpa/story-play": "workspace:*",
     "@v-ronpa/ui-kit": "workspace:*",

@@ -13,11 +13,19 @@ import type { SaveLoadActiveOperation, SaveLoadErrorViewModel, SaveSlotPreviewVi
 export interface SaveSlotControllerOptions {
   port: SavePort;
   policy: SaveSlotPolicy;
-  collectSaveData: () => SaveData;
-  restoreSaveData: (save: SaveData) => void;
+  collectSaveData: () => SaveDataCollectionResult;
+  restoreSaveData: (save: SaveData) => SaveDataRestoreResult | void;
   capturePreview?: (() => Promise<SaveSlotPreview | undefined> | SaveSlotPreview | undefined) | undefined;
-  canSave?: (() => boolean) | undefined;
+  canSave: () => boolean;
 }
+
+export type SaveDataCollectionResult =
+  | { ok: true; value: SaveData }
+  | { ok: false; code: string; message: string };
+
+export type SaveDataRestoreResult =
+  | { ok: true }
+  | { ok: false; code: string; message: string };
 
 export interface SaveSlotController {
   activeOperation: SaveLoadActiveOperation | undefined;
@@ -39,7 +47,7 @@ export interface SaveSlotController {
 }
 
 export function useSaveSlotController({
-  canSave = () => true,
+  canSave,
   capturePreview,
   collectSaveData,
   policy,
@@ -71,20 +79,20 @@ export function useSaveSlotController({
       for (const slotId of Object.keys(next)) {
         if (requestedSlotIdSet.has(slotId)) continue;
         const previousUri = previewUrlsRef.current[slotId];
-        if (previousUri) revokeObjectUrl(previousUri);
+        if (previousUri) revokeObjectUrlAfterCommit(previousUri);
         delete previewUrlsRef.current[slotId];
         delete next[slotId];
       }
       for (const slotId of requestedSlotIds) {
         if (previews[slotId]) continue;
         const previousUri = previewUrlsRef.current[slotId];
-        if (previousUri) revokeObjectUrl(previousUri);
+        if (previousUri) revokeObjectUrlAfterCommit(previousUri);
         delete previewUrlsRef.current[slotId];
         delete next[slotId];
       }
       for (const [slotId, preview] of Object.entries(previews)) {
         const previousUri = previewUrlsRef.current[slotId];
-        if (previousUri) revokeObjectUrl(previousUri);
+        if (previousUri) revokeObjectUrlAfterCommit(previousUri);
         const uri = createObjectUrl(preview.blob);
         previewUrlsRef.current[slotId] = uri;
         next[slotId] = {
@@ -109,7 +117,7 @@ export function useSaveSlotController({
           continue;
         }
         const uri = previewUrlsRef.current[slotId];
-        if (uri) revokeObjectUrl(uri);
+        if (uri) revokeObjectUrlAfterCommit(uri);
         delete previewUrlsRef.current[slotId];
       }
       return next;
@@ -183,15 +191,22 @@ export function useSaveSlotController({
   const saveToSlot = useCallback(
     async (slotId: string, operation: SaveLoadActiveOperation["kind"]) => {
       if (!policy.allSlotIds.includes(slotId)) return false;
-      if (!canSave()) return false;
+      if (!canSave()) {
+        setLastError({ code: "save-unavailable", message: "Saving is not available at the current runtime stop." });
+        return false;
+      }
       return (
         (await runSerialized({ kind: operation, slotId }, async () => {
-          const data = collectSaveData();
+          const collected = collectSaveData();
+          if (!collected.ok) {
+            setLastError({ code: collected.code, message: collected.message });
+            return false;
+          }
           const preview = await captureSavePreview(capturePreview, setLastError);
           const result = await port.save({
             id: slotId,
             label: policy.labelForSlot(slotId),
-            data,
+            data: collected.value,
             ...(preview ? { preview } : {})
           });
           if (!result.ok) {
@@ -244,7 +259,11 @@ export function useSaveSlotController({
         return false;
       }
       if (!result.value) return false;
-      restoreSaveData(result.value.data);
+      const restored = restoreSaveData(result.value.data);
+      if (restored && !restored.ok) {
+        setLastError({ code: restored.code, message: restored.message });
+        return false;
+      }
       setPendingLoadSlot(undefined);
       await refreshSummariesNow();
       return true;
@@ -260,7 +279,11 @@ export function useSaveSlotController({
           return false;
         }
         if (!result.value) return false;
-        restoreSaveData(result.value.data);
+        const restored = restoreSaveData(result.value.data);
+        if (restored && !restored.ok) {
+          setLastError({ code: restored.code, message: restored.message });
+          return false;
+        }
         setPendingLoadSlot(undefined);
         await refreshSummariesNow();
         return true;
@@ -340,4 +363,13 @@ function createObjectUrl(blob: Blob): string {
 function revokeObjectUrl(uri: string): void {
   if (!uri || typeof URL === "undefined" || typeof URL.revokeObjectURL !== "function") return;
   URL.revokeObjectURL(uri);
+}
+
+function revokeObjectUrlAfterCommit(uri: string): void {
+  if (!uri) return;
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(() => revokeObjectUrl(uri));
+    return;
+  }
+  setTimeout(() => revokeObjectUrl(uri), 0);
 }

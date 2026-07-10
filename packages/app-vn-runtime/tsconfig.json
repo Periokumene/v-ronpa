@@ -16,7 +16,7 @@
     { "path": "../media-save" },
     { "path": "../nani-parser" },
     { "path": "../nani-runtime-compiler" },
-    { "path": "../pixi-presenter" },
+    { "path": "../pixi-stage-model" },
     { "path": "../story-engine" },
     { "path": "../story-play" }
   ],

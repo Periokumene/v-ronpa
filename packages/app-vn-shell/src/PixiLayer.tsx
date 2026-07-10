@@ -9,8 +9,9 @@ import {
   type PixiThumbnailMime,
   type PixiThumbnailCaptureOptions,
   type PixiThumbnailCaptureResult,
-  type PixiStageRenderHint
 } from "@v-ronpa/pixi-presenter";
+import type { PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
+import type { PresentationTaskObservation } from "@v-ronpa/app-vn-runtime";
 
 export interface PixiStageCaptureHandle {
   captureThumbnail<Mime extends PixiThumbnailMime = "image/webp">(
@@ -24,7 +25,7 @@ export interface PixiLayerProps {
   animate: boolean;
   hints: PixiStageRenderHint[];
   hintSequence: number;
-  presentationTasks?: PixiPresentationTaskSnapshot[];
+  observedTasks?: PresentationTaskObservation[];
 
   // Host surface.
   visible: boolean;
@@ -41,7 +42,7 @@ export function PixiLayer({
   animate,
   hints,
   hintSequence,
-  presentationTasks = [],
+  observedTasks = [],
   visible,
   assetResolver,
   onDiagnostic,
@@ -106,7 +107,7 @@ export function PixiLayer({
       data-pixi-characters={formatPixiStageCharacters(snapshot)}
       data-pixi-hints={formatPixiHints(hints)}
       data-pixi-hint-sequence={String(hintSequence)}
-      data-pixi-active-tasks={formatPixiPresentationTasks(presentationTasks)}
+      data-pixi-active-tasks={formatPixiPresentationTasks(observedTasks)}
       className={visible ? "pixi-layer" : "pixi-layer pixi-layer-hidden"}
       aria-hidden={!visible}
     />
@@ -117,7 +118,7 @@ function formatPixiHints(hints: PixiStageRenderHint[]): string {
   return hints.length > 0 ? hints.map((hint) => hint.type).join(",") : "empty";
 }
 
-function formatPixiPresentationTasks(tasks: PixiPresentationTaskSnapshot[]): string {
+function formatPixiPresentationTasks(tasks: PresentationTaskObservation[]): string {
   if (tasks.length === 0) return "empty";
   return tasks.map((task) => `${task.kind}:${task.target}:${task.status}:${task.durationMs}`).join(", ");
 }

@@ -11,6 +11,7 @@ import {
   createDialogRevealState,
   createInitialMediaRuntimeState,
   createInitialUiRuntimeState,
+  createVnUiCheckpoint,
   createVnRuntimePresentationTransaction,
   deriveUiRuntimeLifecycleState,
   dismissToast,
@@ -54,14 +55,13 @@ import {
 import {
   createDefaultSettingsSnapshot,
   type DialogueBleepConfig,
-  type GameInteractionContext,
   type GameUiAction,
   type GameplayEvent,
   type PixiStageSnapshot,
   type RichTextDocument,
   type RuntimeCommand,
   type RuntimeValue,
-  type SaveData,
+  type SaveableVnState,
   type StoryRuntimeSnapshot
 } from "@v-ronpa/contracts";
 import {
@@ -70,7 +70,6 @@ import {
   type AudioPort,
   type VideoPort
 } from "@v-ronpa/media-save";
-import type { PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
 import { selectCurrentStoryLine, type StoryStepperDiagnostic, type StoryStepperResult } from "@v-ronpa/story-engine";
 import {
   selectStoryPlaySchedule,
@@ -99,14 +98,21 @@ import {
   type VnRuntimeMediaHandleStore
 } from "./runtimeMedia";
 import { createVnRuntimeRestorePlan } from "./runtimeRestore";
+import { collectVnSaveCheckpoint, validateVnRestoreIdentity } from "./checkpoint";
 import type {
   VnDialogRevealRuntime,
+  VnInteractionFacts,
   VnMediaRuntime,
+  PresentationTaskObservation,
   VnPixiStageRuntime,
   VnRuntimeDialogueBleepSettings,
   VnRuntimeDialogRevealSettings,
   VnRuntimeEntry,
-  VnRuntimeStateAdapter,
+  VnRestoreResult,
+  RestoreVnRuntimeStateInput,
+  VnSaveCheckpointResult,
+  StartVnStoryOptions,
+  UseVnRuntimeResult,
   VnRuntimeVoiceSettings,
   VnStoryRuntime,
   VnUiRuntime
@@ -137,6 +143,7 @@ const DEFAULT_DIALOG_REVEAL_SETTINGS: VnRuntimeDialogRevealSettings = {
 const MAX_DIALOG_REVEAL_EVENTS = 50;
 
 export interface UseVnRuntimeOptions {
+  gameId: string;
   entry: VnRuntimeEntry;
   assetResolver?: AssetResolver;
   audioPort?: AudioPort;
@@ -148,20 +155,9 @@ export interface UseVnRuntimeOptions {
   dialogueBleepConfig?: DialogueBleepConfig;
   dialogueBleepSettings?: VnRuntimeDialogueBleepSettings;
   dialogRevealSettings?: VnRuntimeDialogRevealSettings;
-  interactionMode?: GameInteractionContext["mode"];
   onGameplayEvents?: (events: GameplayEvent[]) => void;
   onRuntimeStatus?: (status: { action: string; outcome: string }) => void;
   onStoryEnd?: (action: "story:end") => void;
-}
-
-export interface StartVnStoryOptions {
-  source?: Extract<StoryPlayAdvanceSource, "start">;
-}
-
-export interface RestoreVnRuntimeStateInput {
-  active?: boolean;
-  pixiStage: PixiStageSnapshot;
-  story: StoryRuntimeSnapshot;
 }
 
 interface CommitVnSessionStepInput {
@@ -188,7 +184,7 @@ export function useVnRuntime({
   dialogueBleepConfig,
   dialogueBleepSettings = DEFAULT_DIALOGUE_BLEEP_SETTINGS,
   entry,
-  interactionMode = "vn",
+  gameId,
   onGameplayEvents,
   onRuntimeStatus,
   onStoryEnd,
@@ -197,14 +193,7 @@ export function useVnRuntime({
   storyPlayTiming,
   videoPort: configuredVideoPort,
   voiceSettings = DEFAULT_VOICE_SETTINGS
-}: UseVnRuntimeOptions): VnRuntimeStateAdapter & {
-  createVnSaveSnapshot(): { story: StoryRuntimeSnapshot; pixiStage: PixiStageSnapshot };
-  observeAssetDiagnostic(diagnostic: { code?: string; severity?: "info" | "warning" | "error"; message: string; assetId?: string; kind?: string }): void;
-  resetRuntime(options?: { stopMedia?: boolean }): void;
-  restoreVnState(input: RestoreVnRuntimeStateInput): void;
-  runtimeDiagnostics: VnRuntimeDiagnostic[];
-  startStory(options?: StartVnStoryOptions): void;
-} {
+}: UseVnRuntimeOptions): UseVnRuntimeResult {
   const bootStep = useMemo(
     () =>
       createVnSession({
@@ -814,17 +803,32 @@ export function useVnRuntime({
     setUiRuntimeNow((current) => ({ state: clearMovieOverlay(current.state) }));
   }
 
-  function restoreVnState({ active, pixiStage, story }: RestoreVnRuntimeStateInput) {
+  function restoreVnState({ gameId: savedGameId, state }: RestoreVnRuntimeStateInput): VnRestoreResult {
+    const rejection = validateVnRestoreIdentity({
+      expectedEntryId: entry.id,
+      expectedGameId: gameId,
+      expectedScriptRevision: entry.scriptRevision,
+      savedEntryId: state.entryId,
+      savedGameId,
+      savedScriptRevision: state.scriptRevision
+    });
+    if (rejection) {
+      appendRuntimeDiagnostics([
+        { source: "story", severity: "error", code: rejection.code, message: rejection.message }
+      ]);
+      return rejection;
+    }
     cancelStoryPlayHostSchedule();
     clearVoiceAutoAdvanceGate({ stopVoice: true });
     clearDialogRevealRuntime();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     const plan = createVnRuntimeRestorePlan({
-      ...(active !== undefined ? { active } : {}),
-      pixiStage,
+      active: !state.story.ended,
+      pixiStage: state.pixiStage,
       script: bootSession.script,
-      story
+      story: state.story,
+      ui: state.ui
     });
     mediaHandlesRef.current = stopAllVnRuntimeMediaHandles(mediaHandlesRef.current, videoPort);
     pendingMoviePlaybackRef.current = undefined;
@@ -837,7 +841,7 @@ export function useVnRuntime({
       })
     );
     setMediaRuntimeNow({ state: createInitialMediaRuntimeState() });
-    setUiRuntimeNow({ state: deriveUiRuntimeLifecycleState(createInitialUiRuntimeState(), plan.storyRuntime.state) });
+    setUiRuntimeNow({ state: plan.uiRuntime });
     setRuntimeDiagnostics((current) => limitVnRuntimeDiagnostics([...current, ...plan.diagnostics]));
     setPixiStageRuntimeNow((current) => ({
       ...plan.pixiStageRuntime,
@@ -845,6 +849,7 @@ export function useVnRuntime({
     }));
     setStorySession((current) => current + 1);
     setLastRuntimeCommandCount(0);
+    return { ok: true };
   }
 
   function commitVnSessionStep({
@@ -1042,7 +1047,7 @@ export function useVnRuntime({
     };
   }
 
-  function updatePixiPresentationTasks(tasks: PixiPresentationTaskSnapshot[]) {
+  function updatePixiPresentationTasks(tasks: PresentationTaskObservation[]) {
     setPixiStageRuntimeNow((current) => ({
       ...current,
       presentationTasks: tasks
@@ -1050,7 +1055,7 @@ export function useVnRuntime({
     observePixiPresentationTasks(tasks);
   }
 
-  function observePixiPresentationTasks(tasks: PixiPresentationTaskSnapshot[]) {
+  function observePixiPresentationTasks(tasks: PresentationTaskObservation[]) {
     const currentSession = sessionRef.current;
     const wait = currentSession.story.presentationWait;
     if (!currentSession.active || !wait) return;
@@ -1162,17 +1167,20 @@ export function useVnRuntime({
     }
   }
 
-  function createVnSaveSnapshot() {
-    return {
-      story: sessionRef.current.story,
-      pixiStage: pixiStageRuntimeRef.current.snapshot
-    };
+  function createVnSaveCheckpoint({ allowInactive = false }: { allowInactive?: boolean } = {}): VnSaveCheckpointResult {
+    const current = sessionRef.current;
+    return collectVnSaveCheckpoint({
+      active: current.active,
+      allowInactive,
+      entry,
+      story: current.story,
+      pixiStage: pixiStageRuntimeRef.current.snapshot,
+      ui: createVnUiCheckpoint(uiRuntimeRef.current.state)
+    });
   }
 
-  const interactionContext: GameInteractionContext = useMemo(
+  const interactionFacts = useMemo<VnInteractionFacts>(
     () => ({
-      mode: interactionMode,
-      overlayStack: [],
       inputLock: session.active ? "dialog" : "none",
       hasActiveStory: session.active,
       storyHasChoices: session.story.pendingChoices.length > 0,
@@ -1180,7 +1188,6 @@ export function useVnRuntime({
       isAtStableStop: session.active && !session.story.presentationWait && !session.story.runtimeWait
     }),
     [
-      interactionMode,
       session.active,
       session.story.ended,
       session.story.pendingChoices.length,
@@ -1190,34 +1197,44 @@ export function useVnRuntime({
   );
 
   return {
-    advanceStory,
-    attachMovieElement,
-    chooseStory,
-    completeMoviePlayback,
-    createVnSaveSnapshot,
-    dialogRevealRuntime,
-    dismissRuntimeToast,
-    interactionContext,
-    lastRuntimeCommandCount,
-    mediaRuntime,
-    observeAssetDiagnostic,
-    pixiStageRuntime,
-    resetRuntime,
-    restoreVnState,
-    runtimeDiagnostics,
-    startStory,
-    stopStoryAutomation,
-    storyPlay,
-    storyPlayActiveActions,
-    storyPlaySchedule,
-    storyRuntime,
-    storySession,
-    storySessionState: session,
-    submitStoryInput,
-    toggleStoryAuto,
-    toggleStorySkip,
-    uiRuntime,
-    updatePixiPresentationTasks
+    shell: {
+      advanceStory,
+      attachMovieElement,
+      chooseStory,
+      completeMoviePlayback,
+      dialogRevealRuntime,
+      dismissRuntimeToast,
+      interactionFacts,
+      storyPlayActiveActions,
+      storyRuntime,
+      submitStoryInput,
+      uiRuntime
+    },
+    presentation: {
+      pixiStageRuntime,
+      storySession,
+      updatePixiPresentationTasks
+    },
+    lifecycle: {
+      createVnSaveCheckpoint,
+      resetRuntime,
+      restoreVnState,
+      startStory
+    },
+    diagnostics: {
+      observeAssetDiagnostic,
+      runtimeDiagnostics
+    },
+    debug: {
+      lastRuntimeCommandCount,
+      mediaRuntime,
+      stopStoryAutomation,
+      storyPlay,
+      storyPlaySchedule,
+      storySessionState: session,
+      toggleStoryAuto,
+      toggleStorySkip
+    }
   };
 }
 

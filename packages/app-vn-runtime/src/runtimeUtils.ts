@@ -1,8 +1,8 @@
 import type { StoryPresentationWaitTask, StoryRuntimeSnapshot } from "@v-ronpa/contracts";
 import { dismissToast, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
-import { createInitialPixiStageSnapshot, type PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
+import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import type { StoryPlayAdvanceSource, StoryPlayPacing, StoryPlayState } from "@v-ronpa/story-play";
-import type { VnPixiStageRuntime, VnStoryRuntime } from "./runtimeTypes";
+import type { PresentationTaskObservation, VnPixiStageRuntime, VnStoryRuntime } from "./runtimeTypes";
 
 export const DEFAULT_VN_TOAST_DURATION_MS = 2500;
 
@@ -103,7 +103,7 @@ export function vnPresentationWaitTaskKey(task: StoryPresentationWaitTask): stri
   return `${task.kind}:${task.target}:${task.revision}`;
 }
 
-export function vnPixiPresentationTaskKey(task: PixiPresentationTaskSnapshot): string {
+export function vnPixiPresentationTaskKey(task: PresentationTaskObservation): string {
   return `${task.kind}:${task.target}:${task.revision}`;
 }
 
