@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { ContentManifest, RuntimeAsset, RuntimeAssetFormat, RuntimeAssetKind } from "@v-ronpa/contracts";
-import { createAssetRegistry, isRawAssetReference } from "./index";
+import { composeContentManifest, createAssetRegistry, defineRuntimeAssetFragment, isRawAssetReference } from "./index";
 
 describe("asset registry", () => {
+  it("composes provider fragments into one manifest and rejects duplicate authority", () => {
+    const fragment = defineRuntimeAssetFragment({
+      id: "runtime-assets:test",
+      runtimeAssets: [runtimeAsset("fx:noise", "fx")]
+    });
+    const explicit = baseManifest([]);
+    const manifest = composeContentManifest(explicit, [fragment]);
+
+    expect(createAssetRegistry(manifest).resolve({ id: "fx:noise", kind: "fx" }).uri).toBe("/assets/fx-noise");
+    expect(() => composeContentManifest({ ...explicit, runtimeAssets: [runtimeAsset("fx:noise", "fx")] }, [fragment])).toThrow(
+      "Duplicate runtime asset 'fx:noise'"
+    );
+  });
   it("resolves every runtime asset kind from ContentManifest.runtimeAssets", () => {
     const manifest = manifestWithKinds(["character-pack", "background", "bgm", "sfx", "bleep", "voice", "video", "font", "glb", "texture", "fx"]);
     const registry = createAssetRegistry(manifest);
@@ -91,6 +104,7 @@ describe("asset registry", () => {
           id: "vn:opening",
           title: "Opening",
           scriptPath: "opening.nani",
+          scriptRevision: "sha256:test",
           profile: "vn2d",
           assetRefs: [{ id: "texture:missing-vn", kind: "texture", tags: [] }]
         }

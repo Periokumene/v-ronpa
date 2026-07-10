@@ -21,7 +21,7 @@ import type {
   PixiWeatherKind,
   PixiWeatherSnapshot
 } from "@v-ronpa/contracts";
-import { INNER_BACKGROUND_ID, type PixiStageRenderHint } from "../stageSnapshot";
+import { INNER_BACKGROUND_ID, type PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
 import { getBuiltInPixiFxTexture } from "./fxAssets";
 import type { PixiPresentationTaskHandle, PixiPresentationTaskKind, PresentationTaskController } from "./presentationTasks";
 import { pixiAssetLoadFailed, resolvePixiAsset, type PixiAssetResolver, type PixiPresenterDiagnostic } from "./assetResolver";

@@ -18,7 +18,18 @@ import {
   RAIN_TINT_MIN,
   RAIN_WIND_MAX,
   RAIN_WIND_MIN
-} from "./internal/rain/commandParams";
+} from "./rainCommandParams";
+
+export {
+  DEFAULT_RAIN_COMMAND_PARAMS,
+  RAIN_HUE_WRAP,
+  RAIN_POWER_MAX,
+  RAIN_POWER_MIN,
+  RAIN_TINT_MAX,
+  RAIN_TINT_MIN,
+  RAIN_WIND_MAX,
+  RAIN_WIND_MIN
+} from "./rainCommandParams";
 
 export type PixiStageRenderHint =
   | { type: "flash"; color: string; durationMs: number; wait?: boolean }

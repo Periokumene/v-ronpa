@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@v-ronpa/contracts": "workspace:*",
-    "@v-ronpa/pixi-presenter": "workspace:*",
+    "@v-ronpa/pixi-stage-model": "workspace:*",
     "@v-ronpa/story-play": "workspace:*"
   },
   "devDependencies": {

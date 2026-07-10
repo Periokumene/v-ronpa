@@ -1,0 +1,12 @@
+{
+  "name": "@v-ronpa/pixi-stage-model",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/contracts": "workspace:*"
+  }
+}

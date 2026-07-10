@@ -3,7 +3,7 @@ import {
   reducePixiRuntimeCommand,
   type PixiRuntimeCommandReduction,
   type PixiStageRenderHint
-} from "@v-ronpa/pixi-presenter";
+} from "@v-ronpa/pixi-stage-model";
 import {
   defaultVnOutputRouteTable,
   selectRuntimeCommandsForTarget,

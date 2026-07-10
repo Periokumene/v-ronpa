@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PIXI_INNER_BACKGROUND_ID, PIXI_MAIN_BACKGROUND_ID, type RuntimeScript } from "@v-ronpa/contracts";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
-import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-presenter";
+import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import { advanceToNextStop, createInitialStoryState } from "@v-ronpa/story-engine";
 import { createVnRuntimePresentationTransaction } from "./vnRuntimeTransaction";
 

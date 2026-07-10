@@ -56,6 +56,9 @@ importers:
       '@v-ronpa/media-save':
         specifier: workspace:*
         version: link:../../packages/media-save
+      '@v-ronpa/runtime-assets-pixi':
+        specifier: workspace:*
+        version: link:../../packages/runtime-assets-pixi
       '@v-ronpa/ui-kit':
         specifier: workspace:*
         version: link:../../packages/ui-kit
@@ -113,9 +116,15 @@ importers:
       '@v-ronpa/pixi-presenter':
         specifier: workspace:*
         version: link:../../packages/pixi-presenter
+      '@v-ronpa/pixi-stage-model':
+        specifier: workspace:*
+        version: link:../../packages/pixi-stage-model
       '@v-ronpa/r3f-adapter':
         specifier: workspace:*
         version: link:../../packages/r3f-adapter
+      '@v-ronpa/runtime-assets-pixi':
+        specifier: workspace:*
+        version: link:../../packages/runtime-assets-pixi
       '@v-ronpa/story-engine':
         specifier: workspace:*
         version: link:../../packages/story-engine
@@ -153,9 +162,9 @@ importers:
       '@v-ronpa/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@v-ronpa/pixi-presenter':
+      '@v-ronpa/pixi-stage-model':
         specifier: workspace:*
-        version: link:../pixi-presenter
+        version: link:../pixi-stage-model
       '@v-ronpa/story-play':
         specifier: workspace:*
         version: link:../story-play
@@ -187,9 +196,9 @@ importers:
       '@v-ronpa/media-save':
         specifier: workspace:*
         version: link:../media-save
-      '@v-ronpa/pixi-presenter':
+      '@v-ronpa/pixi-stage-model':
         specifier: workspace:*
-        version: link:../pixi-presenter
+        version: link:../pixi-stage-model
       '@v-ronpa/story-engine':
         specifier: workspace:*
         version: link:../story-engine
@@ -230,6 +239,9 @@ importers:
       '@v-ronpa/app-vn-dispatch':
         specifier: workspace:*
         version: link:../app-vn-dispatch
+      '@v-ronpa/app-vn-runtime':
+        specifier: workspace:*
+        version: link:../app-vn-runtime
       '@v-ronpa/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -239,6 +251,9 @@ importers:
       '@v-ronpa/pixi-presenter':
         specifier: workspace:*
         version: link:../pixi-presenter
+      '@v-ronpa/pixi-stage-model':
+        specifier: workspace:*
+        version: link:../pixi-stage-model
       '@v-ronpa/story-engine':
         specifier: workspace:*
         version: link:../story-engine
@@ -332,12 +347,24 @@ importers:
       '@v-ronpa/layered-character':
         specifier: workspace:*
         version: link:../layered-character
+      '@v-ronpa/pixi-stage-model':
+        specifier: workspace:*
+        version: link:../pixi-stage-model
+      '@v-ronpa/runtime-assets-pixi':
+        specifier: workspace:*
+        version: link:../runtime-assets-pixi
       pixi-filters:
         specifier: ^6.1.5
         version: 6.1.5(pixi.js@8.19.0)
       pixi.js:
         specifier: ^8.0.0
         version: 8.19.0
+
+  packages/pixi-stage-model:
+    dependencies:
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/r3f-adapter:
     dependencies:
@@ -360,6 +387,15 @@ importers:
       '@types/three':
         specifier: ^0.181.0
         version: 0.181.0
+
+  packages/runtime-assets-pixi:
+    dependencies:
+      '@v-ronpa/asset-registry':
+        specifier: workspace:*
+        version: link:../asset-registry
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/story-engine:
     dependencies:

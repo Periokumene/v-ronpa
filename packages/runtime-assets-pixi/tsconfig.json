@@ -9,12 +9,8 @@
     "lib": ["ES2022", "DOM"]
   },
   "references": [
-    { "path": "../contracts" },
-    { "path": "../nani-parser" },
-    { "path": "../nani-runtime-compiler" },
-    { "path": "../pixi-stage-model" },
-    { "path": "../story-engine" },
-    { "path": "../story-play" }
+    { "path": "../asset-registry" },
+    { "path": "../contracts" }
   ],
   "include": ["src"]
 }

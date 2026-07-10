@@ -1,4 +1,43 @@
-import { ContentManifestSchema, type AssetRef, type ContentManifest, type RuntimeAsset, type RuntimeAssetKind } from "@v-ronpa/contracts";
+import {
+  ContentManifestSchema,
+  type AssetRef,
+  type ContentManifest,
+  type ContentManifestInput,
+  type FontFaceDefinition,
+  type RuntimeAsset,
+  type RuntimeAssetKind
+} from "@v-ronpa/contracts";
+
+/**
+ * A provider contributes assets to the one app-owned ContentManifest. It must
+ * never create a resolver, registry, loader, or alternate manifest authority.
+ */
+export interface RuntimeAssetFragment {
+  id: string;
+  runtimeAssets: readonly RuntimeAsset[];
+  fonts?: readonly FontFaceDefinition[];
+}
+
+export function defineRuntimeAssetFragment(fragment: RuntimeAssetFragment): RuntimeAssetFragment {
+  return fragment;
+}
+
+export function composeContentManifest(
+  explicit: ContentManifestInput,
+  fragments: readonly RuntimeAssetFragment[] = []
+): ContentManifest {
+  const runtimeAssets = [...fragments.flatMap((fragment) => fragment.runtimeAssets), ...(explicit.runtimeAssets ?? [])];
+  const fonts = [...fragments.flatMap((fragment) => fragment.fonts ?? []), ...(explicit.fonts ?? [])];
+  assertUniqueCompositionIds(
+    "runtime asset",
+    runtimeAssets.map((asset) => ({ id: asset.id, source: sourceForAsset(fragments, asset.id) }))
+  );
+  assertUniqueCompositionIds(
+    "font",
+    fonts.map((font) => ({ id: font.id, source: sourceForFont(fragments, font.id) }))
+  );
+  return ContentManifestSchema.parse({ ...explicit, runtimeAssets, fonts });
+}
 
 export type AssetRegistryDiagnosticCode =
   | "manifest-version-unsupported"
@@ -202,4 +241,21 @@ function createEmptyManifest(): ContentManifest {
     evidence: [],
     trials: []
   };
+}
+
+function assertUniqueCompositionIds(kind: string, values: Array<{ id: string; source: string }>): void {
+  const seen = new Map<string, string>();
+  for (const value of values) {
+    const previous = seen.get(value.id);
+    if (previous) throw new Error(`Duplicate ${kind} '${value.id}' from ${previous} and ${value.source}.`);
+    seen.set(value.id, value.source);
+  }
+}
+
+function sourceForAsset(fragments: readonly RuntimeAssetFragment[], id: string): string {
+  return fragments.find((fragment) => fragment.runtimeAssets.some((asset) => asset.id === id))?.id ?? "explicit manifest";
+}
+
+function sourceForFont(fragments: readonly RuntimeAssetFragment[], id: string): string {
+  return fragments.find((fragment) => fragment.fonts?.some((font) => font.id === id))?.id ?? "explicit manifest";
 }

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Assets, Container, Graphics, Rectangle, Sprite, Texture, TextureSource, TilingSprite, type Filter, type Ticker } from "pixi.js";
 import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "@v-ronpa/contracts";
-import { INNER_BACKGROUND_ID, createInitialPixiStageSnapshot } from "../stageSnapshot";
+import { INNER_BACKGROUND_ID, createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import {
   ActorSystem,
   FilterSystem,

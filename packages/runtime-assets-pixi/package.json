@@ -1,0 +1,13 @@
+{
+  "name": "@v-ronpa/runtime-assets-pixi",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/asset-registry": "workspace:*",
+    "@v-ronpa/contracts": "workspace:*"
+  }
+}

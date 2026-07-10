@@ -1,5 +1,7 @@
 import type { PixiRainCommandParams } from "@v-ronpa/contracts";
 
+// Canonical command-space limits belong to the pure stage model, not the renderer.
+
 export const DEFAULT_RAIN_COMMAND_PARAMS: PixiRainCommandParams = {
   power: 1,
   wind: -1,

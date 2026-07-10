@@ -8,7 +8,7 @@ import {
   RAIN_TINT_MIN,
   RAIN_WIND_MAX,
   RAIN_WIND_MIN
-} from "./commandParams";
+} from "@v-ronpa/pixi-stage-model";
 import { resolveNearTrackPreset, type NearTrackPreset } from "./nearTrackPresets";
 
 export type PresetId = 'calibration' | 'preview';

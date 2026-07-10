@@ -10,6 +10,8 @@
     "@tweenjs/tween.js": "^25.0.0",
     "@v-ronpa/contracts": "workspace:*",
     "@v-ronpa/layered-character": "workspace:*",
+    "@v-ronpa/pixi-stage-model": "workspace:*",
+    "@v-ronpa/runtime-assets-pixi": "workspace:*",
     "pixi-filters": "^6.1.5",
     "pixi.js": "^8.0.0"
   }

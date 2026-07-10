@@ -5,7 +5,8 @@ import {
   type RuntimeUiGroup,
   type RuntimeValue,
   type StoryRuntimeSnapshot,
-  type StoryUiPresentationWait
+  type StoryUiPresentationWait,
+  type VnUiCheckpoint
 } from "@v-ronpa/contracts";
 
 export { RUNTIME_UI_GROUPS };
@@ -86,6 +87,25 @@ export function createInitialUiRuntimeState(): UiRuntimeState {
       dialog: shownSurface(),
       commandBar: shownSurface(),
       toastLayer: shownSurface()
+    },
+    toasts: []
+  };
+}
+
+export function createVnUiCheckpoint(state: UiRuntimeState): VnUiCheckpoint {
+  return {
+    dialog: state.surfaces.dialog.targetVisible,
+    commandBar: state.surfaces.commandBar.targetVisible,
+    toastLayer: state.surfaces.toastLayer.targetVisible
+  };
+}
+
+export function createUiRuntimeStateFromCheckpoint(checkpoint: VnUiCheckpoint): UiRuntimeState {
+  return {
+    surfaces: {
+      dialog: terminalSurface(checkpoint.dialog),
+      commandBar: terminalSurface(checkpoint.commandBar),
+      toastLayer: terminalSurface(checkpoint.toastLayer)
     },
     toasts: []
   };

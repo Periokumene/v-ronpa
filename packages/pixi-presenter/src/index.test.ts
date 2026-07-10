@@ -4,9 +4,9 @@ import type { NaniCommandCategory, NaniCommandSource, NaniCommandStatus, Runtime
 import {
   INNER_BACKGROUND_ID,
   createInitialPixiStageSnapshot,
-  createPixiPresenter,
   reducePixiRuntimeCommand
-} from "./index";
+} from "@v-ronpa/pixi-stage-model";
+import { createPixiPresenter } from "./index";
 import { ActorSystem } from "./internal/systems";
 import { resolveRainSettingsFromCommandParams } from "./internal/rain/settings";
 

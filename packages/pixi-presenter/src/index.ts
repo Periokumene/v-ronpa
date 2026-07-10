@@ -9,24 +9,12 @@ import {
   TweenSystem,
   WeatherSystem
 } from "./internal/systems";
-import { builtInPixiFxRuntimeAssets, preloadBuiltInPixiFxAssets } from "./internal/fxAssets";
+import { preloadBuiltInPixiFxAssets } from "./internal/fxAssets";
 import type { PixiAssetResolver, PixiPresenterDiagnostic } from "./internal/assetResolver";
 import { PresentationTaskController, type PixiPresentationTaskSnapshot } from "./internal/presentationTasks";
-import { type PixiStageRenderHint } from "./stageSnapshot";
+import { type PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
 
-export {
-  INNER_BACKGROUND_ID,
-  MAIN_BACKGROUND_ID,
-  createInitialPixiStageSnapshot,
-  normalizeActorTransformParams,
-  reducePixiRuntimeCommand,
-  resolvePixiActorTarget,
-  type PixiRuntimeCommandDiagnostic,
-  type PixiRuntimeCommandReduction,
-  type PixiStageRenderHint
-} from "./stageSnapshot";
 export type { PixiPresentationTaskSnapshot } from "./internal/presentationTasks";
-export { builtInPixiFxRuntimeAssets };
 export type { PixiAssetResolver, PixiPresenterDiagnostic };
 
 export interface PixiPresenterOptions {
