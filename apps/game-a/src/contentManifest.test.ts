@@ -8,28 +8,28 @@ describe("game-a content manifest", () => {
 
     expect(registry.diagnostics).toEqual([]);
     expect(registry.validateReferences()).toEqual([]);
-    expect(gameAContentManifest.vnEntries).toEqual([
-      expect.objectContaining({
-        id: gameAVnEntry.id,
-        scriptPath: gameAVnEntry.scriptPath,
-        assetRefs: expect.arrayContaining([
-          { id: "bg:game-a-academy-hall-fullscreen", kind: "background", tags: ["game-a", "vn"] },
-          { id: "bg:game-a-snow-outskirts-frame", kind: "background", tags: ["game-a", "vn"] },
-          { id: "bg:rain-street", kind: "background", tags: ["game-a", "vn"] },
-          { id: "bgm:dead-fish-riffle", kind: "bgm", tags: ["game-a", "vn"] },
-          { id: "bgm:game-a-main", kind: "bgm", tags: ["game-a", "vn"] },
-          { id: "sfx:game-a-chime", kind: "sfx", tags: ["game-a", "vn"] },
-          { id: "sfx:gentle-rain-loop", kind: "sfx", tags: ["game-a", "vn"] },
-          { id: "sfx:glug-glug-glug", kind: "sfx", tags: ["game-a", "vn"] },
-          { id: "sfx:noise-6hz", kind: "sfx", tags: ["game-a", "vn"] },
-          { id: "bleep:game-a-dialogue", kind: "bleep", tags: ["game-a", "vn"] },
-          { id: "voice:zh:game_a_voice_0001", kind: "voice", tags: ["game-a", "vn"] },
-          { id: "video:game-a-intro", kind: "video", tags: ["game-a", "vn"] },
-          { id: "texture:ui:game-a-dialog-frame", kind: "texture", tags: ["game-a", "ui", "vn"] },
-          { id: "alice", kind: "character-pack", tags: ["game-a", "vn"] }
-        ])
-      })
-    ]);
+    expect(gameAContentManifest.vnEntries).toHaveLength(1);
+    expect(gameAContentManifest.vnEntries[0]).toMatchObject({
+      id: gameAVnEntry.id,
+      scriptPath: gameAVnEntry.scriptPath,
+      scriptRevision: gameAVnEntry.scriptRevision
+    });
+    expect(new Set(gameAVnEntry.assetRefs.map((ref) => ref.id))).toEqual(
+      new Set([
+        "alice",
+        "bg:rain-street",
+        "bgm:dead-fish-riffle",
+        "sfx:gentle-rain-loop",
+        "sfx:glug-glug-glug",
+        "sfx:noise-6hz",
+        "bleep:game-a-dialogue",
+        "texture:ui:game-a-dialog-frame",
+        "bg:game-a-academy-hall-fullscreen",
+        "bg:game-a-snow-outskirts-frame"
+      ])
+    );
+    expect(gameAContentManifest.vnEntries.some((entry) => entry.id === "vn:game-a-smoke")).toBe(false);
+    expect(gameAContentManifest.runtimeAssets.some((asset) => asset.id === "fx:noise")).toBe(true);
     expect(gameAContentManifest.fonts).toEqual([
       {
         id: "font:jinghua-laosong-gb",

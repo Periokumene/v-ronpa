@@ -17,6 +17,7 @@
     { "path": "../../packages/game-flow-machine" },
     { "path": "../../packages/gameplay" },
     { "path": "../../packages/media-save" },
+    { "path": "../../packages/runtime-assets-pixi" },
     { "path": "../../packages/ui-kit" }
   ],
   "include": ["src"]

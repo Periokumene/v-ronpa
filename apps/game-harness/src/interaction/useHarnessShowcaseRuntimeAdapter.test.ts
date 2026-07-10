@@ -1,13 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
-import { createInitialStoryState } from "@v-ronpa/story-engine";
 import { harnessShowcaseScript } from "../harness/showcase";
 import {
-  createHarnessShowcaseInteractionContext,
   createInitialHarnessShowcaseTrialRuntime,
-  harnessShowcasePosePresets,
-  type TrialRuntime
+  harnessShowcasePosePresets
 } from "./useHarnessShowcaseRuntimeAdapter";
 
 describe("harness showcase runtime adapter glue", () => {
@@ -211,72 +208,6 @@ describe("harness showcase runtime adapter glue", () => {
     );
     expect(fontFaceRun).toBeDefined();
     expect(fontFaceComparison?.richText?.text.slice(fontFaceRun?.start, fontFaceRun?.end)).toBe(comparisonSample);
-  });
-
-  it("extracts GameInteractionContext from harness Navi and Trial glue", () => {
-    const runtimeScript = compileRuntimeScript(
-      parseScenario({ sourceText: "Felix: Hello.\n- Choice A", scriptPath: "context-test.nani" }).scenario
-    ).script;
-    const storyRuntime = {
-      active: true,
-      state: {
-        ...createInitialStoryState(runtimeScript),
-        pendingChoices: [{ text: "Choice A", enabled: true }]
-      }
-    };
-    const trialRuntime: TrialRuntime = {
-      definition: {
-        id: "trial:door-lock",
-        title: "Door Lock Trial",
-        initialSegmentId: "debate:door-lock",
-        segments: []
-      },
-      active: true,
-      state: {
-        trialId: "trial:door-lock",
-        currentSegmentId: "debate:door-lock",
-        presentation: "debate3d",
-        inputLock: "trial-targeting",
-        keywordStates: {}
-      },
-      lastOutcome: "segment:debate:door-lock"
-    };
-
-    expect(
-      createHarnessShowcaseInteractionContext({
-        flowMode: "navi",
-        navi: { substate: "vn2d-overlay", inputLock: "dialog" },
-        storyRuntime
-      })
-    ).toEqual({
-      mode: "navi",
-      overlayStack: [],
-      naviSubstate: "vn2d-overlay",
-      inputLock: "dialog",
-      hasActiveStory: true,
-      storyHasChoices: true,
-      storyEnded: false,
-      isAtStableStop: true
-    });
-
-    expect(
-      createHarnessShowcaseInteractionContext({
-        flowMode: "trial",
-        navi: { substate: "walk", inputLock: "none" },
-        storyRuntime: { ...storyRuntime, active: false },
-        trialRuntime
-      })
-    ).toEqual({
-      mode: "trial",
-      overlayStack: [],
-      naviSubstate: "walk",
-      trialPresentation: "debate3d",
-      inputLock: "trial-targeting",
-      hasActiveStory: false,
-      storyHasChoices: false,
-      storyEnded: false,
-      isAtStableStop: false
-    });
   });
 
   it("keeps harness-specific pose and Trial defaults in the adapter layer", () => {

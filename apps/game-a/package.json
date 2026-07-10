@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node ../../scripts/validate-game-a-production.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false"
   },
@@ -17,6 +17,7 @@
     "@v-ronpa/game-flow-machine": "workspace:*",
     "@v-ronpa/gameplay": "workspace:*",
     "@v-ronpa/media-save": "workspace:*",
+    "@v-ronpa/runtime-assets-pixi": "workspace:*",
     "@v-ronpa/ui-kit": "workspace:*",
     "@xstate/react": "^6.1.0",
     "react": "^19.0.0",

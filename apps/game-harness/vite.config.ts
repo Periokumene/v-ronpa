@@ -1,9 +1,9 @@
-import { resolveWorktreeRuntimeEnv } from "../../scripts/worktree-env.mjs";
+import { resolveWorktreeAppRuntimeEnv } from "../../scripts/worktree-env.mjs";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { fileURLToPath, URL } from "node:url";
 
-const runtimeEnv = resolveWorktreeRuntimeEnv();
+const runtimeEnv = resolveWorktreeAppRuntimeEnv("game-harness");
 
 export default defineConfig({
   plugins: [react()],

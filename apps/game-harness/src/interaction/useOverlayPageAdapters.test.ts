@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
+import type { VnRuntimeShellPort } from "@v-ronpa/app-vn-runtime";
 import {
   createGameInteractionOverlayActions,
   createGameInteractionShellViewModels,
@@ -7,8 +8,7 @@ import {
   overlayKindForVnShellAction,
   renderGameInteractionOverlaySurface,
   type GameInteractionShellSurfaces,
-  type SaveLoadOverlayViewModel,
-  type VnShellRuntimeAdapter
+  type SaveLoadOverlayViewModel
 } from "@v-ronpa/app-vn-shell";
 import { createDefaultSettingsSnapshot, type InteractionCapabilitySnapshot } from "@v-ronpa/contracts";
 import { useOverlayPageAdapters } from "./useOverlayPageAdapters";
@@ -303,17 +303,15 @@ function createCapabilities(): InteractionCapabilitySnapshot {
   };
 }
 
-function createRuntime(): VnShellRuntimeAdapter {
+function createRuntime(): VnRuntimeShellPort {
   return {
     advanceStory: () => undefined,
     attachMovieElement: () => undefined,
     chooseStory: () => undefined,
     completeMoviePlayback: () => undefined,
-    dialogRevealRuntime: {},
+    dialogRevealRuntime: { events: [], eventSequence: 0 },
     dismissRuntimeToast: () => undefined,
-    interactionContext: {
-      mode: "navi",
-      overlayStack: ["vn-load"],
+    interactionFacts: {
       inputLock: "menu",
       hasActiveStory: true,
       storyHasChoices: false,

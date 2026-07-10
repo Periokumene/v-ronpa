@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState, type ButtonHTMLAttributes } fro
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
-  VnRuntimeDispatcher,
+  VnPixiPresenterHost,
   settingsToDialogDisplaySettings,
   settingsToDialogueBleepRuntimeSettings,
   settingsToStoryPlayTimingPolicy,
@@ -13,7 +13,7 @@ import {
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
 import { SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS, type AudioHandle, type AudioHandleFinishReason, type AudioPort } from "@v-ronpa/media-save";
-import type { PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
+import type { PresentationTaskObservation } from "@v-ronpa/app-vn-runtime";
 import { ExplorationStage3D, TrialRoundTableStage } from "@v-ronpa/r3f-adapter";
 import { InspectorLite, RichTextFontStyles } from "@v-ronpa/ui-kit";
 import { useGameFlowActor } from "../../../interaction/useGameFlowActor";
@@ -32,7 +32,7 @@ type VoiceSmokeAudioMode = "fast" | "fail";
 const FAST_VOICE_SMOKE_DURATION_MS = 1500;
 
 export function HarnessShowcaseScenario() {
-  const flow = useGameFlowActor();
+  const flowActor = useGameFlowActor();
   const settings = useGameSettingsAdapter();
   const assetRegistry = useMemo(() => createAssetRegistry(harnessContentManifest), []);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
@@ -45,9 +45,9 @@ export function HarnessShowcaseScenario() {
     const mode = selectVoiceSmokeAudioMode();
     return mode ? createVoiceSmokeAudioPort(mode) : undefined;
   }, []);
-  const enterTrialMode = useCallback(() => flow.send({ type: "ENTER_TRIAL" }), [flow.send]);
-  const enterNaviMode = useCallback(() => flow.send({ type: "ENTER_NAVI" }), [flow.send]);
-  const runtime = useHarnessShowcaseRuntimeAdapter(flow.mode, {
+  const enterTrialMode = useCallback(() => flowActor.send({ type: "ENTER_TRIAL" }), [flowActor.send]);
+  const enterNaviMode = useCallback(() => flowActor.send({ type: "ENTER_NAVI" }), [flowActor.send]);
+  const runtime = useHarnessShowcaseRuntimeAdapter(flowActor.mode, {
     ...(smokeAudioPort ? { audioPort: smokeAudioPort } : {}),
     assetResolver: assetRegistry,
     ...(harnessContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: harnessContentManifest.audio.dialogueBleep } : {}),
@@ -58,7 +58,9 @@ export function HarnessShowcaseScenario() {
     onEnterTrial: enterTrialMode,
     onEnterNavi: enterNaviMode
   });
+  const flow = flowActor.withInteractionFacts(runtime.interactionFacts, runtime.hostInteractionFacts);
   const save = useHarnessShowcaseSaveAdapter(runtime, {
+    canSave: () => flow.capabilities.canSave,
     capturePreview: () => pixiCaptureHandleRef.current?.captureThumbnail(SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS)
   });
   const overlayPages = useOverlayPageAdapters({ flow, runtime, save, settings });
@@ -72,7 +74,14 @@ export function HarnessShowcaseScenario() {
         onDiagnostic={runtime.observeAssetDiagnostic}
       />
       <section className="playfield" data-testid="playfield">
-        <GameInteractionShell dialogDisplay={dialogDisplay} flow={flow} formatStorySpeaker={displayStorySpeaker} overlayPages={overlayPages} runtime={runtime}>
+        <GameInteractionShell
+          dialogDisplay={dialogDisplay}
+          flow={flow}
+          formatStorySpeaker={displayStorySpeaker}
+          host={{ naviSubstate: runtime.navi.substate }}
+          overlayPages={overlayPages}
+          runtime={runtime.shell}
+        >
           <div className="scene-stack" data-testid="harness-showcase-shell">
             {flow.mode === "trial" && runtime.trialRuntime.state ? (
               <TrialRoundTableStage
@@ -84,20 +93,14 @@ export function HarnessShowcaseScenario() {
             ) : (
               <ExplorationStage3D {...runtime.firstPersonBridge.explorationStageProps} />
             )}
-            <VnRuntimeDispatcher
+            <VnPixiPresenterHost
               active={flow.mode !== "trial" && runtime.storyRuntime.active}
               assetResolver={assetRegistry}
-              pixiAnimate={runtime.pixiStageRuntime.animate}
-              pixiHintSequence={runtime.pixiStageRuntime.hintSequence}
-              pixiHints={runtime.pixiStageRuntime.hints}
-              pixiPresentationTasks={runtime.pixiStageRuntime.presentationTasks}
-              pixiStage={runtime.pixiStageRuntime.snapshot}
-              storySession={runtime.storySession}
-              onPixiCaptureHandleChanged={(handle) => {
+              diagnostics={runtime.diagnostics}
+              presentation={runtime.presentation}
+              onCaptureHandleChanged={(handle) => {
                 pixiCaptureHandleRef.current = handle;
               }}
-              onPixiDiagnostic={runtime.observeAssetDiagnostic}
-              onPixiTasksChanged={runtime.updatePixiPresentationTasks}
             />
           </div>
         </GameInteractionShell>
@@ -339,7 +342,7 @@ function formatPixiStageCharacters(stage: Pick<PixiStageSnapshot, "actorOrder" |
   return entries.length > 0 ? entries.join(", ") : "empty";
 }
 
-function formatPixiPresentationTasks(tasks: PixiPresentationTaskSnapshot[]): string {
+function formatPixiPresentationTasks(tasks: PresentationTaskObservation[]): string {
   if (tasks.length === 0) return "empty";
   return tasks
     .map((task) => `${task.kind}:${task.target}:${task.status}:${task.durationMs}ms:r${task.revision}`)

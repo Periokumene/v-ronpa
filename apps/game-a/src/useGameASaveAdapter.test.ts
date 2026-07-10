@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { PixiStageSnapshot, StoryRuntimeSnapshot } from "@v-ronpa/contracts";
+import {
+  createSaveableStorySnapshot,
+  type PixiStageSnapshot,
+  type SaveableVnState,
+  type StoryRuntimeSnapshot
+} from "@v-ronpa/contracts";
 import { createSaveSlotSummary } from "@v-ronpa/media-save";
 import {
   GAME_A_SAVE_DB_NAME,
@@ -13,7 +18,7 @@ import {
 } from "./useGameASaveAdapter";
 
 describe("game-a save adapter", () => {
-  it("creates v5 save data only under the VN section and trims backlog without mutating runtime state", () => {
+  it("creates v6 save data from the canonical VN checkpoint", () => {
     const story = createStory(
       Array.from({ length: 25 }, (_, index) => ({
         speaker: "Mira",
@@ -21,13 +26,15 @@ describe("game-a save adapter", () => {
       }))
     );
     const originalBacklog = [...story.backlog];
-    const data = createGameASaveData({ story, pixiStage: createPixiStage() });
+    const data = createGameASaveData({ vn: createVnCheckpoint(story) });
 
     expect(data).toMatchObject({
-      version: 5,
+      version: 6,
+      gameId: "game-a",
       mode: "vn",
       vn: {
         entryId: "vn:game-a-opening",
+        scriptRevision: "sha256:test",
         story: {
           backlog: expect.arrayContaining([{ speaker: "Mira", text: "Line 25" }])
         },
@@ -45,7 +52,7 @@ describe("game-a save adapter", () => {
   });
 
   it("uses media-save as the sole slot policy authority for manual and quick saves", () => {
-    expect(GAME_A_SAVE_DB_NAME).toBe("v-ronpa-game-a-saves-v7");
+    expect(GAME_A_SAVE_DB_NAME).toBe("v-ronpa-game-a-saves-v8");
     expect(gameASaveSlotPolicy.namespace).toBe("game-a");
     expect(gameASaveSlotIds).toHaveLength(gameAManualSaveSlotCount);
     expect(gameASaveSlotIds.slice(0, 3)).toEqual(["slot:game-a:1", "slot:game-a:2", "slot:game-a:3"]);
@@ -60,17 +67,17 @@ describe("game-a save adapter", () => {
     const manual = createSaveSlotSummary(
       "slot:game-a:1",
       gameASaveSlotPolicy.labelForSlot("slot:game-a:1"),
-      createGameASaveData({ story: createStory([{ speaker: "Mira", text: "Manual." }]), pixiStage: createPixiStage() })
+      createGameASaveData({ vn: createVnCheckpoint(createStory([{ speaker: "Mira", text: "Manual." }])) })
     );
     const second = createSaveSlotSummary(
       "slot:game-a:2",
       gameASaveSlotPolicy.labelForSlot("slot:game-a:2"),
-      createGameASaveData({ story: createStory([{ speaker: "Mira", text: "Second." }]), pixiStage: createPixiStage() })
+      createGameASaveData({ vn: createVnCheckpoint(createStory([{ speaker: "Mira", text: "Second." }])) })
     );
     const quick = createSaveSlotSummary(
       gameAQuickSaveSlotId,
       gameASaveSlotPolicy.labelForSlot(gameAQuickSaveSlotId),
-      createGameASaveData({ story: createStory([{ speaker: "Mira", text: "Quick." }]), pixiStage: createPixiStage() })
+      createGameASaveData({ vn: createVnCheckpoint(createStory([{ speaker: "Mira", text: "Quick." }])) })
     );
 
     expect(selectGameAManualSaveSlotSummaries([quick, second, manual])).toEqual([manual, second]);
@@ -99,5 +106,15 @@ function createPixiStage(): PixiStageSnapshot {
     actorOrder: [],
     weather: {},
     screenFilters: {}
+  };
+}
+
+function createVnCheckpoint(story: StoryRuntimeSnapshot): SaveableVnState {
+  return {
+    entryId: "vn:game-a-opening",
+    scriptRevision: "sha256:test",
+    story: createSaveableStorySnapshot(story),
+    pixiStage: createPixiStage(),
+    ui: { dialog: true, commandBar: true, toastLayer: true }
   };
 }

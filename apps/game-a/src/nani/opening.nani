@@ -1,24 +1,11 @@
 #Start
-; @showUI dialog
-; @showUI commandBar visible:true
-
-; @back bg:game-a-academy-hall-fullscreen effect:fade time:0.12
-; @inback bg:game-a-snow-outskirts-frame effect:fade time:0.12
-
-
-
 @hideUI dialog
-; @back bg:eat-pill effect:fade time:0.5 wait!
 @sfx sfx:noise-6hz group:noise volume:0.3 loop!
-@choice "吃下我！" goto:#STORY-BEGIN
+@choice "吃下我！" goto:#StoryBegin
 
-#STORY-BEGIN
-; @back bg:eat-pill visible:false effect:fade time:0.2
+#StoryBegin
 @stopSfx group:noise fade:2
 @sfx sfx:glug-glug-glug group:glug volume:0.2 wait!
-
-; TODO 吃药的交互
-
 @sfx sfx:gentle-rain-loop group:rain loop:true volume:0.1
 @showUI dialog time:2 wait!
 nar: 最烂的天气我会投雨天一票
@@ -27,9 +14,9 @@ nar: 最烂的南方的雨季里遇上了最烂的雨天[>]
 nar: 最烂的一天就是在最烂的南方的雨季里遇上了最烂的雨天[>]
 nar: 最烂的雨天发生在最烂的南方的雨季里最烂的一天[>]
 nar: 最烂的南方的最烂的一天就是最烂的雨季里遇上了最烂的南方的雨季碰上了最烂的……[>]
-
 @choice "喂！" goto:#PartRain
-# PartRain
+
+#PartRain
 nar: 终于来啦！等你好久了
 nar: 可是尽管，天气会很湿，闷的墙壁上仿佛要渗出血，雨帘在路上拉起一层又一层的帷幕
 nar: 可是尽管，路面会很滑，某个地砖会像真正的地雷那样把你从袜子到裤脚全都打湿
@@ -40,73 +27,21 @@ nar: 我还是最、还是最、最……
 @rain power:1 wind:-1 hue:1 tint:0.8 time:5
 nar: 最喜欢雨天了
 nar: 即便如此在南方这些比烂的天气里，即使这个天气如此的糟糕，但我还是最喜欢雨天
-
-
 @choice "为什么？" goto:#PartRain2
-# PartRain2
+
+#PartRain2
 nar: 很闷就意味着喘不过气，自然平等的将它的暴力行使在每个人的咽喉
 nar: 不再有那些聒噪的行人，每个人都行色匆匆，街上只会空空荡荡
 nar: 至于我……
 nar: 不觉得这是一种很独特的体验吗。更好笑的事情是，还需要一边胆战心惊，害怕自己的耳机被雨淋坏，一边在雨里面展开双臂，幻想自己就是风和雨的天命神选，在这无人的街道上展露自己的恣意
-
 nar: ……[>]
 @inback bg:rain-street effect:fade time:0.5 wait!
 nar: 好吧，我承认，我承认这有时候会变成一种自我陶醉和扮演。但是比起扮演我更喜欢将这视作是一种逃跑。渺小的自己和广袤的世界，人类文明如此繁荣的今天依然无法抗衡的伟大存在
 nar: 如果神明真的存在的话，它大概就会是掌管风雨的形象吧。我只是想融化在这场雨里面，融化在这个世界中那样
 nar: 比起很多努力扮演松弛的活着的人，我只是很想在雨声中寻找一场可以把自己淹没的好梦
-
-
-#DBG_ALICE
 nar: 妈妈在喊我了
 @char alice pos:50 time:0.3 wait!
-
-; Narrator: 无论小雨
-; @rain power:1 time:10
-; Narrator: 还是那如山林倾伏的暴雨
-; @rain power:0 time:5
-; Narrator: 那种感觉就像是被 如瀑的暴雨隔绝在另一个世界。雨的那边是真实的世界，而这边是我一个人的孤岛
-; @stopSfx group:rain fade:0.8
-
-
-@hideUI dialog time:0.8
-@hideUI commandBar time:0.8 wait!
-
-
-Narrator:  
-@rain power:0
-@showUI dialog time:0.5 wait!
-
-Narrator: Game A VN framework smoke。这个入口接入共享 VN runtime，不连接 Trial 或 3D。
-Narrator: 手动添加了一行
-Mira: 第一层验证是 DOM 对话框、Pixi 背景、BGM、SFX 和命令栏同时工作。[>]
-@choice "继续调查" goto:#Investigate
-@choice "检查设置与存档" goto:#SaveLoad
-
-
-
-#Investigate
-@set route:"investigate"
-Narrator: 你记录了房间里的异常光线。AUTO 与 SKIP 会在这里继续使用共享 runtime 调度。
-Mira: 这句没有 voice 资源，应回退到 game-a 自己的 dialogue bleep。
-@hideUI dialog time:0.2 wait!
-@hideUI commandBar time:0.2 wait!
-@showUI dialog time:0.2 wait!
-@showUI commandBar visible:true time:0.2 wait!
-Narrator: CHECKPOINT GAME-A UI FADE - custom dialog 与 command bar fade wait 已完成，UI 已恢复。
-Mira: 这句带有 textId，应播放 game-a 独立 voice 资源。|#game_a_voice_0001|
-@flash color:#ffffff time:0.18 wait!
-Narrator: CHECKPOINT GAME-A WAIT - Pixi wait! 已完成，剧情恢复推进。
-@movie video:game-a-intro block:true
-Narrator: CHECKPOINT GAME-A MOVIE - 阻塞 movie 已结束或跳过，runtimeWait 已清理。
-@stopBgm group:music fade:0.1
-@choice "回到标题" goto:#End
-
-#SaveLoad
-@set route:"save-load"
-Narrator: 这条分支用于验证 SAVE、LOAD、Backlog 和 Settings overlays 来自 VN shell glue，而不是 harness。
-Mira: 存档只保存 StoryRuntimeSnapshot 与 PixiStageSnapshot，不保存 reveal、voice gate、movie 或音频门控。
-@choice "结束本轮" goto:#End
-
-#End
-Narrator: Game A VN smoke 完成。
+nar: 雨幕里，一个熟悉的人影停在了街角。
+@stopSfx group:rain fade:0.8
+@stopBgm group:music fade:0.8
 @end

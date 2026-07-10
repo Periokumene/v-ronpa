@@ -198,7 +198,7 @@ describe("game-a interaction surfaces", () => {
 
     expect(root?.props).toMatchObject({
       className: "game-a-pause-screen",
-      "data-active-tab": "log"
+      "data-active-tab": "backlog"
     });
     expect(findElementByClassName(element, "game-a-pause-header")).toBeUndefined();
     expect(tabList).toBeDefined();

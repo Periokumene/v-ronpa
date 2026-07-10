@@ -7,7 +7,7 @@ describe("game-a overlay adapters", () => {
 
     started.dispatchUiAction("new-game");
 
-    expect(started.flowSend).toHaveBeenCalledWith({ type: "ENTER_VN" });
+    expect(started.flowSend).toHaveBeenCalledWith({ type: "START_NEW_GAME", mode: "vn" });
   });
 
   it("keeps the title flow when a debug start label prevents new-game startup", () => {
@@ -18,17 +18,17 @@ describe("game-a overlay adapters", () => {
     expect(blocked.flowSend).not.toHaveBeenCalled();
   });
 
-  it("opens LOG as the game-a pause tab entry instead of the shared pause menu", () => {
+  it("opens the canonical pause menu", () => {
     const adapters = createAdapters({ mode: "vn", startNewGame: () => true });
 
     adapters.dispatchUiAction("open-pause-menu");
 
     expect(adapters.stopStoryAutomation).toHaveBeenCalledWith("overlay");
-    expect(adapters.openOverlay).toHaveBeenCalledWith("vn-backlog");
+    expect(adapters.openOverlay).toHaveBeenCalledWith("pause-menu");
     expect(adapters.closeAllOverlays).not.toHaveBeenCalled();
   });
 
-  it("replaces pause tabs instead of stacking overlays", () => {
+  it("pushes a shared pause section through the flow overlay stack", () => {
     const adapters = createAdapters({
       activeOverlay: "vn-backlog",
       mode: "vn",
@@ -37,11 +37,10 @@ describe("game-a overlay adapters", () => {
 
     adapters.dispatchUiAction("open-save");
 
-    expect(adapters.replaceOverlay).toHaveBeenCalledWith("vn-save");
-    expect(adapters.openOverlay).not.toHaveBeenCalled();
+    expect(adapters.openOverlay).toHaveBeenCalledWith("vn-save");
   });
 
-  it("blocks pause tab switching while a load confirmation is pending", () => {
+  it("keeps section routing canonical when invoked", () => {
     const adapters = createAdapters({
       activeOverlay: "vn-load",
       mode: "vn",
@@ -56,11 +55,10 @@ describe("game-a overlay adapters", () => {
 
     adapters.dispatchUiAction("open-settings");
 
-    expect(adapters.replaceOverlay).not.toHaveBeenCalled();
-    expect(adapters.openOverlay).not.toHaveBeenCalled();
+    expect(adapters.openOverlay).toHaveBeenCalledWith("vn-settings");
   });
 
-  it("blocks return-title while a load confirmation is pending", () => {
+  it("routes return-title through flow; confirmation UI owns disabling the action", () => {
     const adapters = createAdapters({
       activeOverlay: "vn-load",
       mode: "vn",
@@ -75,10 +73,10 @@ describe("game-a overlay adapters", () => {
 
     adapters.dispatchUiAction("return-title");
 
-    expect(adapters.flowSend).not.toHaveBeenCalledWith({ type: "RETURN_TITLE" });
+    expect(adapters.flowSend).toHaveBeenCalledWith({ type: "RETURN_TITLE" });
   });
 
-  it("uses the app-local flow replacement helper for pause tab navigation", () => {
+  it("uses the shared overlay action for backlog navigation", () => {
     const adapters = createAdapters({
       activeOverlay: "vn-settings",
       mode: "vn",
@@ -87,8 +85,7 @@ describe("game-a overlay adapters", () => {
 
     adapters.dispatchUiAction("open-backlog");
 
-    expect(adapters.replaceOverlay).toHaveBeenCalledWith("vn-backlog");
-    expect(adapters.openOverlay).not.toHaveBeenCalled();
+    expect(adapters.openOverlay).toHaveBeenCalledWith("vn-backlog");
   });
 
   it("keeps return-title routed through the app flow", () => {
@@ -165,7 +162,7 @@ function createAdapters({
   quickSlot,
   startNewGame
 }: {
-  activeOverlay?: "vn-backlog" | "vn-save" | "vn-load" | "vn-settings";
+  activeOverlay?: "pause-menu" | "vn-backlog" | "vn-save" | "vn-load" | "vn-settings";
   mode?: "title" | "vn";
   pendingLoadSlot?: {
     id: string;
@@ -185,7 +182,6 @@ function createAdapters({
   const flowSend = vi.fn();
   const openOverlay = vi.fn();
   const closeAllOverlays = vi.fn();
-  const replaceOverlay = vi.fn();
   const quickLoadSlot = vi.fn(async () => quickLoadResult);
   const quickSaveSlot = vi.fn(async () => undefined);
   const stopStoryAutomation = vi.fn();
@@ -196,15 +192,16 @@ function createAdapters({
       capabilities: { canLoad: true, canSave: mode === "vn" },
       send: flowSend,
       openOverlay,
-      replaceOverlay,
       closeTopOverlay: vi.fn(),
       closeAllOverlays
     },
     runtime: {
       startNewGame,
-      toggleStoryAuto: vi.fn(),
-      toggleStorySkip: vi.fn(),
-      stopStoryAutomation
+      debug: {
+        toggleStoryAuto: vi.fn(),
+        toggleStorySkip: vi.fn(),
+        stopStoryAutomation
+      }
     },
     save: {
       cancelLoadSlot: vi.fn(),
@@ -230,5 +227,5 @@ function createAdapters({
     }
   } as unknown as Parameters<typeof useGameAOverlayAdapters>[0]);
 
-  return { ...adapters, closeAllOverlays, flowSend, openOverlay, quickLoadSlot, quickSaveSlot, replaceOverlay, stopStoryAutomation };
+  return { ...adapters, closeAllOverlays, flowSend, openOverlay, quickLoadSlot, quickSaveSlot, stopStoryAutomation };
 }

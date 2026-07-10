@@ -1,8 +1,27 @@
-import { ContentManifestSchema, type ContentManifestInput } from "@v-ronpa/contracts";
-import { builtInPixiFxRuntimeAssets } from "@v-ronpa/pixi-presenter";
+import { composeContentManifest } from "@v-ronpa/asset-registry";
+import type { ContentManifestInput } from "@v-ronpa/contracts";
 import { defaultHarnessInputBindings } from "./inputActions";
 import { harnessShowcaseEvidence, harnessShowcaseItem, harnessShowcaseMaps, harnessShowcaseTrial } from "./showcase";
-import { harnessFontFaces, harnessRuntimeAssets } from "./generatedAssets";
+import {
+  harnessFontFaces,
+  harnessRuntimeAssetFragments,
+  harnessRuntimeAssets,
+  harnessScriptMetadataByPath
+} from "./generatedAssets";
+
+export const harnessShowcaseScriptPath = "harness/harness-showcase.nani";
+const harnessShowcaseScriptMetadata = harnessScriptMetadataByPath[harnessShowcaseScriptPath];
+if (!harnessShowcaseScriptMetadata) throw new Error(`Missing generated metadata for '${harnessShowcaseScriptPath}'.`);
+
+export const harnessShowcaseVnEntry = {
+  id: "vn:harness-showcase",
+  title: "Harness Showcase",
+  scriptPath: harnessShowcaseScriptPath,
+  scriptRevision: harnessShowcaseScriptMetadata.scriptRevision,
+  startLabel: "Start",
+  profile: "vn2d" as const,
+  assetRefs: harnessShowcaseScriptMetadata.assetRefs
+};
 
 const harnessContentManifestInput = {
   version: 3,
@@ -17,16 +36,14 @@ const harnessContentManifestInput = {
   },
   assets: [],
   fonts: harnessFontFaces,
-  runtimeAssets: [
-    ...harnessRuntimeAssets,
-    ...builtInPixiFxRuntimeAssets
-  ],
+  runtimeAssets: harnessRuntimeAssets,
   collisionProxies: [],
   input: defaultHarnessInputBindings,
   maps: harnessShowcaseMaps,
   items: [harnessShowcaseItem],
   evidence: [harnessShowcaseEvidence],
-  trials: [harnessShowcaseTrial]
+  trials: [harnessShowcaseTrial],
+  vnEntries: [harnessShowcaseVnEntry]
 } satisfies ContentManifestInput;
 
-export const harnessContentManifest = ContentManifestSchema.parse(harnessContentManifestInput);
+export const harnessContentManifest = composeContentManifest(harnessContentManifestInput, harnessRuntimeAssetFragments);

@@ -4,6 +4,7 @@ import { compileRuntimeScript } from "../../../packages/nani-runtime-compiler/sr
 import { parseScenario } from "../../../packages/nani-parser/src/index";
 import { gameAVnEntry } from "./contentManifest";
 import { gameAOpeningNaniSource, gameAOpeningRuntimeEntry } from "./gameAScripts";
+import { gameASmokeRuntimeEntry } from "./gameATestEntries";
 
 describe("game-a nani scripts", () => {
   it("exposes the opening .nani source as the app runtime entry", () => {
@@ -12,6 +13,8 @@ describe("game-a nani scripts", () => {
     expect(gameAOpeningNaniSource).toContain("@char alice pos:50 time:0.3 wait!");
     expect(gameAOpeningNaniSource).toContain("@sfx sfx:gentle-rain-loop group:rain loop:true volume:0.1");
     expect(gameAOpeningNaniSource).toContain("@stopSfx group:rain fade:0.8");
+    expect(gameAOpeningNaniSource).not.toContain("CHECKPOINT");
+    expect(gameAOpeningNaniSource).not.toContain("TODO");
     expect(gameAOpeningNaniSource).not.toMatch(/\$\{[^}]+\}/u);
 
     expect(gameAOpeningRuntimeEntry.scriptPath).toBe(gameAVnEntry.scriptPath);
@@ -44,6 +47,18 @@ describe("game-a nani scripts", () => {
     );
   });
 
+  it("keeps smoke coverage in a separate test-only entry", () => {
+    const parsed = parseScenario({
+      scriptPath: gameASmokeRuntimeEntry.scriptPath,
+      sourceText: gameASmokeRuntimeEntry.sourceText
+    });
+    const compiled = compileRuntimeScript(parsed.scenario);
+    expect(parsed.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+    expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+    expect(gameASmokeRuntimeEntry.sourceText).toContain("CHECKPOINT SMOKE MOVIE");
+    expect(gameAOpeningNaniSource).not.toContain("CHECKPOINT SMOKE");
+  });
+
   it("keeps active script asset references declared on the VN entry", () => {
     const parsed = parseScenario({
       scriptPath: gameAOpeningRuntimeEntry.scriptPath,
@@ -59,8 +74,7 @@ describe("game-a nani scripts", () => {
         { id: "bgm:dead-fish-riffle", kind: "bgm" },
         { id: "sfx:gentle-rain-loop", kind: "sfx" },
         { id: "sfx:glug-glug-glug", kind: "sfx" },
-        { id: "sfx:noise-6hz", kind: "sfx" },
-        { id: "video:game-a-intro", kind: "video" }
+        { id: "sfx:noise-6hz", kind: "sfx" }
       ])
     );
     expect(

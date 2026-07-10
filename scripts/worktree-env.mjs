@@ -4,6 +4,10 @@ import { basename, dirname, resolve } from "node:path";
 
 export const DEFAULT_DEV_PORT = 5173;
 export const WORKTREE_ENV_FILE = ".env.worktree";
+export const APP_DEV_PORT_OFFSETS = Object.freeze({
+  "game-harness": 0,
+  "game-a": 1
+});
 
 export function parseEnvText(text) {
   const values = {};
@@ -72,6 +76,13 @@ export function resolveWorktreeRuntimeEnv(startDir = process.cwd()) {
     values: loaded.values,
     port
   };
+}
+
+export function resolveWorktreeAppRuntimeEnv(appId, startDir = process.cwd()) {
+  const runtime = resolveWorktreeRuntimeEnv(startDir);
+  const offset = APP_DEV_PORT_OFFSETS[appId];
+  if (offset === undefined) throw new Error(`Unknown worktree app id '${appId}'.`);
+  return { ...runtime, appId, appOffset: offset, port: runtime.port + offset };
 }
 
 export function createWorktreeEnvContent({ cwd = process.cwd(), port = deriveWorktreePort(cwd) } = {}) {

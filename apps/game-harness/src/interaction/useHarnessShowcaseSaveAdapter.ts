@@ -1,11 +1,10 @@
 import { useCallback, useMemo } from "react";
-import { SaveDataSchema, createSaveableStoryRuntimeSnapshot } from "@v-ronpa/contracts";
+import { SaveDataSchema } from "@v-ronpa/contracts";
 import type {
   NaviRuntimeState,
-  PixiStageSnapshot,
   SaveData,
+  SaveableVnState,
   SaveSlotSummary,
-  StoryRuntimeSnapshot,
   TrialRuntimeState
 } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
@@ -22,7 +21,7 @@ import type { useHarnessShowcaseRuntimeAdapter } from "./useHarnessShowcaseRunti
 
 type HarnessShowcaseRuntimeAdapter = ReturnType<typeof useHarnessShowcaseRuntimeAdapter>;
 
-export const HARNESS_SHOWCASE_DB = "v-ronpa-harness-showcase-v7";
+export const HARNESS_SHOWCASE_DB = "v-ronpa-harness-showcase-v8";
 export const harnessShowcaseSaveSlotPolicy = createFortyPlusQuickSaveSlotPolicy("harness");
 export const harnessShowcaseManualSaveSlotCount = harnessShowcaseSaveSlotPolicy.manualSlotCount;
 export const harnessShowcaseSaveSlotIds = harnessShowcaseSaveSlotPolicy.manualSlotIds;
@@ -32,8 +31,7 @@ export interface HarnessShowcaseSaveDataInput {
   mode?: SaveData["mode"];
   savedAt: string;
   navi: NaviRuntimeState;
-  story: StoryRuntimeSnapshot;
-  pixiStage: PixiStageSnapshot;
+  vn: SaveableVnState;
   gameplay: GameplayState;
   trial?: TrialRuntimeState;
 }
@@ -41,37 +39,29 @@ export interface HarnessShowcaseSaveDataInput {
 export interface HarnessShowcaseSaveAdapterOptions {
   capturePreview?: (() => Promise<SaveSlotPreview | undefined> | SaveSlotPreview | undefined) | undefined;
   port?: SavePort | undefined;
+  canSave: () => boolean;
 }
 
 export function createHarnessShowcaseSaveData({
   gameplay,
   mode = "navi",
   navi,
-  pixiStage,
   savedAt,
-  story,
+  vn,
   trial
 }: HarnessShowcaseSaveDataInput): SaveData {
-  const { runtimeWait: _runtimeWait, ...storyWithoutRuntimeWait } = story;
-  void _runtimeWait;
   return SaveDataSchema.parse({
-    version: 5,
+    version: 6,
+    gameId: "game-harness",
     savedAt,
     mode,
-    vn: {
-      story: createSaveableStoryRuntimeSnapshot(storyWithoutRuntimeWait),
-      pixiStage
-    },
+    vn,
     navi,
     trial: trial ?? null,
     inventory: gameplay.inventory,
     evidence: gameplay.evidence,
     characters: gameplay.characters
   });
-}
-
-export function canSaveHarnessShowcaseRuntime(runtime: Pick<HarnessShowcaseRuntimeAdapter, "storyRuntime">): boolean {
-  return !runtime.storyRuntime.state.runtimeWait;
 }
 
 export function selectHarnessShowcaseManualSaveSlotSummaries(summaries: SaveSlotSummary[]): SaveSlotSummary[] {
@@ -84,28 +74,28 @@ export function selectHarnessShowcaseQuickSaveSlotSummary(summaries: SaveSlotSum
 
 export function useHarnessShowcaseSaveAdapter(
   runtime: HarnessShowcaseRuntimeAdapter,
-  options: HarnessShowcaseSaveAdapterOptions = {}
+  options: HarnessShowcaseSaveAdapterOptions
 ) {
   const savePort = useMemo(() => options.port ?? createDexieSavePort(HARNESS_SHOWCASE_DB), [options.port]);
   const collectSaveData = useCallback(
-    (): SaveData => {
-      return createHarnessShowcaseSaveData({
+    () => {
+      const checkpoint = runtime.createVnSaveCheckpoint({ allowInactive: true });
+      if (!checkpoint.ok) return checkpoint;
+      return { ok: true as const, value: createHarnessShowcaseSaveData({
         savedAt: new Date().toISOString(),
         navi: runtime.navi,
-        story: runtime.storyRuntime.state,
-        pixiStage: runtime.pixiStageRuntime.snapshot,
+        vn: checkpoint.value,
         gameplay: runtime.gameplay,
         mode: runtime.trialRuntime.active ? "trial" : "navi",
         ...(runtime.trialRuntime.active && runtime.trialRuntime.state ? { trial: runtime.trialRuntime.state } : {})
-      });
+      }) };
     },
     [
       runtime.gameplay.characters,
       runtime.gameplay.evidence,
       runtime.gameplay.inventory,
       runtime.navi,
-      runtime.pixiStageRuntime.snapshot,
-      runtime.storyRuntime.state,
+      runtime.createVnSaveCheckpoint,
       runtime.trialRuntime.active,
       runtime.trialRuntime.state
     ]
@@ -115,7 +105,7 @@ export function useHarnessShowcaseSaveAdapter(
     policy: harnessShowcaseSaveSlotPolicy,
     collectSaveData,
     restoreSaveData: runtime.restoreFromSave,
-    canSave: () => canSaveHarnessShowcaseRuntime(runtime),
+    canSave: options.canSave,
     ...(options.capturePreview ? { capturePreview: options.capturePreview } : {})
   });
 

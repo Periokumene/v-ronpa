@@ -1,13 +1,21 @@
 import { describe, expect, it } from "vitest";
-import type { NaniCommandCategory, RuntimeCommand, RuntimeScript, RuntimeValue } from "@v-ronpa/contracts";
+import {
+  createSaveableStorySnapshot,
+  type NaniCommandCategory,
+  type PixiStageSnapshot,
+  type RuntimeCommand,
+  type RuntimeScript,
+  type RuntimeValue,
+  type SaveableVnState,
+  type StoryRuntimeSnapshot
+} from "@v-ronpa/contracts";
 import { createGameplayState } from "@v-ronpa/gameplay";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
-import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ronpa/pixi-presenter";
+import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ronpa/pixi-stage-model";
 import { createInitialStoryState } from "@v-ronpa/story-engine";
 import {
   HARNESS_SHOWCASE_DB,
-  canSaveHarnessShowcaseRuntime,
   createHarnessShowcaseSaveData,
   harnessShowcaseManualSaveSlotCount,
   harnessShowcaseQuickSaveSlotId,
@@ -38,13 +46,13 @@ describe("harness showcase save adapter", () => {
     const save = createHarnessShowcaseSaveData({
       savedAt: "2026-06-20T00:00:00.000Z",
       navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
-      story,
-      pixiStage,
+      vn: createVnCheckpoint(story, pixiStage),
       gameplay
     });
 
     expect(save).toMatchObject({
-      version: 5,
+      version: 6,
+      gameId: "game-harness",
       mode: "navi",
       vn: {
         pixiStage: {
@@ -87,8 +95,7 @@ describe("harness showcase save adapter", () => {
       mode: "trial",
       savedAt: "2026-06-20T00:00:00.000Z",
       navi: { substate: "walk", activeMapId: "map:academy-hall", inputLock: "none" },
-      story: createInitialStoryState(runtimeScript),
-      pixiStage: createInitialPixiStageSnapshot(),
+      vn: createVnCheckpoint(createInitialStoryState(runtimeScript)),
       gameplay,
       trial
     });
@@ -112,28 +119,18 @@ describe("harness showcase save adapter", () => {
     expect(save).not.toHaveProperty("playback");
   });
 
-  it("does not persist runtimeWait and reports save availability as false while waiting", () => {
+  it("rejects creating a saveable story snapshot while a runtime wait is active", () => {
     const runtimeScript = compileScenario("@wait i", "runtime-wait-save-test.nani");
-    const gameplay = createGameplayState();
     const story = {
       ...createInitialStoryState(runtimeScript),
       runtimeWait: { kind: "pause" as const, commandId: "wait" as const, commandIndex: 0, mode: "confirm" as const }
     };
 
-    const save = createHarnessShowcaseSaveData({
-      savedAt: "2026-06-20T00:00:00.000Z",
-      navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
-      story,
-      pixiStage: createInitialPixiStageSnapshot(),
-      gameplay
-    });
-
-    expect(save.vn?.story.runtimeWait).toBeUndefined();
-    expect(canSaveHarnessShowcaseRuntime({ storyRuntime: { active: true, state: story } })).toBe(false);
+    expect(() => createSaveableStorySnapshot(story)).toThrow("stable stop");
   });
 
   it("keeps forty manual slots plus an independent hidden quick slot through the shared media-save policy", () => {
-    expect(HARNESS_SHOWCASE_DB).toBe("v-ronpa-harness-showcase-v7");
+    expect(HARNESS_SHOWCASE_DB).toBe("v-ronpa-harness-showcase-v8");
     expect(harnessShowcaseSaveSlotPolicy.namespace).toBe("harness");
     expect(harnessShowcaseSaveSlotIds).toHaveLength(harnessShowcaseManualSaveSlotCount);
     expect(harnessShowcaseSaveSlotIds.slice(0, 4)).toEqual([
@@ -183,5 +180,18 @@ function runtimeCommand(commandId: string, category: NaniCommandCategory, params
     status: "implemented",
     params,
     loc: { scriptPath: "save-adapter-test.nani", line: 1, column: 1, raw: `@${commandId}` }
+  };
+}
+
+function createVnCheckpoint(
+  story: StoryRuntimeSnapshot,
+  pixiStage: PixiStageSnapshot = createInitialPixiStageSnapshot()
+): SaveableVnState {
+  return {
+    entryId: "vn:harness-showcase",
+    scriptRevision: "sha256:test",
+    story: createSaveableStorySnapshot(story),
+    pixiStage,
+    ui: { dialog: true, commandBar: true, toastLayer: true }
   };
 }

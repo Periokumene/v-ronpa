@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
-  VnRuntimeDispatcher,
+  VnPixiPresenterHost,
   settingsToDialogDisplaySettings,
   settingsToDialogueBleepRuntimeSettings,
   settingsToStoryPlayTimingPolicy,
@@ -19,11 +19,11 @@ import { useGameAOverlayAdapters } from "./useGameAOverlayAdapters";
 import { useGameASaveAdapter } from "./useGameASaveAdapter";
 import { useGameAVnRuntime } from "./useGameAVnRuntime";
 import { createGameASurfaces, type GameASurfaceNavigation } from "./ui/GameASurfaces";
+import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
 import { gameAUiConfig } from "./ui/gameAUiConfig";
 import { resolveGameAUiAssets } from "./ui/resolveGameAUiAssets";
 
-export function App() {
-  const flow = useGameAFlowActor();
+export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) {
   const devVnLaunchTarget = useMemo(
     () =>
       resolveGameAVnLaunchTarget({
@@ -46,14 +46,16 @@ export function App() {
     ...(gameAContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: gameAContentManifest.audio.dialogueBleep } : {}),
     dialogueBleepSettings,
     dialogRevealSettings,
+    ...(entryOverride ? { entryOverride } : {}),
     storyPlayTiming,
     ...(devVnLaunchTarget.startLabelOverride ? { startLabelOverride: devVnLaunchTarget.startLabelOverride } : {}),
     voiceSettings
   });
+  const flow = useGameAFlowActor(runtime.shell.interactionFacts);
   const save = useGameASaveAdapter({
+    canSave: () => flow.capabilities.canSave,
     capturePreview: () => pixiCaptureHandleRef.current?.captureThumbnail(SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS),
-    getPixiStage: () => runtime.pixiStageRuntime.snapshot,
-    getStory: () => runtime.storyRuntime.state,
+    getCheckpoint: runtime.lifecycle.createVnSaveCheckpoint,
     onLoad: runtime.restoreFromSave
   });
   const overlayPages = useGameAOverlayAdapters({ flow, runtime, save, settings });
@@ -84,8 +86,8 @@ export function App() {
   const sendFlowEvent = flow.send;
 
   useEffect(() => {
-    gameAUiAssets.diagnostics.forEach(runtime.observeAssetDiagnostic);
-  }, [gameAUiAssets.diagnostics, runtime.observeAssetDiagnostic]);
+    gameAUiAssets.diagnostics.forEach(runtime.diagnostics.observeAssetDiagnostic);
+  }, [gameAUiAssets.diagnostics, runtime.diagnostics.observeAssetDiagnostic]);
 
   useEffect(() => {
     if (didAutoStartDevLaunch.current) return;
@@ -111,7 +113,7 @@ export function App() {
       <RichTextFontStyles
         assetResolver={assetRegistry}
         fonts={gameAContentManifest.fonts}
-        onDiagnostic={runtime.observeAssetDiagnostic}
+        onDiagnostic={runtime.diagnostics.observeAssetDiagnostic}
       />
       <section className="game-a-playfield" data-testid="game-a-playfield">
         <GameInteractionShell
@@ -119,23 +121,18 @@ export function App() {
           flow={flow}
           formatStorySpeaker={displaySpeaker}
           overlayPages={overlayPages}
-          runtime={runtime}
+          runtime={runtime.shell}
           surfaces={gameASurfaces}
         >
           <div className="game-a-scene" data-testid="game-a-vn-shell">
-            <VnRuntimeDispatcher
-              active={flow.mode === "vn" && runtime.storyRuntime.active}
+            <VnPixiPresenterHost
+              active={flow.mode === "vn" && runtime.shell.storyRuntime.active}
               assetResolver={assetRegistry}
-              pixiAnimate={runtime.pixiStageRuntime.animate}
-              pixiHintSequence={runtime.pixiStageRuntime.hintSequence}
-              pixiHints={runtime.pixiStageRuntime.hints}
-              pixiPresentationTasks={runtime.pixiStageRuntime.presentationTasks}
-              pixiStage={runtime.pixiStageRuntime.snapshot}
-              storySession="game-a-opening"
-              onPixiCaptureHandleChanged={(handle) => {
+              diagnostics={runtime.diagnostics}
+              presentation={runtime.presentation}
+              onCaptureHandleChanged={(handle) => {
                 pixiCaptureHandleRef.current = handle;
               }}
-              onPixiTasksChanged={runtime.updatePixiPresentationTasks}
             />
           </div>
         </GameInteractionShell>
@@ -168,6 +165,5 @@ function formatGameAMode(mode: string): string {
   if (mode === "navi") return "探索";
   if (mode === "trial") return "裁判";
   if (mode === "paused") return "暂停";
-  if (mode === "saving") return "保存中";
   return mode;
 }

@@ -1,5 +1,6 @@
 import { defineConfig, searchForWorkspaceRoot, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { resolveWorktreeAppRuntimeEnv } from "../../scripts/worktree-env.mjs";
 
 export function gameANaniFullReloadPlugin(): Plugin {
   return {
@@ -14,19 +15,21 @@ export function gameANaniFullReloadPlugin(): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-  const port = Number(process.env.VITE_DEV_PORT ?? process.env.PORT ?? 5174);
+  const runtimeEnv = resolveWorktreeAppRuntimeEnv("game-a");
   return {
     plugins: [react(), gameANaniFullReloadPlugin()],
     server: {
       host: "127.0.0.1",
-      port,
+      port: runtimeEnv.port,
+      strictPort: true,
       fs: {
         allow: [searchForWorkspaceRoot(process.cwd())]
       }
     },
     preview: {
       host: "127.0.0.1",
-      port
+      port: runtimeEnv.port,
+      strictPort: true
     },
     define: {
       __DEV_MODE__: JSON.stringify(mode === "development")

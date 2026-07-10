@@ -22,7 +22,9 @@
     { "path": "../../packages/media-save" },
     { "path": "../../packages/navi-director" },
     { "path": "../../packages/pixi-presenter" },
+    { "path": "../../packages/pixi-stage-model" },
     { "path": "../../packages/r3f-adapter" },
+    { "path": "../../packages/runtime-assets-pixi" },
     { "path": "../../packages/trial-director" },
     { "path": "../../packages/ui-kit" }
   ],

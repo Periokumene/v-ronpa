@@ -1,31 +1,31 @@
-import { ContentManifestSchema, type ContentManifestInput } from "@v-ronpa/contracts";
-import { gameAFontFaces, gameARuntimeAssets } from "./generatedAssets";
+import { composeContentManifest } from "@v-ronpa/asset-registry";
+import type { ContentManifestInput } from "@v-ronpa/contracts";
+import {
+  gameAFontFaces,
+  gameARuntimeAssetFragments,
+  gameARuntimeAssets,
+  gameAScriptMetadataByPath
+} from "./generatedAssets";
 
 export const gameAVnScriptPath = "game-a/opening.nani";
 const GAME_A_MAIN_BACKGROUND_ID = "bg:game-a-academy-hall-fullscreen";
 const GAME_A_INNER_BACKGROUND_ID = "bg:game-a-snow-outskirts-frame";
+const gameAOpeningScriptMetadata = gameAScriptMetadataByPath[gameAVnScriptPath];
+if (!gameAOpeningScriptMetadata) throw new Error(`Missing generated metadata for '${gameAVnScriptPath}'.`);
 
 export const gameAVnEntry = {
   id: "vn:game-a-opening",
   title: "Game A Opening",
   scriptPath: gameAVnScriptPath,
+  scriptRevision: gameAOpeningScriptMetadata.scriptRevision,
   startLabel: "Start",
   profile: "vn2d" as const,
   assetRefs: [
-    { id: GAME_A_MAIN_BACKGROUND_ID, kind: "background" as const, tags: ["game-a", "vn"] },
-    { id: GAME_A_INNER_BACKGROUND_ID, kind: "background" as const, tags: ["game-a", "vn"] },
-    { id: "bg:rain-street", kind: "background" as const, tags: ["game-a", "vn"] },
-    { id: "bgm:dead-fish-riffle", kind: "bgm" as const, tags: ["game-a", "vn"] },
-    { id: "bgm:game-a-main", kind: "bgm" as const, tags: ["game-a", "vn"] },
-    { id: "sfx:game-a-chime", kind: "sfx" as const, tags: ["game-a", "vn"] },
-    { id: "sfx:gentle-rain-loop", kind: "sfx" as const, tags: ["game-a", "vn"] },
-    { id: "sfx:glug-glug-glug", kind: "sfx" as const, tags: ["game-a", "vn"] },
-    { id: "sfx:noise-6hz", kind: "sfx" as const, tags: ["game-a", "vn"] },
+    ...gameAOpeningScriptMetadata.assetRefs,
     { id: "bleep:game-a-dialogue", kind: "bleep" as const, tags: ["game-a", "vn"] },
-    { id: "voice:zh:game_a_voice_0001", kind: "voice" as const, tags: ["game-a", "vn"] },
-    { id: "video:game-a-intro", kind: "video" as const, tags: ["game-a", "vn"] },
     { id: "texture:ui:game-a-dialog-frame", kind: "texture" as const, tags: ["game-a", "ui", "vn"] },
-    { id: "alice", kind: "character-pack" as const, tags: ["game-a", "vn"] }
+    { id: GAME_A_MAIN_BACKGROUND_ID, kind: "background" as const, tags: ["game-a", "preload", "vn"] },
+    { id: GAME_A_INNER_BACKGROUND_ID, kind: "background" as const, tags: ["game-a", "preload", "vn"] }
   ]
 };
 
@@ -49,4 +49,4 @@ const gameAContentManifestInput = {
   trials: []
 } satisfies ContentManifestInput;
 
-export const gameAContentManifest = ContentManifestSchema.parse(gameAContentManifestInput);
+export const gameAContentManifest = composeContentManifest(gameAContentManifestInput, gameARuntimeAssetFragments);

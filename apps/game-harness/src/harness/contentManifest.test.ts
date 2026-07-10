@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import { ContentManifestSchema } from "@v-ronpa/contracts";
-import { builtInPixiFxRuntimeAssets } from "@v-ronpa/pixi-presenter";
+import { pixiRuntimeAssetFragment } from "@v-ronpa/runtime-assets-pixi";
 import { harnessContentManifest } from "./contentManifest";
 
 describe("harness content manifest", () => {
@@ -44,7 +44,7 @@ describe("harness content manifest", () => {
   it("composes Pixi built-in FX assets into the app manifest", () => {
     const manifestAssetIds = new Set(harnessContentManifest.runtimeAssets.map((asset) => asset.id));
 
-    for (const asset of builtInPixiFxRuntimeAssets) {
+    for (const asset of pixiRuntimeAssetFragment.runtimeAssets) {
       expect(manifestAssetIds.has(asset.id)).toBe(true);
     }
   });

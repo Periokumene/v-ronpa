@@ -6,6 +6,7 @@ export const gameAOpeningNaniSource = openingNaniSource;
 
 export const gameAOpeningRuntimeEntry = {
   id: gameAVnEntry.id,
+  scriptRevision: gameAVnEntry.scriptRevision,
   profile: gameAVnEntry.profile,
   scriptPath: gameAVnEntry.scriptPath,
   sourceText: gameAOpeningNaniSource,

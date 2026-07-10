@@ -9,18 +9,22 @@ import {
   generateGameARuntimeAssetsModule,
   generateHarnessRuntimeAssetsModule
 } from "./generate-assets.mjs";
+import gameAAssetConfig from "../apps/game-a/asset.config.mjs";
+import harnessAssetConfig from "../apps/game-harness/asset.config.mjs";
 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const {
+  ContentManifestSchema,
   LayeredCharacterCompositionsSchema,
   LayeredCharacterDefinitionSchema,
   LayeredCharacterLayerMetadataSchema,
   LayeredCharacterLayersSchema
 } = await import(pathToFileURL(join(repoRoot, "packages/contracts/src/index.ts")).href);
+const { createAssetRegistry } = await import(pathToFileURL(join(repoRoot, "packages/asset-registry/src/index.ts")).href);
+const { pixiRuntimeAssetFragment } = await import(pathToFileURL(join(repoRoot, "packages/runtime-assets-pixi/src/index.ts")).href);
 const harnessGeneratedPath = join(repoRoot, "apps/game-harness/src/harness/generatedAssets.ts");
 const gameAGeneratedPath = join(repoRoot, "apps/game-a/src/generatedAssets.ts");
 const gameAContentManifestPath = join(repoRoot, "apps/game-a/src/contentManifest.ts");
-const pixiFxAssetsPath = join(repoRoot, "packages/pixi-presenter/src/internal/fxAssets.ts");
 const bleepAssetsRoot = join(repoRoot, "apps/game-harness/public/harness/media/bleep");
 const voiceAssetsRoot = join(repoRoot, "apps/game-harness/public/harness/media/voice");
 const gameABleepAssetsRoot = join(repoRoot, "apps/game-a/public/game-a/media/bleep");
@@ -47,7 +51,7 @@ const characterPackCommandPattern = /^\s*@(char|slide)\s+([^\s]+)/gmu;
 const allowedHardcodedFiles = new Set([
   "apps/game-harness/src/harness/generatedAssets.ts",
   "apps/game-a/src/generatedAssets.ts",
-  "packages/pixi-presenter/src/internal/fxAssets.ts",
+  "packages/runtime-assets-pixi/src/index.ts",
   "scripts/generate-assets.mjs",
   "scripts/validate-assets.mjs"
 ]);
@@ -59,7 +63,7 @@ const appAssetConfigs = [
     fontFaces: collectHarnessFontFaces(),
     publicRoot: "apps/game-harness/public",
     referenceFiles: harnessReferenceFiles,
-    includePixiFxIds: true
+    providerIds: harnessAssetConfig.providers
   },
   {
     label: "game-a",
@@ -67,7 +71,7 @@ const appAssetConfigs = [
     fontFaces: collectGameAFontFaces(),
     publicRoot: "apps/game-a/public",
     referenceFiles: gameAReferenceFiles,
-    includePixiFxIds: false
+    providerIds: gameAAssetConfig.providers
   }
 ];
 
@@ -86,6 +90,7 @@ checkFontAssetLayout(join(repoRoot, "apps/game-harness/public/harness/fonts"), "
 checkFontAssetLayout(gameAFontAssetsRoot, "apps/game-a/public/game-a/fonts");
 checkCharacterPacks();
 for (const config of appAssetConfigs) checkReferencesResolve(config);
+await checkFinalManifests();
 checkNoHardcodedRuntimeAssetPaths();
 
 if (failed) process.exitCode = 1;
@@ -283,16 +288,41 @@ function resolvePackPath(packRoot, relativePath) {
 
 function collectRegisteredIds(config) {
   const ids = new Set(config.assets.map((asset) => asset.id));
-  if (config.includePixiFxIds && existsSync(pixiFxAssetsPath)) {
-    const content = readFileSync(pixiFxAssetsPath, "utf8");
-    for (const match of content.matchAll(/runtimeFxAsset\("([^"]+)"/gu)) {
-      if (match[1]) ids.add(`fx:${match[1]}`);
+  for (const providerId of config.providerIds) {
+    if (providerId !== "pixi") {
+      fail(`Unknown runtime asset provider '${providerId}' in ${config.label}.`);
+      continue;
     }
+    for (const asset of pixiRuntimeAssetFragment.runtimeAssets) ids.add(asset.id);
   }
   return {
     knownAssetIds: ids,
     knownFontFaceIds: new Set(config.fontFaces.map((font) => font.id))
   };
+}
+
+async function checkFinalManifests() {
+  const { createServer } = await import("vite");
+  const server = await createServer({ root: repoRoot, appType: "custom", server: { middlewareMode: true } });
+  try {
+    const [{ gameAContentManifest }, { harnessContentManifest }] = await Promise.all([
+      server.ssrLoadModule("/apps/game-a/src/contentManifest.ts"),
+      server.ssrLoadModule("/apps/game-harness/src/harness/contentManifest.ts")
+    ]);
+    for (const [label, input] of [["game-a", gameAContentManifest], ["game-harness", harnessContentManifest]]) {
+      try {
+        const manifest = ContentManifestSchema.parse(input);
+        const registry = createAssetRegistry(manifest);
+        for (const diagnostic of [...registry.diagnostics, ...registry.validateReferences()]) {
+          fail(`${label} final manifest: ${diagnostic.message}`);
+        }
+      } catch (error) {
+        fail(`${label} final manifest failed validation: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  } finally {
+    await server.close();
+  }
 }
 
 function checkNoHardcodedRuntimeAssetPaths() {

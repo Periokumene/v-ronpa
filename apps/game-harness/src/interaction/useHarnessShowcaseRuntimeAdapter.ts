@@ -1,19 +1,19 @@
 import { useCallback, useMemo, useState } from "react";
 import type { AssetResolver } from "@v-ronpa/asset-registry";
 import {
+  useVnRuntime,
+  type UseVnRuntimeOptions
+} from "@v-ronpa/app-vn-runtime";
+import {
   canAdvanceVnStoryFromSource,
   canCompleteVnPauseRuntimeWaitFromSource,
   canToggleVnStoryAutomation,
   limitVnRuntimeDiagnostics,
   shouldAnimateVnStoryPlayPacing,
-  useVnRuntime,
-  type UseVnRuntimeOptions,
-  type VnRuntimeDiagnostic,
-  type VnStoryRuntime
-} from "@v-ronpa/app-vn-runtime";
+  type VnRuntimeDiagnostic
+} from "@v-ronpa/app-vn-runtime/debug";
 import type {
   DialogueBleepConfig,
-  GameInteractionContext,
   GameplayEvent,
   NaviInteractionSensorReport,
   NaviRuntimeState,
@@ -23,6 +23,7 @@ import type {
   TrialRuntimeState,
   WorldMapDef
 } from "@v-ronpa/contracts";
+import type { GameMode } from "@v-ronpa/contracts";
 import { applyGameplayEvent, createGameplayState, type ExplorationOutcome, type GameplayState } from "@v-ronpa/gameplay";
 import {
   confirmFocusedNaviInteraction,
@@ -46,6 +47,7 @@ import {
   harnessShowcaseScript,
   harnessShowcaseTrial
 } from "../harness/showcase";
+import { harnessShowcaseVnEntry } from "../harness/contentManifest";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../harness/inputActions";
 import { useFirstPersonExplorationBridge } from "../harness/useFirstPersonExplorationBridge";
 import type { AudioPort, VideoPort } from "@v-ronpa/media-save";
@@ -101,7 +103,7 @@ export const harnessShowcasePosePresets: PosePreset[] = [
 const initialMap = harnessShowcaseMaps[0] ?? createFallbackMap();
 
 export function useHarnessShowcaseRuntimeAdapter(
-  flowMode: GameInteractionContext["mode"],
+  flowMode: GameMode,
   options: HarnessShowcaseRuntimeAdapterOptions = {}
 ) {
   const trialDefinitionDiagnostics = useMemo(() => validateTrialDefinition(harnessShowcaseTrial), []);
@@ -138,12 +140,14 @@ export function useHarnessShowcaseRuntimeAdapter(
     ...(options.dialogueBleepConfig ? { dialogueBleepConfig: options.dialogueBleepConfig } : {}),
     ...(options.dialogueBleepSettings ? { dialogueBleepSettings: options.dialogueBleepSettings } : {}),
     entry: {
+      id: harnessShowcaseVnEntry.id,
+      scriptRevision: harnessShowcaseVnEntry.scriptRevision,
       profile: options.profile ?? "vn2d",
-      scriptPath: "harness/harness-showcase.nani",
+      scriptPath: harnessShowcaseVnEntry.scriptPath,
       sourceText: harnessShowcaseScript,
       startLabel: "Start"
     },
-    interactionMode: "navi",
+    gameId: "game-harness",
     onGameplayEvents: applyRuntimeGameplayEvents,
     onRuntimeStatus: recordRuntimeStatus,
     onStoryEnd: () => closeStoryOverlay("story:end"),
@@ -154,12 +158,12 @@ export function useHarnessShowcaseRuntimeAdapter(
     ...(options.voiceSettings ? { voiceSettings: options.voiceSettings } : {})
   });
   const runtimeDiagnostics: HarnessShowcaseRuntimeDiagnostic[] = useMemo(
-    () => limitHarnessShowcaseDiagnostics([...runtime.runtimeDiagnostics, ...trialRuntimeDiagnostics]),
-    [runtime.runtimeDiagnostics, trialRuntimeDiagnostics]
+    () => limitHarnessShowcaseDiagnostics([...runtime.diagnostics.runtimeDiagnostics, ...trialRuntimeDiagnostics]),
+    [runtime.diagnostics.runtimeDiagnostics, trialRuntimeDiagnostics]
   );
   const observeAssetDiagnostic = useCallback(
     (diagnostic: { code?: string; severity?: "info" | "warning" | "error"; message: string; assetId?: string; kind?: string }) => {
-      runtime.observeAssetDiagnostic(diagnostic);
+      runtime.diagnostics.observeAssetDiagnostic(diagnostic);
     },
     [runtime]
   );
@@ -212,7 +216,7 @@ export function useHarnessShowcaseRuntimeAdapter(
   }
 
   function resetShowcase() {
-    runtime.resetRuntime({ stopMedia: true });
+    runtime.lifecycle.resetRuntime({ stopMedia: true });
     const spawnPose: PlayerPose = { position: initialMap.spawn, yaw: 0, pitch: 0 };
     setNavi({
       ...createInitialNaviState(initialMap.id),
@@ -243,14 +247,14 @@ export function useHarnessShowcaseRuntimeAdapter(
 
   function startStoryOverlay() {
     setTrialRuntime(createInitialHarnessShowcaseTrialRuntime());
-    runtime.startStory();
+    runtime.lifecycle.startStory();
   }
 
   function startTrial(outcome: Extract<ExplorationOutcome, { type: "start-trial" }>) {
-    runtime.resetRuntime({ stopMedia: true });
+    runtime.lifecycle.resetRuntime({ stopMedia: true });
     const definition = findHarnessShowcaseTrialDefinition(outcome.trialId);
     if (!definition) {
-      runtime.observeAssetDiagnostic({
+      runtime.diagnostics.observeAssetDiagnostic({
         code: "missing-trial-definition",
         severity: "error",
         message: `Trial definition '${outcome.trialId}' does not exist.`,
@@ -311,25 +315,21 @@ export function useHarnessShowcaseRuntimeAdapter(
   }
 
   function closeStoryOverlay(action = "dialog:cancel") {
-    runtime.resetRuntime({ stopMedia: true });
+    runtime.lifecycle.resetRuntime({ stopMedia: true });
     setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
     setLastAction(action);
     setLastOutcome("overlay-closed");
   }
 
   function restoreFromSave(save: SaveData) {
+    if (save.vn) {
+      const restored = runtime.lifecycle.restoreVnState({ gameId: save.gameId, state: save.vn });
+      if (!restored.ok) return restored;
+    }
     if (save.navi) setNavi(save.navi);
     if (save.navi?.playerPose) firstPersonBridge.issuePoseCommand(save.navi.playerPose);
     setGameplay({ inventory: save.inventory, evidence: save.evidence, characters: save.characters });
-    if (save.vn) {
-      runtime.restoreVnState({
-        active: save.navi?.substate === "vn2d-overlay" && !save.vn.story.ended,
-        story: save.vn.story,
-        pixiStage: save.vn.pixiStage
-      });
-    } else {
-      runtime.resetRuntime({ stopMedia: true });
-    }
+    if (!save.vn) runtime.lifecycle.resetRuntime({ stopMedia: true });
     setTrialRuntime(
       save.mode === "trial" && save.trial
         ? {
@@ -342,107 +342,74 @@ export function useHarnessShowcaseRuntimeAdapter(
     );
     setLastAction("load:slot");
     setLastOutcome("loaded");
+    return { ok: true as const };
   }
 
-  const interactionContext: GameInteractionContext = useMemo(
-    () => createHarnessShowcaseInteractionContext({ flowMode, navi, storyRuntime: runtime.storyRuntime, trialRuntime }),
-    [
-      flowMode,
-      navi.inputLock,
-      navi.substate,
-      runtime.storyRuntime.active,
-      runtime.storyRuntime.state.ended,
-      runtime.storyRuntime.state.pendingChoices.length,
-      runtime.storyRuntime.state.presentationWait,
-      runtime.storyRuntime.state.runtimeWait,
-      trialRuntime.active,
-      trialRuntime.state?.currentSegmentId,
-      trialRuntime.state?.inputLock,
-      trialRuntime.state?.presentation
-    ]
+  const hostInteractionFacts = useMemo(
+    () => ({
+      inputLock:
+        flowMode === "trial" && trialRuntime.active && trialRuntime.state
+          ? trialRuntime.state.inputLock
+          : runtime.shell.storyRuntime.active
+            ? runtime.shell.interactionFacts.inputLock
+            : navi.inputLock,
+      naviSubstate: navi.substate,
+      isAtStableStop:
+        flowMode === "trial"
+          ? Boolean(trialRuntime.active && trialRuntime.state && trialRuntime.state.inputLock !== "cutscene")
+          : !runtime.shell.storyRuntime.state.presentationWait &&
+            !runtime.shell.storyRuntime.state.runtimeWait &&
+            (navi.substate === "walk" || navi.substate === "vn2d-overlay"),
+      ...(trialRuntime.state?.presentation ? { trialPresentation: trialRuntime.state.presentation } : {})
+    }),
+    [flowMode, navi.inputLock, navi.substate, runtime.shell.interactionFacts.inputLock, runtime.shell.storyRuntime.active, runtime.shell.storyRuntime.state.presentationWait, runtime.shell.storyRuntime.state.runtimeWait, trialRuntime.active, trialRuntime.state]
   );
 
   return {
     activeMap,
-    advanceStory: runtime.advanceStory,
-    attachMovieElement: runtime.attachMovieElement,
-    chooseStory: runtime.chooseStory,
+    advanceStory: runtime.shell.advanceStory,
+    attachMovieElement: runtime.shell.attachMovieElement,
+    chooseStory: runtime.shell.chooseStory,
     closeStoryOverlay,
-    completeMoviePlayback: runtime.completeMoviePlayback,
+    completeMoviePlayback: runtime.shell.completeMoviePlayback,
     confirmFocusedInteraction,
-    dialogRevealRuntime: runtime.dialogRevealRuntime,
-    dismissRuntimeToast: runtime.dismissRuntimeToast,
+    dialogRevealRuntime: runtime.shell.dialogRevealRuntime,
+    dismissRuntimeToast: runtime.shell.dismissRuntimeToast,
+    diagnostics: runtime.diagnostics,
     firstPersonBridge,
     gameplay,
-    interactionContext,
+    hostInteractionFacts,
+    interactionFacts: runtime.shell.interactionFacts,
     interactionView,
     lastAction,
     lastOutcome,
-    lastRuntimeCommandCount: runtime.lastRuntimeCommandCount,
-    mediaRuntime: runtime.mediaRuntime,
+    lastRuntimeCommandCount: runtime.debug.lastRuntimeCommandCount,
+    mediaRuntime: runtime.debug.mediaRuntime,
     moveToPreset,
     navi,
     observeAssetDiagnostic,
-    pixiStageRuntime: runtime.pixiStageRuntime,
+    pixiStageRuntime: runtime.presentation.pixiStageRuntime,
+    presentation: runtime.presentation,
     resetShowcase,
     restoreFromSave,
     runtimeDiagnostics,
     resolveTrialKeywordWithEvidence,
     resolveTrialTimeout,
-    stopStoryAutomation: runtime.stopStoryAutomation,
-    storyPlay: runtime.storyPlay,
-    storyPlayActiveActions: runtime.storyPlayActiveActions,
-    storyPlaySchedule: runtime.storyPlaySchedule,
-    storyRuntime: runtime.storyRuntime,
-    storySession: runtime.storySession,
-    submitStoryInput: runtime.submitStoryInput,
-    toggleStoryAuto: runtime.toggleStoryAuto,
-    toggleStorySkip: runtime.toggleStorySkip,
+    shell: runtime.shell,
+    stopStoryAutomation: runtime.debug.stopStoryAutomation,
+    storyPlay: runtime.debug.storyPlay,
+    storyPlayActiveActions: runtime.shell.storyPlayActiveActions,
+    storyPlaySchedule: runtime.debug.storyPlaySchedule,
+    storyRuntime: runtime.shell.storyRuntime,
+    storySession: runtime.presentation.storySession,
+    submitStoryInput: runtime.shell.submitStoryInput,
+    toggleStoryAuto: runtime.debug.toggleStoryAuto,
+    toggleStorySkip: runtime.debug.toggleStorySkip,
     trialRuntime,
-    uiRuntime: runtime.uiRuntime,
-    updatePixiPresentationTasks: runtime.updatePixiPresentationTasks,
+    uiRuntime: runtime.shell.uiRuntime,
+    updatePixiPresentationTasks: runtime.presentation.updatePixiPresentationTasks,
+    createVnSaveCheckpoint: runtime.lifecycle.createVnSaveCheckpoint,
     exitTrial
-  };
-}
-
-export function createHarnessShowcaseInteractionContext({
-  flowMode,
-  navi,
-  storyRuntime,
-  trialRuntime = createInitialHarnessShowcaseTrialRuntime()
-}: {
-  flowMode: GameInteractionContext["mode"];
-  navi: Pick<NaviRuntimeState, "inputLock" | "substate">;
-  storyRuntime: VnStoryRuntime;
-  trialRuntime?: TrialRuntime;
-}): GameInteractionContext {
-  if (flowMode === "trial" && trialRuntime.active && trialRuntime.state) {
-    return {
-      mode: flowMode,
-      overlayStack: [],
-      naviSubstate: navi.substate,
-      trialPresentation: trialRuntime.state.presentation,
-      inputLock: trialRuntime.state.inputLock,
-      hasActiveStory: false,
-      storyHasChoices: false,
-      storyEnded: false,
-      isAtStableStop: false
-    };
-  }
-
-  return {
-    mode: flowMode,
-    overlayStack: [],
-    naviSubstate: navi.substate,
-    inputLock: navi.inputLock,
-    hasActiveStory: storyRuntime.active,
-    storyHasChoices: storyRuntime.state.pendingChoices.length > 0,
-    storyEnded: storyRuntime.state.ended,
-    isAtStableStop:
-      flowMode === "navi" &&
-      !storyRuntime.state.presentationWait &&
-      !storyRuntime.state.runtimeWait &&
-      (navi.substate === "walk" || navi.substate === "vn2d-overlay")
   };
 }
 

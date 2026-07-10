@@ -3,18 +3,18 @@ import { resolveGameAVnLaunchTarget, shouldAutoStartGameAVnLaunchTarget } from "
 
 describe("game-a VN launch target", () => {
   it("resolves a dev vnStart URL parameter into an auto-start label override", () => {
-    expect(resolveGameAVnLaunchTarget({ devMode: true, search: "?vnStart=DBG_RAIN" })).toEqual({
+    expect(resolveGameAVnLaunchTarget({ devMode: true, search: "?vnStart=PartRain" })).toEqual({
       requested: true,
       autoStart: true,
-      startLabelOverride: "DBG_RAIN"
+      startLabelOverride: "PartRain"
     });
   });
 
   it("normalizes a decoded local label prefix", () => {
-    expect(resolveGameAVnLaunchTarget({ devMode: true, search: "?vnStart=%23DBG_RAIN" })).toEqual({
+    expect(resolveGameAVnLaunchTarget({ devMode: true, search: "?vnStart=%23PartRain" })).toEqual({
       requested: true,
       autoStart: true,
-      startLabelOverride: "DBG_RAIN"
+      startLabelOverride: "PartRain"
     });
   });
 
@@ -30,14 +30,14 @@ describe("game-a VN launch target", () => {
   });
 
   it("ignores vnStart outside dev mode", () => {
-    expect(resolveGameAVnLaunchTarget({ devMode: false, search: "?vnStart=DBG_RAIN" })).toEqual({
+    expect(resolveGameAVnLaunchTarget({ devMode: false, search: "?vnStart=PartRain" })).toEqual({
       requested: false,
       autoStart: false
     });
   });
 
   it("auto-starts only when a requested label has no runtime start-label error", () => {
-    const target = resolveGameAVnLaunchTarget({ devMode: true, search: "?vnStart=DBG_RAIN" });
+    const target = resolveGameAVnLaunchTarget({ devMode: true, search: "?vnStart=PartRain" });
 
     expect(shouldAutoStartGameAVnLaunchTarget({ target, hasInvalidStartLabel: false })).toBe(true);
     expect(shouldAutoStartGameAVnLaunchTarget({ target, hasInvalidStartLabel: true })).toBe(false);

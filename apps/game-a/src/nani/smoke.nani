@@ -1,0 +1,40 @@
+#Start
+@showUI dialog
+@showUI commandBar visible:true
+@back bg:game-a-academy-hall-fullscreen effect:fade time:0.05
+Narrator: CHECKPOINT SMOKE 00 - test-only VN entry is active.
+@choice "交互与存档" goto:#Interaction
+@choice "Pixi 与媒体" goto:#Presentation
+
+#Interaction
+@set route:"smoke-interaction"
+@hideUI dialog time:0.05 wait!
+@hideUI commandBar time:0.05 wait!
+@showUI dialog time:0.05 wait!
+@showUI commandBar visible:true time:0.05 wait!
+Narrator: CHECKPOINT SMOKE UI - terminal visibility is stable and saveable.
+@input playerName type:string summary:"输入测试代号" value:Felix
+Narrator: CHECKPOINT SMOKE INPUT - input wait completed.
+@wait i
+Narrator: CHECKPOINT SMOKE PAUSE - explicit runtime wait completed.
+Narrator: CHECKPOINT SMOKE SAVE LOAD SETTINGS - use shared command bar and pause sections now.
+@choice "进入 Pixi 与媒体" goto:#Presentation
+
+#Presentation
+@set route:"smoke-presentation"
+@back bg:game-a-academy-hall-fullscreen effect:fade time:0.05
+@inback bg:game-a-snow-outskirts-frame effect:fade time:0.05
+@char alice pos:50 time:0.05 wait!
+@rain power:0.5 wind:-1 hue:215 tint:0.55 time:0.05
+@flash color:#ffffff time:0.05 wait!
+Narrator: CHECKPOINT SMOKE PIXI - renderer task completed without phantom waits.
+@choice "继续媒体测试" goto:#Media
+
+#Media
+Mira: CHECKPOINT SMOKE VOICE - textId audio is optional runtime intent. |#game_a_voice_0001|
+@movie video:game-a-intro block:true
+Narrator: CHECKPOINT SMOKE MOVIE - media wait completed and is not saveable playback state.
+@rain power:0 time:0.05 wait!
+@hideChars time:0.05 wait!
+Narrator: CHECKPOINT SMOKE COMPLETE
+@end

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode, type RefCallback } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import type {
   BacklogOverlayActions,
   BacklogOverlayViewModel,
@@ -22,14 +22,21 @@ import type {
   VnCommandBarViewModel,
   VnDialogViewModel
 } from "@v-ronpa/app-vn-shell";
+import {
+  VN_PAUSE_SECTIONS,
+  SETTINGS_LANGUAGE_OPTIONS,
+  SETTINGS_SECTION_DESCRIPTORS,
+  SETTINGS_TEXT_SIZE_OPTIONS,
+  adjacentSettingsOption,
+  createEscapeCaptureRef,
+  isVnPauseSectionOverlay,
+  normalizeSettingsStep,
+  type SettingsOption,
+  type SettingsSectionId,
+  type VnPauseSectionId
+} from "@v-ronpa/app-vn-shell";
 import type { GameOverlayKind, GameUiAction, InteractionCapabilitySnapshot } from "@v-ronpa/contracts";
 import { paginateSaveLoadSlotIds, RichTextRenderer, SAVE_LOAD_SLOTS_PER_PAGE, SurfaceFrame } from "@v-ronpa/ui-kit";
-import {
-  GAME_A_PAUSE_TABS,
-  getGameAPauseTabSectionNumber,
-  isGameAPauseTabOverlay,
-  type GameAPauseTab
-} from "../gameAPauseTabs";
 import type { GameAUiConfig } from "./gameAUiConfig";
 import type { GameAUiAssets } from "./resolveGameAUiAssets";
 
@@ -254,8 +261,8 @@ function GameABacklogOverlay({
   navigation: GameASurfaceNavigation;
 }) {
   return (
-    <GameAPauseTabShell
-      activeTab="log"
+    <GameAPauseSectionShell
+      activeSection="backlog"
       navigation={navigation}
       onClose={actions.close}
       testId="backlog-overlay"
@@ -275,7 +282,7 @@ function GameABacklogOverlay({
           ))}
         </ol>
       )}
-    </GameAPauseTabShell>
+    </GameAPauseSectionShell>
   );
 }
 
@@ -387,7 +394,7 @@ function GameASaveLoadOverlay({
     </>
   );
 
-  if (!isGameAPauseTabOverlay(navigation.activeOverlay)) {
+  if (!isVnPauseSectionOverlay(navigation.activeOverlay)) {
     return (
       <GameAOverlayPanel onClose={actions.close} testId="save-load-overlay" title={formatSaveLoadOverlayTitle(model.mode, "title")}>
         {content}
@@ -396,8 +403,8 @@ function GameASaveLoadOverlay({
   }
 
   return (
-    <GameAPauseTabShell
-      activeTab={model.mode}
+    <GameAPauseSectionShell
+      activeSection={model.mode}
       navigation={navigation}
       navigationLocked={Boolean(model.pendingLoadSlot)}
       onEscapeCapture={model.pendingLoadSlot ? actions.cancelLoad : undefined}
@@ -406,7 +413,7 @@ function GameASaveLoadOverlay({
       title={formatSaveLoadOverlayTitle(model.mode, "pause")}
     >
       {content}
-    </GameAPauseTabShell>
+    </GameAPauseSectionShell>
   );
 }
 
@@ -427,7 +434,7 @@ function GameASettingsOverlay({
     />
   );
 
-  if (!isGameAPauseTabOverlay(navigation.activeOverlay)) {
+  if (!isVnPauseSectionOverlay(navigation.activeOverlay)) {
     return (
       <GameAOverlayPanel onClose={actions.close} testId="settings-overlay" title="设置">
         {content}
@@ -436,46 +443,20 @@ function GameASettingsOverlay({
   }
 
   return (
-    <GameAPauseTabShell
-      activeTab="settings"
+    <GameAPauseSectionShell
+      activeSection="settings"
       navigation={navigation}
       onClose={actions.close}
       testId="settings-overlay"
       title="设置"
     >
       {content}
-    </GameAPauseTabShell>
+    </GameAPauseSectionShell>
   );
 }
 
-export type GameASettingsTab = "system" | "display" | "sound" | "automation";
+export type GameASettingsTab = SettingsSectionId;
 type GameASettingsSnapshot = SettingsOverlayViewModel["settings"];
-type GameASettingOption<T extends string> = {
-  label: string;
-  value: T;
-};
-type GameASettingOptions<T extends string> = [GameASettingOption<T>, ...Array<GameASettingOption<T>>];
-
-const GAME_A_SETTINGS_SUBTABS: Array<{ label: string; tab: GameASettingsTab; testId: string }> = [
-  { label: "SYSTEM", tab: "system", testId: "settings-subtab-system" },
-  { label: "DISPLAY", tab: "display", testId: "settings-subtab-display" },
-  { label: "SOUND", tab: "sound", testId: "settings-subtab-sound" },
-  { label: "AUTO", tab: "automation", testId: "settings-subtab-auto" }
-];
-
-const GAME_A_LANGUAGE_OPTIONS: GameASettingOptions<GameASettingsSnapshot["system"]["language"]> = [
-  { value: "zh-CN", label: "简体中文" },
-  { value: "zh-TW", label: "繁体中文" },
-  { value: "en", label: "英语" },
-  { value: "ja", label: "日语" },
-  { value: "ko", label: "韩语" }
-];
-
-const GAME_A_TEXT_SIZE_OPTIONS: GameASettingOptions<GameASettingsSnapshot["display"]["textSize"]> = [
-  { value: "small", label: "小" },
-  { value: "medium", label: "中" },
-  { value: "large", label: "大" }
-];
 
 export function GameASettingsContent({
   actions,
@@ -488,7 +469,7 @@ export function GameASettingsContent({
   model: SettingsOverlayViewModel;
   onSettingsTabChange: (tab: GameASettingsTab) => void;
 }) {
-  const tabLabel = GAME_A_SETTINGS_SUBTABS.find((tab) => tab.tab === activeSettingsTab)?.label ?? "SYSTEM";
+  const tabLabel = SETTINGS_SECTION_DESCRIPTORS.find((section) => section.id === activeSettingsTab)?.label ?? "SYSTEM";
 
   return (
     <div className="game-a-settings-page" data-settings-tab={activeSettingsTab} data-testid="settings-page">
@@ -524,7 +505,7 @@ function renderGameASettingsRows({
             <GameAOptionStepper
               label="语言"
               onChange={(language) => actions.patchSettings({ system: { language } })}
-              options={GAME_A_LANGUAGE_OPTIONS}
+              options={SETTINGS_LANGUAGE_OPTIONS}
               testId="settings-system-language"
               value={settings.system.language}
             />
@@ -554,7 +535,7 @@ function renderGameASettingsRows({
             <GameAOptionStepper
               label="文字大小"
               onChange={(textSize) => actions.patchSettings({ display: { textSize } })}
-              options={GAME_A_TEXT_SIZE_OPTIONS}
+              options={SETTINGS_TEXT_SIZE_OPTIONS}
               testId="settings-display-text-size"
               value={settings.display.textSize}
             />
@@ -659,11 +640,11 @@ function GameAStepMeter({
   testId: string;
   value: number;
 }) {
-  const normalized = clampGameASetting(value);
+  const normalized = normalizeSettingsStep(value);
   const filledBlocks = Math.round(normalized * 10);
   const valueText = `${Math.round(normalized * 100)}%`;
-  const previous = clampGameASetting(normalized - 0.1);
-  const next = clampGameASetting(normalized + 0.1);
+  const previous = normalizeSettingsStep(normalized - 0.1);
+  const next = normalizeSettingsStep(normalized + 0.1);
 
   return (
     <div className="game-a-step-meter" data-testid={testId} data-value={String(normalized)} role="group" aria-label={label}>
@@ -715,7 +696,7 @@ function GameAOptionStepper<T extends string>({
 }: {
   label: string;
   onChange: (value: T) => void;
-  options: GameASettingOptions<T>;
+  options: readonly SettingsOption<T>[];
   testId: string;
   value: T;
 }) {
@@ -724,8 +705,9 @@ function GameAOptionStepper<T extends string>({
     options.findIndex((option) => option.value === value)
   );
   const currentOption = options[currentIndex] ?? options[0];
-  const previousOption = options[currentIndex - 1];
-  const nextOption = options[currentIndex + 1];
+  if (!currentOption) return null;
+  const previousOption = adjacentSettingsOption(options, value, -1);
+  const nextOption = adjacentSettingsOption(options, value, 1);
 
   return (
     <div className="game-a-option-stepper" data-testid={testId} data-value={currentOption.value} role="group" aria-label={label}>
@@ -793,29 +775,25 @@ function GameASettingsSubtabs({
 }) {
   return (
     <nav aria-label="设置分类" className="game-a-settings-subtabs" data-testid="settings-subtab-list">
-      {GAME_A_SETTINGS_SUBTABS.map((tab) => {
-        const active = activeTab === tab.tab;
+      {SETTINGS_SECTION_DESCRIPTORS.map((section) => {
+        const active = activeTab === section.id;
         return (
           <button
             aria-current={active ? "page" : undefined}
             className={active ? "game-a-settings-subtab game-a-settings-subtab-active" : "game-a-settings-subtab"}
-            data-testid={tab.testId}
-            key={tab.tab}
+            data-testid={section.testId}
+            key={section.id}
             onClick={() => {
-              if (!active) onTabChange(tab.tab);
+              if (!active) onTabChange(section.id);
             }}
             type="button"
           >
-            {tab.label}
+            {section.label}
           </button>
         );
       })}
     </nav>
   );
-}
-
-function clampGameASetting(value: number): number {
-  return Math.min(1, Math.max(0, Math.round(value * 10) / 10));
 }
 
 function GameAPauseMenuOverlay({
@@ -848,8 +826,8 @@ function GameAPauseMenuOverlay({
   );
 }
 
-function GameAPauseTabShell({
-  activeTab,
+function GameAPauseSectionShell({
+  activeSection,
   children,
   navigation,
   navigationLocked = false,
@@ -858,7 +836,7 @@ function GameAPauseTabShell({
   testId,
   title
 }: {
-  activeTab: GameAPauseTab;
+  activeSection: VnPauseSectionId;
   children: ReactNode;
   navigation: GameASurfaceNavigation;
   navigationLocked?: boolean;
@@ -872,7 +850,7 @@ function GameAPauseTabShell({
     <section
       aria-label={title}
       className="game-a-pause-screen"
-      data-active-tab={activeTab}
+      data-active-tab={activeSection}
       data-testid={testId}
       ref={escapeCaptureRef}
     >
@@ -888,27 +866,29 @@ function GameAPauseTabShell({
           x
         </button>
         <div className="game-a-pause-heading">
-          <span className="game-a-pause-number">{getGameAPauseTabSectionNumber(activeTab)}</span>
+          <span className="game-a-pause-number">
+            {String(VN_PAUSE_SECTIONS.findIndex((section) => section.id === activeSection) + 1).padStart(2, "0")}
+          </span>
           <strong>{title}</strong>
         </div>
         <div className="game-a-pause-nav-row">
           <nav aria-label="暂停菜单页签" className="game-a-pause-tabs" data-testid="pause-tab-list">
-            {GAME_A_PAUSE_TABS.map((tab) => {
-              const active = activeTab === tab.tab;
+            {VN_PAUSE_SECTIONS.map((section) => {
+              const active = activeSection === section.id;
               const disabled = navigationLocked;
               return (
                 <button
                   aria-current={active ? "page" : undefined}
                   className={active ? "game-a-pause-tab game-a-pause-tab-active" : "game-a-pause-tab"}
-                  data-testid={tab.testId}
+                  data-testid={section.testId}
                   disabled={disabled}
-                  key={tab.tab}
+                  key={section.id}
                   onClick={() => {
-                    if (!active && !disabled) navigation.dispatch(tab.action);
+                    if (!active && !disabled) navigation.dispatch(section.action);
                   }}
                   type="button"
                 >
-                  {tab.label}
+                  {section.label}
                 </button>
               );
             })}
@@ -927,24 +907,6 @@ function GameAPauseTabShell({
       </div>
     </section>
   );
-}
-
-function createEscapeCaptureRef(onEscapeCapture: (() => void) | undefined): RefCallback<HTMLElement> | undefined {
-  if (!onEscapeCapture) return undefined;
-  const handleEscape = onEscapeCapture;
-  return (element) => {
-    const view = element?.ownerDocument.defaultView;
-    if (!view) return;
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      handleEscape();
-    }
-    view.addEventListener("keydown", handleKeyDown, { capture: true });
-    return () => view.removeEventListener("keydown", handleKeyDown, { capture: true });
-  };
 }
 
 function GameAOverlayPanel({

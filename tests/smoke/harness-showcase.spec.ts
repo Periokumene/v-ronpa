@@ -5,12 +5,14 @@ test.setTimeout(420_000);
 test("harness showcase connects Navi exploration, gameplay state, VN dialog, and branch outcomes", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error" && !isExpectedPointerLockError(message.text())) consoleErrors.push(message.text());
+    if (message.type() === "error" && !isExpectedPointerLockError(message.text())) {
+      consoleErrors.push(`${message.text()} @ ${message.location().url || "unknown"}`);
+    }
   });
 
   await page.addInitScript(() => {
     localStorage.removeItem("v-ronpa:settings:v1");
-    indexedDB.deleteDatabase("v-ronpa-harness-showcase-v7");
+    indexedDB.deleteDatabase("v-ronpa-harness-showcase-v8");
   });
   await page.goto("/");
 
