@@ -54,7 +54,7 @@ const howlerMock = vi.hoisted(() => {
 vi.mock("howler", () => ({ Howl: howlerMock.Howl }));
 
 const baseSave = SaveDataSchema.parse({
-  version: 6 as const,
+  version: 7 as const,
   gameId: "game:test",
   savedAt: "2026-06-14T00:00:00.000Z",
   mode: "navi" as const,
@@ -90,6 +90,10 @@ const baseSave = SaveDataSchema.parse({
       actorOrder: ["MainBackground", "Ema"],
       weather: {},
       screenFilters: {}
+    },
+    media: {
+      bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
+      loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
     },
     ui: { dialog: true, commandBar: true, toastLayer: true }
   },

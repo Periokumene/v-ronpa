@@ -1,5 +1,9 @@
 # Contract Change Request
 
+> Superseded note: The v7 database namespace values in this CCR are superseded
+> by `save-data-v7-vn-persistent-media.md`. Shared slot/storage ownership,
+> transaction, summary, preview, and policy decisions remain active.
+
 ## Requested Change
 
 Make `packages/media-save` the single save-slot infrastructure authority for

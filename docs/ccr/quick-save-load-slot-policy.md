@@ -2,7 +2,8 @@
 
 > Superseded note: Slot-policy ownership details in this CCR are superseded by
 > `docs/ccr/unified-media-save-slots-and-thumbnails.md`. The shared quick
-> save/load actions remain valid.
+> save/load actions remain valid. Its SaveData v5 payload-version statement is
+> superseded by `docs/ccr/save-data-v7-vn-persistent-media.md`.
 
 ## Requested Change
 

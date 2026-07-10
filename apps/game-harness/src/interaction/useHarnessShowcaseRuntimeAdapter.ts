@@ -216,7 +216,7 @@ export function useHarnessShowcaseRuntimeAdapter(
   }
 
   function resetShowcase() {
-    runtime.lifecycle.resetRuntime({ stopMedia: true });
+    runtime.lifecycle.resetRuntime();
     const spawnPose: PlayerPose = { position: initialMap.spawn, yaw: 0, pitch: 0 };
     setNavi({
       ...createInitialNaviState(initialMap.id),
@@ -251,7 +251,7 @@ export function useHarnessShowcaseRuntimeAdapter(
   }
 
   function startTrial(outcome: Extract<ExplorationOutcome, { type: "start-trial" }>) {
-    runtime.lifecycle.resetRuntime({ stopMedia: true });
+    runtime.lifecycle.resetRuntime();
     const definition = findHarnessShowcaseTrialDefinition(outcome.trialId);
     if (!definition) {
       runtime.diagnostics.observeAssetDiagnostic({
@@ -315,7 +315,7 @@ export function useHarnessShowcaseRuntimeAdapter(
   }
 
   function closeStoryOverlay(action = "dialog:cancel") {
-    runtime.lifecycle.resetRuntime({ stopMedia: true });
+    runtime.lifecycle.resetRuntime();
     setNavi((currentNavi) => naviReducer(currentNavi, { type: "CLOSE_OVERLAY" }));
     setLastAction(action);
     setLastOutcome("overlay-closed");
@@ -329,7 +329,7 @@ export function useHarnessShowcaseRuntimeAdapter(
     if (save.navi) setNavi(save.navi);
     if (save.navi?.playerPose) firstPersonBridge.issuePoseCommand(save.navi.playerPose);
     setGameplay({ inventory: save.inventory, evidence: save.evidence, characters: save.characters });
-    if (!save.vn) runtime.lifecycle.resetRuntime({ stopMedia: true });
+    if (!save.vn) runtime.lifecycle.resetRuntime();
     setTrialRuntime(
       save.mode === "trial" && save.trial
         ? {

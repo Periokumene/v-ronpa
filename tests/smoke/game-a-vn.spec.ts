@@ -10,7 +10,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
 
   await page.addInitScript(() => {
     localStorage.removeItem("v-ronpa:game-a:settings:v1");
-    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v8");
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v9");
   });
   await page.goto("/?vnEntry=smoke");
 
@@ -99,6 +99,12 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
     document.querySelector<HTMLElement>('[data-testid="runtime-movie-skip"]')?.click();
   });
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT SMOKE MOVIE");
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pause-menu-overlay")).toBeVisible();
+  await clickByTestId(page, "pause-return-title");
+  await expect(page.getByTestId("game-a-mode")).toHaveText("标题");
+  await expect(page.getByTestId("title-surface")).toBeVisible();
 
   expect(consoleErrors).toEqual([]);
 });

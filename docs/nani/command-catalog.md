@@ -210,6 +210,11 @@ Shared shorthand:
   interpolated `rainSettings` and shader uniforms remain Pixi runtime state.
 - `audio params`: `volume:decimal`, `loop:boolean`, `fade:decimal`,
   `group:string`, `time:decimal`, `wait:boolean`.
+  BGM playback is always looping: `@bgm loop:` remains an official declared
+  Naninovel parameter but is not consumed and produces an
+  `unsupported-command-param` diagnostic. For `@sfx`, `loop` remains consumed;
+  only looping SFX enters persistent VN media state. Omitted play volume is
+  normalized to `0.7` for BGM and `1` for SFX.
 - `particle params`: for `snow` and `sun`, `power:decimal`, `time:decimal`,
   `pos:decimal list`, `position:decimal list`, `rotation:decimal list`,
   `scale:decimal list`, `wait:boolean`.

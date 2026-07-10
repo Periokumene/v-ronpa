@@ -8,6 +8,8 @@ Narrator: CHECKPOINT SMOKE 00 - test-only VN entry is active.
 
 #Interaction
 @set route:"smoke-interaction"
+@bgm bgm:game-a-main group:music volume:0.35
+@sfx sfx:gentle-rain-loop group:rain loop:true volume:0.2
 @hideUI dialog time:0.05 wait!
 @hideUI commandBar time:0.05 wait!
 @showUI dialog time:0.05 wait!

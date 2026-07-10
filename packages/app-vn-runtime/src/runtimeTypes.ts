@@ -89,7 +89,7 @@ export interface VnPresentationPort {
 /** Canonical lifecycle capability for app composition and save/load. */
 export interface VnLifecyclePort {
   createVnSaveCheckpoint(options?: { allowInactive?: boolean }): VnSaveCheckpointResult;
-  resetRuntime(options?: { stopMedia?: boolean }): void;
+  resetRuntime(): void;
   restoreVnState(input: RestoreVnRuntimeStateInput): VnRestoreResult;
   startStory(options?: StartVnStoryOptions): void;
 }

@@ -856,7 +856,7 @@ const implementedCommandDocs: Record<string, NaniCommandDocs> = {
   append: { zh: "向当前文本框追加一段文本，不重置当前说话人或文本框状态。", examples: ['@append "继续显示的文本"'] },
   arrange: { zh: "按命名位置排列角色立绘，常用于快速把多个角色放到舞台预设位置。", examples: ["@arrange Felix.Left,Mira.Right wait!"] },
   back: { zh: "切换主背景或背景演员，并可附带转场、位置、缩放和等待控制。", examples: ["@back bg:classroom effect:fade time:0.5 wait!"] },
-  bgm: { zh: "播放背景音乐，可设置音量、循环、淡入淡出和分组。", examples: ["@bgm bgm:main volume:0.6 fade:1 group:music"] },
+  bgm: { zh: "播放循环背景音乐，可设置音量、淡入淡出和分组。", examples: ["@bgm bgm:main volume:0.6 fade:1 group:music"] },
   blur: { zh: "对舞台或演员应用模糊效果，通常用于焦点转移或回忆演出；time 会插值 actor/stage blur 强度，power:0 time:x 会淡出后移除 blur。", examples: ["@blur stage power:0.4 time:0.3 wait!", "@blur actorId:MainBackground power:0 time:0.2 wait!"] },
   bokeh: { zh: "应用景深虚化效果，可调焦点、距离和强度；time 会插值 bokeh 强度，power:0 time:x 会淡出 overlay/root blur 后清理。", examples: ["@bokeh focus:Felix power:0.6 time:0.4", "@bokeh power:0 time:0.2 wait!"] },
   char: { zh: "显示或更新角色立绘外观，并可设置位置、表情、转场和动画时长。", examples: ["@char Felix.Happy pos:0.5,0 wait!"] },
@@ -897,7 +897,7 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   append: ["text", "speaker", "author", "printer"],
   arrange: ["characterPositions", "look", "time", "wait"],
   back: ["appearanceAndTransition", "id", "appearance", "pose", "via", "params", "dissolve", "pos", "position", "rotation", "scale", "tint", "easing", "time", "lazy", "wait", "visible", "effect"],
-  bgm: ["bgmPath", "volume", "loop", "fade", "time", "group"],
+  bgm: ["bgmPath", "volume", "fade", "time", "group"],
   blur: ["actorId", "power", "time", "wait"],
   bokeh: ["focus", "dist", "power", "time", "wait"],
   char: ["idAndAppearance", "id", "pose", "via", "params", "dissolve", "look", "avatar", "pos", "position", "rotation", "scale", "tint", "easing", "time", "lazy", "wait", "visible"],
@@ -2174,20 +2174,46 @@ export const VnUiCheckpointSchema = z
   .strict();
 export type VnUiCheckpoint = z.infer<typeof VnUiCheckpointSchema>;
 
+export const VnMediaBgmTrackSchema = z
+  .object({
+    sourceRef: z.string().min(1),
+    volume: z.number().finite()
+  })
+  .strict();
+export type VnMediaBgmTrack = z.infer<typeof VnMediaBgmTrackSchema>;
+
+export const VnMediaSfxLoopSchema = z
+  .object({
+    sourceRef: z.string().min(1),
+    volume: z.number().finite(),
+    group: z.string().min(1).optional()
+  })
+  .strict();
+export type VnMediaSfxLoop = z.infer<typeof VnMediaSfxLoopSchema>;
+
+export const VnMediaCheckpointSchema = z
+  .object({
+    bgmByGroup: z.record(z.string().min(1), VnMediaBgmTrackSchema),
+    loopingSfxByKey: z.record(z.string().min(1), VnMediaSfxLoopSchema)
+  })
+  .strict();
+export type VnMediaCheckpoint = z.infer<typeof VnMediaCheckpointSchema>;
+
 export const SaveableVnStateSchema = z
   .object({
     entryId: IdSchema,
     scriptRevision: IdSchema,
     story: SaveableStorySnapshotSchema,
     pixiStage: PixiStageSnapshotSchema,
-    ui: VnUiCheckpointSchema
+    ui: VnUiCheckpointSchema,
+    media: VnMediaCheckpointSchema
   })
   .strict();
 export type SaveableVnState = z.infer<typeof SaveableVnStateSchema>;
 
 export const SaveDataSchema = z
   .object({
-    version: z.literal(6),
+    version: z.literal(7),
     gameId: IdSchema,
     savedAt: z.string(),
     mode: SaveModeSchema,

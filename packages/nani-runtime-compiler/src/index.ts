@@ -358,12 +358,11 @@ function normalizeCommandParams(command: CommandShape, definition: NaniCommandDe
         params: compactParams({
           bgmPath: runtimeCommandValue(command.primary) ?? runtimeParam(command, "bgmPath") ?? "",
           volume: runtimeParam(command, "volume"),
-          loop: runtimeParam(command, "loop"),
           fadeMs: durationMsValue(runtimeParam(command, "fade")),
           durationMs: durationMsValue(runtimeParam(command, "time")),
           group: runtimeParam(command, "group")
         }),
-        consumesParams: ["bgmPath", "volume", "loop", "fade", "time", "group"]
+        consumesParams: ["bgmPath", "volume", "fade", "time", "group"]
       };
     case "stopbgm":
       return {

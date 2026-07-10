@@ -1,5 +1,9 @@
 # CCR: SaveData v6 Stable VN Checkpoint
 
+> SaveData v6 and its media-exclusion rule are superseded by
+> `save-data-v7-vn-persistent-media.md`. Stable checkpoint rejection and restore
+> identity rules are retained by v7.
+
 ## Requested Change
 
 Replace the development-only v5 save boundary with a strict v6 checkpoint. A

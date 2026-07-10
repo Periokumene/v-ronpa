@@ -17,7 +17,12 @@ describe("VN checkpoint authority", () => {
   it("creates a complete stable checkpoint", () => {
     expect(checkpoint(stableStory)).toMatchObject({
       ok: true,
-      value: { entryId: "vn:test", scriptRevision: "sha256:test", ui: { dialog: true } }
+      value: {
+        entryId: "vn:test",
+        scriptRevision: "sha256:test",
+        media: { bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } } },
+        ui: { dialog: true }
+      }
     });
   });
 
@@ -53,6 +58,10 @@ function checkpoint(story: StoryRuntimeSnapshot) {
     entry,
     story,
     pixiStage: createInitialPixiStageSnapshot(),
+    media: {
+      bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
+      loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+    },
     ui: { dialog: true, commandBar: true, toastLayer: true }
   });
 }
