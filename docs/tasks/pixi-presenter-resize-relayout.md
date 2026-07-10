@@ -51,7 +51,7 @@ or introducing an app/Pixi shared viewport model.
 - `packages/pixi-presenter/**`
 - `docs/tasks/pixi-presenter-resize-relayout.md`
 - `docs/architecture/system-guide.md`
-- `docs/architecture/vn-runtime-dispatcher.md`
+- `docs/architecture/vn-runtime-ports.md`
 
 ## Forbidden Paths
 

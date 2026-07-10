@@ -46,7 +46,7 @@ not apply `prefers-reduced-motion` timing overrides.
 ## Context
 
 - `docs/ccr/ui-runtime-transition-wait.md`
-- `docs/architecture/vn-runtime-dispatcher.md`
+- `docs/architecture/vn-runtime-ports.md`
 - `docs/architecture/presentation-pipeline.md`
 - `docs/architecture/contracts.md`
 - `docs/nani/command-catalog.md`
@@ -82,7 +82,7 @@ not apply `prefers-reduced-motion` timing overrides.
 - `tests/smoke/harness-showcase.spec.ts`
 - `docs/ccr/ui-runtime-transition-wait.md`
 - `docs/tasks/ui-runtime-transition-wait.md`
-- `docs/architecture/vn-runtime-dispatcher.md`
+- `docs/architecture/vn-runtime-ports.md`
 - `docs/architecture/presentation-pipeline.md`
 - `docs/architecture/contracts.md`
 - `docs/nani/command-catalog.md`

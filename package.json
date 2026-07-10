@@ -19,7 +19,7 @@
     "validate:subsystem": "node scripts/validate-subsystem.mjs",
     "validate:app-cleanup": "node scripts/validate-app-cleanup.mjs",
     "validate:vn-runtime-cleanup": "node scripts/validate-vn-runtime-cleanup.mjs",
-    "validate:baseline": "pnpm typecheck && pnpm validate:contracts && pnpm test && pnpm validate:assets && pnpm validate:boundaries && pnpm validate:ccr && pnpm validate:app-cleanup && pnpm --filter @v-ronpa/game-a build && pnpm --filter @v-ronpa/game-harness build && pnpm test:smoke",
+    "validate:baseline": "pnpm typecheck && pnpm validate:contracts && pnpm test && pnpm validate:assets && pnpm validate:boundaries && pnpm validate:ccr && pnpm validate:app-cleanup && pnpm validate:vn-runtime-cleanup && pnpm --filter @v-ronpa/game-a build && pnpm --filter @v-ronpa/game-harness build && pnpm test:smoke",
     "setup:worktree-env": "node scripts/setup-worktree-env.mjs"
   },
   "devDependencies": {

@@ -1,175 +1,23 @@
-# Content Asset Pipeline
+# Runtime Asset Pipeline
 
-## Intent
+Each app owns a declarative `asset.config.mjs`. Generation scans its public
+assets, compiles configured `.nani` entries, emits stable semantic SHA-256 script
+revisions, derives script asset refs, and records selected runtime providers.
 
-Runtime-loading assets are declared once in `ContentManifest.runtimeAssets`.
-Scripts, maps, UI config, evidence, and renderer adapters may reference asset
-ids, but must not carry raw file URLs or public paths.
+`RuntimeAssetFragment` is the only provider protocol. A `runtime-assets-*`
+package may contribute stable IDs, runtime assets, optional fonts, and source
+identity. It must not create a manifest, registry, resolver, loader, or alternate
+validator. It may depend only on contracts and asset-registry.
 
-`packages/asset-registry` is the pure lookup layer. Apps create an
-`AssetRegistry` from a parsed `ContentManifest` and inject the structural
-resolver into Pixi, R3F, media, and UI adapters.
+`runtime-assets-pixi` is the first provider. Apps select `providers: ["pixi"]`;
+generated modules expose its fragment. `composeContentManifest()` combines
+generated assets, provider fragments, and explicit UI/preload/optional refs.
+Every duplicate ID fails; nothing silently overrides another source. The result
+is parsed by `ContentManifestSchema` and creates exactly one AssetRegistry.
 
-The registry validates the manifest with the contracts schema before indexing.
-Unsupported manifest versions, invalid manifests, duplicate runtime asset ids,
-missing ids, kind mismatches, and raw URI-like refs are reported as
-`AssetRegistryDiagnostic` entries. Registry diagnostics are runtime visibility
-signals; the registry still does not fetch, preload, transform, or inspect
-files.
+Future `runtime-assets-r3f`-style packages must reuse this protocol, composition,
+diagnostics, conformance test, and boundary gate.
 
-## Runtime Assets
-
-`RuntimeAsset` is the shipping asset shape:
-
-- `id`: stable content id such as `bg:harness`, `Ema`, or
-  `video:validation-intro`.
-- `kind`: runtime family, including `character-pack`, `background`, `bgm`,
-  `sfx`, `bleep`, `voice`, `video`, `font`, `glb`, `texture`, and `fx`.
-- `sourceUri`: optional authoring source for traceability.
-- `optimizedUri`: app-loadable file emitted by the asset pipeline.
-- `format`: `json`, `glb`, `gltf`, `webp`, `png`, `woff`, `woff2`, `ttf`,
-  `otf`, `ogg`, `mp4`, and related runtime formats.
-- `compression`, `lods`, `textureBudget`, and `collisionProxyIds`: production
-  metadata used by future build and review gates.
-
-Only the registry reads `optimizedUri` for app runtime resolution. Renderer
-packages receive a resolver and load the returned URL; they do not assemble
-paths.
-
-## Asset References
-
-`AssetRef` is id-only: `{ id, kind, tags? }`. It appears in dependency lists
-such as `RuntimeScript.assets`, `VnEntryDef.assetRefs`, and
-`WorldMapDef.assetRefs`. These lists declare what content a script, VN entry,
-or map needs, not where the file lives.
-
-UI skin resources are app-local config. When an app skin needs a runtime file,
-its config should reference a `RuntimeAsset` id and resolve it through the
-app-created `AssetRegistry`; shared contracts do not define UI asset roles,
-frame slicing, tiling, or skin rendering behavior.
-
-Evidence resources follow the same rule:
-
-- `EvidenceVisual.iconAssetId` and `thumbnailAssetId` point to texture runtime
-  assets.
-- `CollisionProxy.assetId`, when used for mesh-backed collision data, points to
-  a declared runtime asset. The current harness keeps collision as simple
-  bounds and does not add mesh collision files.
-
-## Generator And Validation
-
-Harness and Game A app assets use a convention-plus-override generator:
-
-- `pnpm generate:assets` scans `apps/game-harness/public/harness/**` and writes
-  `apps/game-harness/src/harness/generatedAssets.ts`.
-- The same command scans `apps/game-a/public/game-a/**` and writes
-  `apps/game-a/src/generatedAssets.ts`.
-- The generated modules export both runtime assets and font face definitions.
-  Runtime assets register files; font face definitions describe which font ids
-  rich text may use.
-- Font fixtures live under each app public asset root's
-  `fonts/*.{woff,woff2,ttf,otf}`;
-  the generator emits ids as `font:<file-name-without-extension>`. When multiple
-  font runtime formats share the same stem, the generator registers the most
-  web-ready format first: `woff2`, then `woff`, `otf`, and `ttf`.
-  Validation rejects duplicate font stems in public roots so source TTF files do
-  not ship alongside preferred WOFF2 runtime files.
-- Generated font faces default to `id = sourceRef = family = font:<stem>`,
-  `weight = "400"`, and `style = "normal"`. App-specific overrides handle
-  historical aliases or special CSS family names; for example the harness keeps
-  the rich text id `font:serif` mapped to the runtime asset `font:rich-serif`.
-- Voice validation assets live under each app public asset root's
-  `media/voice/<locale>/*.ogg`; the generator emits ids as
-  `voice:<locale>:<file-name-without-extension>`, for example
-  `voice:zh:voice_validation_0001`.
-- Voice text ids use the same flat filename-safe stem as the `.ogg` file:
-  letters, numbers, `_`, and `-`. `pnpm validate:assets` rejects nested voice
-  files or path-like text ids under `media/voice`.
-- `pnpm validate:assets` dry-runs the generator, checks generated files exist,
-  checks generated font faces resolve to font runtime assets, checks each app's
-  script-authored asset ids and rich text `font:*` ids against that app's
-  generated declarations, and rejects hardcoded runtime asset paths in source.
-  Harness and Game A are validated with separate id pools; one app cannot pass
-  because another app happens to declare the same or similar asset id.
-
-Generated asset files and the Pixi built-in FX manifest are allowed to contain
-runtime URLs because they are asset registration sources. Runtime adapters,
-scripts, and renderer systems must use asset ids and injected resolvers.
-Public app asset roots should contain only shipped runtime files. Source fonts,
-obsolete filenames, and unused staging assets must live outside public roots so
-Vite does not publish them.
-
-## App Composition
-
-`apps/game-a/src/contentManifest.ts` is a separate VN-first manifest. It
-composes generated runtime assets from `gameARuntimeAssets`; Game A scripts,
-UI config, and render code must still reference runtime asset ids only. Raw
-`/game-a/**` public paths remain limited to generated asset registration
-sources.
-
-`apps/game-harness/src/harness/contentManifest.ts` composes the harness-showcase manifest:
-
-- generated harness assets from `harnessRuntimeAssets`
-- Pixi built-in FX assets from `builtInPixiFxRuntimeAssets`
-- maps, items, evidence, trials, and scripts from `showcase/*`
-- input bindings from `inputActions.ts`
-
-`inputActions.ts` provides harness input bindings, and
-`useFirstPersonExplorationBridge.ts` is the app bridge into R3F first-person
-exploration.
-
-The harness-showcase app creates one `AssetRegistry` from this manifest and passes
-it through adapter props:
-
-- `app-vn-runtime` resolves VN media command refs for `bgm`, `sfx`, `voice`,
-  and `video` ids before calling `media-save` `AudioPort` / `VideoPort`.
-- `app-vn-runtime` checks dialogue line audio ids such as
-  `voice:<locale>:<textId>` through the same registry; a resolved voice asset
-  suppresses bleep, while a missing planned voice asset can fallback to dialogue
-  bleep.
-- dialogue reveal bleep resolves `bleep:*` ids declared by
-  `ContentManifest.audio.dialogueBleep` through `app-vn-runtime` before calling
-  `AudioPort.playDialogueBleep`.
-- rich text font faces resolve `ContentManifest.fonts[*].sourceRef` to
-  `RuntimeAsset.kind === "font"` before `@v-ronpa/ui-kit` emits controlled
-  `@font-face` CSS and rich text CSS variables. `AssetRegistry` does not create
-  CSS or load fonts by itself; it only resolves the font asset URL. Script-
-  authored rich text stores only `fontId`, not raw CSS family names or URLs.
-- Pixi resolves backgrounds, character-pack entry JSON, and FX ids before
-  loading textures.
-- Shader-only Pixi effects may have no FX texture entry. The rain shader path is
-  driven by `rainCommandParams` and internal `rainSettings`; it must not keep a
-  legacy `rain-streak` texture in the manifest.
-- Character-pack runtime assets point only to `character.json`. Pixi resolves
-  that entry, loads sibling `layers.json` and `compositions.json`, then uses the
-  pure layered-character resolver to determine the current active layers before
-  fetching per-layer metadata and PNGs. Layer paths inside `layers.json` must be
-  pack-relative paths; absolute URLs and parent-directory escapes are contract
-  failures. Unused layer metadata is not a required dependency for the current
-  render. Character packs use one PNG per layer; atlas rects are not part of the
-  current contract.
-- Layered character metadata stores transform, pivot, draw order, renderer
-  flags, and `pixelsPerUnit` only. Texture dimensions come from the loaded PNG at
-  runtime, and `renderSpace.characterAnchor` is the character-local point placed
-  on the Pixi actor `pos`. Width/height and local size fields must not be
-  duplicated in layer metadata.
-- R3F resolves `WorldMapDef.assetRefs` model ids before probing or loading
-  glTF assets.
-- UI/evidence image references are validated even when the current harness does
-  not render every thumbnail.
-
-Missing assets must produce diagnostics and keep the existing visible fallback.
-They must not crash the app and must not fail silently.
-
-See `docs/architecture/app-vn-integration.md` for how app packages pass their
-asset registries into VN runtime, shell, Pixi, R3F, UI skin, and debug wiring.
-
-## Collision Proxies
-
-`CollisionProxy` covers `box`, `sphere`, `capsule`, `convex-mesh`, `trimesh`,
-and `navmesh`. A `WorldMapDef` declares which proxies define walkable or
-interactable space.
-
-Navi first-person movement must be collision-ready before production maps are
-added. Harness placeholders can still use simple geometry, but map definitions
-must keep proxy references.
+`pnpm generate:assets` updates generated modules. `pnpm validate:assets` checks
+generated freshness, files, fonts, character packs, provider refs, final
+manifests, and final registries.
