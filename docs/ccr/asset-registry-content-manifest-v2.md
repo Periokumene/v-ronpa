@@ -1,5 +1,7 @@
 # Contract Change Request
 
+> Status: retained for Manifest v3 history and extended by the runtime-asset fragment protocol in `interaction-vn-runtime-presentation-authority.md`.
+
 ## Requested Change
 
 Hard-cut `ContentManifest` to version 3 and make

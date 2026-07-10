@@ -1,5 +1,7 @@
 # Contract Change Request
 
+> Status: superseded by `save-data-v6-stable-vn-checkpoint.md`; v5 is not read or migrated.
+
 > Superseded note: App storage-boundary details in this CCR are superseded by
 > `docs/ccr/unified-media-save-slots-and-thumbnails.md`. The v5 `SaveData`
 > authority remains valid.

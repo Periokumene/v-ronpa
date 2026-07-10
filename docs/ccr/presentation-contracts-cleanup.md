@@ -1,5 +1,7 @@
 # Contract Change Request
 
+> Status: superseded by `interaction-vn-runtime-presentation-authority.md`; command-aware PresenterTrace was removed.
+
 > Superseded note: `docs/ccr/runtime-command-pixi-dispatch.md` removes public
 > `PresentationCommand` wire shapes. This CCR remains as the historical record
 > for removing the former `@v-ronpa/presentation-contracts` package.

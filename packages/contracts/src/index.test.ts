@@ -36,7 +36,7 @@ import {
   StoryTextStateSchema,
   createDefaultSettingsSnapshot,
   createSaveSlotSummaryFromSaveData,
-  createSaveableStoryRuntimeSnapshot,
+  createSaveableStorySnapshot,
   TrialDefinitionSchema,
   TrialRuntimeStateSchema,
   getNaniCommandDefinition,
@@ -1285,13 +1285,16 @@ describe("contracts", () => {
     };
 
     const save = SaveDataSchema.parse({
-      version: 5,
+      version: 6,
+      gameId: "game:test",
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "navi",
       vn: {
         entryId: "vn:opening",
+        scriptRevision: "sha256:test",
         story,
-        pixiStage
+        pixiStage,
+        ui: { dialog: true, commandBar: true, toastLayer: true }
       },
       navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
       trial: null,
@@ -1300,7 +1303,7 @@ describe("contracts", () => {
       characters: {}
     });
 
-    expect(save.version).toBe(5);
+    expect(save.version).toBe(6);
     expect(save.vn?.pixiStage.innerBackgroundsById).toEqual({});
     expect(save.vn?.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
     expect(save.vn?.pixiStage.charactersById.Ema?.appearanceExpression).toBe("Pensive1,ArmR3");
@@ -1319,10 +1322,17 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 5,
+        version: 6,
+        gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "vn",
-        vn: { story, pixiStage },
+        vn: {
+          entryId: "vn:opening",
+          scriptRevision: "sha256:test",
+          story,
+          pixiStage,
+          ui: { dialog: true, commandBar: true, toastLayer: true }
+        },
         navi: null,
         trial: null,
         inventory: { items: {} },
@@ -1333,7 +1343,8 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 5,
+        version: 6,
+        gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "navi",
         vn: null,
@@ -1349,7 +1360,8 @@ describe("contracts", () => {
         "slot:contracts:navi",
         "Contracts Navi",
         SaveDataSchema.parse({
-          version: 5,
+          version: 6,
+          gameId: "game:test",
           savedAt: "2026-06-14T00:00:00.000Z",
           mode: "navi",
           vn: null,
@@ -1369,10 +1381,17 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 5,
+        version: 6,
+        gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "trial",
-        vn: { story, pixiStage },
+        vn: {
+          entryId: "vn:opening",
+          scriptRevision: "sha256:test",
+          story,
+          pixiStage,
+          ui: { dialog: true, commandBar: true, toastLayer: true }
+        },
         navi: { substate: "walk", activeMapId: "map:academy-hall", inputLock: "none" },
         trial: { trialId: "trial:case-01", currentSegmentId: "debate:door", presentation: "debate3d" },
         inventory: { items: {} },
@@ -1496,10 +1515,13 @@ describe("contracts", () => {
 
   it("does not persist runtime command streams in save data", () => {
     const save = SaveDataSchema.parse({
-      version: 5,
+      version: 6,
+      gameId: "game:test",
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "vn",
       vn: {
+        entryId: "vn:opening",
+        scriptRevision: "sha256:test",
         story: {
           currentScriptPath: "opening.nani",
           instructionPointer: 2,
@@ -1509,7 +1531,8 @@ describe("contracts", () => {
           ended: false,
           emittedRuntimeCommands: []
         },
-        pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} }
+        pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
+        ui: { dialog: true, commandBar: true, toastLayer: true }
       },
       navi: null,
       trial: null,
@@ -1536,7 +1559,7 @@ describe("contracts", () => {
       ended: false
     });
 
-    const saveable = createSaveableStoryRuntimeSnapshot(story);
+    const saveable = createSaveableStorySnapshot(story);
 
     expect(saveable.backlog).toHaveLength(SAVE_BACKLOG_LIMIT);
     expect(saveable.backlog[0]?.text).toBe("Line 5");

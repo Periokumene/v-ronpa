@@ -1,5 +1,7 @@
 # Contract Change Request
 
+> Status: renderer boundary superseded by `interaction-vn-runtime-presentation-authority.md`.
+
 ## Requested Change
 
 Remove public `PresentationCommand` wire shapes and make routed `RuntimeCommand`

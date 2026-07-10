@@ -1,127 +1,81 @@
 import { createActor } from "xstate";
 import { describe, expect, it } from "vitest";
-import { calculateInteractionCapabilities, gameFlowMachine, modeFromSnapshotValue } from "./index";
+import {
+  createGameFlowSnapshot,
+  deriveGameInteractionState,
+  gameFlowMachine,
+  modeFromSnapshotValue,
+  type PlayableGameMode
+} from "./index";
 
 describe("game flow machine", () => {
-  it("moves through top-level game modes", () => {
+  it.each(["vn", "navi", "trial"] satisfies PlayableGameMode[])("starts and resumes the explicit %s mode", (mode) => {
     const actor = createActor(gameFlowMachine).start();
-    expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("loading");
-
     actor.send({ type: "BOOT" });
-    expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("title");
+    actor.send({ type: "START_NEW_GAME", mode });
+    expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe(mode);
 
-    actor.send({ type: "START_NEW_GAME" });
-    expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("navi");
-
-    actor.send({ type: "ENTER_TRIAL" });
-    expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("trial");
-
-    actor.send({ type: "ENTER_NAVI" });
     actor.send({ type: "PAUSE" });
+    expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("paused");
+    expect(actor.getSnapshot().context).toMatchObject({ overlayStack: ["pause-menu"], resumeMode: mode });
+    const pausedInteraction = deriveGameInteractionState({
+      flow: createGameFlowSnapshot(actor.getSnapshot().value, actor.getSnapshot().context),
+      vn: { hasActiveStory: true, storyHasChoices: false, storyEnded: false, isAtStableStop: true, inputLock: "dialog" }
+    });
+    expect(pausedInteraction.capabilities).toMatchObject({
+      canOpenBacklog: mode === "vn",
+      canSave: true,
+      canAuto: false,
+      canSkip: false
+    });
     actor.send({ type: "RESUME" });
-
-    expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("navi");
+    expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe(mode);
+    expect(actor.getSnapshot().context).toEqual({ overlayStack: [], resumeMode: null });
   });
 
-  it("keeps overlay stack and capabilities in machine context", () => {
+  it("ignores repeated pause while already paused", () => {
     const actor = createActor(gameFlowMachine).start();
     actor.send({ type: "BOOT" });
-    expect(actor.getSnapshot().context.capabilities).toMatchObject({
-      canStartNewGame: true,
-      canLoad: true,
-      canSave: false
-    });
+    actor.send({ type: "START_NEW_GAME", mode: "vn" });
+    actor.send({ type: "PAUSE" });
+    actor.send({ type: "PAUSE" });
+    expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("paused");
+    expect(actor.getSnapshot().context).toEqual({ overlayStack: ["pause-menu"], resumeMode: "vn" });
+  });
 
-    actor.send({ type: "OPEN_OVERLAY", overlay: "title-load" });
-    expect(actor.getSnapshot().context.interaction.overlayStack).toEqual(["title-load"]);
+  it("closes nested pause sections before resuming the root pause surface", () => {
+    const actor = createActor(gameFlowMachine).start();
+    actor.send({ type: "BOOT" });
+    actor.send({ type: "START_NEW_GAME", mode: "vn" });
+    actor.send({ type: "PAUSE" });
+    actor.send({ type: "OPEN_OVERLAY", overlay: "vn-save" });
+    actor.send({ type: "POP_OVERLAY" });
+    expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("paused");
+    expect(actor.getSnapshot().context.overlayStack).toEqual(["pause-menu"]);
 
     actor.send({ type: "POP_OVERLAY" });
-    expect(actor.getSnapshot().context.interaction.overlayStack).toEqual([]);
-
-    actor.send({ type: "START_NEW_GAME" });
-    actor.send({
-      type: "UPDATE_CONTEXT",
-      context: {
-        naviSubstate: "vn2d-overlay",
-        inputLock: "dialog",
-        hasActiveStory: true,
-        isAtStableStop: true
-      }
-    });
-    expect(actor.getSnapshot().context.capabilities).toMatchObject({
-      canSave: true,
-      canOpenBacklog: true,
-      canAuto: true,
-      canSkip: true
-    });
+    expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("vn");
   });
 
-  it("calculates capabilities from small interaction context snapshots", () => {
-    expect(
-      calculateInteractionCapabilities({
-        mode: "title",
-        overlayStack: [],
-        inputLock: "none",
-        hasActiveStory: false,
+  it("derives context and capabilities without mutating machine context", () => {
+    const actor = createActor(gameFlowMachine).start();
+    actor.send({ type: "BOOT" });
+    actor.send({ type: "START_NEW_GAME", mode: "navi" });
+    const flow = createGameFlowSnapshot(actor.getSnapshot().value, actor.getSnapshot().context);
+    const interaction = deriveGameInteractionState({
+      flow,
+      host: { naviSubstate: "vn2d-overlay" },
+      vn: {
+        hasActiveStory: true,
         storyHasChoices: false,
         storyEnded: false,
-        isAtStableStop: false
-      })
-    ).toMatchObject({
-      canStartNewGame: true,
-      canLoad: true,
-      canSave: false,
-      canOpenBacklog: false
+        isAtStableStop: true,
+        inputLock: "dialog"
+      }
     });
 
-    expect(
-      calculateInteractionCapabilities({
-        mode: "trial",
-        overlayStack: [],
-        trialPresentation: "vn2d",
-        inputLock: "dialog",
-        hasActiveStory: true,
-        storyHasChoices: true,
-        storyEnded: false,
-        isAtStableStop: true
-      })
-    ).toMatchObject({
-      canSave: true,
-      canOpenBacklog: true,
-      canReturnTitle: true
-    });
-
-    expect(
-      calculateInteractionCapabilities({
-        mode: "navi",
-        overlayStack: [],
-        naviSubstate: "vn2d-overlay",
-        inputLock: "dialog",
-        hasActiveStory: true,
-        storyHasChoices: true,
-        storyEnded: false,
-        isAtStableStop: true
-      })
-    ).toMatchObject({
-      canAuto: false,
-      canSkip: false,
-      canOpenBacklog: true
-    });
-
-    expect(
-      calculateInteractionCapabilities({
-        mode: "navi",
-        overlayStack: [],
-        naviSubstate: "walk",
-        inputLock: "none",
-        hasActiveStory: false,
-        storyHasChoices: false,
-        storyEnded: true,
-        isAtStableStop: true
-      })
-    ).toMatchObject({
-      canSave: true,
-      canOpenBacklog: false
-    });
+    expect(interaction.context).toMatchObject({ mode: "navi", naviSubstate: "vn2d-overlay", inputLock: "dialog" });
+    expect(interaction.capabilities).toMatchObject({ canSave: true, canOpenBacklog: true, canAuto: true, canSkip: true });
+    expect(actor.getSnapshot().context).toEqual({ overlayStack: [], resumeMode: null });
   });
 });

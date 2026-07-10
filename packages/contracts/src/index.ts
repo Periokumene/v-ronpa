@@ -4,7 +4,7 @@ export const IdSchema = z.string().min(1).regex(/^[a-zA-Z0-9:_./-]+$/);
 export const PIXI_MAIN_BACKGROUND_ID = "MainBackground" as const;
 export const PIXI_INNER_BACKGROUND_ID = "InnerBackground" as const;
 
-export const GameModeSchema = z.enum(["loading", "title", "vn", "navi", "trial", "paused", "saving"]);
+export const GameModeSchema = z.enum(["loading", "title", "vn", "navi", "trial", "paused"]);
 export type GameMode = z.infer<typeof GameModeSchema>;
 
 export const GameOverlayKindSchema = z.enum([
@@ -14,9 +14,7 @@ export const GameOverlayKindSchema = z.enum([
   "vn-backlog",
   "vn-save",
   "vn-load",
-  "vn-settings",
-  "confirm-load",
-  "confirm-return-title"
+  "vn-settings"
 ]);
 export type GameOverlayKind = z.infer<typeof GameOverlayKindSchema>;
 
@@ -1976,9 +1974,21 @@ export type StoryRuntimeSnapshot = z.infer<typeof StoryRuntimeSnapshotSchema>;
 
 export const SAVE_BACKLOG_LIMIT = 20;
 
-export function createSaveableStoryRuntimeSnapshot(story: StoryRuntimeSnapshot): StoryRuntimeSnapshot {
-  return StoryRuntimeSnapshotSchema.parse({
-    ...story,
+export const SaveableStorySnapshotSchema = StoryRuntimeSnapshotSchema.omit({
+  presentationWait: true,
+  runtimeWait: true
+});
+export type SaveableStorySnapshot = z.infer<typeof SaveableStorySnapshotSchema>;
+
+export function createSaveableStorySnapshot(story: StoryRuntimeSnapshot): SaveableStorySnapshot {
+  if (story.runtimeWait || story.presentationWait) {
+    throw new Error("VN story checkpoints may only be created at a stable stop.");
+  }
+  const { presentationWait: _presentationWait, runtimeWait: _runtimeWait, ...stableStory } = story;
+  void _presentationWait;
+  void _runtimeWait;
+  return SaveableStorySnapshotSchema.parse({
+    ...stableStory,
     backlog: story.backlog.slice(-SAVE_BACKLOG_LIMIT)
   });
 }
@@ -2147,6 +2157,7 @@ export const VnEntryDefSchema = z
     id: IdSchema,
     title: z.string().min(1),
     scriptPath: z.string().min(1),
+    scriptRevision: IdSchema,
     startLabel: z.string().min(1).optional(),
     profile: VnPresentationProfileSchema.default("vn2d"),
     assetRefs: z.array(AssetRefSchema).default([])
@@ -2154,18 +2165,30 @@ export const VnEntryDefSchema = z
   .strict();
 export type VnEntryDef = z.infer<typeof VnEntryDefSchema>;
 
+export const VnUiCheckpointSchema = z
+  .object({
+    dialog: z.boolean(),
+    commandBar: z.boolean(),
+    toastLayer: z.boolean()
+  })
+  .strict();
+export type VnUiCheckpoint = z.infer<typeof VnUiCheckpointSchema>;
+
 export const SaveableVnStateSchema = z
   .object({
-    entryId: IdSchema.optional(),
-    story: StoryRuntimeSnapshotSchema,
-    pixiStage: PixiStageSnapshotSchema
+    entryId: IdSchema,
+    scriptRevision: IdSchema,
+    story: SaveableStorySnapshotSchema,
+    pixiStage: PixiStageSnapshotSchema,
+    ui: VnUiCheckpointSchema
   })
   .strict();
 export type SaveableVnState = z.infer<typeof SaveableVnStateSchema>;
 
 export const SaveDataSchema = z
   .object({
-    version: z.literal(5),
+    version: z.literal(6),
+    gameId: IdSchema,
     savedAt: z.string(),
     mode: SaveModeSchema,
     vn: SaveableVnStateSchema.nullable(),

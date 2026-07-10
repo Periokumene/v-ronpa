@@ -84,15 +84,6 @@ export interface SavePort {
   delete(id: string): Promise<SaveOperationResult>;
 }
 
-export interface SaveMigrationResult {
-  data: SaveData;
-  migrated: boolean;
-}
-
-export interface SaveMigrator {
-  migrate(value: unknown): SaveMigrationResult;
-}
-
 export type AudioHandleFinishReason = "ended" | "stopped" | "failed";
 
 export interface AudioHandleFinishResult {
@@ -151,15 +142,8 @@ interface SaveDbShape extends Dexie {
   previews: EntityTable<SaveSlotPreviewRecord, "slotId">;
 }
 
-export function createSaveMigrator(): SaveMigrator {
-  return {
-    migrate(value) {
-      return {
-        data: SaveDataSchema.parse(value),
-        migrated: false
-      };
-    }
-  };
+export function parseSaveData(value: unknown): SaveData {
+  return SaveDataSchema.parse(value);
 }
 
 export function createSaveSlotSummary(id: string, label: string, data: SaveData): SaveSlotSummary {
@@ -207,8 +191,8 @@ export function selectQuickSaveSlotSummary(policy: SaveSlotPolicy, summaries: Sa
   return summaries.find((summary) => summary.id === policy.quickSlotId);
 }
 
-function normalizeSaveSlotWrite(slot: SaveSlotWrite, migrator: SaveMigrator): SaveSlot {
-  const { data } = migrator.migrate(slot.data);
+function normalizeSaveSlotWrite(slot: SaveSlotWrite): SaveSlot {
+  const data = parseSaveData(slot.data);
   const summary = createSaveSlotSummary(slot.id, slot.label, data);
   return {
     id: slot.id,
@@ -219,7 +203,7 @@ function normalizeSaveSlotWrite(slot: SaveSlotWrite, migrator: SaveMigrator): Sa
   };
 }
 
-export function createDexieSavePort(dbName = "v-ronpa-saves", migrator = createSaveMigrator()): SavePort {
+export function createDexieSavePort(dbName = "v-ronpa-saves"): SavePort {
   const db = new Dexie(dbName) as SaveDbShape;
   db.version(1).stores({
     slots: "id, label, savedAt, mode",
@@ -231,7 +215,7 @@ export function createDexieSavePort(dbName = "v-ronpa-saves", migrator = createS
     async save(slot) {
       let normalized: SaveSlot;
       try {
-        normalized = normalizeSaveSlotWrite(slot, migrator);
+        normalized = normalizeSaveSlotWrite(slot);
       } catch (cause) {
         return fail(saveError(cause, "invalid-save"));
       }
@@ -260,7 +244,7 @@ export function createDexieSavePort(dbName = "v-ronpa-saves", migrator = createS
         });
         if (!slot) return ok(undefined);
         if (!payload) return fail({ code: "storage-failed", message: `Save slot ${id} is missing its payload.` });
-        const data = migrator.migrate(payload.data).data;
+        const data = parseSaveData(payload.data);
         const summary = createSaveSlotSummary(slot.id, slot.label, data);
         return ok({
           id: slot.id,
@@ -287,7 +271,7 @@ export function createDexieSavePort(dbName = "v-ronpa-saves", migrator = createS
           slotIndexes.flatMap((slot) => {
             const payload = payloadsById.get(slot.id);
             if (!payload) return [];
-            const data = migrator.migrate(payload.data).data;
+            const data = parseSaveData(payload.data);
             return [
               {
                 id: slot.id,
@@ -337,13 +321,13 @@ export function createDexieSavePort(dbName = "v-ronpa-saves", migrator = createS
   };
 }
 
-export function createMemorySavePort(initialSlots: SaveSlot[] = [], migrator = createSaveMigrator()): SavePort {
+export function createMemorySavePort(initialSlots: SaveSlot[] = []): SavePort {
   const slots = new Map<string, SaveSlotIndexRecord>();
   const payloads = new Map<string, SaveSlotPayloadRecord>();
   const previews = new Map<string, SaveSlotPreviewRecord>();
 
   for (const slot of initialSlots) {
-    const normalized = normalizeSaveSlotWrite(slot, migrator);
+    const normalized = normalizeSaveSlotWrite(slot);
     slots.set(normalized.id, createSlotIndexRecord(normalized));
     payloads.set(normalized.id, { slotId: normalized.id, data: normalized.data });
     if (normalized.preview) previews.set(normalized.id, { slotId: normalized.id, metadata: normalized.preview.metadata, blob: normalized.preview.blob });
@@ -352,7 +336,7 @@ export function createMemorySavePort(initialSlots: SaveSlot[] = [], migrator = c
   return {
     async save(slot) {
       try {
-        const normalized = normalizeSaveSlotWrite(slot, migrator);
+        const normalized = normalizeSaveSlotWrite(slot);
         slots.set(normalized.id, createSlotIndexRecord(normalized));
         payloads.set(normalized.id, { slotId: normalized.id, data: normalized.data });
         if (normalized.preview) previews.set(normalized.id, { slotId: normalized.id, metadata: normalized.preview.metadata, blob: normalized.preview.blob });
@@ -368,7 +352,7 @@ export function createMemorySavePort(initialSlots: SaveSlot[] = [], migrator = c
         if (!slot) return ok(undefined);
         const payload = payloads.get(id);
         if (!payload) return fail({ code: "storage-failed", message: `Save slot ${id} is missing its payload.` });
-        const data = migrator.migrate(payload.data).data;
+        const data = parseSaveData(payload.data);
         const preview = previews.get(id);
         return ok({
           id: slot.id,
@@ -387,7 +371,7 @@ export function createMemorySavePort(initialSlots: SaveSlot[] = [], migrator = c
           [...slots.values()].flatMap((slot) => {
             const payload = payloads.get(slot.id);
             if (!payload) return [];
-            const data = migrator.migrate(payload.data).data;
+            const data = parseSaveData(payload.data);
             const preview = previews.get(slot.id);
             return [
               {

@@ -9,8 +9,8 @@ import {
   createFortyPlusQuickSaveSlotPolicy,
   createHowlerAudioPort,
   createMemorySavePort,
-  createSaveMigrator,
   createSaveSlotSummary,
+  parseSaveData,
   selectManualSaveSlotSummaries,
   selectQuickSaveSlotSummary,
   type SaveSlotPreview
@@ -54,10 +54,13 @@ const howlerMock = vi.hoisted(() => {
 vi.mock("howler", () => ({ Howl: howlerMock.Howl }));
 
 const baseSave = SaveDataSchema.parse({
-  version: 5 as const,
+  version: 6 as const,
+  gameId: "game:test",
   savedAt: "2026-06-14T00:00:00.000Z",
   mode: "navi" as const,
   vn: {
+    entryId: "vn:opening",
+    scriptRevision: "sha256:test",
     story: {
       currentScriptPath: "opening.nani",
       instructionPointer: 4,
@@ -87,7 +90,8 @@ const baseSave = SaveDataSchema.parse({
       actorOrder: ["MainBackground", "Ema"],
       weather: {},
       screenFilters: {}
-    }
+    },
+    ui: { dialog: true, commandBar: true, toastLayer: true }
   },
   navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
   trial: null,
@@ -99,14 +103,14 @@ const baseSave = SaveDataSchema.parse({
 const currentTextSave = SaveDataSchema.parse({
   ...baseSave,
   vn: {
+    ...baseSave.vn!,
     story: {
       ...baseSave.vn!.story,
       text: {
         visible: true,
         current: { speaker: "Mira", text: "Current save line." }
       }
-    },
-    pixiStage: baseSave.vn!.pixiStage
+    }
   }
 });
 
@@ -121,56 +125,15 @@ describe("media save contracts", () => {
     vi.useRealTimers();
   });
 
-  it("validates saves through the versioned migrator boundary", () => {
-    const result = createSaveMigrator().migrate({
-      version: 5,
-      savedAt: "2026-06-14T00:00:00.000Z",
-      mode: "trial",
-      vn: {
-        story: {
-          currentScriptPath: "trial.nani",
-          instructionPointer: 4,
-          variables: {},
-          backlog: [],
-          pendingChoices: [],
-          ended: false
-        },
-        pixiStage: {
-          version: 5,
-          revision: 0,
-          backgroundsById: {},
-          charactersById: {},
-          actorOrder: [],
-          weather: {},
-          screenFilters: {}
-        }
-      },
-      navi: null,
-      inventory: { items: { "gift:coffee": 1 } },
-      evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] },
-      characters: {},
-      trial: {
-        trialId: "trial:case-01",
-        currentSegmentId: "debate:door",
-        presentation: "debate3d",
-        inputLock: "trial-targeting"
-      }
-    });
-
-    expect(result).toMatchObject({
-      migrated: false,
-      data: {
-        version: 5,
-        trial: { keywordStates: {} }
-      }
-    });
+  it("validates v6 saves through the strict parse boundary", () => {
+    expect(parseSaveData(baseSave)).toEqual(baseSave);
   });
 
-  it("rejects old save versions instead of migrating them", () => {
+  it("rejects old save versions without migration", () => {
     expect(() =>
-      createSaveMigrator().migrate({
+      parseSaveData({
         ...baseSave,
-        version: 3
+        version: 5
       })
     ).toThrow();
   });

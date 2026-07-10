@@ -1,5 +1,7 @@
 # Contract Change Request
 
+> Status: authority model superseded by `interaction-vn-runtime-presentation-authority.md`.
+
 > Superseded note: save-slot thumbnail and concrete app path details in this
 > CCR are historical. Current save-slot storage, preview storage, and Game A /
 > harness wiring are defined by
