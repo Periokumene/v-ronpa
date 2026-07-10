@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { GameOverlayKind, GameUiAction } from "@v-ronpa/contracts";
+import type { GameOverlayKind } from "@v-ronpa/contracts";
 import type { VnInteractionFacts } from "@v-ronpa/app-vn-runtime";
 import {
   createGameFlowSnapshot,
@@ -36,11 +36,6 @@ export function useGameAFlowActor(vn: VnInteractionFacts) {
     },
     closeAllOverlays() {
       send({ type: "CLOSE_OVERLAY" });
-    },
-    dispatchAction(action: GameUiAction) {
-      if (action === "new-game") send({ type: "START_NEW_GAME", mode: "vn" });
-      if (action === "open-pause-menu") send({ type: "PAUSE" });
-      if (action === "return-title") send({ type: "RETURN_TITLE" });
     }
   };
 }

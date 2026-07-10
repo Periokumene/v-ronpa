@@ -8,8 +8,14 @@ Review changes for these drift risks:
 - dispatch/runtime importing presenter, or presenter interpreting RuntimeCommand;
 - save code stripping waits instead of returning checkpoint rejection;
 - restore ignoring game, entry, or script revision identity;
+- persistent-media desired state drifting from command volume/stop semantics;
+- lifecycle reset, accepted restore, or unmount bypassing runtime-exclusive
+  port-wide media disposal;
 - multiple AssetRegistry instances, provider resolver chains, or silent ID overrides;
 - Game A product content containing CHECKPOINT/debug/test branches;
 - app-specific pause behavior, fixed ports, or active docs describing superseded paths.
 
-Canonical references are under `docs/architecture/` and the two 2026-07-10 CCRs.
+Canonical current-state references are under `docs/architecture/`. Relevant
+change records are `interaction-vn-runtime-presentation-authority.md`,
+`unified-media-save-slots-and-thumbnails.md` (except its superseded database
+names), and `save-data-v7-vn-persistent-media.md`.

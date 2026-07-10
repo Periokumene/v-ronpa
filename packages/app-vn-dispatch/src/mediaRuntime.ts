@@ -1,27 +1,24 @@
-import type { RuntimeCommand, RuntimeValue } from "@v-ronpa/contracts";
+import {
+  VnMediaCheckpointSchema,
+  type RuntimeCommand,
+  type RuntimeValue,
+  type VnMediaBgmTrack,
+  type VnMediaCheckpoint,
+  type VnMediaSfxLoop
+} from "@v-ronpa/contracts";
 
-export interface MediaRuntimeBgmTrack {
-  key: string;
-  group: string;
-  sourceRef: string;
-}
+export const DEFAULT_BGM_VOLUME = 0.7;
+export const DEFAULT_SFX_VOLUME = 1;
 
-export interface MediaRuntimeSfxLoop {
-  key: string;
-  group?: string;
-  sourceRef: string;
-}
-
-export interface MediaRuntimeState {
-  bgmByGroup: Record<string, MediaRuntimeBgmTrack>;
-  loopingSfxByKey: Record<string, MediaRuntimeSfxLoop>;
-}
+export type MediaRuntimeBgmTrack = VnMediaBgmTrack;
+export type MediaRuntimeSfxLoop = VnMediaSfxLoop;
+export type MediaRuntimeState = VnMediaCheckpoint;
 
 export type MediaRuntimeEffect =
-  | { type: "play-bgm"; key: string; group: string; sourceRef: string; volume?: number; fadeInMs?: number }
+  | { type: "play-bgm"; key: string; group: string; sourceRef: string; volume: number; fadeInMs?: number }
   | { type: "set-bgm-volume"; key: string; group: string; volume: number; durationMs?: number }
   | { type: "stop-bgm"; key: string; group: string; fadeMs?: number }
-  | { type: "play-sfx"; sourceRef: string; loop: boolean; fast: boolean; key?: string; group?: string; volume?: number; fadeInMs?: number }
+  | { type: "play-sfx"; sourceRef: string; loop: boolean; fast: boolean; volume: number; key?: string; group?: string; fadeInMs?: number }
   | { type: "set-sfx-volume"; key: string; group?: string; volume: number; durationMs?: number }
   | { type: "stop-sfx"; key: string; group?: string; fadeMs?: number }
   | { type: "play-dialogue-bleep"; key: string; sourceRef: string; volume?: number }
@@ -45,6 +42,40 @@ export interface MediaRuntimeResult {
 
 export function createInitialMediaRuntimeState(): MediaRuntimeState {
   return { bgmByGroup: {}, loopingSfxByKey: {} };
+}
+
+export function createVnMediaCheckpoint(state: MediaRuntimeState): VnMediaCheckpoint {
+  return VnMediaCheckpointSchema.parse(state);
+}
+
+export function createVnMediaRestoreEffects(state: MediaRuntimeState): MediaRuntimeEffect[] {
+  const bgmEffects: MediaRuntimeEffect[] = Object.keys(state.bgmByGroup)
+    .sort()
+    .map((group) => {
+      const track = state.bgmByGroup[group]!;
+      return {
+        type: "play-bgm",
+        key: group,
+        group,
+        sourceRef: track.sourceRef,
+        volume: track.volume
+      };
+    });
+  const sfxEffects: MediaRuntimeEffect[] = Object.keys(state.loopingSfxByKey)
+    .sort()
+    .map((key) => {
+      const loop = state.loopingSfxByKey[key]!;
+      return {
+        type: "play-sfx",
+        key,
+        sourceRef: loop.sourceRef,
+        loop: true,
+        fast: false,
+        volume: loop.volume,
+        ...(loop.group ? { group: loop.group } : {})
+      };
+    });
+  return [...bgmEffects, ...sfxEffects];
 }
 
 export function reduceMediaRuntimeCommand(state: MediaRuntimeState, command: RuntimeCommand): MediaRuntimeResult {
@@ -109,27 +140,34 @@ function reduceBgmCommand(state: MediaRuntimeState, command: RuntimeCommand): Me
     if (volume === undefined) return missingSource(state, command, "bgmPath");
     if (!previous) return missingActiveBgmGroup(state, command, group);
     return {
-      state,
-      effects: [setBgmVolumeEffect(previous, volume, durationMs)],
+      state: {
+        ...state,
+        bgmByGroup: { ...state.bgmByGroup, [group]: { ...previous, volume } }
+      },
+      effects: [setBgmVolumeEffect(group, volume, durationMs)],
       diagnostics: []
     };
   }
 
   if (previous?.sourceRef === sourceRef) {
+    if (volume === undefined) return { state, effects: [], diagnostics: [] };
     return {
-      state,
-      effects: volume !== undefined ? [setBgmVolumeEffect(previous, volume, durationMs)] : [],
+      state: {
+        ...state,
+        bgmByGroup: { ...state.bgmByGroup, [group]: { ...previous, volume } }
+      },
+      effects: [setBgmVolumeEffect(group, volume, durationMs)],
       diagnostics: []
     };
   }
 
-  const nextTrack: MediaRuntimeBgmTrack = { key: group, group, sourceRef };
+  const nextTrack: MediaRuntimeBgmTrack = { sourceRef, volume: volume ?? DEFAULT_BGM_VOLUME };
   const playEffect: MediaRuntimeEffect = {
     type: "play-bgm",
-    key: nextTrack.key,
+    key: group,
     group,
     sourceRef,
-    ...(volume !== undefined ? { volume } : {}),
+    volume: nextTrack.volume,
     ...(fadeMs !== undefined ? { fadeInMs: fadeMs } : {})
   };
   return {
@@ -138,7 +176,7 @@ function reduceBgmCommand(state: MediaRuntimeState, command: RuntimeCommand): Me
       bgmByGroup: { ...state.bgmByGroup, [group]: nextTrack }
     },
     effects: [
-      ...(previous ? [{ type: "stop-bgm" as const, key: previous.key, group, ...(fadeMs !== undefined ? { fadeMs } : {}) }] : []),
+      ...(previous ? [{ type: "stop-bgm" as const, key: group, group, ...(fadeMs !== undefined ? { fadeMs } : {}) }] : []),
       playEffect
     ],
     diagnostics: []
@@ -154,7 +192,7 @@ function reduceStopBgmCommand(state: MediaRuntimeState, command: RuntimeCommand)
   const fadeMs = numberParam(command, "fadeMs");
   return {
     state: { ...state, bgmByGroup },
-    effects: [{ type: "stop-bgm", key: previous.key, group, ...(fadeMs !== undefined ? { fadeMs } : {}) }],
+    effects: [{ type: "stop-bgm", key: group, group, ...(fadeMs !== undefined ? { fadeMs } : {}) }],
     diagnostics: []
   };
 }
@@ -176,8 +214,11 @@ function reduceSfxCommand(state: MediaRuntimeState, command: RuntimeCommand, fas
     const previous = state.loopingSfxByKey[group];
     if (!previous) return missingActiveSfxLoop(state, command, group);
     return {
-      state,
-      effects: [setSfxVolumeEffect(previous, volume, durationMs)],
+      state: {
+        ...state,
+        loopingSfxByKey: { ...state.loopingSfxByKey, [group]: { ...previous, volume } }
+      },
+      effects: [setSfxVolumeEffect(group, previous, volume, durationMs)],
       diagnostics: []
     };
   }
@@ -186,13 +227,20 @@ function reduceSfxCommand(state: MediaRuntimeState, command: RuntimeCommand, fas
   const key = loop ? group ?? sourceRef : undefined;
   const previous = key ? state.loopingSfxByKey[key] : undefined;
   if (previous?.sourceRef === sourceRef) {
+    if (volume === undefined) return { state, effects: [], diagnostics: [] };
     return {
-      state,
-      effects: volume !== undefined ? [setSfxVolumeEffect(previous, volume, durationMs)] : [],
+      state: {
+        ...state,
+        loopingSfxByKey: { ...state.loopingSfxByKey, [key!]: { ...previous, volume } }
+      },
+      effects: [setSfxVolumeEffect(key!, previous, volume, durationMs)],
       diagnostics: []
     };
   }
-  const nextLoop: MediaRuntimeSfxLoop | undefined = loop && key ? { key, sourceRef, ...(group ? { group } : {}) } : undefined;
+  const targetVolume = volume ?? DEFAULT_SFX_VOLUME;
+  const nextLoop: MediaRuntimeSfxLoop | undefined = loop && key
+    ? { sourceRef, volume: targetVolume, ...(group ? { group } : {}) }
+    : undefined;
   const nextLoopingSfxByKey =
     nextLoop && key ? { ...state.loopingSfxByKey, [key]: nextLoop } : state.loopingSfxByKey;
   const playEffect: MediaRuntimeEffect = {
@@ -200,9 +248,9 @@ function reduceSfxCommand(state: MediaRuntimeState, command: RuntimeCommand, fas
     sourceRef,
     loop,
     fast,
+    volume: targetVolume,
     ...(key ? { key } : {}),
     ...(group ? { group } : {}),
-    ...(volume !== undefined ? { volume } : {}),
     ...(fadeMs !== undefined ? { fadeInMs: fadeMs } : {})
   };
   return {
@@ -211,7 +259,7 @@ function reduceSfxCommand(state: MediaRuntimeState, command: RuntimeCommand, fas
       loopingSfxByKey: nextLoopingSfxByKey
     },
     effects: [
-      ...(previous ? [{ type: "stop-sfx" as const, key: previous.key, ...(previous.group ? { group: previous.group } : {}), ...(fadeMs !== undefined ? { fadeMs } : {}) }] : []),
+      ...(previous && key ? [{ type: "stop-sfx" as const, key, ...(previous.group ? { group: previous.group } : {}), ...(fadeMs !== undefined ? { fadeMs } : {}) }] : []),
       playEffect
     ],
     diagnostics: []
@@ -327,20 +375,20 @@ function missingActiveSfxLoop(state: MediaRuntimeState, command: RuntimeCommand,
   };
 }
 
-function setBgmVolumeEffect(track: MediaRuntimeBgmTrack, volume: number, durationMs: number | undefined): MediaRuntimeEffect {
+function setBgmVolumeEffect(group: string, volume: number, durationMs: number | undefined): MediaRuntimeEffect {
   return {
     type: "set-bgm-volume",
-    key: track.key,
-    group: track.group,
+    key: group,
+    group,
     volume,
     ...(durationMs !== undefined ? { durationMs } : {})
   };
 }
 
-function setSfxVolumeEffect(loop: MediaRuntimeSfxLoop, volume: number, durationMs: number | undefined): MediaRuntimeEffect {
+function setSfxVolumeEffect(key: string, loop: MediaRuntimeSfxLoop, volume: number, durationMs: number | undefined): MediaRuntimeEffect {
   return {
     type: "set-sfx-volume",
-    key: loop.key,
+    key,
     ...(loop.group ? { group: loop.group } : {}),
     volume,
     ...(durationMs !== undefined ? { durationMs } : {})

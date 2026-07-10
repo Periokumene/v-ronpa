@@ -11,6 +11,7 @@ import {
   createDialogRevealState,
   createInitialMediaRuntimeState,
   createInitialUiRuntimeState,
+  createVnMediaCheckpoint,
   createVnUiCheckpoint,
   createVnRuntimePresentationTransaction,
   deriveUiRuntimeLifecycleState,
@@ -92,9 +93,9 @@ import {
 import {
   applyVnRuntimeMediaEffects,
   createInitialVnRuntimeMediaHandleStore,
+  disposeVnRuntimeMedia,
   resolveVnDialogueVoiceAssetAvailability,
   resolveVnRuntimeMediaSource,
-  stopAllVnRuntimeMediaHandles,
   type VnRuntimeMediaHandleStore
 } from "./runtimeMedia";
 import { createVnRuntimeRestorePlan } from "./runtimeRestore";
@@ -146,6 +147,7 @@ export interface UseVnRuntimeOptions {
   gameId: string;
   entry: VnRuntimeEntry;
   assetResolver?: AssetResolver;
+  /** The VN runtime takes exclusive ownership of this port and stops it on reset, restore, and unmount. */
   audioPort?: AudioPort;
   videoPort?: VideoPort;
   routeTable?: VnOutputRouteTable;
@@ -423,11 +425,9 @@ export function useVnRuntime({
     return () => {
       for (const timeout of Object.values(toastTimeoutsRef.current)) window.clearTimeout(timeout);
       toastTimeoutsRef.current = {};
-      voiceAutoAdvanceGateControllerRef.current?.clear({ stopVoice: true });
-      mediaHandlesRef.current = stopAllVnRuntimeMediaHandles(mediaHandlesRef.current, videoPort);
-      dialogueAudioRuntimeRef.current = {};
+      disposeRuntimeMedia();
     };
-  }, [videoPort]);
+  }, [audioPort, videoPort]);
 
   function setSessionNow(next: VnSessionState | ((current: VnSessionState) => VnSessionState)) {
     const resolved = typeof next === "function" ? next(sessionRef.current) : next;
@@ -488,6 +488,14 @@ export function useVnRuntime({
   function clearVoiceAutoAdvanceGate(options: { stopVoice?: boolean } = {}) {
     voiceEffectTokenRef.current += 1;
     getVoiceAutoAdvanceGateController().clear(options);
+  }
+
+  function disposeRuntimeMedia() {
+    voiceEffectTokenRef.current += 1;
+    voiceAutoAdvanceGateControllerRef.current?.clear();
+    mediaHandlesRef.current = disposeVnRuntimeMedia(mediaHandlesRef.current, audioPort, videoPort);
+    pendingMoviePlaybackRef.current = undefined;
+    dialogueAudioRuntimeRef.current = {};
   }
 
   function requestDialogPlaybackScheduleAdvance(source: DialogPlaybackScheduleSource): boolean {
@@ -576,9 +584,8 @@ export function useVnRuntime({
     storyPlayHostRef.current = { active: sessionRef.current.active, schedule: { type: "idle" } };
   }
 
-  function resetRuntime({ stopMedia = true }: { stopMedia?: boolean } = {}) {
+  function resetRuntime() {
     cancelStoryPlayHostSchedule();
-    clearVoiceAutoAdvanceGate({ stopVoice: stopMedia });
     clearDialogRevealRuntime();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
@@ -588,15 +595,7 @@ export function useVnRuntime({
       ...(entry.startLabel ? { startLabel: entry.startLabel } : {})
     }).session;
     setSessionNow({ ...nextBoot, active: false });
-    if (stopMedia) mediaHandlesRef.current = stopAllVnRuntimeMediaHandles(mediaHandlesRef.current, videoPort);
-    else {
-      mediaHandlesRef.current.dialogueBleep?.stop();
-      mediaHandlesRef.current.voice?.stop();
-      delete mediaHandlesRef.current.dialogueBleep;
-      delete mediaHandlesRef.current.voice;
-    }
-    pendingMoviePlaybackRef.current = undefined;
-    dialogueAudioRuntimeRef.current = {};
+    disposeRuntimeMedia();
     setMediaRuntimeNow({ state: createInitialMediaRuntimeState() });
     setUiRuntimeNow({ state: createInitialUiRuntimeState() });
     setRuntimeDiagnostics(initialRuntimeDiagnostics);
@@ -610,11 +609,11 @@ export function useVnRuntime({
 
   function startStory(_options: StartVnStoryOptions = {}) {
     if (hasInvalidStartLabel) {
-      resetRuntime({ stopMedia: true });
+      resetRuntime();
       onRuntimeStatus?.({ action: "story:start", outcome: "invalid-start-label" });
       return;
     }
-    resetRuntime({ stopMedia: true });
+    resetRuntime();
     const nextBoot = createVnSession({
       scriptPath: entry.scriptPath,
       sourceText: entry.sourceText,
@@ -819,20 +818,18 @@ export function useVnRuntime({
       return rejection;
     }
     cancelStoryPlayHostSchedule();
-    clearVoiceAutoAdvanceGate({ stopVoice: true });
     clearDialogRevealRuntime();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     const plan = createVnRuntimeRestorePlan({
       active: !state.story.ended,
+      media: state.media,
       pixiStage: state.pixiStage,
       script: bootSession.script,
       story: state.story,
       ui: state.ui
     });
-    mediaHandlesRef.current = stopAllVnRuntimeMediaHandles(mediaHandlesRef.current, videoPort);
-    pendingMoviePlaybackRef.current = undefined;
-    dialogueAudioRuntimeRef.current = {};
+    disposeRuntimeMedia();
     setSessionNow(
       restoreVnSession({
         active: plan.storyRuntime.active,
@@ -840,7 +837,7 @@ export function useVnRuntime({
         snapshot: { story: plan.storyRuntime.state, play: plan.storyPlay }
       })
     );
-    setMediaRuntimeNow({ state: createInitialMediaRuntimeState() });
+    setMediaRuntimeNow({ state: plan.mediaRuntime });
     setUiRuntimeNow({ state: plan.uiRuntime });
     setRuntimeDiagnostics((current) => limitVnRuntimeDiagnostics([...current, ...plan.diagnostics]));
     setPixiStageRuntimeNow((current) => ({
@@ -849,6 +846,19 @@ export function useVnRuntime({
     }));
     setStorySession((current) => current + 1);
     setLastRuntimeCommandCount(0);
+    if (plan.mediaEffects.length > 0) {
+      void applyVnRuntimeMediaEffects({
+        audioPort,
+        effects: plan.mediaEffects,
+        handles: mediaHandlesRef.current,
+        resolver: ({ kind, sourceRef }) =>
+          resolveVnRuntimeMediaSource({
+            kind,
+            sourceRef,
+            ...(assetResolver ? { assetResolver } : {})
+          })
+      }).then((result) => appendRuntimeDiagnostics(result.diagnostics));
+    }
     return { ok: true };
   }
 
@@ -1175,6 +1185,7 @@ export function useVnRuntime({
       entry,
       story: current.story,
       pixiStage: pixiStageRuntimeRef.current.snapshot,
+      media: createVnMediaCheckpoint(mediaRuntimeRef.current.state),
       ui: createVnUiCheckpoint(uiRuntimeRef.current.state)
     });
   }

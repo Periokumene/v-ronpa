@@ -1,5 +1,10 @@
 # Contract Change Request
 
+> Superseded note: SaveData v2 and the exclusion of BGM/looping-SFX runtime
+> intent in this CCR are superseded by
+> `save-data-v7-vn-persistent-media.md`. Media/UI execution routing and transient
+> UI/wait decisions remain active.
+
 ## Title
 
 Non-Pixi runtime command baseline contracts

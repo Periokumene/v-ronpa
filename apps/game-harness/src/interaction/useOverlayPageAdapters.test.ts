@@ -287,6 +287,37 @@ describe("overlay page adapter helpers", () => {
     expect(flowSend).not.toHaveBeenCalledWith({ type: "ENTER_NAVI" });
     expect(closeAllOverlays).not.toHaveBeenCalled();
   });
+
+  it("resets the showcase before routing return-title through flow", () => {
+    const resetShowcase = vi.fn();
+    const flowSend = vi.fn();
+    const adapters = useOverlayPageAdapters({
+      flow: {
+        activeOverlay: "pause-menu",
+        capabilities: createCapabilities(),
+        closeAllOverlays: vi.fn(),
+        closeTopOverlay: vi.fn(),
+        dispatchAction: vi.fn(),
+        mode: "navi",
+        openOverlay: vi.fn(),
+        send: flowSend
+      },
+      runtime: {
+        resetShowcase,
+        stopStoryAutomation: vi.fn(),
+        toggleStoryAuto: vi.fn(),
+        toggleStorySkip: vi.fn()
+      },
+      save: {},
+      settings: {}
+    } as unknown as Parameters<typeof useOverlayPageAdapters>[0]);
+
+    adapters.dispatchUiAction("return-title");
+
+    expect(resetShowcase).toHaveBeenCalledOnce();
+    expect(flowSend).toHaveBeenCalledWith({ type: "RETURN_TITLE" });
+    expect(resetShowcase.mock.invocationCallOrder[0]).toBeLessThan(flowSend.mock.invocationCallOrder[0]!);
+  });
 });
 
 function createCapabilities(): InteractionCapabilitySnapshot {

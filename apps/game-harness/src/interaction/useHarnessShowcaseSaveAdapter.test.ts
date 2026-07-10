@@ -51,10 +51,14 @@ describe("harness showcase save adapter", () => {
     });
 
     expect(save).toMatchObject({
-      version: 6,
+      version: 7,
       gameId: "game-harness",
       mode: "navi",
       vn: {
+        media: {
+          bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
+          loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+        },
         pixiStage: {
           version: 5,
           revision: 1,
@@ -130,7 +134,7 @@ describe("harness showcase save adapter", () => {
   });
 
   it("keeps forty manual slots plus an independent hidden quick slot through the shared media-save policy", () => {
-    expect(HARNESS_SHOWCASE_DB).toBe("v-ronpa-harness-showcase-v8");
+    expect(HARNESS_SHOWCASE_DB).toBe("v-ronpa-harness-showcase-v9");
     expect(harnessShowcaseSaveSlotPolicy.namespace).toBe("harness");
     expect(harnessShowcaseSaveSlotIds).toHaveLength(harnessShowcaseManualSaveSlotCount);
     expect(harnessShowcaseSaveSlotIds.slice(0, 4)).toEqual([
@@ -192,6 +196,10 @@ function createVnCheckpoint(
     scriptRevision: "sha256:test",
     story: createSaveableStorySnapshot(story),
     pixiStage,
+    media: {
+      bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
+      loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+    },
     ui: { dialog: true, commandBar: true, toastLayer: true }
   };
 }

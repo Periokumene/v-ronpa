@@ -1,5 +1,12 @@
-import type { PixiStageSnapshot, RuntimeScript, SaveableStorySnapshot, VnUiCheckpoint } from "@v-ronpa/contracts";
-import { createUiRuntimeStateFromCheckpoint, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
+import type { PixiStageSnapshot, RuntimeScript, SaveableStorySnapshot, VnMediaCheckpoint, VnUiCheckpoint } from "@v-ronpa/contracts";
+import {
+  createUiRuntimeStateFromCheckpoint,
+  createVnMediaCheckpoint,
+  createVnMediaRestoreEffects,
+  type MediaRuntimeEffect,
+  type MediaRuntimeState,
+  type UiRuntimeState
+} from "@v-ronpa/app-vn-dispatch";
 import { createInitialStoryPlayState, type StoryPlayState } from "@v-ronpa/story-play";
 import { createInitialStoryState } from "@v-ronpa/story-engine";
 import type { VnPixiStageRuntime, VnStoryRuntime } from "./runtimeTypes";
@@ -11,11 +18,14 @@ export interface VnRuntimeRestorePlan {
   storyPlay: StoryPlayState;
   pixiStageRuntime: VnPixiStageRuntime;
   uiRuntime: UiRuntimeState;
+  mediaRuntime: MediaRuntimeState;
+  mediaEffects: MediaRuntimeEffect[];
 }
 
 export interface CreateVnRuntimeRestorePlanInput {
   active?: boolean;
   pixiStage: PixiStageSnapshot;
+  media: VnMediaCheckpoint;
   script: Pick<RuntimeScript, "scriptPath">;
   story: SaveableStorySnapshot;
   ui: VnUiCheckpoint;
@@ -23,11 +33,13 @@ export interface CreateVnRuntimeRestorePlanInput {
 
 export function createVnRuntimeRestorePlan({
   active,
+  media,
   pixiStage,
   script,
   story,
   ui
 }: CreateVnRuntimeRestorePlanInput): VnRuntimeRestorePlan {
+  const mediaRuntime = createVnMediaCheckpoint(media);
   const storyRuntime = {
     active: active ?? !story.ended,
     state: {
@@ -46,6 +58,8 @@ export function createVnRuntimeRestorePlan({
       animate: false,
       presentationTasks: []
     },
-    uiRuntime: createUiRuntimeStateFromCheckpoint(ui)
+    uiRuntime: createUiRuntimeStateFromCheckpoint(ui),
+    mediaRuntime,
+    mediaEffects: createVnMediaRestoreEffects(mediaRuntime)
   };
 }

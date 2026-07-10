@@ -3,6 +3,7 @@ import {
   INVALID_VN_START_LABEL_DIAGNOSTIC_CODE,
   useVnRuntime,
   type UseVnRuntimeOptions,
+  type VnLifecyclePort,
   type VnRuntimeEntry
 } from "@v-ronpa/app-vn-runtime";
 import type { SaveData } from "@v-ronpa/contracts";
@@ -46,8 +47,7 @@ export function useGameAVnRuntime({ entryOverride, startLabelOverride, ...option
     debug: runtime.debug,
     startLabelError,
     restoreFromSave(save: SaveData) {
-      if (!save.vn) return;
-      runtime.lifecycle.restoreVnState({ gameId: save.gameId, state: save.vn });
+      return restoreGameAVnSave(runtime.lifecycle, save);
     },
     startNewGame(): boolean {
       if (startLabelError) return false;
@@ -55,4 +55,9 @@ export function useGameAVnRuntime({ entryOverride, startLabelOverride, ...option
       return true;
     }
   };
+}
+
+export function restoreGameAVnSave(lifecycle: Pick<VnLifecyclePort, "restoreVnState">, save: SaveData) {
+  if (!save.vn) return;
+  return lifecycle.restoreVnState({ gameId: save.gameId, state: save.vn });
 }

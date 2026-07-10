@@ -271,11 +271,12 @@ export async function applyVnRuntimeMediaEffects({
   };
 }
 
-export function stopAllVnRuntimeMediaHandles(handles: VnRuntimeMediaHandleStore, videoPort?: VideoPort): VnRuntimeMediaHandleStore {
-  for (const handle of Object.values(handles.bgm)) handle.stop();
-  for (const handle of Object.values(handles.sfx)) handle.stop();
-  handles.dialogueBleep?.stop();
-  handles.voice?.stop();
+export function disposeVnRuntimeMedia(
+  handles: VnRuntimeMediaHandleStore,
+  audioPort: AudioPort,
+  videoPort?: VideoPort
+): VnRuntimeMediaHandleStore {
+  audioPort.stopAll();
   videoPort?.stop();
   return { bgm: {}, sfx: {}, oneShotSequence: handles.oneShotSequence };
 }

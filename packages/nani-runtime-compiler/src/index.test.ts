@@ -709,7 +709,7 @@ describe("nani runtime compiler", () => {
   it("diagnoses unsupported media wait and advanced input/UI/sfxFast params", () => {
     const { scenario } = parseScenario({
       sourceText: [
-        "@bgm bgm:validation-main wait!",
+        "@bgm bgm:validation-main loop:false wait!",
         "@input playerName nostop!",
         "@hideUI commandBar wait! allowToggle!",
         "@sfxFast beep restart! additive! wait!"
@@ -724,6 +724,10 @@ describe("nani runtime compiler", () => {
         expect.objectContaining({
           code: "unsupported-command-param",
           message: expect.stringContaining("@bgm accepts wait!:boolean")
+        }),
+        expect.objectContaining({
+          code: "unsupported-command-param",
+          message: expect.stringContaining("@bgm accepts loop:boolean")
         }),
         expect.objectContaining({
           code: "unsupported-command-param",
@@ -743,6 +747,7 @@ describe("nani runtime compiler", () => {
         })
       ])
     );
+    expect(result.script.commands[0]?.params).not.toHaveProperty("loop");
     expect(result.script.commands[2]?.params).toMatchObject({ target: "commandBar", visible: false, wait: true });
   });
 

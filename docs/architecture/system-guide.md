@@ -12,7 +12,7 @@ interaction state back into the machine.
 
 ## Package ownership
 
-- `contracts`: public schemas, SaveData v6, `.nani` runtime IR.
+- `contracts`: public schemas, SaveData v7, `.nani` runtime IR.
 - `app-vn-session`: story session orchestration.
 - `app-vn-dispatch`: headless command fanout and pure UI/media transactions.
 - `pixi-stage-model`: pure Pixi snapshot reducer, hints, waits, diagnostics.

@@ -58,7 +58,7 @@ describe("game-a overlay adapters", () => {
     expect(adapters.openOverlay).toHaveBeenCalledWith("vn-settings");
   });
 
-  it("routes return-title through flow; confirmation UI owns disabling the action", () => {
+  it("resets the VN runtime before routing return-title through flow", () => {
     const adapters = createAdapters({
       activeOverlay: "vn-load",
       mode: "vn",
@@ -73,7 +73,9 @@ describe("game-a overlay adapters", () => {
 
     adapters.dispatchUiAction("return-title");
 
+    expect(adapters.resetRuntime).toHaveBeenCalledOnce();
     expect(adapters.flowSend).toHaveBeenCalledWith({ type: "RETURN_TITLE" });
+    expect(adapters.resetRuntime.mock.invocationCallOrder[0]).toBeLessThan(adapters.flowSend.mock.invocationCallOrder[0]!);
   });
 
   it("uses the shared overlay action for backlog navigation", () => {
@@ -93,6 +95,7 @@ describe("game-a overlay adapters", () => {
 
     adapters.dispatchUiAction("return-title");
 
+    expect(adapters.resetRuntime).toHaveBeenCalledOnce();
     expect(adapters.flowSend).toHaveBeenCalledWith({ type: "RETURN_TITLE" });
   });
 
@@ -145,6 +148,28 @@ describe("game-a overlay adapters", () => {
     expect(adapters.closeAllOverlays).not.toHaveBeenCalled();
   });
 
+  it("keeps the current flow and overlays when an available quick load is rejected", async () => {
+    const adapters = createAdapters({
+      mode: "vn",
+      quickLoadResult: false,
+      quickSlot: {
+        id: "slot:game-a:quick",
+        label: "Quick Save",
+        savedAt: "2026-07-08T00:00:00.000Z",
+        mode: "vn"
+      },
+      startNewGame: () => true
+    });
+
+    adapters.dispatchUiAction("quick-load");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(adapters.quickLoadSlot).toHaveBeenCalledOnce();
+    expect(adapters.flowSend).not.toHaveBeenCalledWith({ type: "ENTER_VN" });
+    expect(adapters.closeAllOverlays).not.toHaveBeenCalled();
+  });
+
   it("does not let quick save bypass the flow canSave capability", () => {
     const adapters = createAdapters({ mode: "title", startNewGame: () => true });
 
@@ -185,6 +210,7 @@ function createAdapters({
   const quickLoadSlot = vi.fn(async () => quickLoadResult);
   const quickSaveSlot = vi.fn(async () => undefined);
   const stopStoryAutomation = vi.fn();
+  const resetRuntime = vi.fn();
   const adapters = useGameAOverlayAdapters({
     flow: {
       activeOverlay,
@@ -197,6 +223,9 @@ function createAdapters({
     },
     runtime: {
       startNewGame,
+      lifecycle: {
+        resetRuntime
+      },
       debug: {
         toggleStoryAuto: vi.fn(),
         toggleStorySkip: vi.fn(),
@@ -227,5 +256,5 @@ function createAdapters({
     }
   } as unknown as Parameters<typeof useGameAOverlayAdapters>[0]);
 
-  return { ...adapters, closeAllOverlays, flowSend, openOverlay, quickLoadSlot, quickSaveSlot, stopStoryAutomation };
+  return { ...adapters, closeAllOverlays, flowSend, openOverlay, quickLoadSlot, quickSaveSlot, resetRuntime, stopStoryAutomation };
 }

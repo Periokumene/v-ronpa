@@ -15,6 +15,7 @@ import { createInitialStoryState, storyRuntimeSnapshot } from "@v-ronpa/story-en
 import type { AudioHandle, AudioHandleFinishResult, AudioPort, VideoPort } from "@v-ronpa/media-save";
 import {
   applyVnRuntimeMediaEffects,
+  disposeVnRuntimeMedia,
   resolveVnDialogueVoiceAssetAvailability,
   resolveVnRuntimeMediaSource,
   type VnRuntimeMediaHandleStore
@@ -90,6 +91,10 @@ describe("app VN runtime helpers", () => {
 
     const plan = createVnRuntimeRestorePlan({
       active: true,
+      media: {
+        bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
+        loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+      },
       pixiStage,
       script: runtimeScript,
       story: storyRuntimeSnapshot(story),
@@ -112,6 +117,14 @@ describe("app VN runtime helpers", () => {
     });
     expect(plan.diagnostics).toEqual([]);
     expect(plan.uiRuntime.surfaces.toastLayer.targetVisible).toBe(false);
+    expect(plan.mediaRuntime).toEqual({
+      bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
+      loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+    });
+    expect(plan.mediaEffects).toEqual([
+      { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:main", volume: 0.4 },
+      { type: "play-sfx", key: "rain", group: "rain", sourceRef: "sfx:rain", loop: true, fast: false, volume: 0.3 }
+    ]);
   });
 
   it("restores terminal UI visibility without creating transitions", () => {
@@ -123,6 +136,7 @@ describe("app VN runtime helpers", () => {
 
     const plan = createVnRuntimeRestorePlan({
       active: true,
+      media: { bgmByGroup: {}, loopingSfxByKey: {} },
       pixiStage: createInitialPixiStageSnapshot(),
       script: runtimeScript,
       story: storyRuntimeSnapshot(story),
@@ -197,6 +211,37 @@ describe("app VN runtime helpers", () => {
     expect((bgmHandle.fadeOutAndStop as ReturnType<typeof viFn>).calls).toEqual([[200]]);
     expect((sfxHandle.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
     expect(result).toEqual({ diagnostics: [], voiceHandle });
+  });
+
+  it("disposes the runtime-owned audio port and video port instead of relying on tracked handles", () => {
+    const trackedBgm = audioHandle("music");
+    const stopAll = viFn();
+    const stopVideo = viFn();
+    const audioPort: AudioPort = {
+      playBgm: viFn(),
+      playSfx: viFn(),
+      playDialogueBleep: viFn(),
+      playVoice: viFn(),
+      stopAll
+    };
+    const handles: VnRuntimeMediaHandleStore = {
+      bgm: { music: trackedBgm },
+      sfx: {},
+      dialogueBleep: audioHandle("bleep"),
+      voice: audioHandle("voice"),
+      oneShotSequence: 4
+    };
+
+    const disposed = disposeVnRuntimeMedia(handles, audioPort, {
+      attach: viFn(),
+      play: viFn(async () => undefined),
+      stop: stopVideo
+    });
+
+    expect(stopAll.calls).toEqual([[]]);
+    expect(stopVideo.calls).toEqual([[]]);
+    expect((trackedBgm.stop as ReturnType<typeof viFn>).calls).toEqual([]);
+    expect(disposed).toEqual({ bgm: {}, sfx: {}, oneShotSequence: 4 });
   });
 
   it("reports missing handles for scripted media volume transitions", async () => {
@@ -381,7 +426,7 @@ describe("app VN runtime helpers", () => {
       audioPort,
       handles,
       effects: [
-        { type: "play-bgm", key: "missing-bgm", group: "music", sourceRef: "bgm:missing" },
+        { type: "play-bgm", key: "missing-bgm", group: "music", sourceRef: "bgm:missing", volume: 0.7 },
         { type: "play-dialogue-bleep", key: "bleep:line", sourceRef: "bleep:missing" },
         { type: "play-voice", key: "voice:zh:missing", textId: "missing", sourceRef: "voice:zh:missing" }
       ],

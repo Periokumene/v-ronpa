@@ -12,7 +12,7 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
 
   await page.addInitScript(() => {
     localStorage.removeItem("v-ronpa:settings:v1");
-    indexedDB.deleteDatabase("v-ronpa-harness-showcase-v8");
+    indexedDB.deleteDatabase("v-ronpa-harness-showcase-v9");
   });
   await page.goto("/");
 

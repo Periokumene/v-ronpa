@@ -191,7 +191,7 @@ describe("VN runtime presentation transaction", () => {
     expect(transaction.uiState).toMatchObject({ toasts: [] });
     expect(transaction.mediaEffects).toEqual([
       { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:validation-main", volume: 0.45 },
-      { type: "play-sfx", sourceRef: "sfx:rain", loop: true, fast: false, key: "rain", group: "rain" }
+      { type: "play-sfx", sourceRef: "sfx:rain", loop: true, fast: false, volume: 1, key: "rain", group: "rain" }
     ]);
   });
 

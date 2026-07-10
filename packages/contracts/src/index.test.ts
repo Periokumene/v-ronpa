@@ -39,6 +39,7 @@ import {
   createSaveableStorySnapshot,
   TrialDefinitionSchema,
   TrialRuntimeStateSchema,
+  VnMediaCheckpointSchema,
   getNaniCommandDefinition,
   naniCommandCatalog
 } from "./index";
@@ -1126,6 +1127,10 @@ describe("contracts", () => {
       runtimeSupport: "consumed",
       recommendedRange: { min: 0, max: 1 }
     });
+    expect(getNaniCommandDefinition("bgm")?.params.find((paramSpec) => paramSpec.name === "loop")?.docs).toMatchObject({
+      runtimeSupport: "declared-not-consumed",
+      runtimeNoteZh: expect.stringContaining("暂未消费")
+    });
   });
 
   it("marks command execution boundaries for Pixi waits and declared-only Naninovel tracks", () => {
@@ -1252,6 +1257,18 @@ describe("contracts", () => {
   it("validates versioned save data", () => {
     expect(SaveModeSchema.parse("vn")).toBe("vn");
     expect(() => SaveModeSchema.parse("title")).toThrow();
+    expect(() =>
+      VnMediaCheckpointSchema.parse({
+        bgmByGroup: { music: { sourceRef: "bgm:main", volume: Number.POSITIVE_INFINITY } },
+        loopingSfxByKey: {}
+      })
+    ).toThrow();
+    expect(() =>
+      VnMediaCheckpointSchema.parse({
+        bgmByGroup: {},
+        loopingSfxByKey: { "": { sourceRef: "sfx:rain", volume: 0.3 } }
+      })
+    ).toThrow();
 
     const story = {
       currentScriptPath: "opening.nani",
@@ -1285,7 +1302,7 @@ describe("contracts", () => {
     };
 
     const save = SaveDataSchema.parse({
-      version: 6,
+      version: 7,
       gameId: "game:test",
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "navi",
@@ -1294,6 +1311,16 @@ describe("contracts", () => {
         scriptRevision: "sha256:test",
         story,
         pixiStage,
+        media: {
+          bgmByGroup: {
+            music: { sourceRef: "bgm:main", volume: 0.4 },
+            ambient: { sourceRef: "bgm:ambient", volume: 0.2 }
+          },
+          loopingSfxByKey: {
+            rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" },
+            "sfx:hum": { sourceRef: "sfx:hum", volume: 0.8 }
+          }
+        },
         ui: { dialog: true, commandBar: true, toastLayer: true }
       },
       navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
@@ -1303,7 +1330,17 @@ describe("contracts", () => {
       characters: {}
     });
 
-    expect(save.version).toBe(6);
+    expect(save.version).toBe(7);
+    expect(save.vn?.media).toEqual({
+      bgmByGroup: {
+        music: { sourceRef: "bgm:main", volume: 0.4 },
+        ambient: { sourceRef: "bgm:ambient", volume: 0.2 }
+      },
+      loopingSfxByKey: {
+        rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" },
+        "sfx:hum": { sourceRef: "sfx:hum", volume: 0.8 }
+      }
+    });
     expect(save.vn?.pixiStage.innerBackgroundsById).toEqual({});
     expect(save.vn?.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
     expect(save.vn?.pixiStage.charactersById.Ema?.appearanceExpression).toBe("Pensive1,ArmR3");
@@ -1322,7 +1359,29 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 6,
+        version: 7,
+        gameId: "game:test",
+        savedAt: "2026-06-14T00:00:00.000Z",
+        mode: "vn",
+        vn: {
+          entryId: "vn:opening",
+          scriptRevision: "sha256:test",
+          story,
+          pixiStage,
+          media: { bgmByGroup: {}, loopingSfxByKey: {} },
+          ui: { dialog: true, commandBar: true, toastLayer: true }
+        },
+        navi: null,
+        trial: null,
+        inventory: { items: {} },
+        evidence: { ownedEvidenceIds: [] },
+        characters: {}
+      }).mode
+    ).toBe("vn");
+
+    expect(() =>
+      SaveDataSchema.parse({
+        version: 7,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "vn",
@@ -1338,12 +1397,12 @@ describe("contracts", () => {
         inventory: { items: {} },
         evidence: { ownedEvidenceIds: [] },
         characters: {}
-      }).mode
-    ).toBe("vn");
+      })
+    ).toThrow();
 
     expect(
       SaveDataSchema.parse({
-        version: 6,
+        version: 7,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "navi",
@@ -1360,7 +1419,7 @@ describe("contracts", () => {
         "slot:contracts:navi",
         "Contracts Navi",
         SaveDataSchema.parse({
-          version: 6,
+          version: 7,
           gameId: "game:test",
           savedAt: "2026-06-14T00:00:00.000Z",
           mode: "navi",
@@ -1381,7 +1440,7 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 6,
+        version: 7,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "trial",
@@ -1390,6 +1449,7 @@ describe("contracts", () => {
           scriptRevision: "sha256:test",
           story,
           pixiStage,
+          media: { bgmByGroup: {}, loopingSfxByKey: {} },
           ui: { dialog: true, commandBar: true, toastLayer: true }
         },
         navi: { substate: "walk", activeMapId: "map:academy-hall", inputLock: "none" },
@@ -1402,6 +1462,20 @@ describe("contracts", () => {
   });
 
   it("rejects old save and Pixi stage versions", () => {
+    expect(() =>
+      SaveDataSchema.parse({
+        version: 6,
+        gameId: "game:test",
+        savedAt: "2026-06-14T00:00:00.000Z",
+        mode: "navi",
+        vn: null,
+        navi: { substate: "walk", activeMapId: "map:academy-hall", inputLock: "none" },
+        trial: null,
+        inventory: { items: {} },
+        evidence: { ownedEvidenceIds: [] },
+        characters: {}
+      })
+    ).toThrow();
     expect(() =>
       SaveDataSchema.parse({
         version: 4,
@@ -1515,7 +1589,7 @@ describe("contracts", () => {
 
   it("does not persist runtime command streams in save data", () => {
     const save = SaveDataSchema.parse({
-      version: 6,
+      version: 7,
       gameId: "game:test",
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "vn",
@@ -1532,6 +1606,7 @@ describe("contracts", () => {
           emittedRuntimeCommands: []
         },
         pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
+        media: { bgmByGroup: {}, loopingSfxByKey: {} },
         ui: { dialog: true, commandBar: true, toastLayer: true }
       },
       navi: null,

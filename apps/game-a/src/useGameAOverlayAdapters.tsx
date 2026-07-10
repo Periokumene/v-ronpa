@@ -57,6 +57,7 @@ export function useGameAOverlayAdapters({
       return;
     }
     if (action === "return-title") {
+      runtime.lifecycle.resetRuntime();
       flow.send({ type: "RETURN_TITLE" });
       return;
     }

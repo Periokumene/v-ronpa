@@ -17,7 +17,7 @@
 - State: `In Progress`
 - Owner: `Codex`
 - Created: `2026-07-01`
-- Updated: `2026-07-09`
+- Updated: `2026-07-11`
 - Completed Commit: `TBD`
 - Archive Target: `docs/archive/completed-tasks/inner-background-command.md`
 
@@ -80,9 +80,9 @@ the existing full-stage `@back` background path.
   source for reserved Pixi actor ids.
 - `PixiStageSnapshotSchema` is version `5` and includes
   `innerBackgroundsById`.
-- `SaveDataSchema` is version `5`; Pixi stage v5 is stored only under
-  `SaveData.vn.pixiStage`.
-- Old Pixi v4 snapshots and SaveData payloads before v5 are rejected.
+- `SaveDataSchema` is version `7`; Pixi stage v5 is stored only under
+  `SaveData.vn.pixiStage`, and VN saves include canonical `media`.
+- Old Pixi v4 snapshots and SaveData payloads before v7 are rejected.
 
 ## Observability And Acceptance Matrix
 
@@ -102,11 +102,11 @@ Required regression cases:
 - Normal path: `@inback bg:x effect:fade time:0.2 wait!` compiles and reduces to
   `innerBackgroundsById.InnerBackground`.
 - Boundary or rejection path: unsupported v1 params warn; old SaveData before
-  v5 and Pixi snapshot v4 reject.
+  v7 and Pixi snapshot v4 reject.
 - No-op path: `visible:false` on a missing inner background leaves the snapshot
   unchanged.
-- Serialization path: SaveData v5 embeds Pixi v5 under `vn.pixiStage` with
-  default `innerBackgroundsById`.
+- Serialization path: SaveData v7 embeds Pixi v5 under `vn.pixiStage` with
+  default `innerBackgroundsById` and required canonical VN `media`.
 
 Test placement:
 
@@ -165,8 +165,8 @@ or screen effect ownership out of Pixi.
 
 ## Rollback Notes
 
-This task originally introduced Pixi snapshot v5. Current SaveData v5 ownership
-is defined by `docs/ccr/save-data-v5-vn-state-authority.md`; reverting the inner
+This task originally introduced Pixi snapshot v5. Current SaveData v7 ownership
+is defined by `docs/ccr/save-data-v7-vn-persistent-media.md`; reverting the inner
 background task must not reintroduce top-level `story` or `pixiStage` save
 fields. Development saves created with the current versions should be
 considered incompatible with branches expecting older save shapes.

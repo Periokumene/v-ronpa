@@ -2,6 +2,7 @@ import {
   createSaveableStorySnapshot,
   type PixiStageSnapshot,
   type StoryRuntimeSnapshot,
+  type VnMediaCheckpoint,
   type VnUiCheckpoint
 } from "@v-ronpa/contracts";
 import type { VnRestoreResult, VnRuntimeEntry, VnSaveCheckpointResult } from "./runtimeTypes";
@@ -12,6 +13,7 @@ export function collectVnSaveCheckpoint({
   entry,
   pixiStage,
   story,
+  media,
   ui
 }: {
   active: boolean;
@@ -19,6 +21,7 @@ export function collectVnSaveCheckpoint({
   entry: Pick<VnRuntimeEntry, "id" | "scriptRevision">;
   pixiStage: PixiStageSnapshot;
   story: StoryRuntimeSnapshot;
+  media: VnMediaCheckpoint;
   ui: VnUiCheckpoint;
 }): VnSaveCheckpointResult {
   if ((!allowInactive && !active) || story.ended) {
@@ -44,6 +47,7 @@ export function collectVnSaveCheckpoint({
       scriptRevision: entry.scriptRevision,
       story: createSaveableStorySnapshot(story),
       pixiStage,
+      media,
       ui
     }
   };

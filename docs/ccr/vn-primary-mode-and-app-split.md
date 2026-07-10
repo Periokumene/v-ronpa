@@ -1,5 +1,11 @@
 # CCR: VN Primary Mode And App Split
 
+> Superseded note: The app split and `vn` mode remain active. SaveData shape and
+> VN checkpoint fields in this CCR were superseded successively by
+> `save-data-v5-vn-state-authority.md`,
+> `save-data-v6-stable-vn-checkpoint.md`, and
+> `save-data-v7-vn-persistent-media.md`.
+
 ## Summary
 
 Promote `vn` to a first-class `GameMode`, split the browser app surface into

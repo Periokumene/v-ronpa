@@ -11,8 +11,9 @@ Required gates:
 - `validate:assets`, `validate:boundaries`, `validate:ccr`, app cleanup, and VN
   runtime cleanup;
 - Game A and Harness production builds;
-- Playwright Game A title/VN/pause/save/settings/Pixi/movie evidence and Harness
-  VN/Navi/Trial pause evidence.
+- Playwright Game A title/VN/pause/save/settings/Pixi/movie evidence, persistent
+  BGM/looping-SFX save-load plus title cleanup, and Harness VN/Navi/Trial pause
+  evidence.
 
 Game A smoke content is enabled only with `VITE_ENABLE_TEST_ENTRIES=1` and
 `?vnEntry=smoke`. Production build validation rejects smoke markers in output.

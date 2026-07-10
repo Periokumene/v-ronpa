@@ -1,0 +1,59 @@
+import { describe, expect, it, vi } from "vitest";
+import type { SaveData } from "@v-ronpa/contracts";
+import { restoreGameAVnSave } from "./useGameAVnRuntime";
+
+describe("game-a VN runtime wrapper", () => {
+  it("returns restore rejection to the save controller", () => {
+    const rejection = { ok: false as const, code: "script-revision-mismatch" as const, message: "revision mismatch" };
+    const restoreVnState = vi.fn(() => rejection);
+    const save = createSave();
+
+    expect(restoreGameAVnSave({ restoreVnState }, save)).toBe(rejection);
+    expect(restoreVnState).toHaveBeenCalledWith({ gameId: "game-a", state: save.vn });
+  });
+
+  it("does not invoke VN restore for a save without VN state", () => {
+    const restoreVnState = vi.fn();
+
+    expect(restoreGameAVnSave({ restoreVnState }, { ...createSave(), mode: "navi", vn: null, navi: { substate: "walk", activeMapId: "map:test", inputLock: "none" } })).toBeUndefined();
+    expect(restoreVnState).not.toHaveBeenCalled();
+  });
+});
+
+function createSave(): SaveData {
+  return {
+    version: 7,
+    gameId: "game-a",
+    savedAt: "2026-07-11T00:00:00.000Z",
+    mode: "vn",
+    vn: {
+      entryId: "vn:game-a-opening",
+      scriptRevision: "sha256:test",
+      story: {
+        currentScriptPath: "game-a/opening.nani",
+        instructionPointer: 1,
+        variables: {},
+        backlog: [],
+        pendingChoices: [],
+        ended: false
+      },
+      pixiStage: {
+        version: 5,
+        revision: 0,
+        backgroundsById: {},
+        innerBackgroundsById: {},
+        charactersById: {},
+        actorOrder: [],
+        weather: {},
+        screenFilters: {}
+      },
+      media: { bgmByGroup: {}, loopingSfxByKey: {} },
+      ui: { dialog: true, commandBar: true, toastLayer: true }
+    },
+    navi: null,
+    trial: null,
+    inventory: { items: {} },
+    evidence: { ownedEvidenceIds: [], submittedEvidenceIds: [] },
+    characters: {}
+  };
+}

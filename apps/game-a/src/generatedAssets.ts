@@ -264,7 +264,7 @@ export const gameAScriptMetadataByPath = {
       ]
     },
     "game-a/smoke.nani": {
-      "scriptRevision": "sha256:c47f5f068ebc5e96e11bc135fceb7ddc55e8ec371ccfe6464e54637a0c197c9f",
+      "scriptRevision": "sha256:7efdfb3d29acbf318d4a512efadf2eed29522bc6d4bc8acfb7ad084089357f22",
       "assetRefs": [
         {
           "id": "alice",
@@ -279,6 +279,16 @@ export const gameAScriptMetadataByPath = {
         {
           "id": "bg:game-a-snow-outskirts-frame",
           "kind": "background",
+          "tags": []
+        },
+        {
+          "id": "bgm:game-a-main",
+          "kind": "bgm",
+          "tags": []
+        },
+        {
+          "id": "sfx:gentle-rain-loop",
+          "kind": "sfx",
           "tags": []
         },
         {
