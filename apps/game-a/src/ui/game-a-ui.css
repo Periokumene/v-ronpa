@@ -3,8 +3,8 @@
   --game-a-dialog-line-soft: rgba(229, 234, 236, 0.38);
   --game-a-ui-mono-font: "Courier New", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --game-a-ui-rich-font:
-    var(--v-ronpa-rich-font-font_jinghua-laosong-gb, "Courier New"),
-    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    var(--v-ronpa-rich-font-font_fusion-pixel-zh-hans, sans-serif),
+    sans-serif;
 }
 
 .game-a-dialog-surface {

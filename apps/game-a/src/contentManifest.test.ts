@@ -36,9 +36,9 @@ describe("game-a content manifest", () => {
     expect(gameAContentManifest.runtimeAssets.some((asset) => asset.id === "fx:noise")).toBe(true);
     expect(gameAContentManifest.fonts).toEqual([
       {
-        id: "font:jinghua-laosong-gb",
-        family: "font:jinghua-laosong-gb",
-        sourceRef: "font:jinghua-laosong-gb",
+        id: "font:fusion-pixel-zh-hans",
+        family: "Fusion Pixel 12px zh-Hans",
+        sourceRef: "font:fusion-pixel-12px-proportional-zh-hans",
         weight: "400",
         style: "normal"
       }
@@ -79,8 +79,8 @@ describe("game-a content manifest", () => {
     expect(registry.url({ id: "alice", kind: "character-pack" })).toBe(
       "/game-a/characters/alice/character.json"
     );
-    expect(registry.url({ id: "font:jinghua-laosong-gb", kind: "font" })).toBe(
-      "/game-a/fonts/jinghua-laosong-gb.woff2"
+    expect(registry.url({ id: "font:fusion-pixel-12px-proportional-zh-hans", kind: "font" })).toBe(
+      "/game-a/fonts/fusion-pixel-12px-proportional-zh-hans.woff2"
     );
   });
 });

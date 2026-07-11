@@ -21,7 +21,12 @@ export default {
     }
   ],
   idOverrides: {},
-  fontFaceOverrides: {},
+  fontFaceOverrides: {
+    "font:fusion-pixel-12px-proportional-zh-hans": {
+      id: "font:fusion-pixel-zh-hans",
+      family: "Fusion Pixel 12px zh-Hans"
+    }
+  },
   tags: ["game-a", "vn"],
   uiTextureTags: ["game-a", "ui", "vn"]
 };
