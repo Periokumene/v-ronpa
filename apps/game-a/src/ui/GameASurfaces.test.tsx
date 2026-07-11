@@ -54,6 +54,14 @@ describe("game-a interaction surfaces", () => {
     const root = findElementByTestId(element, "vn-dialog-surface");
 
     expect(assets.dialogFrameUri).toBe("/game-a/ui/game-a-dialog-frame.png");
+    expect(assets.uiAudio).toEqual({
+      cues: {
+        activate: { gain: 1, uri: "/game-a/media/sfx/ui-click-default.ogg" },
+        hover: { gain: 1, uri: "/game-a/media/sfx/ui-hover-default.ogg" }
+      },
+      defaults: { click: "activate", hover: "hover" },
+      hoverThrottleMs: 60
+    });
     expect(gameAUiConfig.dialog.frameAssetId).toBe("texture:ui:game-a-dialog-frame");
     expect(assets.diagnostics).toEqual([]);
     expect(root?.props).toMatchObject({ "data-frame": "resolved" });
@@ -128,16 +136,17 @@ describe("game-a interaction surfaces", () => {
   });
 
   it("returns diagnostics and keeps the dialog renderable when the texture is missing", () => {
+    const registry = createAssetRegistry(gameAContentManifest);
     const missingResolver: AssetResolver = {
-      resolve: () => ({
+      resolve: (input) => input.kind === "texture" ? {
         diagnostic: {
           code: "asset-missing",
           severity: "error",
-          id: "texture:ui:game-a-dialog-frame",
-          kind: "texture",
+          id: input.id,
+          kind: input.kind,
           message: "missing texture"
         }
-      })
+      } : registry.resolve(input)
     };
     const assets = resolveGameAUiAssets(missingResolver, gameAUiConfig);
     const element = GameADialogSurface({
@@ -152,6 +161,30 @@ describe("game-a interaction surfaces", () => {
     expect(assets.diagnostics).toMatchObject([{ code: "asset-missing", id: "texture:ui:game-a-dialog-frame" }]);
     expect(root?.props).toMatchObject({ "data-frame": "fallback" });
     expect(findElementByTestId(element, "vn-dialog-text")).toBeDefined();
+  });
+
+  it("reports missing UI audio without creating an alternate resolver or blocking the dialog texture", () => {
+    const registry = createAssetRegistry(gameAContentManifest);
+    const missingAudioResolver: AssetResolver = {
+      resolve: (input) => input.kind === "sfx" ? {
+        diagnostic: {
+          code: "asset-missing",
+          severity: "error",
+          id: input.id,
+          kind: input.kind,
+          message: "missing UI sound"
+        }
+      } : registry.resolve(input)
+    };
+
+    const assets = resolveGameAUiAssets(missingAudioResolver, gameAUiConfig);
+
+    expect(assets.dialogFrameUri).toBe("/game-a/ui/game-a-dialog-frame.png");
+    expect(assets.uiAudio.cues).toEqual({});
+    expect(assets.diagnostics).toMatchObject([
+      { code: "asset-missing", id: "sfx:ui-hover-default", kind: "sfx" },
+      { code: "asset-missing", id: "sfx:ui-click-default", kind: "sfx" }
+    ]);
   });
 
   it("skins command labels without changing dispatched command actions", () => {
@@ -338,6 +371,7 @@ describe("game-a interaction surfaces", () => {
     const soundElement = createSettingsContentElement("sound");
     expect(findElementByTestId(soundElement, "settings-group-sound")).toBeDefined();
     expect(findElementByTestId(soundElement, "settings-sound-master")).toBeDefined();
+    expect(findElementByTestId(soundElement, "settings-sound-ui")).toBeDefined();
     expect(findElementByTestId(soundElement, "settings-group-system")).toBeUndefined();
     expect(findElementByTestId(soundElement, "settings-system-language")).toBeUndefined();
 
@@ -373,6 +407,15 @@ describe("game-a interaction surfaces", () => {
     boundaryModel.settings.display.textSpeed = 0;
     const boundaryElement = createSettingsContentElement("display", actions, boundaryModel);
     expect(findElementByTestId(boundaryElement, "settings-display-text-speed-previous")?.props).toMatchObject({ disabled: true });
+  });
+
+  it("patches the existing UI sound volume through the SOUND step meter", () => {
+    const actions = createSettingsActions();
+    const element = createSettingsContentElement("sound", actions);
+
+    (findElementByTestId(element, "settings-sound-ui-next")?.props as { onClick?: () => void }).onClick?.();
+
+    expect(actions.patchSettings).toHaveBeenCalledWith({ sound: { uiVolume: 0.6 } });
   });
 
   it("patches discrete Settings values through option steppers", () => {

@@ -4,8 +4,12 @@ test.setTimeout(240_000);
 
 test("game-a ships product UI while exercising the test-only VN entry", async ({ page }) => {
   const consoleErrors: string[] = [];
+  const uiAudioRequests: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  page.on("request", (request) => {
+    if (request.url().includes("/game-a/media/sfx/ui-")) uiAudioRequests.push(request.url());
   });
 
   await page.addInitScript(() => {
@@ -19,8 +23,20 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("title-surface")).toHaveClass(/game-a-title-surface/);
   await page.screenshot({ path: "test-results/game-a-title.png", fullPage: true });
 
-  await clickByTestId(page, "title-settings");
+  await page.getByTestId("title-settings").click();
+  await expect.poll(() => uiAudioRequests.some((url) => url.endsWith("/ui-click-default.ogg"))).toBe(true);
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
+  await page.getByTestId("settings-subtab-sound").hover();
+  await expect.poll(() => uiAudioRequests.some((url) => url.endsWith("/ui-hover-default.ogg"))).toBe(true);
+  await clickByTestId(page, "settings-subtab-sound");
+  await clickByTestId(page, "settings-sound-ui-next");
+  await expect(page.getByTestId("settings-sound-ui-value")).toHaveText("60%");
+  await page.waitForTimeout(160);
+  await expect.poll(async () => page.evaluate(() => {
+    const raw = localStorage.getItem("v-ronpa:game-a:settings:v1");
+    return raw ? (JSON.parse(raw) as { sound?: { uiVolume?: number } }).sound?.uiVolume : undefined;
+  })).toBe(0.6);
+  await page.screenshot({ path: "test-results/game-a-settings-sound.png", fullPage: true });
   await clickByTestId(page, "settings-subtab-display");
   await clickByTestId(page, "settings-display-text-size-next");
   await clickByTestId(page, "settings-display-text-speed-next");

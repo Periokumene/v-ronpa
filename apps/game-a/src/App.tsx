@@ -22,6 +22,7 @@ import { createGameASurfaces, type GameASurfaceNavigation } from "./ui/GameASurf
 import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
 import { gameAUiConfig } from "./ui/gameAUiConfig";
 import { resolveGameAUiAssets } from "./ui/resolveGameAUiAssets";
+import { useGameAUiAudio } from "./ui/useGameAUiAudio";
 
 export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) {
   const devVnLaunchTarget = useMemo(
@@ -60,6 +61,10 @@ export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) 
   });
   const overlayPages = useGameAOverlayAdapters({ flow, runtime, save, settings });
   const gameAUiAssets = useMemo(() => resolveGameAUiAssets(assetRegistry, gameAUiConfig), [assetRegistry]);
+  const gameAUiAudioBindings = useGameAUiAudio({
+    assets: gameAUiAssets.uiAudio,
+    sound: settings.settings.sound
+  });
   const gameASurfaceNavigationRef = useRef<GameASurfaceNavigation | null>(null);
   if (!gameASurfaceNavigationRef.current) {
     gameASurfaceNavigationRef.current = {
@@ -109,7 +114,7 @@ export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) 
     : undefined;
 
   return (
-    <main className="game-a-shell">
+    <main className="game-a-shell" {...gameAUiAudioBindings}>
       <RichTextFontStyles
         assetResolver={assetRegistry}
         fonts={gameAContentManifest.fonts}

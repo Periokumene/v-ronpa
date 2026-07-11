@@ -558,6 +558,9 @@ function renderGameASettingsRows({
           <GameASettingRow label="音效音量" testId="settings-sound-sfx">
             <GameAStepMeter label="音效音量" onChange={(sfxVolume) => actions.patchSettings({ sound: { sfxVolume } })} testId="settings-sound-sfx" value={settings.sound.sfxVolume} />
           </GameASettingRow>
+          <GameASettingRow label="界面音效音量" testId="settings-sound-ui">
+            <GameAStepMeter label="界面音效音量" onChange={(uiVolume) => actions.patchSettings({ sound: { uiVolume } })} testId="settings-sound-ui" value={settings.sound.uiVolume} />
+          </GameASettingRow>
           <GameASettingRow label="对话提示音量" testId="settings-sound-bleep">
             <GameAStepMeter label="对话提示音量" onChange={(bleepVolume) => actions.patchSettings({ sound: { bleepVolume } })} testId="settings-sound-bleep" value={settings.sound.bleepVolume} />
           </GameASettingRow>

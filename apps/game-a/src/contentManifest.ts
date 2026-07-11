@@ -31,7 +31,10 @@ export const gameAVnEntry = {
 
 const gameAContentManifestInput = {
   version: 3,
-  assets: [],
+  assets: [
+    { id: "sfx:ui-hover-default", kind: "sfx" as const, tags: ["game-a", "ui"] },
+    { id: "sfx:ui-click-default", kind: "sfx" as const, tags: ["game-a", "ui"] }
+  ],
   audio: {
     dialogueBleep: {
       enabled: true,

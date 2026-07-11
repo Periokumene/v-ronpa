@@ -29,6 +29,10 @@ describe("game-a content manifest", () => {
       ])
     );
     expect(gameAContentManifest.vnEntries.some((entry) => entry.id === "vn:game-a-smoke")).toBe(false);
+    expect(gameAContentManifest.assets).toEqual([
+      { id: "sfx:ui-hover-default", kind: "sfx", tags: ["game-a", "ui"] },
+      { id: "sfx:ui-click-default", kind: "sfx", tags: ["game-a", "ui"] }
+    ]);
     expect(gameAContentManifest.runtimeAssets.some((asset) => asset.id === "fx:noise")).toBe(true);
     expect(gameAContentManifest.fonts).toEqual([
       {
@@ -58,6 +62,12 @@ describe("game-a content manifest", () => {
       "/game-a/media/sfx/glug-glug-glug.mp3"
     );
     expect(registry.url({ id: "sfx:noise-6hz", kind: "sfx" })).toBe("/game-a/media/sfx/noise-6hz.mp3");
+    expect(registry.url({ id: "sfx:ui-hover-default", kind: "sfx" })).toBe(
+      "/game-a/media/sfx/ui-hover-default.ogg"
+    );
+    expect(registry.url({ id: "sfx:ui-click-default", kind: "sfx" })).toBe(
+      "/game-a/media/sfx/ui-click-default.ogg"
+    );
     expect(registry.url({ id: "bleep:game-a-dialogue", kind: "bleep" })).toBe("/game-a/media/bleep/game-a-dialogue.ogg");
     expect(registry.url({ id: "voice:zh:game_a_voice_0001", kind: "voice" })).toBe(
       "/game-a/media/voice/zh/game_a_voice_0001.ogg"

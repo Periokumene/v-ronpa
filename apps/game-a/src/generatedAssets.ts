@@ -174,6 +174,32 @@ export const gameARuntimeAssets = [
       ]
     },
     {
+      "id": "sfx:ui-click-default",
+      "kind": "sfx",
+      "optimizedUri": "/game-a/media/sfx/ui-click-default.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "game-a",
+        "vn"
+      ]
+    },
+    {
+      "id": "sfx:ui-hover-default",
+      "kind": "sfx",
+      "optimizedUri": "/game-a/media/sfx/ui-hover-default.ogg",
+      "format": "ogg",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "game-a",
+        "vn"
+      ]
+    },
+    {
       "id": "texture:ui:game-a-dialog-frame",
       "kind": "texture",
       "optimizedUri": "/game-a/ui/game-a-dialog-frame.png",
@@ -229,7 +255,7 @@ export const gameARuntimeAssetFragments = [pixiRuntimeAssetFragment] satisfies R
 
 export const gameAScriptMetadataByPath = {
     "game-a/opening.nani": {
-      "scriptRevision": "sha256:194e6dd21bc6ddd8bfdc96bd402c18b82da6ccf120933929beeff135e6016c4b",
+      "scriptRevision": "sha256:4ad6ef99e7d5ea3e6d43fb1e5fb4fd198ab4b80170e228d68156b43e08c0a61f",
       "assetRefs": [
         {
           "id": "alice",

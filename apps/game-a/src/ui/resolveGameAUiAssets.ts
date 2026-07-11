@@ -1,9 +1,24 @@
 import type { AssetRegistryDiagnostic, AssetResolver } from "@v-ronpa/asset-registry";
 import type { GameAUiConfig } from "./gameAUiConfig";
 
+export interface GameAUiAudioCueAsset {
+  gain: number;
+  uri: string;
+}
+
+export interface GameAUiAudioAssets {
+  cues: Readonly<Record<string, GameAUiAudioCueAsset>>;
+  defaults: {
+    click: string;
+    hover: string;
+  };
+  hoverThrottleMs: number;
+}
+
 export interface GameAUiAssets {
   dialogFrameUri?: string | undefined;
   diagnostics: AssetRegistryDiagnostic[];
+  uiAudio: GameAUiAudioAssets;
 }
 
 export function resolveGameAUiAssets(
@@ -11,8 +26,20 @@ export function resolveGameAUiAssets(
   config: GameAUiConfig
 ): GameAUiAssets {
   const dialogFrame = assetResolver.resolve({ id: config.dialog.frameAssetId, kind: "texture" });
+  const diagnostics = dialogFrame.diagnostic ? [dialogFrame.diagnostic] : [];
+  const cues: Record<string, GameAUiAudioCueAsset> = {};
+  for (const [cueId, cue] of Object.entries(config.uiAudio.cues)) {
+    const resolved = assetResolver.resolve({ id: cue.sourceRef, kind: "sfx" });
+    if (resolved.uri) cues[cueId] = { gain: cue.gain, uri: resolved.uri };
+    if (resolved.diagnostic) diagnostics.push(resolved.diagnostic);
+  }
   return {
     ...(dialogFrame.uri ? { dialogFrameUri: dialogFrame.uri } : {}),
-    diagnostics: dialogFrame.diagnostic ? [dialogFrame.diagnostic] : []
+    diagnostics,
+    uiAudio: {
+      cues,
+      defaults: config.uiAudio.defaults,
+      hoverThrottleMs: config.uiAudio.hoverThrottleMs
+    }
   };
 }
