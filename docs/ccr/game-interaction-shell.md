@@ -26,7 +26,7 @@ shell.
 
 The previous vertical slice entered Navi directly and kept interaction controls
 inside harness code. The UI/interaction branch needs shared vocabulary for title
-entry, VN toolbar actions, overlay stack, save/load summaries, UI asset
+entry, VN toolbar actions, active overlay/pause section, save/load summaries, UI asset
 references, and settings shells before feature branches add concrete pages. Without those
 contracts, app adapters, ui-kit surfaces, save storage, and game-flow capability
 logic would each invent their own shape.
@@ -37,7 +37,7 @@ logic would each invent their own shape.
 - `GameOverlayKind` names title, VN, pause, and confirmation overlays.
 - `GameUiAction` names shell-level UI actions such as new game, save/load,
   backlog, settings, auto/skip, and return title.
-- `GameInteractionContext` carries current mode, overlay stack, input lock,
+- `GameInteractionContext` carries current mode, active overlay, pause section, input lock,
   active-story flags, and stable-stop hints.
 - `InteractionCapabilitySnapshot` is derived by `game-flow-machine` and consumed
   by UI surfaces.
@@ -48,7 +48,7 @@ logic would each invent their own shape.
 
 ## Runtime Ownership
 
-- `game-flow-machine` owns mode, overlay stack, and capability policy.
+- `game-flow-machine` owns mode, active overlay, pause section, and capability policy.
 - `apps/game/src/interaction/**` adapts the current vertical slice runtime to
   that public flow model.
 - `media-save` owns slot persistence, migration, summaries, list, load, and
@@ -73,7 +73,7 @@ contract fields.
 - `packages/media-save/src/index.test.ts` covers save summary derivation,
   summary listing, and deletion.
 - `apps/game/src/interaction/useVerticalSliceSaveAdapter.test.ts` covers
-  vertical-slice save collection without leaking overlay stack.
+  vertical-slice save collection without leaking interaction navigation state.
 - `tests/smoke/vertical-slice.spec.ts` covers title to Navi to VN, toolbar,
   backlog, save/load confirmation, and pause menu.
 

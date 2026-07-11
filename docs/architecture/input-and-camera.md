@@ -45,8 +45,8 @@ Renderers must receive this value from directors. They must not infer it from
 CSS visibility or component-local state.
 
 Global shell overlays use `menu`. The app-level `GameInteractionShell` opens
-title load/settings, VN backlog/save/load/settings, and Navi pause menu through
-the `GameFlowMachine` overlay stack, then publishes `menu` to the current
+title load/settings through the active overlay field and backlog/save/load/settings
+through the `GameFlowMachine` pause section, then publishes `menu` to the current
 `GameInteractionContext`. R3F camera controls and semantic movement must treat
 `menu` as locked. Closing the overlay returns authority to the underlying Navi
 or Trial director context.
@@ -99,6 +99,15 @@ camera pose or compute confirmable interactable candidates.
 
 The ESC pause path is authoritative at the shell layer: if Navi is active and no
 top-level shell overlay, input prompt, or movie overlay is consuming input, ESC
-opens `pause-menu` and locks input as `menu`. If a shell overlay is already
-active, ESC closes that top overlay. ESC must not mutate Navi maps,
+opens the first enabled pause section and locks input as `menu`. If paused, ESC
+resumes the originating mode in one step; if a title overlay is active, ESC
+closes it. ESC must not mutate Navi maps,
 interactable candidates, story state, or camera pose.
+
+`PauseSurface` is the sole top-level DOM owner for paused navigation. It covers
+the complete app playfield and carries modal semantics; backlog, save/load, and
+settings slots contribute section content only. While the root mode is
+`paused`, the shell does not publish playable dialog, choice, or command-bar
+view models. Their runtime state remains unchanged and is projected again after
+`RESUME`, preventing both visual overlap and keyboard or assistive-technology
+interaction with the paused scene.

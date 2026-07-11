@@ -3,6 +3,7 @@ import type {
   GameInteractionContext,
   GameMode,
   GameOverlayKind,
+  GamePauseSection,
   InputLockState,
   InteractionCapabilitySnapshot,
   NaviSubstate,
@@ -18,21 +19,22 @@ export type GameFlowEvent =
   | { type: "ENTER_VN" }
   | { type: "ENTER_NAVI" }
   | { type: "ENTER_TRIAL" }
-  | { type: "PAUSE" }
+  | { type: "OPEN_PAUSE"; section: GamePauseSection }
   | { type: "RESUME" }
   | { type: "RETURN_TITLE" }
   | { type: "OPEN_OVERLAY"; overlay: GameOverlayKind }
-  | { type: "CLOSE_OVERLAY" }
-  | { type: "POP_OVERLAY" };
+  | { type: "CLOSE_OVERLAY" };
 
 export interface GameFlowContext {
-  overlayStack: GameOverlayKind[];
+  activeOverlay: GameOverlayKind | null;
+  pauseSection: GamePauseSection | null;
   resumeMode: PlayableGameMode | null;
 }
 
 export interface GameFlowSnapshot {
   mode: GameMode;
-  overlayStack: GameOverlayKind[];
+  activeOverlay?: GameOverlayKind;
+  pauseSection?: GamePauseSection;
   resumeMode?: PlayableGameMode;
 }
 
@@ -51,7 +53,7 @@ export interface GameHostInteractionFacts {
   trialPresentation?: TrialPresentationProfile;
 }
 
-const initialGameFlowContext: GameFlowContext = { overlayStack: [], resumeMode: null };
+const initialGameFlowContext: GameFlowContext = { activeOverlay: null, pauseSection: null, resumeMode: null };
 
 const machineSetup = setup({
   types: {} as { context: GameFlowContext; events: GameFlowEvent },
@@ -61,28 +63,40 @@ const machineSetup = setup({
     startTrial: ({ event }) => event.type === "START_NEW_GAME" && event.mode === "trial",
     resumeVn: ({ context }) => context.resumeMode === "vn",
     resumeNavi: ({ context }) => context.resumeMode === "navi",
-    resumeTrial: ({ context }) => context.resumeMode === "trial",
-    hasNestedPauseOverlay: ({ context }) => context.overlayStack.length > 1
+    resumeTrial: ({ context }) => context.resumeMode === "trial"
   },
   actions: {
-    clearFlow: assign(() => ({ overlayStack: [], resumeMode: null })),
-    clearResume: assign(() => ({ overlayStack: [], resumeMode: null })),
-    enterPlayable: assign(({ context }) => ({ ...context, overlayStack: [] })),
-    rememberVnPause: assign(() => ({ overlayStack: ["pause-menu"], resumeMode: "vn" as const })),
-    rememberNaviPause: assign(() => ({ overlayStack: ["pause-menu"], resumeMode: "navi" as const })),
-    rememberTrialPause: assign(() => ({ overlayStack: ["pause-menu"], resumeMode: "trial" as const })),
-    pushOverlay: assign(({ context, event }) =>
-      event.type === "OPEN_OVERLAY" ? { ...context, overlayStack: [...context.overlayStack, event.overlay] } : context
+    clearFlow: assign(() => ({ activeOverlay: null, pauseSection: null, resumeMode: null })),
+    clearResume: assign(() => ({ activeOverlay: null, pauseSection: null, resumeMode: null })),
+    enterPlayable: assign(({ context }) => ({ ...context, activeOverlay: null, pauseSection: null })),
+    rememberVnPause: assign(({ event }) =>
+      event.type === "OPEN_PAUSE"
+        ? { activeOverlay: null, pauseSection: event.section, resumeMode: "vn" as const }
+        : initialGameFlowContext
     ),
-    closeOverlays: assign(({ context }) => ({ ...context, overlayStack: [] })),
-    popOverlay: assign(({ context }) => ({ ...context, overlayStack: context.overlayStack.slice(0, -1) }))
+    rememberNaviPause: assign(({ event }) =>
+      event.type === "OPEN_PAUSE"
+        ? { activeOverlay: null, pauseSection: event.section, resumeMode: "navi" as const }
+        : initialGameFlowContext
+    ),
+    rememberTrialPause: assign(({ event }) =>
+      event.type === "OPEN_PAUSE"
+        ? { activeOverlay: null, pauseSection: event.section, resumeMode: "trial" as const }
+        : initialGameFlowContext
+    ),
+    setPauseSection: assign(({ context, event }) =>
+      event.type === "OPEN_PAUSE" ? { ...context, pauseSection: event.section } : context
+    ),
+    openOverlay: assign(({ context, event }) =>
+      event.type === "OPEN_OVERLAY" ? { ...context, activeOverlay: event.overlay } : context
+    ),
+    closeOverlay: assign(({ context }) => ({ ...context, activeOverlay: null }))
   }
 });
 
 const overlayEvents = {
-  OPEN_OVERLAY: { actions: "pushOverlay" },
-  CLOSE_OVERLAY: { actions: "closeOverlays" },
-  POP_OVERLAY: { actions: "popOverlay" }
+  OPEN_OVERLAY: { actions: "openOverlay" },
+  CLOSE_OVERLAY: { actions: "closeOverlay" }
 } as const;
 
 const playableTransitions = {
@@ -118,18 +132,13 @@ export const gameFlowMachine = machineSetup.createMachine({
         ...overlayEvents
       }
     },
-    vn: { on: { ...playableTransitions, PAUSE: { target: "paused", actions: "rememberVnPause" } } },
-    navi: { on: { ...playableTransitions, PAUSE: { target: "paused", actions: "rememberNaviPause" } } },
-    trial: { on: { ...playableTransitions, PAUSE: { target: "paused", actions: "rememberTrialPause" } } },
+    vn: { on: { ...playableTransitions, OPEN_PAUSE: { target: "paused", actions: "rememberVnPause" } } },
+    navi: { on: { ...playableTransitions, OPEN_PAUSE: { target: "paused", actions: "rememberNaviPause" } } },
+    trial: { on: { ...playableTransitions, OPEN_PAUSE: { target: "paused", actions: "rememberTrialPause" } } },
     paused: {
       on: {
         RESUME: resumeTransitions,
-        POP_OVERLAY: [
-          { guard: "hasNestedPauseOverlay", actions: "popOverlay" },
-          ...resumeTransitions
-        ],
-        CLOSE_OVERLAY: resumeTransitions,
-        OPEN_OVERLAY: { actions: "pushOverlay" },
+        OPEN_PAUSE: { actions: "setPauseSection" },
         RETURN_TITLE: { target: "title", actions: "clearFlow" },
         ENTER_VN: { target: "vn", actions: "clearResume" },
         ENTER_NAVI: { target: "navi", actions: "clearResume" },
@@ -146,7 +155,8 @@ export function modeFromSnapshotValue(value: unknown): GameMode {
 export function createGameFlowSnapshot(value: unknown, context: GameFlowContext): GameFlowSnapshot {
   return {
     mode: modeFromSnapshotValue(value),
-    overlayStack: context.overlayStack,
+    ...(context.activeOverlay ? { activeOverlay: context.activeOverlay } : {}),
+    ...(context.pauseSection ? { pauseSection: context.pauseSection } : {}),
     ...(context.resumeMode ? { resumeMode: context.resumeMode } : {})
   };
 }
@@ -160,11 +170,12 @@ export function deriveGameInteractionState({
   host?: GameHostInteractionFacts;
   vn: VnInteractionFacts;
 }): { context: GameInteractionContext; capabilities: InteractionCapabilitySnapshot } {
-  const hasOverlay = flow.overlayStack.length > 0;
-  const inputLock = hasOverlay ? "menu" : host.inputLock ?? vn.inputLock;
+  const hasMenu = Boolean(flow.activeOverlay || flow.pauseSection || flow.mode === "paused");
+  const inputLock = hasMenu ? "menu" : host.inputLock ?? vn.inputLock;
   const context = GameInteractionContextSchema.parse({
     mode: flow.mode,
-    overlayStack: flow.overlayStack,
+    ...(flow.activeOverlay ? { activeOverlay: flow.activeOverlay } : {}),
+    ...(flow.pauseSection ? { pauseSection: flow.pauseSection } : {}),
     inputLock,
     hasActiveStory: vn.hasActiveStory,
     storyHasChoices: vn.storyHasChoices,
@@ -200,7 +211,7 @@ export function calculateInteractionCapabilities(
     canLoad,
     canOpenSettings: true,
     canOpenBacklog: hasStoryBacklog,
-    canOpenPauseMenu: context.mode !== "paused" && inPlayableMode && context.inputLock !== "menu",
+    canOpenPause: context.mode !== "paused" && inPlayableMode && context.inputLock !== "menu",
     canAuto: canAutomateStory,
     canSkip: canAutomateStory,
     canReturnTitle: inPlayableMode

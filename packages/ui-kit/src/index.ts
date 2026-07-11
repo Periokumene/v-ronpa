@@ -16,7 +16,6 @@ export type {
 } from "./surfaces/RichTextFontStyles";
 export {
   GameOverlayHost,
-  PauseMenuOverlay,
   paginateSaveLoadSlotIds,
   ReadOnlyBacklogOverlay,
   SAVE_LOAD_SLOTS_PER_PAGE,
@@ -37,7 +36,6 @@ export { VnChoiceOverlay } from "./surfaces/VnChoiceOverlay";
 export { VnDialogSurface } from "./surfaces/VnDialogSurface";
 export type {
   GameOverlayHostProps,
-  PauseMenuOverlayProps,
   ReadOnlyBacklogOverlayProps,
   SaveLoadOverlayProps,
   SettingsOverlayProps,

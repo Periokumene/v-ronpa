@@ -3,8 +3,8 @@ import type {
   BacklogOverlayActions,
   BacklogOverlayViewModel,
   GameInteractionShellSurfaces,
-  PauseMenuOverlayActions,
-  PauseMenuOverlayViewModel,
+  PauseSurfaceActions,
+  PauseSurfaceViewModel,
   RuntimeInputPromptActions,
   RuntimeInputPromptViewModel,
   RuntimeToastActions,
@@ -29,19 +29,17 @@ import {
   SETTINGS_TEXT_SIZE_OPTIONS,
   adjacentSettingsOption,
   createEscapeCaptureRef,
-  isVnPauseSectionOverlay,
   normalizeSettingsStep,
   type SettingsOption,
-  type SettingsSectionId,
-  type VnPauseSectionId
+  type SettingsSectionId
 } from "@v-ronpa/app-vn-shell";
-import type { GameOverlayKind, GameUiAction, InteractionCapabilitySnapshot } from "@v-ronpa/contracts";
+import type { GamePauseSection, GameUiAction, InteractionCapabilitySnapshot } from "@v-ronpa/contracts";
 import { paginateSaveLoadSlotIds, RichTextRenderer, SAVE_LOAD_SLOTS_PER_PAGE, SurfaceFrame } from "@v-ronpa/ui-kit";
 import type { GameAUiConfig } from "./gameAUiConfig";
 import type { GameAUiAssets } from "./resolveGameAUiAssets";
 
 export interface GameASurfaceNavigation {
-  activeOverlay?: GameOverlayKind | undefined;
+  pauseSection?: GamePauseSection | undefined;
   capabilities: InteractionCapabilitySnapshot;
   dispatch(action: GameUiAction): void;
 }
@@ -62,10 +60,10 @@ export function createGameASurfaces({
     Title: (props) => <GameATitleSurface {...props} config={config} />,
     ToastLayer: GameAToastLayer,
     InputPrompt: GameAInputPrompt,
+    PauseSurface: GameAPauseSurface,
     BacklogOverlay: (props) => <GameABacklogOverlay {...props} navigation={navigation} />,
     SaveLoadOverlay: (props) => <GameASaveLoadOverlay {...props} navigation={navigation} />,
-    SettingsOverlay: (props) => <GameASettingsOverlay {...props} navigation={navigation} />,
-    PauseMenuOverlay: (props) => <GameAPauseMenuOverlay {...props} navigation={navigation} />
+    SettingsOverlay: (props) => <GameASettingsOverlay {...props} navigation={navigation} />
   };
 }
 
@@ -254,20 +252,12 @@ function GameAInputPrompt({ actions, model }: SurfaceSlotProps<RuntimeInputPromp
 }
 
 function GameABacklogOverlay({
-  actions,
-  model,
-  navigation
+  model
 }: SurfaceSlotProps<BacklogOverlayViewModel, BacklogOverlayActions> & {
   navigation: GameASurfaceNavigation;
 }) {
   return (
-    <GameAPauseSectionShell
-      activeSection="backlog"
-      navigation={navigation}
-      onClose={actions.close}
-      testId="backlog-overlay"
-      title="日志"
-    >
+    <GameAPauseSectionContent testId="backlog-overlay" title="日志">
       {model.entries.length === 0 ? (
         <p data-testid="backlog-empty" className="game-a-overlay-empty">暂无日志。</p>
       ) : (
@@ -282,7 +272,7 @@ function GameABacklogOverlay({
           ))}
         </ol>
       )}
-    </GameAPauseSectionShell>
+    </GameAPauseSectionContent>
   );
 }
 
@@ -394,7 +384,7 @@ function GameASaveLoadOverlay({
     </>
   );
 
-  if (!isVnPauseSectionOverlay(navigation.activeOverlay)) {
+  if (!navigation.pauseSection) {
     return (
       <GameAOverlayPanel onClose={actions.close} testId="save-load-overlay" title={formatSaveLoadOverlayTitle(model.mode, "title")}>
         {content}
@@ -403,17 +393,13 @@ function GameASaveLoadOverlay({
   }
 
   return (
-    <GameAPauseSectionShell
-      activeSection={model.mode}
-      navigation={navigation}
-      navigationLocked={Boolean(model.pendingLoadSlot)}
+    <GameAPauseSectionContent
       onEscapeCapture={model.pendingLoadSlot ? actions.cancelLoad : undefined}
-      onClose={actions.close}
       testId="save-load-overlay"
       title={formatSaveLoadOverlayTitle(model.mode, "pause")}
     >
       {content}
-    </GameAPauseSectionShell>
+    </GameAPauseSectionContent>
   );
 }
 
@@ -434,7 +420,7 @@ function GameASettingsOverlay({
     />
   );
 
-  if (!isVnPauseSectionOverlay(navigation.activeOverlay)) {
+  if (!navigation.pauseSection) {
     return (
       <GameAOverlayPanel onClose={actions.close} testId="settings-overlay" title="设置">
         {content}
@@ -443,15 +429,9 @@ function GameASettingsOverlay({
   }
 
   return (
-    <GameAPauseSectionShell
-      activeSection="settings"
-      navigation={navigation}
-      onClose={actions.close}
-      testId="settings-overlay"
-      title="设置"
-    >
+    <GameAPauseSectionContent testId="settings-overlay" title="设置">
       {content}
-    </GameAPauseSectionShell>
+    </GameAPauseSectionContent>
   );
 }
 
@@ -796,86 +776,58 @@ function GameASettingsSubtabs({
   );
 }
 
-function GameAPauseMenuOverlay({
-  actions,
-  model,
-  navigation
-}: SurfaceSlotProps<PauseMenuOverlayViewModel, PauseMenuOverlayActions> & {
-  navigation: GameASurfaceNavigation;
-}) {
-  return (
-    <GameAOverlayPanel onClose={actions.close} testId="pause-menu-overlay" title="暂停">
-      <div className="game-a-pause-actions">
-        <button data-testid="pause-log" disabled={!model.capabilities.canOpenBacklog} onClick={() => navigation.dispatch("open-backlog")} type="button">
-          日志
-        </button>
-        <button data-testid="pause-save" disabled={!model.capabilities.canSave} onClick={() => actions.dispatch("open-save")} type="button">
-          保存
-        </button>
-        <button data-testid="pause-load" disabled={!model.capabilities.canLoad} onClick={() => actions.dispatch("open-load")} type="button">
-          读取
-        </button>
-        <button data-testid="pause-settings" disabled={!model.capabilities.canOpenSettings} onClick={() => actions.dispatch("open-settings")} type="button">
-          设置
-        </button>
-        <button data-testid="pause-return-title" disabled={!model.capabilities.canReturnTitle} onClick={() => actions.dispatch("return-title")} type="button">
-          TITLE
-        </button>
-      </div>
-    </GameAOverlayPanel>
-  );
-}
+const GAME_A_PAUSE_SECTION_TITLES: Record<GamePauseSection, string> = {
+  backlog: "日志",
+  save: "保存数据",
+  load: "读取数据",
+  settings: "设置"
+};
 
-function GameAPauseSectionShell({
-  activeSection,
+function GameAPauseSurface({
+  actions,
   children,
-  navigation,
-  navigationLocked = false,
-  onEscapeCapture,
-  onClose,
-  testId,
-  title
-}: {
-  activeSection: VnPauseSectionId;
-  children: ReactNode;
-  navigation: GameASurfaceNavigation;
-  navigationLocked?: boolean;
-  onEscapeCapture?: (() => void) | undefined;
-  onClose: () => void;
-  testId: string;
-  title: string;
-}) {
-  const escapeCaptureRef = createEscapeCaptureRef(onEscapeCapture);
+  model
+}: SurfaceSlotProps<PauseSurfaceViewModel, PauseSurfaceActions> & { children?: ReactNode }) {
+  const title = GAME_A_PAUSE_SECTION_TITLES[model.activeSection];
   return (
     <section
-      aria-label={title}
+      aria-label="暂停菜单"
+      aria-modal="true"
       className="game-a-pause-screen"
-      data-active-tab={activeSection}
-      data-testid={testId}
-      ref={escapeCaptureRef}
+      data-active-tab={model.activeSection}
+      data-pause-section={model.activeSection}
+      data-testid="pause-surface"
+      role="dialog"
     >
       <div className="game-a-pause-panel">
         <button
-          aria-label={`关闭${title}`}
+          aria-label="关闭暂停菜单"
           className="game-a-pause-close"
-          data-testid={`${testId}-close`}
-          disabled={navigationLocked}
-          onClick={onClose}
+          data-testid="pause-surface-close"
+          disabled={model.navigationLocked}
+          onClick={actions.close}
           type="button"
         >
           x
         </button>
         <div className="game-a-pause-heading">
           <span className="game-a-pause-number">
-            {String(VN_PAUSE_SECTIONS.findIndex((section) => section.id === activeSection) + 1).padStart(2, "0")}
+            {String(VN_PAUSE_SECTIONS.findIndex((section) => section.id === model.activeSection) + 1).padStart(2, "0")}
           </span>
           <strong>{title}</strong>
         </div>
         <div className="game-a-pause-nav-row">
           <nav aria-label="暂停菜单页签" className="game-a-pause-tabs" data-testid="pause-tab-list">
             {VN_PAUSE_SECTIONS.map((section) => {
-              const active = activeSection === section.id;
-              const disabled = navigationLocked;
+              const active = model.activeSection === section.id;
+              const enabled = section.id === "backlog"
+                ? model.capabilities.canOpenBacklog
+                : section.id === "save"
+                  ? model.capabilities.canSave
+                  : section.id === "load"
+                    ? model.capabilities.canLoad
+                    : model.capabilities.canOpenSettings;
+              const disabled = model.navigationLocked || !enabled;
               return (
                 <button
                   aria-current={active ? "page" : undefined}
@@ -884,7 +836,7 @@ function GameAPauseSectionShell({
                   disabled={disabled}
                   key={section.id}
                   onClick={() => {
-                    if (!active && !disabled) navigation.dispatch(section.action);
+                    if (!active && !disabled) actions.dispatch(section.action);
                   }}
                   type="button"
                 >
@@ -896,8 +848,8 @@ function GameAPauseSectionShell({
           <button
             className="game-a-pause-return-title"
             data-testid="pause-return-title"
-            disabled={navigationLocked || !navigation.capabilities.canReturnTitle}
-            onClick={() => navigation.dispatch("return-title")}
+            disabled={model.navigationLocked || !model.capabilities.canReturnTitle}
+            onClick={() => actions.dispatch("return-title")}
             type="button"
           >
             TITLE
@@ -905,6 +857,25 @@ function GameAPauseSectionShell({
         </div>
         <div className="game-a-pause-content">{children}</div>
       </div>
+    </section>
+  );
+}
+
+function GameAPauseSectionContent({
+  children,
+  onEscapeCapture,
+  testId,
+  title
+}: {
+  children: ReactNode;
+  onEscapeCapture?: (() => void) | undefined;
+  testId: string;
+  title: string;
+}) {
+  const escapeCaptureRef = createEscapeCaptureRef(onEscapeCapture);
+  return (
+    <section aria-label={title} className="game-a-pause-section" data-testid={testId} ref={escapeCaptureRef}>
+      {children}
     </section>
   );
 }

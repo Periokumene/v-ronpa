@@ -7,16 +7,11 @@ export const PIXI_INNER_BACKGROUND_ID = "InnerBackground" as const;
 export const GameModeSchema = z.enum(["loading", "title", "vn", "navi", "trial", "paused"]);
 export type GameMode = z.infer<typeof GameModeSchema>;
 
-export const GameOverlayKindSchema = z.enum([
-  "title-load",
-  "title-settings",
-  "pause-menu",
-  "vn-backlog",
-  "vn-save",
-  "vn-load",
-  "vn-settings"
-]);
+export const GameOverlayKindSchema = z.enum(["title-load", "title-settings"]);
 export type GameOverlayKind = z.infer<typeof GameOverlayKindSchema>;
+
+export const GamePauseSectionSchema = z.enum(["backlog", "save", "load", "settings"]);
+export type GamePauseSection = z.infer<typeof GamePauseSectionSchema>;
 
 export const GameUiActionSchema = z.enum([
   "new-game",
@@ -24,7 +19,7 @@ export const GameUiActionSchema = z.enum([
   "open-save",
   "open-settings",
   "open-backlog",
-  "open-pause-menu",
+  "open-pause",
   "quick-save",
   "quick-load",
   "close-overlay",
@@ -1995,7 +1990,8 @@ export function createSaveableStorySnapshot(story: StoryRuntimeSnapshot): Saveab
 
 export const GameInteractionContextSchema = z.object({
   mode: GameModeSchema,
-  overlayStack: z.array(GameOverlayKindSchema).default([]),
+  activeOverlay: GameOverlayKindSchema.optional(),
+  pauseSection: GamePauseSectionSchema.optional(),
   naviSubstate: NaviSubstateSchema.optional(),
   trialPresentation: TrialPresentationProfileSchema.optional(),
   inputLock: InputLockStateSchema.default("none"),
@@ -2003,7 +1999,7 @@ export const GameInteractionContextSchema = z.object({
   storyHasChoices: z.boolean().default(false),
   storyEnded: z.boolean().default(false),
   isAtStableStop: z.boolean().default(false)
-});
+}).strict();
 export type GameInteractionContext = z.infer<typeof GameInteractionContextSchema>;
 
 export const InteractionCapabilitySnapshotSchema = z.object({
@@ -2012,7 +2008,7 @@ export const InteractionCapabilitySnapshotSchema = z.object({
   canLoad: z.boolean().default(false),
   canOpenSettings: z.boolean().default(true),
   canOpenBacklog: z.boolean().default(false),
-  canOpenPauseMenu: z.boolean().default(false),
+  canOpenPause: z.boolean().default(false),
   canAuto: z.boolean().default(false),
   canSkip: z.boolean().default(false),
   canReturnTitle: z.boolean().default(false)

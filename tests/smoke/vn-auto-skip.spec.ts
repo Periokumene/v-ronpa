@@ -24,7 +24,7 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
   await page.getByTestId("settings-automation-auto-speed").fill("100");
   await expect(page.getByTestId("settings-automation-auto-speed-value")).toHaveText("100%");
-  await page.getByTestId("settings-overlay-close").click();
+  await page.getByTestId("pause-surface-close").click();
   await expect(page.getByTestId("settings-overlay")).toBeHidden();
 
   await page.getByTestId("vn-command-auto").click();
@@ -35,18 +35,19 @@ test("VN AUTO, SKIP, autoNext, and overlay stop behavior work end to end", async
   await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "false");
 
   for (const overlay of [
-    { command: "vn-command-backlog", panel: "backlog-overlay", close: "backlog-overlay-close" },
-    { command: "vn-command-save", panel: "save-load-overlay", close: "save-load-overlay-close" },
-    { command: "vn-command-load", panel: "save-load-overlay", close: "save-load-overlay-close" },
-    { command: "vn-command-settings", panel: "settings-overlay", close: "settings-overlay-close" }
+    { command: "vn-command-backlog", panel: "backlog-overlay", close: "pause-surface-close" },
+    { command: "vn-command-save", panel: "save-load-overlay", close: "pause-surface-close" },
+    { command: "vn-command-load", panel: "save-load-overlay", close: "pause-surface-close" },
+    { command: "vn-command-settings", panel: "settings-overlay", close: "pause-surface-close" }
   ]) {
     await page.getByTestId("vn-command-auto").click();
     await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "true");
     await page.getByTestId(overlay.command).click();
     await expect(page.getByTestId(overlay.panel)).toBeVisible();
-    await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByTestId("vn-command-auto")).toHaveCount(0);
     await page.getByTestId(overlay.close).click();
     await expect(page.getByTestId(overlay.panel)).toBeHidden();
+    await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "false");
   }
 
   await page.getByTestId("vn-command-skip").click();
@@ -116,7 +117,7 @@ test("VN AUTO voice gate advances branch 3 without returning to the baseline che
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
   await page.getByTestId("settings-automation-auto-speed").fill("100");
   await expect(page.getByTestId("settings-automation-auto-speed-value")).toHaveText("100%");
-  await page.getByTestId("settings-overlay-close").click();
+  await page.getByTestId("pause-surface-close").click();
   await expect(page.getByTestId("settings-overlay")).toBeHidden();
 
   await page.getByTestId("vn-choice-2").click();

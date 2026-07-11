@@ -42,6 +42,11 @@ nar: 比起很多努力扮演松弛的活着的人，我只是很想在雨声中
 nar: 妈妈在喊我了
 @char alice pos:50 time:0.3 wait!
 nar: 雨幕里，一个熟悉的人影停在了街角。
+
+@choice "陪我去买牛奶吧" goto:#MILKBEGIN
+
+#MILKBEGIN
+nar:转场测试
 @stopSfx group:rain fade:0.8
 @stopBgm group:music fade:0.8
 @end

@@ -63,12 +63,12 @@ export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) 
   const gameASurfaceNavigationRef = useRef<GameASurfaceNavigation | null>(null);
   if (!gameASurfaceNavigationRef.current) {
     gameASurfaceNavigationRef.current = {
-      activeOverlay: flow.activeOverlay,
+      pauseSection: flow.pauseSection,
       capabilities: flow.capabilities,
       dispatch: overlayPages.dispatchUiAction
     };
   }
-  gameASurfaceNavigationRef.current.activeOverlay = flow.activeOverlay;
+  gameASurfaceNavigationRef.current.pauseSection = flow.pauseSection;
   gameASurfaceNavigationRef.current.capabilities = flow.capabilities;
   gameASurfaceNavigationRef.current.dispatch = overlayPages.dispatchUiAction;
   const gameASurfaceNavigation = gameASurfaceNavigationRef.current;

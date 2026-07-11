@@ -327,8 +327,9 @@
   --game-a-pause-faint: rgba(229, 229, 224, 0.22);
   --game-a-pause-paper: rgba(229, 229, 224, 0.9);
   --game-a-pause-black: rgba(2, 2, 2, 0.95);
-  position: relative;
-  z-index: 1;
+  position: absolute;
+  z-index: 32;
+  inset: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   width: 100%;
@@ -454,6 +455,10 @@
   min-height: 0;
   overflow: auto;
   border: 1px solid var(--game-a-pause-muted);
+}
+
+.game-a-pause-section {
+  min-height: 100%;
 }
 
 .game-a-pause-screen .game-a-pause-content:has(.game-a-save-grid) {

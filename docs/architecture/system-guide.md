@@ -3,7 +3,7 @@
 ## Playable modes and authority
 
 `vn`, `navi`, and `trial` are peer playable root modes. `GameFlowMachine` owns
-only the root mode, overlay stack, and paused `resumeMode`. The app chooses the
+only the root mode, active title overlay, pause section, and paused `resumeMode`. The app chooses the
 target of `START_NEW_GAME`; the flow machine has no default gameplay mode.
 
 Interaction state is a synchronous projection of the flow snapshot, VN facts,
@@ -17,7 +17,9 @@ interaction state back into the machine.
 - `app-vn-dispatch`: headless command fanout and pure UI/media transactions.
 - `pixi-stage-model`: pure Pixi snapshot reducer, hints, waits, diagnostics.
 - `app-vn-runtime`: React runtime hook and canonical capability ports.
-- `app-vn-shell`: DOM shell, shared pause/save/load/settings behavior, Pixi host.
+- `app-vn-shell`: DOM shell, canonical modal pause-surface ownership, shared
+  pause/save/load/settings behavior, and Pixi host. Paused section slots provide
+  content only; playable dialog, choices, and commands are omitted until resume.
 - `pixi-presenter`: Pixi renderer adapter only; it does not interpret runtime commands.
 - `runtime-assets-pixi`: Pixi-owned AssetRegistry fragment only.
 - `navi-director` / `trial-director`: mode-specific state and flow.

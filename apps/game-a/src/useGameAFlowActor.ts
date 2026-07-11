@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { GameOverlayKind } from "@v-ronpa/contracts";
+import type { GameOverlayKind, GamePauseSection } from "@v-ronpa/contracts";
 import type { VnInteractionFacts } from "@v-ronpa/app-vn-runtime";
 import {
   createGameFlowSnapshot,
@@ -18,24 +18,24 @@ export function useGameAFlowActor(vn: VnInteractionFacts) {
 
   const flow = createGameFlowSnapshot(snapshot.value, snapshot.context);
   const interaction = deriveGameInteractionState({ flow, vn });
-  const activeOverlay = flow.overlayStack.at(-1);
-
   return {
-    activeOverlay,
+    activeOverlay: flow.activeOverlay,
+    pauseSection: flow.pauseSection,
     capabilities: interaction.capabilities,
     context: interaction.context,
     mode: flow.mode,
-    overlayStack: flow.overlayStack,
     send,
     openOverlay(overlay: GameOverlayKind) {
-      if (overlay === "pause-menu") send({ type: "PAUSE" });
-      else send({ type: "OPEN_OVERLAY", overlay });
+      send({ type: "OPEN_OVERLAY", overlay });
     },
-    closeTopOverlay() {
-      send({ type: "POP_OVERLAY" });
-    },
-    closeAllOverlays() {
+    closeOverlay() {
       send({ type: "CLOSE_OVERLAY" });
+    },
+    openPauseSection(section: GamePauseSection) {
+      send({ type: "OPEN_PAUSE", section });
+    },
+    resumeFromPause() {
+      send({ type: "RESUME" });
     }
   };
 }

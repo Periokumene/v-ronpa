@@ -1,12 +1,14 @@
 import {
   createVnSaveLoadOverlayModel,
-  overlayKindForVnShellAction,
+  resolveVnShellNavigation,
+  selectDefaultPauseSection,
   shouldStopVnShellAutomationForAction,
+  type GameInteractionPage,
   type GameInteractionOverlayActions,
   type GameInteractionOverlayViewModelInputs,
   type useGameSettingsAdapter
 } from "@v-ronpa/app-vn-shell";
-import type { GameOverlayKind, GameUiAction } from "@v-ronpa/contracts";
+import type { GameUiAction } from "@v-ronpa/contracts";
 import type { useGameFlowActor } from "./useGameFlowActor";
 import type { useHarnessShowcaseRuntimeAdapter } from "./useHarnessShowcaseRuntimeAdapter";
 import type { useHarnessShowcaseSaveAdapter } from "./useHarnessShowcaseSaveAdapter";
@@ -57,16 +59,21 @@ export function useOverlayPageAdapters({
       void save.quickLoadSlot().then((loaded) => {
         if (!loaded) return;
         flow.send({ type: "ENTER_NAVI" });
-        flow.closeAllOverlays();
       });
       return;
     }
 
-    const overlay = overlayKindForVnShellAction(action, flow.mode);
-    if (overlay) {
-      if (save.busy && (overlay === "vn-save" || overlay === "vn-load" || overlay === "title-load")) return;
+    const target = resolveVnShellNavigation(action, flow.mode);
+    if (target) {
+      const section = target.kind === "pause"
+        ? target.section ?? selectDefaultPauseSection(flow.capabilities, createCommandAvailability())
+        : undefined;
+      if (save.busy && target.kind === "overlay" && target.overlay === "title-load") return;
       if (shouldStopVnShellAutomationForAction(action, flow.mode)) runtime.stopStoryAutomation("overlay");
-      flow.openOverlay(overlay);
+      if (target.kind === "pause") {
+        flow.openPauseSection(section ?? selectDefaultPauseSection(flow.capabilities, createCommandAvailability()));
+      }
+      else flow.openOverlay(target.overlay);
       return;
     }
 
@@ -76,26 +83,28 @@ export function useOverlayPageAdapters({
     }
   }
 
+  function createCommandAvailability() {
+    return {
+      "open-save": !save.busy,
+      "quick-save": !save.busy,
+      "open-load": !save.busy,
+      "quick-load": Boolean(save.quickSlot) && !save.busy
+    };
+  }
+
   return {
     dispatchUiAction,
-    createCommandAvailability() {
-      return {
-        "open-save": !save.busy,
-        "quick-save": !save.busy,
-        "open-load": !save.busy,
-        "quick-load": Boolean(save.quickSlot) && !save.busy
-      };
-    },
-    createOverlayViewModelInputs(overlay: GameOverlayKind | undefined): GameInteractionOverlayViewModelInputs {
-      if (!overlay) return {};
-      if (overlay === "vn-save" || overlay === "title-load" || overlay === "vn-load") {
+    createCommandAvailability,
+    createPageViewModelInputs(page: GameInteractionPage | undefined): GameInteractionOverlayViewModelInputs {
+      if (!page) return {};
+      if (page === "save" || page === "load" || page === "title-load") {
         return {
           saveLoad: createVnSaveLoadOverlayModel({
             canSave: flow.capabilities.canSave,
             activeOperation: save.activeOperation,
             busy: save.busy,
             lastError: save.lastError,
-            overlay,
+            page,
             pendingLoadSlot: save.pendingLoadSlot,
             slotPreviewsById: save.slotPreviewsById,
             slotIds: save.slotIds,
@@ -103,23 +112,24 @@ export function useOverlayPageAdapters({
           })
         };
       }
-      if (overlay === "title-settings" || overlay === "vn-settings") {
+      if (page === "title-settings" || page === "settings") {
         return { settings: settings.settings };
       }
       return {};
     },
-    createOverlayActions(overlay: GameOverlayKind | undefined): GameInteractionOverlayActions {
-      if (!overlay) return {};
+    createPageActions(page: GameInteractionPage | undefined): GameInteractionOverlayActions {
+      if (!page) return {};
+      const close = flow.mode === "paused" ? flow.resumeFromPause : flow.closeOverlay;
 
-      if (overlay === "vn-backlog") {
-        return { backlog: { close: flow.closeTopOverlay } };
+      if (page === "backlog") {
+        return { backlog: { close } };
       }
 
-      if (overlay === "vn-save") {
+      if (page === "save") {
         return {
           saveLoad: {
             cancelLoad: save.cancelLoadSlot,
-            close: flow.closeTopOverlay,
+            close,
             confirmLoad: () => {
               void save.confirmLoadSlot();
             },
@@ -134,16 +144,15 @@ export function useOverlayPageAdapters({
         };
       }
 
-      if (overlay === "title-load" || overlay === "vn-load") {
+      if (page === "title-load" || page === "load") {
         return {
           saveLoad: {
             cancelLoad: save.cancelLoadSlot,
-            close: flow.closeTopOverlay,
+            close,
             confirmLoad: () => {
               void save.confirmLoadSlot().then((loaded) => {
                 if (!loaded) return;
                 flow.send({ type: "ENTER_NAVI" });
-                flow.closeAllOverlays();
               });
             },
             loadPreviews: save.loadPreviews,
@@ -157,18 +166,14 @@ export function useOverlayPageAdapters({
         };
       }
 
-      if (overlay === "title-settings" || overlay === "vn-settings") {
+      if (page === "title-settings" || page === "settings") {
         return {
           settings: {
-            close: flow.closeTopOverlay,
+            close,
             patchSettings: settings.patchSettings,
             resetSettings: settings.resetSettings
           }
         };
-      }
-
-      if (overlay === "pause-menu") {
-        return { pauseMenu: { close: flow.closeTopOverlay, dispatch: dispatchUiAction } };
       }
 
       return {};

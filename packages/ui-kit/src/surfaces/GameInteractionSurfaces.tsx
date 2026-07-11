@@ -110,13 +110,13 @@ export function GameOverlayHost({ activeOverlay, children }: GameOverlayHostProp
 }
 
 export interface ReadOnlyBacklogOverlayProps {
+  embedded?: boolean;
   entries: StoryBacklogEntry[];
   onClose: () => void;
 }
 
-export function ReadOnlyBacklogOverlay({ entries, onClose }: ReadOnlyBacklogOverlayProps) {
-  return (
-    <OverlayPanel onClose={onClose} testId="backlog-overlay" title="Backlog">
+export function ReadOnlyBacklogOverlay({ embedded = false, entries, onClose }: ReadOnlyBacklogOverlayProps) {
+  const content = (
       <ScrollArea.Root style={scrollRootStyle}>
         <ScrollArea.Viewport style={scrollViewportStyle}>
           {entries.length === 0 ? (
@@ -138,11 +138,13 @@ export function ReadOnlyBacklogOverlay({ entries, onClose }: ReadOnlyBacklogOver
           <ScrollArea.Thumb style={scrollThumbStyle} />
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
-    </OverlayPanel>
   );
+  if (embedded) return <div data-testid="backlog-overlay" style={embeddedSectionStyle}>{content}</div>;
+  return <OverlayPanel onClose={onClose} testId="backlog-overlay" title="Backlog">{content}</OverlayPanel>;
 }
 
 export interface SaveLoadOverlayProps {
+  embedded?: boolean;
   mode: "save" | "load";
   slotIds: string[];
   slots: SaveSlotSummary[];
@@ -189,6 +191,7 @@ export function paginateSaveLoadSlotIds(slotIds: string[], pageIndex: number): {
 }
 
 export function SaveLoadOverlay({
+  embedded = false,
   mode,
   slotIds,
   slots,
@@ -219,8 +222,8 @@ export function SaveLoadOverlay({
     onLoadPreviews?.(page.pageSlotIds);
   }, [onLoadPreviews, pageSlotIdsKey]);
 
-  return (
-    <OverlayPanel onClose={onClose} testId="save-load-overlay" title={title}>
+  const content = (
+    <>
       <div data-testid="save-load-mode" style={modeBadgeStyle}>{mode}</div>
       {lastError ? (
         <div data-testid="save-load-error" role="alert" style={saveLoadErrorStyle}>
@@ -287,7 +290,15 @@ export function SaveLoadOverlay({
       <AlertDialog.Root open={Boolean(pendingLoadSlot)}>
         <AlertDialog.Portal>
           <AlertDialog.Overlay style={confirmOverlayStyle} />
-          <AlertDialog.Content data-testid="load-confirmation" style={confirmContentStyle}>
+          <AlertDialog.Content
+            data-testid="load-confirmation"
+            onEscapeKeyDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onCancelLoad();
+            }}
+            style={confirmContentStyle}
+          >
             <AlertDialog.Title style={confirmTitleStyle}>Load this slot?</AlertDialog.Title>
             <AlertDialog.Description style={confirmTextStyle}>
               Current progress will be replaced by {pendingLoadSlot?.label ?? "this save"}.
@@ -307,20 +318,23 @@ export function SaveLoadOverlay({
           </AlertDialog.Content>
         </AlertDialog.Portal>
       </AlertDialog.Root>
-    </OverlayPanel>
+    </>
   );
+  if (embedded) return <div data-testid="save-load-overlay" style={embeddedSectionStyle}>{content}</div>;
+  return <OverlayPanel onClose={onClose} testId="save-load-overlay" title={title}>{content}</OverlayPanel>;
 }
 
 export interface SettingsOverlayProps {
+  embedded?: boolean;
   onPatchSettings: (patch: SettingsPatch) => void;
   onResetSettings: () => void;
   onClose: () => void;
   settings: SettingsSnapshot;
 }
 
-export function SettingsOverlay({ onClose, onPatchSettings, onResetSettings, settings }: SettingsOverlayProps) {
-  return (
-    <OverlayPanel onClose={onClose} testId="settings-overlay" title="Settings">
+export function SettingsOverlay({ embedded = false, onClose, onPatchSettings, onResetSettings, settings }: SettingsOverlayProps) {
+  const content = (
+    <>
       <div data-testid="settings-groups" style={settingsGroupsStyle}>
         <section aria-label="System settings" data-testid="settings-group-system" style={settingsGroupStyle}>
           <h3 style={settingsGroupTitleStyle}>System</h3>
@@ -452,8 +466,10 @@ export function SettingsOverlay({ onClose, onPatchSettings, onResetSettings, set
           Reset
         </button>
       </div>
-    </OverlayPanel>
+    </>
   );
+  if (embedded) return <div data-testid="settings-overlay" style={embeddedSectionStyle}>{content}</div>;
+  return <OverlayPanel onClose={onClose} testId="settings-overlay" title="Settings">{content}</OverlayPanel>;
 }
 
 function SettingsSlider({
@@ -541,33 +557,6 @@ function SettingsSelect({
         ))}
       </select>
     </label>
-  );
-}
-
-export interface PauseMenuOverlayProps {
-  capabilities: InteractionCapabilitySnapshot;
-  onAction: (action: GameUiAction) => void;
-  onClose: () => void;
-}
-
-export function PauseMenuOverlay({ capabilities, onAction, onClose }: PauseMenuOverlayProps) {
-  return (
-    <OverlayPanel onClose={onClose} testId="pause-menu-overlay" title="Pause">
-      <div style={pauseActionsStyle}>
-        <button data-testid="pause-save" disabled={!capabilities.canSave} onClick={() => onAction("open-save")} style={secondaryButtonStyle} type="button">
-          Save
-        </button>
-        <button data-testid="pause-load" disabled={!capabilities.canLoad} onClick={() => onAction("open-load")} style={secondaryButtonStyle} type="button">
-          Load
-        </button>
-        <button data-testid="pause-settings" disabled={!capabilities.canOpenSettings} onClick={() => onAction("open-settings")} style={secondaryButtonStyle} type="button">
-          Settings
-        </button>
-        <button data-testid="pause-return-title" disabled={!capabilities.canReturnTitle} onClick={() => onAction("return-title")} style={secondaryButtonStyle} type="button">
-          Return Title
-        </button>
-      </div>
-    </OverlayPanel>
   );
 }
 
@@ -715,6 +704,19 @@ const panelStyle: CSSProperties = {
   borderRadius: 8,
   background: "rgba(11, 16, 23, 0.94)",
   boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
+  color: "#f8fbff"
+};
+
+const embeddedSectionStyle: CSSProperties = {
+  width: "min(920px, calc(100vw - 40px))",
+  maxHeight: "min(650px, calc(100vh - 110px))",
+  overflow: "auto",
+  display: "grid",
+  gap: 14,
+  padding: 18,
+  border: "1px solid rgba(255,255,255,0.22)",
+  borderRadius: 8,
+  background: "rgba(11, 16, 23, 0.94)",
   color: "#f8fbff"
 };
 
@@ -949,11 +951,4 @@ const confirmActionsStyle: CSSProperties = {
   justifyContent: "flex-end",
   gap: 8,
   marginTop: 18
-};
-
-// Pause overlay.
-const pauseActionsStyle: CSSProperties = {
-  width: "min(320px, 100%)",
-  display: "grid",
-  gap: 10
 };

@@ -15,9 +15,9 @@ describe("game flow machine", () => {
     actor.send({ type: "START_NEW_GAME", mode });
     expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe(mode);
 
-    actor.send({ type: "PAUSE" });
+    actor.send({ type: "OPEN_PAUSE", section: "backlog" });
     expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("paused");
-    expect(actor.getSnapshot().context).toMatchObject({ overlayStack: ["pause-menu"], resumeMode: mode });
+    expect(actor.getSnapshot().context).toMatchObject({ activeOverlay: null, pauseSection: "backlog", resumeMode: mode });
     const pausedInteraction = deriveGameInteractionState({
       flow: createGameFlowSnapshot(actor.getSnapshot().value, actor.getSnapshot().context),
       vn: { hasActiveStory: true, storyHasChoices: false, storyEnded: false, isAtStableStop: true, inputLock: "dialog" }
@@ -30,31 +30,43 @@ describe("game flow machine", () => {
     });
     actor.send({ type: "RESUME" });
     expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe(mode);
-    expect(actor.getSnapshot().context).toEqual({ overlayStack: [], resumeMode: null });
+    expect(actor.getSnapshot().context).toEqual({ activeOverlay: null, pauseSection: null, resumeMode: null });
   });
 
   it("ignores repeated pause while already paused", () => {
     const actor = createActor(gameFlowMachine).start();
     actor.send({ type: "BOOT" });
     actor.send({ type: "START_NEW_GAME", mode: "vn" });
-    actor.send({ type: "PAUSE" });
-    actor.send({ type: "PAUSE" });
+    actor.send({ type: "OPEN_PAUSE", section: "backlog" });
+    actor.send({ type: "OPEN_PAUSE", section: "save" });
     expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("paused");
-    expect(actor.getSnapshot().context).toEqual({ overlayStack: ["pause-menu"], resumeMode: "vn" });
+    expect(actor.getSnapshot().context).toEqual({ activeOverlay: null, pauseSection: "save", resumeMode: "vn" });
   });
 
-  it("closes nested pause sections before resuming the root pause surface", () => {
+  it("switches pause sections without history and resumes in one action", () => {
     const actor = createActor(gameFlowMachine).start();
     actor.send({ type: "BOOT" });
     actor.send({ type: "START_NEW_GAME", mode: "vn" });
-    actor.send({ type: "PAUSE" });
-    actor.send({ type: "OPEN_OVERLAY", overlay: "vn-save" });
-    actor.send({ type: "POP_OVERLAY" });
+    actor.send({ type: "OPEN_PAUSE", section: "backlog" });
+    actor.send({ type: "OPEN_PAUSE", section: "save" });
+    actor.send({ type: "OPEN_PAUSE", section: "load" });
+    actor.send({ type: "OPEN_PAUSE", section: "backlog" });
     expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("paused");
-    expect(actor.getSnapshot().context.overlayStack).toEqual(["pause-menu"]);
+    expect(actor.getSnapshot().context.pauseSection).toBe("backlog");
 
-    actor.send({ type: "POP_OVERLAY" });
+    actor.send({ type: "RESUME" });
     expect(modeFromSnapshotValue(actor.getSnapshot().value)).toBe("vn");
+    expect(actor.getSnapshot().context).toEqual({ activeOverlay: null, pauseSection: null, resumeMode: null });
+  });
+
+  it("replaces and closes title overlays without a history stack", () => {
+    const actor = createActor(gameFlowMachine).start();
+    actor.send({ type: "BOOT" });
+    actor.send({ type: "OPEN_OVERLAY", overlay: "title-load" });
+    actor.send({ type: "OPEN_OVERLAY", overlay: "title-settings" });
+    expect(actor.getSnapshot().context.activeOverlay).toBe("title-settings");
+    actor.send({ type: "CLOSE_OVERLAY" });
+    expect(actor.getSnapshot().context.activeOverlay).toBeNull();
   });
 
   it("derives context and capabilities without mutating machine context", () => {
@@ -76,6 +88,6 @@ describe("game flow machine", () => {
 
     expect(interaction.context).toMatchObject({ mode: "navi", naviSubstate: "vn2d-overlay", inputLock: "dialog" });
     expect(interaction.capabilities).toMatchObject({ canSave: true, canOpenBacklog: true, canAuto: true, canSkip: true });
-    expect(actor.getSnapshot().context).toEqual({ overlayStack: [], resumeMode: null });
+    expect(actor.getSnapshot().context).toEqual({ activeOverlay: null, pauseSection: null, resumeMode: null });
   });
 });

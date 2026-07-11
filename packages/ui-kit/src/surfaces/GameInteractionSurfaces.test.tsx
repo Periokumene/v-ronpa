@@ -94,6 +94,19 @@ describe("SettingsOverlay", () => {
     (bleepControl?.props as { onChange: (value: number) => void }).onChange(0.35);
     expect(onPatchSettings).toHaveBeenCalledWith({ sound: { bleepVolume: 0.35 } });
   });
+
+  it("renders embedded pause content without a second overlay close header", () => {
+    const element = SettingsOverlay({
+      embedded: true,
+      onClose: vi.fn(),
+      onPatchSettings: vi.fn(),
+      onResetSettings: vi.fn(),
+      settings: createDefaultSettingsSnapshot()
+    });
+    expect(element.type).toBe("div");
+    expect((element.props as Record<string, unknown>)["data-testid"]).toBe("settings-overlay");
+    expect(collectPropValues(element, "aria-label")).not.toContain("Close Settings");
+  });
 });
 
 function findElementByProp(node: ReactNode, propName: string, propValue: string): ReactElement | undefined {

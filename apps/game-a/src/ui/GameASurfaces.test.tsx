@@ -10,7 +10,7 @@ import type {
   VnCommandBarViewModel,
   VnDialogViewModel
 } from "@v-ronpa/app-vn-shell";
-import { createDefaultSettingsSnapshot, type GameOverlayKind } from "@v-ronpa/contracts";
+import { createDefaultSettingsSnapshot, type GameOverlayKind, type GamePauseSection } from "@v-ronpa/contracts";
 import { paginateSaveLoadSlotIds } from "@v-ronpa/ui-kit";
 import { gameAContentManifest } from "../contentManifest";
 import {
@@ -35,7 +35,7 @@ describe("game-a interaction surfaces", () => {
       "CommandBar",
       "Dialog",
       "InputPrompt",
-      "PauseMenuOverlay",
+      "PauseSurface",
       "SaveLoadOverlay",
       "SettingsOverlay",
       "Title",
@@ -185,21 +185,33 @@ describe("game-a interaction surfaces", () => {
     const surfaces = createGameASurfaces({
       assets: resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig),
       config: gameAUiConfig,
-      navigation: createNavigation({ activeOverlay: "vn-backlog", dispatch })
+      navigation: createNavigation({ pauseSection: "backlog", dispatch })
     });
+    const PauseSurface = surfaces.PauseSurface;
     const BacklogSurface = surfaces.BacklogOverlay;
-    const element = <BacklogSurface actions={{ close: vi.fn() }} model={createBacklogModel()} />;
+    const element = (
+      <PauseSurface
+        actions={{ close: vi.fn(), dispatch }}
+        model={{ activeSection: "backlog", capabilities: createNavigation({}).capabilities, navigationLocked: false }}
+      >
+        <BacklogSurface actions={{ close: vi.fn() }} model={createBacklogModel()} />
+      </PauseSurface>
+    );
+    const pause = findElementByTestId(element, "pause-surface");
     const root = findElementByTestId(element, "backlog-overlay");
     const tabList = findElementByTestId(element, "pause-tab-list");
     const logTab = findElementByTestId(element, "pause-tab-log");
     const saveTab = findElementByTestId(element, "pause-tab-save");
     const returnTitle = findElementByTestId(element, "pause-return-title");
-    const close = findElementByTestId(element, "backlog-overlay-close");
+    const close = findElementByTestId(element, "pause-surface-close");
 
-    expect(root?.props).toMatchObject({
+    expect(pause?.props).toMatchObject({
       className: "game-a-pause-screen",
-      "data-active-tab": "backlog"
+      "data-active-tab": "backlog",
+      "aria-modal": "true",
+      role: "dialog"
     });
+    expect(root?.props).toMatchObject({ className: "game-a-pause-section", "aria-label": "日志" });
     expect(findElementByClassName(element, "game-a-pause-header")).toBeUndefined();
     expect(tabList).toBeDefined();
     expect(logTab?.props).toMatchObject({ "aria-current": "page", children: "LOG" });
@@ -216,10 +228,10 @@ describe("game-a interaction surfaces", () => {
     const surfaces = createGameASurfaces({
       assets,
       config: gameAUiConfig,
-      navigation: createNavigation({ activeOverlay: "vn-save" })
+      navigation: createNavigation({ pauseSection: "save" })
     });
     const SaveLoadSurface = surfaces.SaveLoadOverlay;
-    const saveMarkup = renderToStaticMarkup(<SaveLoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("save")} />);
+    const saveMarkup = renderGameAPauseMarkup(surfaces, "save", <SaveLoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("save")} />);
 
     expect(saveMarkup).toContain('class="game-a-pause-screen"');
     expect(saveMarkup).toContain('data-active-tab="save"');
@@ -239,10 +251,10 @@ describe("game-a interaction surfaces", () => {
     const loadSurfaces = createGameASurfaces({
       assets,
       config: gameAUiConfig,
-      navigation: createNavigation({ activeOverlay: "vn-load" })
+      navigation: createNavigation({ pauseSection: "load" })
     });
     const LoadSurface = loadSurfaces.SaveLoadOverlay;
-    const loadMarkup = renderToStaticMarkup(<LoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("load")} />);
+    const loadMarkup = renderGameAPauseMarkup(loadSurfaces, "load", <LoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("load")} />);
 
     expect(loadMarkup).toContain('class="game-a-pause-screen"');
     expect(loadMarkup).toContain('data-active-tab="load"');
@@ -269,19 +281,19 @@ describe("game-a interaction surfaces", () => {
     const surfaces = createGameASurfaces({
       assets: resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig),
       config: gameAUiConfig,
-      navigation: createNavigation({ activeOverlay: "vn-load" })
+      navigation: createNavigation({ pauseSection: "load" })
     });
     const SaveLoadSurface = surfaces.SaveLoadOverlay;
-    const markup = renderToStaticMarkup(
-      <SaveLoadSurface
-        actions={createSaveLoadActions()}
-        model={createSaveLoadModel("load", { pendingLoad: true })}
-      />
+    const markup = renderGameAPauseMarkup(
+      surfaces,
+      "load",
+      <SaveLoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("load", { pendingLoad: true })} />,
+      true
     );
 
     expect(markup).toContain('data-testid="load-confirmation"');
     expect(markup).toMatch(/data-testid="pause-tab-settings"[^>]*disabled=""/);
-    expect(markup).toMatch(/data-testid="save-load-overlay-close"[^>]*disabled=""/);
+    expect(markup).toMatch(/data-testid="pause-surface-close"[^>]*disabled=""/);
     expect(markup).toMatch(/data-testid="pause-return-title"[^>]*disabled=""/);
     expect(markup.indexOf('data-testid="load-confirm"')).toBeLessThan(markup.indexOf('data-testid="load-cancel"'));
   });
@@ -290,10 +302,10 @@ describe("game-a interaction surfaces", () => {
     const surfaces = createGameASurfaces({
       assets: resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig),
       config: gameAUiConfig,
-      navigation: createNavigation({ activeOverlay: "vn-settings" })
+      navigation: createNavigation({ pauseSection: "settings" })
     });
     const SettingsSurface = surfaces.SettingsOverlay;
-    const markup = renderToStaticMarkup(<SettingsSurface actions={createSettingsActions()} model={createSettingsModel()} />);
+    const markup = renderGameAPauseMarkup(surfaces, "settings", <SettingsSurface actions={createSettingsActions()} model={createSettingsModel()} />);
 
     expect(markup).toContain('data-testid="settings-overlay"');
     expect(markup).toContain('class="game-a-pause-screen"');
@@ -402,7 +414,7 @@ describe("game-a interaction surfaces", () => {
     const surfaces = createGameASurfaces({
       assets: resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig),
       config: gameAUiConfig,
-      navigation: createNavigation({ activeOverlay: "title-load" })
+      navigation: createNavigation({})
     });
     const SaveLoadSurface = surfaces.SaveLoadOverlay;
     const markup = renderToStaticMarkup(<SaveLoadSurface actions={createSaveLoadActions()} model={createSaveLoadModel("load")} />);
@@ -441,7 +453,7 @@ function createCommandBarModel(): VnCommandBarViewModel {
       canLoad: true,
       canOpenSettings: true,
       canOpenBacklog: true,
-      canOpenPauseMenu: true,
+      canOpenPause: true,
       canAuto: true,
       canSkip: true,
       canReturnTitle: true
@@ -463,6 +475,7 @@ function createCommandBarModel(): VnCommandBarViewModel {
 function createBacklogModel(): BacklogOverlayViewModel {
   return {
     visible: true,
+    placement: "pause",
     entries: [
       { speaker: "M", text: "You were right." },
       { speaker: "Y", text: "Then we keep looking." }
@@ -484,6 +497,7 @@ function createSaveLoadModel(
   };
   return {
     visible: true,
+    placement: "pause",
     mode,
     slotIds: Array.from({ length: 40 }, (_, index) => `slot:game-a:${index + 1}`),
     slots: [filledSlot],
@@ -510,6 +524,7 @@ function createSaveLoadActions() {
 function createSettingsModel(): SettingsOverlayViewModel {
   return {
     visible: true,
+    placement: "pause",
     settings: createDefaultSettingsSnapshot()
   };
 }
@@ -520,6 +535,23 @@ function createSettingsActions() {
     patchSettings: vi.fn(),
     resetSettings: vi.fn()
   };
+}
+
+function renderGameAPauseMarkup(
+  surfaces: ReturnType<typeof createGameASurfaces>,
+  activeSection: GamePauseSection,
+  children: ReactNode,
+  navigationLocked = false
+) {
+  const PauseSurface = surfaces.PauseSurface;
+  return renderToStaticMarkup(
+    <PauseSurface
+      actions={{ close: vi.fn(), dispatch: vi.fn() }}
+      model={{ activeSection, capabilities: createNavigation({}).capabilities, navigationLocked }}
+    >
+      {children}
+    </PauseSurface>
+  );
 }
 
 function createSettingsContentElement(
@@ -539,21 +571,21 @@ function createSettingsContentElement(
 }
 
 function createNavigation({
-  activeOverlay,
+  pauseSection,
   dispatch = vi.fn()
 }: {
-  activeOverlay?: GameOverlayKind | undefined;
+  pauseSection?: GameASurfaceNavigation["pauseSection"];
   dispatch?: GameASurfaceNavigation["dispatch"];
 }): GameASurfaceNavigation {
   return {
-    activeOverlay,
+    pauseSection,
     capabilities: {
       canStartNewGame: false,
       canSave: true,
       canLoad: true,
       canOpenSettings: true,
       canOpenBacklog: true,
-      canOpenPauseMenu: true,
+      canOpenPause: true,
       canAuto: true,
       canSkip: true,
       canReturnTitle: true

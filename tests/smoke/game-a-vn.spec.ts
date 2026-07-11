@@ -45,14 +45,22 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("vn-command-save")).toBeEnabled();
 
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("pause-menu-overlay")).toBeVisible();
+  await expect(page.getByTestId("pause-surface")).toBeVisible();
+  await expect(page.getByTestId("pause-surface")).toHaveAttribute("data-active-tab", "backlog");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
+  await expect(page.getByTestId("vn-choice-overlay")).toHaveCount(0);
+  await expect(page.getByTestId("vn-command-bar")).toHaveCount(0);
+  await expectPauseToCoverPlayfield(page);
   await page.screenshot({ path: "test-results/game-a-pause.png", fullPage: true });
-  await clickByTestId(page, "pause-log");
-  await expect(page.getByTestId("backlog-overlay")).toHaveAttribute("data-active-tab", "backlog");
-  await clickByTestId(page, "backlog-overlay-close");
-  await expect(page.getByTestId("pause-menu-overlay")).toBeVisible();
-  await clickByTestId(page, "pause-menu-overlay-close");
+  await clickByTestId(page, "pause-tab-save");
+  await expect(page.getByTestId("pause-surface")).toHaveAttribute("data-active-tab", "save");
+  await clickByTestId(page, "pause-tab-load");
+  await expect(page.getByTestId("pause-surface")).toHaveAttribute("data-active-tab", "load");
+  await clickByTestId(page, "pause-surface-close");
+  await expect(page.getByTestId("pause-surface")).toHaveCount(0);
   await expect(page.getByTestId("game-a-mode")).toHaveText("视觉小说");
+  await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
+  await expect(page.getByTestId("vn-command-bar")).toBeVisible();
 
   await clickByTestId(page, "vn-command-quick-save");
   await expect(page.getByTestId("vn-command-quick-load")).toBeEnabled();
@@ -62,18 +70,23 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("vn-command-save")).toBeEnabled();
 
   await clickByTestId(page, "vn-command-save");
-  await expect(page.getByTestId("save-load-overlay")).toHaveAttribute("data-active-tab", "save");
+  await expect(page.getByTestId("pause-surface")).toHaveAttribute("data-active-tab", "save");
   await expect(page.getByTestId("save-slot-1")).toBeEnabled();
   await clickByTestId(page, "save-slot-1");
   await expect(page.getByTestId("save-slot-1")).toContainText("CHECKPOINT SMOKE UI");
   await page.screenshot({ path: "test-results/game-a-save.png", fullPage: true });
-  await clickByTestId(page, "save-load-overlay-close");
+  await clickByTestId(page, "pause-surface-close");
   await clickByTestId(page, "vn-command-load");
-  await expect(page.getByTestId("save-load-overlay")).toHaveAttribute("data-active-tab", "load");
+  await expect(page.getByTestId("pause-surface")).toHaveAttribute("data-active-tab", "load");
   await expect(page.getByTestId("save-slot-1")).toBeEnabled();
   await clickByTestId(page, "save-slot-1");
   await expect(page.getByTestId("load-confirmation")).toBeVisible();
   await page.screenshot({ path: "test-results/game-a-save-load.png", fullPage: true });
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("load-confirmation")).toHaveCount(0);
+  await expect(page.getByTestId("pause-surface")).toHaveAttribute("data-active-tab", "load");
+  await clickByTestId(page, "save-slot-1");
+  await expect(page.getByTestId("load-confirmation")).toBeVisible();
   await clickByTestId(page, "load-confirm");
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT SMOKE UI");
 
@@ -101,7 +114,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT SMOKE MOVIE");
 
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("pause-menu-overlay")).toBeVisible();
+  await expect(page.getByTestId("backlog-overlay")).toBeVisible();
   await clickByTestId(page, "pause-return-title");
   await expect(page.getByTestId("game-a-mode")).toHaveText("标题");
   await expect(page.getByTestId("title-surface")).toBeVisible();
@@ -117,6 +130,19 @@ async function advanceUntilText(page: Page, text: string, maxSteps: number) {
     await page.waitForTimeout(160);
   }
   await expect(page.getByTestId("vn-dialog-text")).toContainText(text);
+}
+
+async function expectPauseToCoverPlayfield(page: Page) {
+  const [pauseBox, playfieldBox] = await Promise.all([
+    page.getByTestId("pause-surface").boundingBox(),
+    page.getByTestId("game-a-playfield").boundingBox()
+  ]);
+  expect(pauseBox).not.toBeNull();
+  expect(playfieldBox).not.toBeNull();
+  expect(Math.abs((pauseBox?.x ?? 0) - (playfieldBox?.x ?? 0))).toBeLessThanOrEqual(1);
+  expect(Math.abs((pauseBox?.y ?? 0) - (playfieldBox?.y ?? 0))).toBeLessThanOrEqual(1);
+  expect(Math.abs((pauseBox?.width ?? 0) - (playfieldBox?.width ?? 0))).toBeLessThanOrEqual(1);
+  expect(Math.abs((pauseBox?.height ?? 0) - (playfieldBox?.height ?? 0))).toBeLessThanOrEqual(1);
 }
 
 async function advanceVn(page: Page) {

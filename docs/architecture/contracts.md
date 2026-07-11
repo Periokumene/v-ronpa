@@ -32,6 +32,8 @@ The change record and supersession scope are defined by
 
 ## Flow and overlays
 
-Save operations are UI operation kinds, not root game modes. `pause-menu` is
-the pause root; backlog/save/load/settings are
-nested shared sections. Unused confirmation overlay kinds are not public contract.
+Save operations are UI operation kinds, not root game modes. Backlog, save,
+load, and settings are sibling `GamePauseSection` tabs owned by the paused flow
+state; switching tabs replaces `pauseSection` and never creates history.
+`GameOverlayKind` is reserved for independent title load/settings overlays.
+Unused confirmation overlay kinds are not public contract.

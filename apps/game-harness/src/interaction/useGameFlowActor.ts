@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { GameOverlayKind, GameUiAction } from "@v-ronpa/contracts";
+import type { GameOverlayKind, GamePauseSection, GameUiAction } from "@v-ronpa/contracts";
 import {
   createGameFlowSnapshot,
   deriveGameInteractionState,
@@ -27,27 +27,27 @@ export function useGameFlowActor() {
 
   const flow = createGameFlowSnapshot(snapshot.value, snapshot.context);
   const defaultInteraction = deriveGameInteractionState({ flow, vn: inactiveVnFacts });
-  const activeOverlay = flow.overlayStack.at(-1);
   const base = {
-    activeOverlay,
+    activeOverlay: flow.activeOverlay,
+    pauseSection: flow.pauseSection,
     capabilities: defaultInteraction.capabilities,
     context: defaultInteraction.context,
     mode: flow.mode,
-    overlayStack: flow.overlayStack,
     send,
     openOverlay(overlay: GameOverlayKind) {
-      if (overlay === "pause-menu") send({ type: "PAUSE" });
-      else send({ type: "OPEN_OVERLAY", overlay });
+      send({ type: "OPEN_OVERLAY", overlay });
     },
-    closeTopOverlay() {
-      send({ type: "POP_OVERLAY" });
-    },
-    closeAllOverlays() {
+    closeOverlay() {
       send({ type: "CLOSE_OVERLAY" });
+    },
+    openPauseSection(section: GamePauseSection) {
+      send({ type: "OPEN_PAUSE", section });
+    },
+    resumeFromPause() {
+      send({ type: "RESUME" });
     },
     dispatchAction(action: GameUiAction) {
       if (action === "new-game") send({ type: "START_NEW_GAME", mode: "navi" });
-      if (action === "open-pause-menu") send({ type: "PAUSE" });
       if (action === "return-title") send({ type: "RETURN_TITLE" });
     }
   };

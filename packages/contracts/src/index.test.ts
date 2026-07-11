@@ -5,6 +5,7 @@ import {
   GameInteractionContextSchema,
   GameModeSchema,
   GameOverlayKindSchema,
+  GamePauseSectionSchema,
   GameUiActionSchema,
   InputBindingMapSchema,
   InputActionStateSchema,
@@ -864,7 +865,10 @@ describe("contracts", () => {
 
   it("validates game interaction shell contracts", () => {
     expect(GameModeSchema.parse("title")).toBe("title");
-    expect(GameOverlayKindSchema.parse("vn-save")).toBe("vn-save");
+    expect(GameOverlayKindSchema.parse("title-load")).toBe("title-load");
+    expect(GamePauseSectionSchema.parse("save")).toBe("save");
+    expect(() => GameOverlayKindSchema.parse("vn-save")).toThrow();
+    expect(() => GameOverlayKindSchema.parse("pause-menu")).toThrow();
     expect(GameUiActionSchema.parse("open-backlog")).toBe("open-backlog");
     expect(GameUiActionSchema.parse("quick-save")).toBe("quick-save");
     expect(GameUiActionSchema.parse("quick-load")).toBe("quick-load");
@@ -873,7 +877,7 @@ describe("contracts", () => {
     expect(
       GameInteractionContextSchema.parse({
         mode: "navi",
-        overlayStack: ["vn-backlog"],
+        pauseSection: "backlog",
         naviSubstate: "vn2d-overlay",
         inputLock: "dialog",
         hasActiveStory: true,
@@ -882,7 +886,7 @@ describe("contracts", () => {
       })
     ).toMatchObject({
       mode: "navi",
-      overlayStack: ["vn-backlog"],
+      pauseSection: "backlog",
       hasActiveStory: true,
       storyEnded: false
     });
@@ -897,8 +901,9 @@ describe("contracts", () => {
       canSave: true,
       canLoad: true,
       canOpenSettings: true,
-      canOpenPauseMenu: false
+      canOpenPause: false
     });
+    expect(() => GameInteractionContextSchema.parse({ mode: "vn", overlayStack: ["vn-backlog"] })).toThrow();
     expect(InteractionCapabilitySnapshotSchema.parse({ canBack: true })).not.toHaveProperty("canBack");
     expect(InteractionCapabilitySnapshotSchema.parse({ canQuickSave: true })).not.toHaveProperty("canQuickSave");
 

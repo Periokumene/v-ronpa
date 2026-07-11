@@ -2,11 +2,12 @@ import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { createInitialUiRuntimeState, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
 import type { VnRuntimeShellPort } from "@v-ronpa/app-vn-runtime";
-import { createDefaultSettingsSnapshot, type GameOverlayKind, type SaveSlotSummary, type StoryChoiceOption } from "@v-ronpa/contracts";
+import { createDefaultSettingsSnapshot, type GameOverlayKind, type GamePauseSection, type SaveSlotSummary, type StoryChoiceOption } from "@v-ronpa/contracts";
 import {
   createGameInteractionOverlayActions,
   defaultGameInteractionShellSurfaces,
   renderGameInteractionOverlaySurface,
+  renderGameInteractionPauseSurface,
   resolveGameInteractionShellSurfaces,
   shouldRenderVnAdvanceHitPlane,
   type VnAdvanceHitPlaneInput
@@ -18,8 +19,6 @@ import {
   type BacklogOverlayViewModel,
   type GameFlowShellAdapter,
   type GameInteractionShellSurfaces,
-  type PauseMenuOverlayActions,
-  type PauseMenuOverlayViewModel,
   type SaveLoadOverlayActions,
   type SaveLoadOverlayViewModel,
   type SurfaceSlotProps,
@@ -135,6 +134,25 @@ describe("GameInteractionShell view models", () => {
     expect(models.commandBar).toBeUndefined();
   });
 
+  it("omits playable dialog, choices, and command surfaces while paused without changing runtime state", () => {
+    const runtime = createRuntime({ pendingChoices: [{ id: "choice:inspect", text: "Inspect", enabled: true }] });
+
+    const pausedModels = createGameInteractionShellViewModels({
+      flow: createFlow({ mode: "paused", pauseSection: "backlog" }),
+      runtime
+    });
+
+    expect(pausedModels.dialog).toBeUndefined();
+    expect(pausedModels.choices).toBeUndefined();
+    expect(pausedModels.commandBar).toBeUndefined();
+    expect(pausedModels.backlog).toMatchObject({ visible: true, placement: "pause" });
+
+    const resumedModels = createGameInteractionShellViewModels({ flow: createFlow({ mode: "vn" }), runtime });
+    expect(resumedModels.dialog).toMatchObject({ visible: true, state: "choices" });
+    expect(resumedModels.choices).toMatchObject({ visible: true });
+    expect(resumedModels.commandBar).toMatchObject({ visible: true });
+  });
+
   it("mounts dialog presentation before the first story line so showUI fade can render", () => {
     const showingBeforeLine = createRuntime({
       hasCurrentLine: false,
@@ -173,19 +191,13 @@ describe("GameInteractionShell view models", () => {
 
     expect(
       createGameInteractionShellViewModels({
-        flow: createFlow({ mode: "vn", activeOverlay: "vn-backlog" }),
+        flow: createFlow({ mode: "paused", pauseSection: "backlog" }),
         runtime
       }).backlog
     ).toMatchObject({ visible: true, entries: [{ text: "Earlier line" }] });
     expect(
       createGameInteractionShellViewModels({
-        flow: createFlow({ mode: "vn", activeOverlay: "pause-menu" }),
-        runtime
-      }).pauseMenu
-    ).toMatchObject({ visible: true, capabilities: { canSave: true } });
-    expect(
-      createGameInteractionShellViewModels({
-        flow: createFlow({ mode: "vn", activeOverlay: "vn-load" }),
+        flow: createFlow({ mode: "paused", pauseSection: "load" }),
         overlayModels: {
           saveLoad: { mode: "load", canSave: false, pendingLoadSlot: slot, slotIds: ["slot:1"], slots: [slot] }
         },
@@ -193,6 +205,7 @@ describe("GameInteractionShell view models", () => {
       }).saveLoad
     ).toEqual({
       visible: true,
+      placement: "pause",
       mode: "load",
       canSave: false,
       pendingLoadSlot: slot,
@@ -209,7 +222,7 @@ describe("GameInteractionShell view models", () => {
         overlayModels: { settings },
         runtime
       }).settings
-    ).toEqual({ visible: true, settings });
+    ).toEqual({ visible: true, placement: "overlay", settings });
   });
 
   it("resolves partial custom surfaces with default fallback per slot", () => {
@@ -223,14 +236,14 @@ describe("GameInteractionShell view models", () => {
 
   it("selects overlay surface slots inside the shell and binds default plus app actions", () => {
     const surfaces = createNoopSurfaces();
-    const closeTopOverlay = vi.fn();
-    const dispatchUiAction = vi.fn();
+    const close = vi.fn();
     const save = vi.fn();
     const requestLoad = vi.fn();
     const confirmLoad = vi.fn();
     const cancelLoad = vi.fn();
     const saveLoadModel: SaveLoadOverlayViewModel = {
       visible: true,
+      placement: "overlay",
       mode: "load",
       canSave: false,
       pendingLoadSlot: undefined,
@@ -242,12 +255,11 @@ describe("GameInteractionShell view models", () => {
       lastError: undefined
     };
     const actions = createGameInteractionOverlayActions({
-      closeTopOverlay,
-      dispatchUiAction,
+      close,
       overlayActions: {
         saveLoad: {
           cancelLoad,
-          close: closeTopOverlay,
+          close,
           confirmLoad,
           loadPreviews: vi.fn(),
           requestLoad,
@@ -259,7 +271,7 @@ describe("GameInteractionShell view models", () => {
     const saveLoadElement = renderGameInteractionOverlaySurface({
       actions,
       models: { saveLoad: saveLoadModel },
-      overlay: "vn-load",
+      overlay: "title-load",
       surfaces
     }) as ReactElement<SurfaceSlotProps<SaveLoadOverlayViewModel, SaveLoadOverlayActions>>;
     expect(saveLoadElement.type).toBe(surfaces.SaveLoadOverlay);
@@ -267,27 +279,16 @@ describe("GameInteractionShell view models", () => {
     saveLoadElement.props.actions.confirmLoad();
     expect(confirmLoad).toHaveBeenCalledOnce();
 
-    const backlogModel: BacklogOverlayViewModel = { visible: true, entries: [] };
-    const backlogElement = renderGameInteractionOverlaySurface({
+    const backlogModel: BacklogOverlayViewModel = { visible: true, placement: "pause", entries: [] };
+    const backlogElement = renderGameInteractionPauseSurface({
       actions,
       models: { backlog: backlogModel },
-      overlay: "vn-backlog",
+      section: "backlog",
       surfaces
     }) as ReactElement<SurfaceSlotProps<BacklogOverlayViewModel, BacklogOverlayActions>>;
     expect(backlogElement.type).toBe(surfaces.BacklogOverlay);
     backlogElement.props.actions.close();
-    expect(closeTopOverlay).toHaveBeenCalledOnce();
-
-    const pauseModel: PauseMenuOverlayViewModel = { visible: true, capabilities: createFlow({ mode: "vn" }).capabilities };
-    const pauseElement = renderGameInteractionOverlaySurface({
-      actions,
-      models: { pauseMenu: pauseModel },
-      overlay: "pause-menu",
-      surfaces
-    }) as ReactElement<SurfaceSlotProps<PauseMenuOverlayViewModel, PauseMenuOverlayActions>>;
-    expect(pauseElement.type).toBe(surfaces.PauseMenuOverlay);
-    pauseElement.props.actions.dispatch("open-settings");
-    expect(dispatchUiAction).toHaveBeenCalledWith("open-settings");
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it("keeps active command toggles enabled so they can be turned off", () => {
@@ -324,13 +325,16 @@ describe("GameInteractionShell view models", () => {
 
 function createFlow({
   activeOverlay,
+  pauseSection,
   mode
 }: {
   activeOverlay?: GameOverlayKind;
+  pauseSection?: GamePauseSection;
   mode: GameFlowShellAdapter["mode"];
-}): Pick<GameFlowShellAdapter, "activeOverlay" | "capabilities" | "mode"> {
+}): Pick<GameFlowShellAdapter, "activeOverlay" | "pauseSection" | "capabilities" | "mode"> {
   return {
     activeOverlay,
+    pauseSection,
     mode,
     capabilities: {
       canStartNewGame: mode === "title",
@@ -338,7 +342,7 @@ function createFlow({
       canLoad: true,
       canOpenSettings: true,
       canOpenBacklog: true,
-      canOpenPauseMenu: true,
+      canOpenPause: true,
       canAuto: true,
       canSkip: true,
       canReturnTitle: mode !== "title"
@@ -353,7 +357,7 @@ function createNoopSurfaces(): GameInteractionShellSurfaces {
     CommandBar: () => null,
     Dialog: () => null,
     InputPrompt: () => null,
-    PauseMenuOverlay: () => null,
+    PauseSurface: ({ children }) => children,
     SaveLoadOverlay: () => null,
     SettingsOverlay: () => null,
     Title: () => null,

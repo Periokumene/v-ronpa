@@ -1,7 +1,8 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type {
   GameMode,
   GameOverlayKind,
+  GamePauseSection,
   GameUiAction,
   InteractionCapabilitySnapshot,
   NaviSubstate,
@@ -24,9 +25,12 @@ import { selectCurrentStoryLine } from "@v-ronpa/story-engine";
 
 export interface GameFlowShellAdapter {
   activeOverlay: GameOverlayKind | undefined;
+  pauseSection: GamePauseSection | undefined;
   capabilities: InteractionCapabilitySnapshot;
   mode: GameMode;
-  closeTopOverlay(): void;
+  closeOverlay(): void;
+  openPauseSection(section: GamePauseSection): void;
+  resumeFromPause(): void;
   send(event: { type: string; [key: string]: unknown }): void;
 }
 
@@ -43,6 +47,21 @@ export interface SurfaceSlotProps<TModel, TActions = Record<string, never>> {
 
 export type SurfaceSlotComponent<TModel, TActions = Record<string, never>> = ComponentType<
   SurfaceSlotProps<TModel, TActions>
+>;
+
+export interface PauseSurfaceViewModel {
+  activeSection: GamePauseSection;
+  capabilities: InteractionCapabilitySnapshot;
+  navigationLocked: boolean;
+}
+
+export interface PauseSurfaceActions {
+  close(): void;
+  dispatch(action: GameUiAction): void;
+}
+
+export type PauseSurfaceSlotComponent = ComponentType<
+  SurfaceSlotProps<PauseSurfaceViewModel, PauseSurfaceActions> & { children?: ReactNode }
 >;
 
 export type VnDialogState = "line" | "choices" | "ended";
@@ -121,6 +140,7 @@ export interface RuntimeInputPromptActions {
 
 export interface BacklogOverlayViewModel {
   visible: boolean;
+  placement: "pause";
   entries: StoryBacklogEntry[];
 }
 
@@ -130,6 +150,7 @@ export interface BacklogOverlayActions {
 
 export interface SaveLoadOverlayViewModel {
   visible: boolean;
+  placement: "overlay" | "pause";
   mode: "save" | "load";
   slotIds: string[];
   slots: SaveSlotSummary[];
@@ -179,6 +200,7 @@ export interface SaveLoadOverlayActions {
 
 export interface SettingsOverlayViewModel {
   visible: boolean;
+  placement: "overlay" | "pause";
   settings: SettingsSnapshot;
 }
 
@@ -188,21 +210,10 @@ export interface SettingsOverlayActions {
   close(): void;
 }
 
-export interface PauseMenuOverlayViewModel {
-  visible: boolean;
-  capabilities: InteractionCapabilitySnapshot;
-}
-
-export interface PauseMenuOverlayActions {
-  dispatch(action: GameUiAction): void;
-  close(): void;
-}
-
 export interface GameInteractionOverlayActions {
   backlog?: BacklogOverlayActions | undefined;
   saveLoad?: SaveLoadOverlayActions | undefined;
   settings?: SettingsOverlayActions | undefined;
-  pauseMenu?: PauseMenuOverlayActions | undefined;
 }
 
 export interface GameInteractionShellViewModels {
@@ -215,12 +226,11 @@ export interface GameInteractionShellViewModels {
   backlog?: BacklogOverlayViewModel | undefined;
   saveLoad?: SaveLoadOverlayViewModel | undefined;
   settings?: SettingsOverlayViewModel | undefined;
-  pauseMenu?: PauseMenuOverlayViewModel | undefined;
 }
 
 export type SaveLoadOverlayInputModel = Omit<
   SaveLoadOverlayViewModel,
-  "visible" | "slotPreviewsById" | "busy" | "activeOperation" | "lastError"
+  "visible" | "placement" | "slotPreviewsById" | "busy" | "activeOperation" | "lastError"
 > &
   Partial<Pick<SaveLoadOverlayViewModel, "slotPreviewsById" | "busy" | "activeOperation" | "lastError">>;
 
@@ -236,16 +246,16 @@ export interface GameInteractionShellSurfaces {
   Title: SurfaceSlotComponent<TitleViewModel, TitleActions>;
   ToastLayer: SurfaceSlotComponent<RuntimeToastLayerViewModel, RuntimeToastActions>;
   InputPrompt: SurfaceSlotComponent<RuntimeInputPromptViewModel, RuntimeInputPromptActions>;
+  PauseSurface: PauseSurfaceSlotComponent;
   BacklogOverlay: SurfaceSlotComponent<BacklogOverlayViewModel, BacklogOverlayActions>;
   SaveLoadOverlay: SurfaceSlotComponent<SaveLoadOverlayViewModel, SaveLoadOverlayActions>;
   SettingsOverlay: SurfaceSlotComponent<SettingsOverlayViewModel, SettingsOverlayActions>;
-  PauseMenuOverlay: SurfaceSlotComponent<PauseMenuOverlayViewModel, PauseMenuOverlayActions>;
 }
 
 export interface CreateGameInteractionShellViewModelsInput {
   commandAvailability?: GameCommandAvailability | undefined;
   dialogDisplay?: VnDialogDisplaySettings | undefined;
-  flow: Pick<GameFlowShellAdapter, "activeOverlay" | "capabilities" | "mode">;
+  flow: Pick<GameFlowShellAdapter, "activeOverlay" | "pauseSection" | "capabilities" | "mode">;
   formatStorySpeaker?: ((speaker: string) => string) | undefined;
   overlayModels?: GameInteractionOverlayViewModelInputs | undefined;
   host?: { naviSubstate?: NaviSubstate | undefined } | undefined;
@@ -277,7 +287,8 @@ export function createGameInteractionShellViewModels({
   const dialogPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "dialog");
   const commandBarPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "commandBar");
   const toastLayerPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "toastLayer");
-  const showDialog = runtime.storyRuntime.active && flow.mode !== "title" && dialogPresentation.mounted;
+  const showPlayableUi = flow.mode !== "title" && flow.mode !== "paused";
+  const showDialog = runtime.storyRuntime.active && showPlayableUi && dialogPresentation.mounted;
   const currentLine =
     showDialog ? selectCurrentStoryLine(runtime.storyRuntime.state) : undefined;
   const storyHasChoices = runtime.storyRuntime.state.pendingChoices.length > 0;
@@ -288,7 +299,7 @@ export function createGameInteractionShellViewModels({
     !runtime.storyRuntime.state.ended &&
     storyHasChoices;
   const showCommandBar =
-    runtime.storyRuntime.active && flow.mode !== "title" && commandBarPresentation.mounted;
+    runtime.storyRuntime.active && showPlayableUi && commandBarPresentation.mounted;
 
   return {
     ...(showDialog
@@ -335,14 +346,15 @@ export function createGameInteractionShellViewModels({
     ...(runtime.uiRuntime.state.inputPrompt
       ? { inputPrompt: { visible: true, prompt: runtime.uiRuntime.state.inputPrompt } }
       : {}),
-    ...(flow.activeOverlay === "vn-backlog"
-      ? { backlog: { visible: true, entries: runtime.storyRuntime.state.backlog } }
+    ...(flow.pauseSection === "backlog"
+      ? { backlog: { visible: true, placement: "pause", entries: runtime.storyRuntime.state.backlog } }
       : {}),
-    ...((flow.activeOverlay === "vn-save" || flow.activeOverlay === "vn-load" || flow.activeOverlay === "title-load") &&
+    ...((flow.pauseSection === "save" || flow.pauseSection === "load" || flow.activeOverlay === "title-load") &&
     overlayModels?.saveLoad
       ? {
           saveLoad: {
             ...overlayModels.saveLoad,
+            placement: flow.activeOverlay === "title-load" ? "overlay" : "pause",
             slotPreviewsById: overlayModels.saveLoad.slotPreviewsById ?? {},
             busy: overlayModels.saveLoad.busy ?? false,
             activeOperation: overlayModels.saveLoad.activeOperation,
@@ -351,11 +363,8 @@ export function createGameInteractionShellViewModels({
           }
         }
       : {}),
-    ...((flow.activeOverlay === "title-settings" || flow.activeOverlay === "vn-settings") && overlayModels?.settings
-      ? { settings: { visible: true, settings: overlayModels.settings } }
-      : {}),
-    ...(flow.activeOverlay === "pause-menu"
-      ? { pauseMenu: { visible: true, capabilities: flow.capabilities } }
+    ...((flow.activeOverlay === "title-settings" || flow.pauseSection === "settings") && overlayModels?.settings
+      ? { settings: { visible: true, placement: flow.activeOverlay === "title-settings" ? "overlay" : "pause", settings: overlayModels.settings } }
       : {})
   };
 }

@@ -8,7 +8,7 @@ lifecycle, and asset registration single-authority boundaries.
 ## Contract And Port Changes
 
 - Remove the unused `saving` game mode and unused confirmation overlay kinds.
-- Flow owns mode, overlays, and pause history; interaction context and
+- Flow owns mode, active title overlay, and one pause section; interaction context and
   capabilities are pure derived values rather than synchronized mutable state.
 - `app-vn-runtime` exports capability-scoped shell, presentation, lifecycle,
   diagnostics, and interaction-fact ports.
