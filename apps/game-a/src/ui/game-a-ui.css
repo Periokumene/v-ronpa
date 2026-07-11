@@ -1,10 +1,10 @@
 .game-a-playfield {
   --game-a-dialog-line: rgba(229, 234, 236, 0.74);
   --game-a-dialog-line-soft: rgba(229, 234, 236, 0.38);
-  --game-a-ui-mono-font: "Courier New", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --game-a-ui-rich-font:
     var(--v-ronpa-rich-font-font_fusion-pixel-zh-hans, sans-serif),
     sans-serif;
+  --game-a-ui-mono-font: var(--game-a-ui-rich-font);
 }
 
 .game-a-dialog-surface {
@@ -204,7 +204,7 @@
   border-radius: 0;
   background: transparent;
   color: rgba(239, 239, 239, 0.42);
-  font-family: "Courier New", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--game-a-ui-mono-font);
   font-size: clamp(12px, 1.05vw, 19px);
   line-height: 1;
   text-shadow: 0 0 1px rgba(255, 255, 255, 0.24);
