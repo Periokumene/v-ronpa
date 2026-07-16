@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .errors import ToolError
+from .layered_pack import DEFAULT_ANCHOR_BOTTOM_OFFSET, DEFAULT_REFERENCE_STAGE_HEIGHT
 from .pipeline import build_pipeline, list_runs, manifest_summary, prune_runs
 
 
@@ -20,6 +21,8 @@ def _main_parser() -> argparse.ArgumentParser:
     build.add_argument("input", type=Path)
     build.add_argument("--character-id", default="Alice")
     build.add_argument("--character-root", default="/MAIN")
+    build.add_argument("--reference-stage-height", type=float, default=DEFAULT_REFERENCE_STAGE_HEIGHT)
+    build.add_argument("--anchor-bottom-offset", type=float, default=DEFAULT_ANCHOR_BOTTOM_OFFSET)
 
     listing = subparsers.add_parser("list", help="List versioned build runs for one character.")
     listing.add_argument("--character-id", default="Alice")
@@ -35,7 +38,13 @@ def main() -> None:
     args = _main_parser().parse_args()
     try:
         if args.command == "build":
-            output = build_pipeline(args.input, args.character_id, args.character_root)
+            output = build_pipeline(
+                args.input,
+                args.character_id,
+                args.character_root,
+                reference_stage_height=args.reference_stage_height,
+                anchor_bottom_offset=args.anchor_bottom_offset,
+            )
             print(manifest_summary(output))
         elif args.command == "list":
             print(json.dumps(list_runs(args.character_id), ensure_ascii=False, indent=2))

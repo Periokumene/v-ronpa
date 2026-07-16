@@ -24,6 +24,15 @@ uv run csp-char-unpack build /absolute/path/alice.clip \
   --character-root /MAIN
 ```
 
+The generated render space uses two configurable pixel parameters:
+
+- `--reference-stage-height` defaults to `700` and sets `stageScale` to that value divided by the CSP canvas height.
+- `--anchor-bottom-offset` defaults to `100` and moves the character anchor upward from the exact `BODY` sprite's
+  alpha-bounds bottom. If no valid `BODY` sprite exists, the tool uses the bottom of the union of all sprite alpha bounds.
+
+The anchor X coordinate always uses the CSP canvas center. Positive anchor-bottom offsets move the anchor upward in the
+character-local coordinate system.
+
 The CLI has no output-directory option. Every invocation creates a new UTC timestamped run, including repeated builds of
 identical input. The input archive is content-addressed and reused.
 

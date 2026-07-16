@@ -17,7 +17,7 @@ describe("game-a content manifest", () => {
     expect(new Set(gameAVnEntry.assetRefs.map((ref) => ref.id))).toEqual(
       new Set([
         "alice",
-        "bg:rain-street",
+        "bg:home-outside",
         "bgm:dead-fish-riffle",
         "sfx:gentle-rain-loop",
         "sfx:glug-glug-glug",
@@ -49,7 +49,7 @@ describe("game-a content manifest", () => {
     expect(registry.url({ id: "bg:game-a-snow-outskirts-frame", kind: "background" })).toBe(
       "/game-a/backgrounds/game-a-snow-outskirts-frame.png"
     );
-    expect(registry.url({ id: "bg:rain-street", kind: "background" })).toBe("/game-a/backgrounds/rain-street.png");
+    expect(registry.url({ id: "bg:home-outside", kind: "background" })).toBe("/game-a/backgrounds/home-outside.png");
     expect(registry.url({ id: "bgm:dead-fish-riffle", kind: "bgm" })).toBe(
       "/game-a/media/bgm/dead-fish-riffle.mp3"
     );

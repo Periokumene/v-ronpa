@@ -1,7 +1,92 @@
 {
   "tokens": {
+    "SourcePreview": [
+      "MAIN>BODY",
+      "MAIN/ArmR>0",
+      "MAIN/ArmL>0",
+      "MAIN/MOUTH>2",
+      "MAIN/EFFECT>2"
+    ],
     "Default": [
-      "Angle01/FullBody>FullBody"
+      "SourcePreview"
+    ],
+    "ArmR2": [
+      "MAIN/ArmR>2"
+    ],
+    "ArmR1": [
+      "MAIN/ArmR>1"
+    ],
+    "ArmR0": [
+      "MAIN/ArmR>0"
+    ],
+    "ArmL4": [
+      "MAIN/ArmL>4"
+    ],
+    "ArmL3": [
+      "MAIN/ArmL>3"
+    ],
+    "ArmL2": [
+      "MAIN/ArmL>2"
+    ],
+    "ArmL1": [
+      "MAIN/ArmL>1"
+    ],
+    "ArmL0": [
+      "MAIN/ArmL>0"
+    ],
+    "MOUTH6": [
+      "MAIN/MOUTH>6"
+    ],
+    "MOUTH5": [
+      "MAIN/MOUTH>5"
+    ],
+    "MOUTH4": [
+      "MAIN/MOUTH>4"
+    ],
+    "MOUTH3": [
+      "MAIN/MOUTH>3"
+    ],
+    "MOUTH2": [
+      "MAIN/MOUTH>2"
+    ],
+    "MOUTH1": [
+      "MAIN/MOUTH>1"
+    ],
+    "MOUTH0": [
+      "MAIN/MOUTH>0"
+    ],
+    "EYE5": [
+      "MAIN/EYE>5"
+    ],
+    "EYE4": [
+      "MAIN/EYE>4"
+    ],
+    "EYE3": [
+      "MAIN/EYE>3"
+    ],
+    "EYE2": [
+      "MAIN/EYE>2"
+    ],
+    "EYE1": [
+      "MAIN/EYE>1"
+    ],
+    "EYE0": [
+      "MAIN/EYE>0"
+    ],
+    "EFFECT2": [
+      "MAIN/EFFECT>2"
+    ],
+    "EFFECT1": [
+      "MAIN/EFFECT>1"
+    ],
+    "EFFECT0": [
+      "MAIN/EFFECT>0"
+    ],
+    "EYEOff": [
+      "MAIN/EYE-"
+    ],
+    "EFFECTOff": [
+      "MAIN/EFFECT-"
     ]
   }
 }

@@ -149,7 +149,37 @@ def test_builds_cropped_pack_with_default_and_builtin_tokens(tmp_path: Path) -> 
     metadata = json.loads((tmp_path / "assets/layers/MAIN/ArmL/0.json").read_text(encoding="utf-8"))
     assert metadata["localTransform"]["position"] == {"x": 20, "y": 80, "z": 0}
     assert Image.open(tmp_path / "assets/layers/MAIN/ArmL/0.png").size == (20, 30)
+    character = json.loads((tmp_path / "character.json").read_text(encoding="utf-8"))
+    assert character["renderSpace"] == {"stageScale": 7.0, "characterAnchor": [50.0, 160.0]}
     assert validate_pack(tmp_path) == "Validated V-Ronpa character pack 'Alice'."
+
+
+def test_render_parameters_and_all_sprite_bounds_fallback_are_applied(tmp_path: Path) -> None:
+    inspection = valid_inspection()
+    inspection.by_id["L0002"].layer.name = "TORSO"
+    result = build_layered_character_pack(
+        inspection,
+        tmp_path,
+        "Alice",
+        "/MAIN",
+        reference_stage_height=250,
+        anchor_bottom_offset=7,
+    )
+
+    character = json.loads((tmp_path / "character.json").read_text(encoding="utf-8"))
+    assert character["renderSpace"] == {"stageScale": 2.5, "characterAnchor": [50.0, 57.0]}
+    assert "MAIN>TORSO" in result.tokens["SourcePreview"]
+
+
+def test_rejects_invalid_render_parameters(tmp_path: Path) -> None:
+    with pytest.raises(ToolError, match="Reference stage height"):
+        build_layered_character_pack(
+            valid_inspection(), tmp_path, "Alice", "/MAIN", reference_stage_height=0
+        )
+    with pytest.raises(ToolError, match="Anchor bottom offset"):
+        build_layered_character_pack(
+            valid_inspection(), tmp_path, "Alice", "/MAIN", anchor_bottom_offset=-1
+        )
 
 
 def test_rejects_required_group_with_zero_or_multiple_visible_sprites() -> None:

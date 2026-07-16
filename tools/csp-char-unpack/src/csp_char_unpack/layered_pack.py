@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass
@@ -11,6 +12,8 @@ from .psd_report import PsdInspection, PsdNode
 from .util import write_json
 
 PRESET_VERSION = "v1"
+DEFAULT_REFERENCE_STAGE_HEIGHT = 700.0
+DEFAULT_ANCHOR_BOTTOM_OFFSET = 100.0
 ALIAS_GROUPS = frozenset({"ArmL", "ArmR", "MOUTH", "EYE", "EFFECT"})
 OPTIONAL_GROUPS = frozenset({"EYE", "EFFECT"})
 RESERVED_EXPRESSION_CHARACTERS = frozenset(">+-/\\")
@@ -257,12 +260,43 @@ def _preset_tokens(sprites: list[LeafSprite]) -> dict[str, list[str]]:
     return tokens
 
 
+def _union_bounds(bounds: list[tuple[int, int, int, int]]) -> tuple[int, int, int, int]:
+    return (
+        min(left for left, _top, _right, _bottom in bounds),
+        min(top for _left, top, _right, _bottom in bounds),
+        max(right for _left, _top, right, _bottom in bounds),
+        max(bottom for _left, _top, _right, bottom in bounds),
+    )
+
+
+def _character_anchor(
+    sprites_with_bounds: list[tuple[LeafSprite, tuple[int, int, int, int]]],
+    width: int,
+    height: int,
+    anchor_bottom_offset: float,
+) -> list[float]:
+    body_bounds = [bounds for sprite, bounds in sprites_with_bounds if sprite.layer == "BODY"]
+    anchor_bounds = _union_bounds(body_bounds or [bounds for _sprite, bounds in sprites_with_bounds])
+    return [width / 2, height - anchor_bounds[3] + anchor_bottom_offset]
+
+
+def _validate_render_parameters(reference_stage_height: float, anchor_bottom_offset: float) -> None:
+    if not math.isfinite(reference_stage_height) or reference_stage_height <= 0:
+        raise ToolError(f"Reference stage height must be a finite positive number, got {reference_stage_height}.")
+    if not math.isfinite(anchor_bottom_offset) or anchor_bottom_offset < 0:
+        raise ToolError(f"Anchor bottom offset must be a finite non-negative number, got {anchor_bottom_offset}.")
+
+
 def build_layered_character_pack(
     inspection: PsdInspection,
     output_root: Path,
     character_id: str,
     character_root: str,
+    *,
+    reference_stage_height: float = DEFAULT_REFERENCE_STAGE_HEIGHT,
+    anchor_bottom_offset: float = DEFAULT_ANCHOR_BOTTOM_OFFSET,
 ) -> LayeredPackResult:
+    _validate_render_parameters(reference_stage_height, anchor_bottom_offset)
     root, sprites = discover_leaf_sprites(inspection, character_root)
     width = int(inspection.psd.width)
     height = int(inspection.psd.height)
@@ -270,6 +304,7 @@ def build_layered_character_pack(
         raise ToolError(f"PSD canvas must be positive, got {width}x{height}.")
     groups: dict[str, dict[str, dict[str, dict[str, str]]]] = {}
     sprite_records: list[dict[str, Any]] = []
+    sprites_with_bounds: list[tuple[LeafSprite, tuple[int, int, int, int]]] = []
     warnings: list[str] = []
     descendants = {
         sprite.node.id: [node for node in inspection.nodes if sprite.node.id in node.ancestor_ids]
@@ -278,6 +313,7 @@ def build_layered_character_pack(
 
     for sprite in sprites:
         cropped, alpha_bbox = _composite_leaf(inspection, sprite)
+        sprites_with_bounds.append((sprite, alpha_bbox))
         asset_rel = Path("assets", "layers", *sprite.asset_components[:-1], f"{sprite.asset_components[-1]}.png")
         metadata_rel = Path("assets", "layers", *sprite.asset_components[:-1], f"{sprite.asset_components[-1]}.json")
         asset_path = output_root / asset_rel
@@ -320,7 +356,10 @@ def build_layered_character_pack(
     character = {
         "id": character_id,
         "defaultComposition": ["Default"],
-        "renderSpace": {"stageScale": 540 / height, "characterAnchor": [width / 2, 0]},
+        "renderSpace": {
+            "stageScale": reference_stage_height / height,
+            "characterAnchor": _character_anchor(sprites_with_bounds, width, height, anchor_bottom_offset),
+        },
     }
     write_json(output_root / "character.json", character)
     write_json(output_root / "layers.json", {"groups": groups})

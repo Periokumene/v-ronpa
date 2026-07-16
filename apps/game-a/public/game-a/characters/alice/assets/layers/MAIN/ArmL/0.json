@@ -1,17 +1,17 @@
 {
-  "sourcePath": "alice/Angle01/FullBody",
-  "drawOrder": 1,
+  "sourcePath": "alice/MAIN/ArmL/0",
+  "drawOrder": 2,
   "sprite": {
     "pivot": {
-      "x": 0.5,
-      "y": 0.5
+      "x": 0,
+      "y": 0
     },
-    "pixelsPerUnit": 64
+    "pixelsPerUnit": 1
   },
   "localTransform": {
     "position": {
-      "x": 0,
-      "y": 10.8203125,
+      "x": 449,
+      "y": 735,
       "z": 0
     },
     "scale": {

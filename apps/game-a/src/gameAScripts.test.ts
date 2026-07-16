@@ -10,7 +10,7 @@ describe("game-a nani scripts", () => {
   it("exposes the opening .nani source as the app runtime entry", () => {
     expect(gameAOpeningNaniSource.trim().length).toBeGreaterThan(0);
     expect(gameAOpeningNaniSource).toContain("#Start");
-    expect(gameAOpeningNaniSource).toContain("@char alice pos:50 time:0.3 wait!");
+    expect(gameAOpeningNaniSource).toContain("@char alice pos:50 scale:0.78,0.78,1 time:0.3 wait!");
     expect(gameAOpeningNaniSource).toContain("@sfx sfx:gentle-rain-loop group:rain loop:true volume:0.1");
     expect(gameAOpeningNaniSource).toContain("@stopSfx group:rain fade:0.8");
     expect(gameAOpeningNaniSource).not.toContain("CHECKPOINT");
@@ -40,11 +40,23 @@ describe("game-a nani scripts", () => {
           target: "alice",
           appearanceExpression: "",
           pos: [50, 0],
+          scale: [0.78, 0.78, 1],
           durationMs: 300,
           wait: true
         })
       })
     );
+    expect(
+      compiled.script.commands
+        .filter((command) => command.commandId === "char")
+        .map((command) => command.params.appearanceExpression)
+    ).toEqual([
+      "",
+      "EYE0,MOUTH0",
+      "EYE1,MOUTH3,ArmL2",
+      "EYE4,MOUTH5,ArmL4,ArmR2,EFFECT0",
+      "EYE2,MOUTH2,ArmL0,ArmR0,EFFECT2"
+    ]);
   });
 
   it("keeps smoke coverage in a separate test-only entry", () => {
@@ -70,7 +82,7 @@ describe("game-a nani scripts", () => {
     expect(collectRuntimeCommandAssetRefs(compiled.script.commands)).toEqual(
       expect.arrayContaining([
         { id: "alice", kind: "character-pack" },
-        { id: "bg:rain-street", kind: "background" },
+        { id: "bg:home-outside", kind: "background" },
         { id: "bgm:dead-fish-riffle", kind: "bgm" },
         { id: "sfx:gentle-rain-loop", kind: "sfx" },
         { id: "sfx:glug-glug-glug", kind: "sfx" },

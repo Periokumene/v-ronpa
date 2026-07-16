@@ -13,7 +13,13 @@ from typing import Any
 from .converter import UPSTREAM_COMMIT, ConversionOptions, convert_clip_to_psd
 from .csp_report import export_csp_report
 from .errors import ToolError
-from .layered_pack import PRESET_VERSION, LayeredPackResult, build_layered_character_pack
+from .layered_pack import (
+    DEFAULT_ANCHOR_BOTTOM_OFFSET,
+    DEFAULT_REFERENCE_STAGE_HEIGHT,
+    PRESET_VERSION,
+    LayeredPackResult,
+    build_layered_character_pack,
+)
 from .psd_report import inspect_psd, write_psd_report
 from .qa import generate_qa
 from .util import copy_if_needed, hash_file, publish_directory, write_json
@@ -76,6 +82,8 @@ def _base_manifest(
     character_root: str,
     run_id: str,
     created_at: datetime,
+    reference_stage_height: float,
+    anchor_bottom_offset: float,
 ) -> dict[str, Any]:
     stat = source.stat()
     return {
@@ -85,6 +93,10 @@ def _base_manifest(
         "characterId": character_id,
         "characterRoot": character_root,
         "preset": {"id": "v-ronpa-layered-character", "version": PRESET_VERSION},
+        "parameters": {
+            "referenceStageHeight": reference_stage_height,
+            "anchorBottomOffset": anchor_bottom_offset,
+        },
         "source": {
             "originalPath": str(source),
             "archivePath": str(cached_input),
@@ -171,6 +183,8 @@ def build_pipeline(
     character_id: str,
     character_root: str,
     *,
+    reference_stage_height: float = DEFAULT_REFERENCE_STAGE_HEIGHT,
+    anchor_bottom_offset: float = DEFAULT_ANCHOR_BOTTOM_OFFSET,
     _workspace_root: Path | None = None,
 ) -> Path:
     source = input_file.expanduser().resolve()
@@ -192,7 +206,17 @@ def build_pipeline(
     staging = Path(tempfile.mkdtemp(prefix=f".{run_id}.staging-", dir=outputs))
     reports = staging / "reports"
     reports.mkdir(parents=True, exist_ok=True)
-    base_manifest = _base_manifest(source, cached_input, digest, character_id, character_root, run_id, created_at)
+    base_manifest = _base_manifest(
+        source,
+        cached_input,
+        digest,
+        character_id,
+        character_root,
+        run_id,
+        created_at,
+        reference_stage_height,
+        anchor_bottom_offset,
+    )
     result: LayeredPackResult | None = None
     psd_report: dict[str, Any] | None = None
     warnings: list[Any] = []
@@ -221,7 +245,14 @@ def build_pipeline(
             if psd_report["diagnostics"]:
                 warnings.extend(psd_report["diagnostics"])
             pack_root = staging / "character" / character_id
-            result = build_layered_character_pack(inspection, pack_root, character_id, character_root)
+            result = build_layered_character_pack(
+                inspection,
+                pack_root,
+                character_id,
+                character_root,
+                reference_stage_height=reference_stage_height,
+                anchor_bottom_offset=anchor_bottom_offset,
+            )
             warnings.extend(result.warnings)
             schema_validation = validate_pack(pack_root)
             qa_metrics = generate_qa(inspection, csp_preview, pack_root, result, reports)

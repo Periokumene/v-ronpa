@@ -57,9 +57,9 @@ export const gameARuntimeAssets = [
       ]
     },
     {
-      "id": "bg:rain-street",
+      "id": "bg:home-outside",
       "kind": "background",
-      "optimizedUri": "/game-a/backgrounds/rain-street.png",
+      "optimizedUri": "/game-a/backgrounds/home-outside.png",
       "format": "png",
       "compression": [],
       "lods": [],
@@ -255,7 +255,7 @@ export const gameARuntimeAssetFragments = [pixiRuntimeAssetFragment] satisfies R
 
 export const gameAScriptMetadataByPath = {
     "game-a/opening.nani": {
-      "scriptRevision": "sha256:4ad6ef99e7d5ea3e6d43fb1e5fb4fd198ab4b80170e228d68156b43e08c0a61f",
+      "scriptRevision": "sha256:1231a838a1153b52ac5b3e4bfbb73af7e6d8c8c7ff57ae9041b1d0fd15c4a5ee",
       "assetRefs": [
         {
           "id": "alice",
@@ -263,7 +263,7 @@ export const gameAScriptMetadataByPath = {
           "tags": []
         },
         {
-          "id": "bg:rain-street",
+          "id": "bg:home-outside",
           "kind": "background",
           "tags": []
         },
