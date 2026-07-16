@@ -1,0 +1,38 @@
+[project]
+name = "csp-char-unpack"
+version = "0.2.0"
+description = "Isolated Clip Studio Paint to V-Ronpa layered-character validation pipeline"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "pillow==12.3.0",
+  "psd-tools[composite]==1.17.4",
+]
+
+[project.scripts]
+csp-char-unpack = "csp_char_unpack.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest==9.0.2",
+  "ruff==0.14.14",
+]
+
+[build-system]
+requires = ["hatchling==1.29.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/csp_char_unpack"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["third_party"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
