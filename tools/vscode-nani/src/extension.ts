@@ -4,21 +4,31 @@ import { computeNaniDiagnostics, type NaniDiagnostic } from "./diagnostics";
 import { getNaniHover } from "./hoverProvider";
 import { NANI_LANGUAGE_ID } from "./languageFacts";
 import type { NaniRange } from "./documentContext";
+import { NaniProjectAssetService } from "./projectAssetService";
 
 export function activate(context: vscode.ExtensionContext): void {
   const diagnostics = vscode.languages.createDiagnosticCollection(NANI_LANGUAGE_ID);
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  const output = vscode.window.createOutputChannel("V-Ronpa Nani");
+  const projectAssets = new NaniProjectAssetService(output);
 
-  context.subscriptions.push(diagnostics);
+  context.subscriptions.push(diagnostics, output, projectAssets);
+  context.subscriptions.push(
+    vscode.commands.registerCommand("v-ronpa-nani.refreshProjectAssets", () => {
+      projectAssets.refreshAll();
+      void vscode.window.showInformationMessage("V-Ronpa Nani project assets refreshed.");
+    })
+  );
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(
       { language: NANI_LANGUAGE_ID },
       {
-        provideCompletionItems(document, position) {
+        async provideCompletionItems(document, position) {
+          const assetIndex = await projectAssets.getIndex(document.uri);
           return getNaniCompletions(document.getText(), {
             line: position.line,
             character: position.character
-          }).map(toVscodeCompletion);
+          }, assetIndex).map(toVscodeCompletion);
         }
       },
       "@",
@@ -26,7 +36,9 @@ export function activate(context: vscode.ExtensionContext): void {
       ":",
       "#",
       "[",
-      "!"
+      "!",
+      ".",
+      ","
     )
   );
   context.subscriptions.push(
@@ -143,6 +155,8 @@ function completionKind(kind: NaniCompletionKind): vscode.CompletionItemKind {
       return vscode.CompletionItemKind.Reference;
     case "snippet":
       return vscode.CompletionItemKind.Snippet;
+    case "resource":
+      return vscode.CompletionItemKind.File;
   }
 }
 

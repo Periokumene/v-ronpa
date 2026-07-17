@@ -161,4 +161,46 @@ describe("diagnostics", () => {
 
     expect(diagnostics.filter((diagnostic) => diagnostic.source === "vscode-nani")).toEqual([]);
   });
+
+  it("reports an unknown colon parameter that the compiler silently promotes and ignores", () => {
+    const source = "@flash color:#ffffff time:0.05 wait!";
+    const diagnostics = computeNaniDiagnostics(source, "ignored-primary.nani");
+
+    expect(diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "vscode-nani",
+          code: "ignored-promoted-primary",
+          severity: "warning",
+          message: expect.stringContaining("time:0.05 would be ignored"),
+          range: {
+            start: { line: 0, character: source.indexOf("time:0.05") },
+            end: { line: 0, character: source.indexOf("time:0.05") + "time:0.05".length }
+          }
+        })
+      ])
+    );
+  });
+
+  it("does not report colon-form resource IDs consumed as command primary values", () => {
+    for (const source of ["@bgm bgm:main", "@sfx sfx:door", "@back bg:room"]) {
+      const diagnostics = computeNaniDiagnostics(source, "resource-primary.nani");
+      expect(diagnostics.filter((diagnostic) => diagnostic.code === "ignored-promoted-primary")).toEqual([]);
+    }
+  });
+
+  it("retains shared diagnostics for handwritten declared-only commands and unconsumed params", () => {
+    const diagnostics = computeNaniDiagnostics(["@voice voice:line", "@sfx sfx:door wait!"].join("\n"), "compat.nani");
+
+    expect(diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: "nani-compiler", code: "declared-only-command" }),
+        expect.objectContaining({
+          source: "nani-compiler",
+          code: "unsupported-command-param",
+          message: expect.stringContaining("@sfx accepts wait!:boolean")
+        })
+      ])
+    );
+  });
 });

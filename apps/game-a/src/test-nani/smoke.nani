@@ -28,7 +28,7 @@ Narrator: CHECKPOINT SMOKE SAVE LOAD SETTINGS - use shared command bar and pause
 @inback bg:game-a-snow-outskirts-frame effect:fade time:0.05
 @char alice pos:50 time:0.05 wait!
 @rain power:0.5 wind:-1 hue:215 tint:0.55 time:0.05
-@flash color:#ffffff time:0.05 wait!
+@flash color:#ffffff duration:50 wait!
 Narrator: CHECKPOINT SMOKE PIXI - renderer task completed without phantom waits.
 @choice "继续媒体测试" goto:#Media
 

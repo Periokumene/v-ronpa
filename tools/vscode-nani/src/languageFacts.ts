@@ -39,7 +39,7 @@ export interface DocumentationFact {
 }
 
 export function commandCompletionFacts(): CommandCompletionFact[] {
-  return naniCommandCatalog.flatMap((definition, definitionIndex) => {
+  return naniCommandCatalog.filter((definition) => definition.status === "implemented").flatMap((definition, definitionIndex) => {
     const names = [definition.canonicalName, ...(definition.aliases ?? [])];
     return names.map((name, nameIndex) => ({
       label: name,
@@ -59,6 +59,7 @@ export function paramCompletionFacts(commandId: string, usedParams: Set<string> 
   const facts: ParamCompletionFact[] = [];
   definition.params.forEach((param, index) => {
     if (usedParams.has(param.name.toLowerCase())) return;
+    if (param.docs?.runtimeSupport === "declared-not-consumed") return;
 
     facts.push({
       label: `${param.name}:`,

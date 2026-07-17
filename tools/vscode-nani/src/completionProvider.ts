@@ -1,7 +1,9 @@
 import { collectLabels, getCompletionContext, type NaniPosition, type NaniRange } from "./documentContext";
 import { allowedValueCompletionFacts, commandCompletionFacts, paramCompletionFacts } from "./languageFacts";
+import { emptyProjectAssetIndex, type NaniProjectAssetIndex } from "./projectAssets";
+import { getNaniResourceCompletions } from "./resourceCompletions";
 
-export type NaniCompletionKind = "command" | "param" | "value" | "label" | "snippet";
+export type NaniCompletionKind = "command" | "param" | "value" | "label" | "snippet" | "resource";
 
 export interface NaniCompletion {
   label: string;
@@ -14,8 +16,20 @@ export interface NaniCompletion {
   sortText?: string;
 }
 
-export function getNaniCompletions(sourceText: string, position: NaniPosition): NaniCompletion[] {
+export function getNaniCompletions(
+  sourceText: string,
+  position: NaniPosition,
+  projectAssets: NaniProjectAssetIndex = emptyProjectAssetIndex
+): NaniCompletion[] {
   const context = getCompletionContext(sourceText, position);
+  const resources = getNaniResourceCompletions(sourceText, position, projectAssets);
+  const resourceCompletions: NaniCompletion[] = (resources?.completions ?? []).map((completion) => ({
+    ...completion,
+    kind: "resource",
+    isSnippet: false
+  }));
+
+  if (resources && !resources.combineWithParams) return resourceCompletions;
 
   if (context.kind === "command") {
     return commandCompletionFacts().map((fact) => ({
@@ -31,7 +45,7 @@ export function getNaniCompletions(sourceText: string, position: NaniPosition): 
   }
 
   if (context.kind === "param") {
-    return paramCompletionFacts(context.commandId, context.usedParams).map((fact) => ({
+    const paramCompletions: NaniCompletion[] = paramCompletionFacts(context.commandId, context.usedParams).map((fact) => ({
       label: fact.label,
       insertText: fact.insertText,
       kind: "param",
@@ -41,6 +55,7 @@ export function getNaniCompletions(sourceText: string, position: NaniPosition): 
       isSnippet: fact.isSnippet,
       sortText: fact.sortText
     }));
+    return [...resourceCompletions, ...paramCompletions];
   }
 
   if (context.kind === "param-value") {

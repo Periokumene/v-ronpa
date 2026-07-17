@@ -27,15 +27,15 @@ describe("completion provider logic", () => {
     const labels = completions.map((completion) => completion.label);
 
     expect(labels).toContain("volume:");
-    expect(labels).toContain("wait!");
-    expect(labels).toContain("!wait");
+    expect(labels).not.toContain("wait!");
+    expect(labels).not.toContain("!wait");
   });
 
   it("does not treat primary args as already-used params", () => {
     const completions = getNaniCompletions("@bgm wait ", { line: 0, character: "@bgm wait ".length });
     const labels = completions.map((completion) => completion.label);
 
-    expect(labels).toContain("wait!");
+    expect(labels).not.toContain("wait!");
   });
 
   it("suggests catalog allowed values in param value position", () => {

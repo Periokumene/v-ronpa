@@ -3,7 +3,7 @@
   "displayName": "V-Ronpa Nani",
   "description": "VS Code language support for V-Ronpa .nani scripts.",
   "publisher": "v-ronpa",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "./dist/extension.cjs",
@@ -15,7 +15,8 @@
     "Linters"
   ],
   "activationEvents": [
-    "onLanguage:nani"
+    "onLanguage:nani",
+    "onCommand:v-ronpa-nani.refreshProjectAssets"
   ],
   "contributes": {
     "languages": [
@@ -38,6 +39,13 @@
         "scopeName": "source.nani",
         "path": "./syntaxes/nani.tmLanguage.json"
       }
+    ],
+    "commands": [
+      {
+        "command": "v-ronpa-nani.refreshProjectAssets",
+        "title": "Refresh Project Assets",
+        "category": "V-Ronpa Nani"
+      }
     ]
   },
   "scripts": {
@@ -46,7 +54,7 @@
     "build:prod": "pnpm run check-types && node scripts/esbuild.mjs --production",
     "test": "vitest run",
     "vscode:prepublish": "pnpm run build:prod",
-    "package:vsix": "vsce package --no-dependencies --out v-ronpa-nani-0.1.0.vsix"
+    "package:vsix": "node scripts/package-vsix.mjs"
   },
   "dependencies": {
     "@v-ronpa/contracts": "workspace:*",
