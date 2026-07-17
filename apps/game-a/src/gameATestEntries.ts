@@ -1,19 +1,57 @@
-import { gameAScriptMetadataByPath } from "./generatedAssets";
+import { gameATestScriptMetadataByPath } from "./generatedTestScripts";
 import type { GameAVnLaunchDefinition } from "./gameAScripts";
-import smokeNaniSource from "./nani/smoke.nani?raw";
+import characterSmokeNaniSource from "./test-nani/character-smoke.nani?raw";
+import smokeNaniSource from "./test-nani/smoke.nani?raw";
 
-const scriptPath = "game-a/smoke.nani";
-const metadata = gameAScriptMetadataByPath[scriptPath];
-if (!metadata) throw new Error(`Missing generated metadata for '${scriptPath}'.`);
+export const gameATestEntryIds = ["smoke", "character"] as const;
+export type GameATestEntryId = (typeof gameATestEntryIds)[number];
+type GameATestScriptPath = keyof typeof gameATestScriptMetadataByPath;
 
-export const gameASmokeLaunchDefinition = {
-  runtimeEntry: {
-    id: "vn:game-a-smoke",
-    scriptRevision: metadata.scriptRevision,
-    profile: "vn2d",
-    scriptPath,
-    sourceText: smokeNaniSource,
-    startLabel: "Start"
-  },
-  characterPreloadPlan: metadata.characterPreloadPlan
-} satisfies GameAVnLaunchDefinition;
+export const gameATestLaunchDefinitions = {
+  smoke: createTestLaunchDefinition({
+    id: "vn:game-a-test-smoke",
+    scriptPath: "game-a/test/smoke.nani",
+    sourceText: smokeNaniSource
+  }),
+  character: createTestLaunchDefinition({
+    id: "vn:game-a-test-character",
+    scriptPath: "game-a/test/character-smoke.nani",
+    sourceText: characterSmokeNaniSource
+  })
+} satisfies Record<GameATestEntryId, GameAVnLaunchDefinition>;
+
+export function resolveGameATestLaunchDefinition(
+  requestedEntry: string | null
+): GameAVnLaunchDefinition | undefined {
+  return isGameATestEntryId(requestedEntry)
+    ? gameATestLaunchDefinitions[requestedEntry]
+    : undefined;
+}
+
+function isGameATestEntryId(value: string | null): value is GameATestEntryId {
+  return value !== null && (gameATestEntryIds as readonly string[]).includes(value);
+}
+
+function createTestLaunchDefinition({
+  id,
+  scriptPath,
+  sourceText
+}: {
+  id: string;
+  scriptPath: GameATestScriptPath;
+  sourceText: string;
+}): GameAVnLaunchDefinition {
+  const metadata = gameATestScriptMetadataByPath[scriptPath];
+  if (!metadata) throw new Error(`Missing generated test metadata for '${scriptPath}'.`);
+  return {
+    runtimeEntry: {
+      id,
+      scriptRevision: metadata.scriptRevision,
+      profile: "vn2d",
+      scriptPath,
+      sourceText,
+      startLabel: "Start"
+    },
+    characterPreloadPlan: metadata.characterPreloadPlan
+  };
+}

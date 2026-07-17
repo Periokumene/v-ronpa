@@ -597,7 +597,7 @@ export const harnessRuntimeAssetFragments = [pixiRuntimeAssetFragment] satisfies
 
 export const harnessScriptMetadataByPath = {
     "harness/harness-showcase.nani": {
-      "scriptRevision": "sha256:96b9978c6f6cef840f20f32f08694dd8fc61a00f6743bd725ada72b63ff28ee3",
+      "scriptRevision": "sha256:0b482f4f9b8776fb36acc7c85bf90db4426966d72d858cabc6d36fe3a2984ac7",
       "assetRefs": [
         {
           "id": "bg:black",

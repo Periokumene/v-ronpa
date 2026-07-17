@@ -10,8 +10,10 @@ void boot();
 async function boot() {
   let launchDefinition: GameAVnLaunchDefinition = gameAOpeningLaunchDefinition;
   const requestedEntry = new URLSearchParams(window.location.search).get("vnEntry");
-  if (import.meta.env.VITE_ENABLE_TEST_ENTRIES === "1" && requestedEntry === "smoke") {
-    launchDefinition = (await import("./gameATestEntries")).gameASmokeLaunchDefinition;
+  if (import.meta.env.VITE_ENABLE_TEST_ENTRIES === "1") {
+    const testLaunchDefinition = (await import("./gameATestEntries"))
+      .resolveGameATestLaunchDefinition(requestedEntry);
+    if (testLaunchDefinition) launchDefinition = testLaunchDefinition;
   }
   createRoot(document.getElementById("root")!).render(
     <StrictMode>

@@ -7,17 +7,24 @@ export default {
   fontFacesExportName: "gameAFontFaces",
   fragmentsExportName: "gameARuntimeAssetFragments",
   scriptMetadataExportName: "gameAScriptMetadataByPath",
+  testScriptOutputPath: "apps/game-a/src/generatedTestScripts.ts",
+  testScriptMetadataExportName: "gameATestScriptMetadataByPath",
   providers: ["pixi"],
   voiceLocales: ["zh"],
   scripts: [
     {
       sourceFile: "apps/game-a/src/nani/opening.nani",
       scriptPath: "game-a/opening.nani"
+    }
+  ],
+  testScripts: [
+    {
+      sourceFile: "apps/game-a/src/test-nani/smoke.nani",
+      scriptPath: "game-a/test/smoke.nani"
     },
     {
-      sourceFile: "apps/game-a/src/nani/smoke.nani",
-      scriptPath: "game-a/smoke.nani",
-      testOnly: true
+      sourceFile: "apps/game-a/src/test-nani/character-smoke.nani",
+      scriptPath: "game-a/test/character-smoke.nani"
     }
   ],
   idOverrides: {},

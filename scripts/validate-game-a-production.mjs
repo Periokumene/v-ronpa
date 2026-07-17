@@ -3,7 +3,12 @@ import { extname, join, relative } from "node:path";
 
 const root = process.cwd();
 const dist = join(root, "apps/game-a/dist");
-const forbidden = ["CHECKPOINT SMOKE", "vn:game-a-smoke", "game-a/smoke.nani"];
+const forbidden = [
+  "CHECKPOINT SMOKE",
+  "CHECKPOINT CHARACTER",
+  "vn:game-a-test-",
+  "game-a/test/"
+];
 const failures = [];
 
 for (const file of collectFiles(dist)) {

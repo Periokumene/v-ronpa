@@ -28,7 +28,7 @@ describe("pixi presenter port", () => {
         throw new Error("mount should not be required for memory behavior");
       }
     } as unknown as HTMLElement;
-    const presenter = createPixiPresenter({ host, characterOutlineEnabled: true, characterPreloadPlan: [] });
+    const presenter = createPixiPresenter({ host, active: true, characterOutlineEnabled: true, characterPreloadPlan: [] });
 
     expect(() => presenter.reconcile(createInitialPixiStageSnapshot())).not.toThrow();
     expect(() => presenter.clear()).not.toThrow();
@@ -61,7 +61,10 @@ describe("pixi presenter port", () => {
     vi.stubGlobal("ResizeObserver", TestResizeObserver);
     vi.spyOn(Application.prototype, "init").mockImplementation(async function (this: Application) {
       Object.defineProperty(this, "renderer", { configurable: true, value: { width: 960, height: 540 } });
-      Object.defineProperty(this, "ticker", { configurable: true, value: { add: vi.fn(), remove: vi.fn() } });
+      Object.defineProperty(this, "ticker", {
+        configurable: true,
+        value: { add: vi.fn(), remove: vi.fn(), start: vi.fn(), stop: vi.fn() }
+      });
       Object.defineProperty(this, "canvas", { configurable: true, value: { dataset: {} } });
     });
     vi.spyOn(Application.prototype, "destroy").mockImplementation(() => undefined);
@@ -75,7 +78,7 @@ describe("pixi presenter port", () => {
       clientHeight: 540,
       appendChild: vi.fn()
     } as unknown as HTMLElement;
-    const presenter = createPixiPresenter({ host, characterOutlineEnabled: true, characterPreloadPlan: [] });
+    const presenter = createPixiPresenter({ host, active: true, characterOutlineEnabled: true, characterPreloadPlan: [] });
 
     await presenter.mount();
     presenter.reconcile(createInitialPixiStageSnapshot());
@@ -104,7 +107,10 @@ describe("pixi presenter port", () => {
     const deferred = createDeferred<void>();
     vi.spyOn(Application.prototype, "init").mockImplementation(async function (this: Application) {
       Object.defineProperty(this, "renderer", { configurable: true, value: { width: 960, height: 540 } });
-      Object.defineProperty(this, "ticker", { configurable: true, value: { add: vi.fn(), remove: vi.fn() } });
+      Object.defineProperty(this, "ticker", {
+        configurable: true,
+        value: { add: vi.fn(), remove: vi.fn(), start: vi.fn(), stop: vi.fn() }
+      });
       Object.defineProperty(this, "canvas", { configurable: true, value: { dataset: {} } });
     });
     vi.spyOn(Application.prototype, "destroy").mockImplementation(() => undefined);
@@ -116,7 +122,7 @@ describe("pixi presenter port", () => {
       appendChild: vi.fn()
     } as unknown as HTMLElement;
     const characterPreloadPlan = [{ characterId: "alice", appearanceExpressions: [""] }] as const;
-    const presenter = createPixiPresenter({ host, characterOutlineEnabled: true, characterPreloadPlan });
+    const presenter = createPixiPresenter({ host, active: true, characterOutlineEnabled: true, characterPreloadPlan });
 
     const ready = presenter.mount();
     presenter.reconcile(createInitialPixiStageSnapshot());
@@ -131,6 +137,69 @@ describe("pixi presenter port", () => {
 
     expect(reconcile).toHaveBeenCalledOnce();
     presenter.destroy();
+  });
+
+  it("stops inactive rendering and resumes the same presenter without remounting", async () => {
+    const start = vi.fn();
+    const stop = vi.fn();
+    vi.spyOn(Application.prototype, "init").mockImplementation(async function (this: Application) {
+      Object.defineProperty(this, "renderer", { configurable: true, value: { width: 960, height: 540 } });
+      Object.defineProperty(this, "ticker", {
+        configurable: true,
+        value: { add: vi.fn(), remove: vi.fn(), start, stop }
+      });
+      Object.defineProperty(this, "canvas", { configurable: true, value: { dataset: {} } });
+    });
+    vi.spyOn(Application.prototype, "destroy").mockImplementation(() => undefined);
+    const host = {
+      clientWidth: 960,
+      clientHeight: 540,
+      appendChild: vi.fn()
+    } as unknown as HTMLElement;
+    const presenter = createPixiPresenter({ host, active: false, characterOutlineEnabled: true, characterPreloadPlan: [] });
+
+    await presenter.mount();
+    expect(stop).toHaveBeenCalled();
+    expect(start).not.toHaveBeenCalled();
+
+    presenter.setActive(true);
+    expect(start).toHaveBeenCalledTimes(1);
+    presenter.setActive(false);
+    expect(stop).toHaveBeenCalledTimes(3);
+
+    presenter.destroy();
+    presenter.setActive(true);
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it("destroys an inactive presenter only once when preparation finishes late", async () => {
+    const deferred = createDeferred<void>();
+    const tickerAdd = vi.fn();
+    vi.spyOn(Application.prototype, "init").mockImplementation(async function (this: Application) {
+      Object.defineProperty(this, "renderer", { configurable: true, value: { width: 960, height: 540 } });
+      Object.defineProperty(this, "ticker", {
+        configurable: true,
+        value: { add: tickerAdd, remove: vi.fn(), start: vi.fn(), stop: vi.fn() }
+      });
+      Object.defineProperty(this, "canvas", { configurable: true, value: { dataset: {} } });
+    });
+    const destroy = vi.spyOn(Application.prototype, "destroy").mockImplementation(() => undefined);
+    const preload = vi.spyOn(ActorSystem.prototype, "preloadCharacters").mockReturnValue(deferred.promise);
+    const host = {
+      clientWidth: 960,
+      clientHeight: 540,
+      appendChild: vi.fn()
+    } as unknown as HTMLElement;
+    const presenter = createPixiPresenter({ host, active: false, characterOutlineEnabled: true, characterPreloadPlan: [] });
+
+    const ready = presenter.mount();
+    await vi.waitFor(() => expect(preload).toHaveBeenCalledOnce());
+    presenter.destroy();
+    deferred.resolve();
+    await ready;
+
+    expect(destroy).toHaveBeenCalledTimes(1);
+    expect(tickerAdd).not.toHaveBeenCalled();
   });
 
   it("reduces persistent VN commands into a terminal Pixi stage snapshot", () => {

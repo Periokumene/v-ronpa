@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.setTimeout(120_000);
 
-test("game-a stays on title until planned character textures are uploaded", async ({ page }) => {
+test("game-a test character entry stays on title until planned textures are uploaded", async ({ page }) => {
   const delayedRequests: string[] = [];
   await page.route("**/game-a/characters/alice/assets/layers/**/*.png", async (route) => {
     delayedRequests.push(route.request().url());
@@ -10,7 +10,7 @@ test("game-a stays on title until planned character textures are uploaded", asyn
     await route.continue();
   });
 
-  await page.goto("/?vnEntry=smoke", { waitUntil: "domcontentloaded" });
+  await page.goto("/?vnEntry=character", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("title-surface")).toBeVisible();
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-preparation", "preparing");
   await page.getByTestId("title-new-game").click();
@@ -27,16 +27,16 @@ test("game-a stays on title until planned character textures are uploaded", asyn
   await expect(page.locator("main.game-a-shell")).not.toContainText("presentation-wait-timeout");
 });
 
-test("game-a opening renders the imported Alice layered states", async ({ page }) => {
+test("game-a character smoke renders the imported Alice layered states", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await page.goto("/?vnStart=PartRain2");
+  await page.goto("/?vnEntry=character&vnStart=Start");
   await expect(page.getByTestId("game-a-mode")).toHaveText("视觉小说");
 
-  await advanceUntilText(page, "雨幕里，一个熟悉的人影停在了街角。", 24);
+  await advanceUntilText(page, "CHECKPOINT CHARACTER 00", 8);
   await expectAliceState(page, "default");
   const steadyInterior = await captureCharacterInterior(page, "test-results/game-a-alice-outline-default.png");
 
@@ -56,20 +56,20 @@ test("game-a opening renders the imported Alice layered states", async ({ page }
     page,
     "test-results/game-a-alice-transition-end-frame.png"
   ));
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("你真的在这里淋了这么久？");
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT CHARACTER 01");
   await expectAliceState(page, "EYE0,MOUTH0");
 
   const states = [
     {
-      text: "妈妈让我来找你。她说牛奶再不买，店就要关门了。",
+      text: "CHECKPOINT CHARACTER 02",
       expression: "EYE1,MOUTH3,ArmL2"
     },
     {
-      text: "还有，伞往这边一点。你半边肩膀都湿透了。",
+      text: "CHECKPOINT CHARACTER 03",
       expression: "EYE4,MOUTH5,ArmL4,ArmR2,EFFECT0"
     },
     {
-      text: "她把伞沿朝我这边压低了一点，像是不打算再给我逃跑的机会。",
+      text: "CHECKPOINT CHARACTER 04",
       expression: "EYE2,MOUTH2,ArmL0,ArmR0,EFFECT2"
     }
   ] as const;
@@ -83,7 +83,7 @@ test("game-a opening renders the imported Alice layered states", async ({ page }
   }
 
   await advanceUntilChoices(page, 4);
-  await expect(page.getByTestId("vn-choice-0")).toHaveText("陪我去买牛奶吧");
+  await expect(page.getByTestId("vn-choice-0")).toHaveText("完成角色测试");
   await expect(page.locator("main.game-a-shell")).toHaveAttribute("data-game-a-asset-diagnostics-count", "0");
   expect(consoleErrors).toEqual([]);
 });
@@ -96,7 +96,15 @@ async function expectAliceState(page: Page, expression: string) {
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-outline", "enabled");
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-preparation", "ready");
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-active-tasks", "empty");
-  await page.waitForTimeout(500);
+  await waitForAnimationFrames(page, 2);
+}
+
+async function waitForAnimationFrames(page: Page, count: number) {
+  await page.evaluate(async (frameCount) => {
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+  }, count);
 }
 
 async function advanceUntilText(page: Page, text: string, maxSteps: number) {

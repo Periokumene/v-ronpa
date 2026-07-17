@@ -1,12 +1,30 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeCommand, RuntimeScript, RuntimeValue } from "@v-ronpa/contracts";
-import { createScriptRevision, deriveLayeredCharacterPreloadPlan } from "./generate-assets.mjs";
+import {
+  createScriptRevision,
+  deriveLayeredCharacterPreloadPlan,
+  generateGameARuntimeAssetsModule,
+  generateGameATestScriptMetadataModule
+} from "./generate-assets.mjs";
 
 describe("generated script revisions", () => {
   it("ignores source locations but changes for semantic command content", () => {
     const base = runtimeScript("Hello", 1);
     expect(createScriptRevision(base)).toBe(createScriptRevision(runtimeScript("Hello", 99)));
     expect(createScriptRevision(base)).not.toBe(createScriptRevision(runtimeScript("Changed", 1)));
+  });
+});
+
+describe("generated Game A script metadata boundaries", () => {
+  it("keeps product and test-only Nani in separate generated exports", () => {
+    const productModule = generateGameARuntimeAssetsModule();
+    const testModule = generateGameATestScriptMetadataModule();
+
+    expect(productModule).toContain('"game-a/opening.nani"');
+    expect(productModule).not.toContain('"game-a/test/');
+    expect(testModule).toContain('"game-a/test/smoke.nani"');
+    expect(testModule).toContain('"game-a/test/character-smoke.nani"');
+    expect(testModule).not.toContain('"game-a/opening.nani"');
   });
 });
 

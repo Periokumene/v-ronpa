@@ -11,7 +11,6 @@ Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command sh
 @choice "分支2：完整 Pixi 命令视觉验收" goto:#PixiCommandShowcase
 @choice "分支3：真实 textId-音频验证" goto:#VoiceTextIdAudioValidation
 @choice "分支4：首轮富文本标签验收" goto:#RichTextShowcase
-@choice "分支5：VN 自动化短路径" goto:#AutomationSmokeShowcase
 
 #VoiceTextIdAudioValidation
 @back bg:harness effect:fade time:0.15
@@ -206,20 +205,4 @@ Narrator: CHECKPOINT 10 - white flash、Ema slide、stage shake。应看到白�
 Narrator: CHECKPOINT 11 - cleanup + consecutive wait。bokeh、blur、rain、snow、sun 均应被移除，画面恢复清晰稳定；本句出现代表连续 cleanup wait 已全部完成，背景保持 bg:classroom。
 @hideChars time:0.2 wait!
 Narrator: CHECKPOINT 12 - hideChars + wait。角色应已隐藏；本句出现后覆盖层即将结束。
-@end
-
-#AutomationSmokeShowcase
-@set route:"automation-smoke"
-@back bg:harness effect:fade time:0.05
-@char Ema pos:50
-Narrator: CHECKPOINT AUTO 00 - automation smoke。此分支只验证 VN AUTO、SKIP、overlay stop 与 wait! 续行，不进入完整 Pixi 命令长链路。
-Narrator: CHECKPOINT AUTO 01 - auto target。AUTO 应能从 AUTO 00 自动推进到本句；打开任意覆盖层应停止 AUTO。
-Narrator: CHECKPOINT AUTO 02A - overlay stop backlog。此句为 backlog 覆盖层停止 AUTO 的短路径缓冲。
-Narrator: CHECKPOINT AUTO 02B - overlay stop save。此句为 save 覆盖层停止 AUTO 的短路径缓冲。
-Narrator: CHECKPOINT AUTO 02C - overlay stop load。此句为 load 覆盖层停止 AUTO 的短路径缓冲。
-Narrator: CHECKPOINT AUTO 02D - overlay stop settings。此句为 settings 覆盖层停止 AUTO 的短路径缓冲。
-Narrator: CHECKPOINT AUTO 03 - wait setup。下一次手动继续会触发 Ema 的 wait! slide；再次继续应立即完成等待并进入 AUTO 04。
-@slide Ema from:42,0 to:50,0 time:0.8 easing:easeOut wait!
-Narrator: CHECKPOINT AUTO 04 - wait complete。出现本句代表 wait! slide 已恢复剧情，Pixi task 应回到 empty。
-Narrator: CHECKPOINT AUTO 05 - skip tail。SKIP 应能快速结束这个短分支并回到 Navi 探索。
 @end`;

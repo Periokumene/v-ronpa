@@ -202,6 +202,7 @@ export function useHarnessShowcaseRuntimeAdapter(
   );
 
   const firstPersonBridge = useFirstPersonExplorationBridge({
+    renderActive: flowMode === "navi" && navi.inputLock === "none",
     map: activeMap,
     ...(assetResolver ? { assetResolver } : {}),
     cameraMode: currentCameraMode,

@@ -312,48 +312,5 @@ export const gameAScriptMetadataByPath = {
           ]
         }
       ]
-    },
-    "game-a/smoke.nani": {
-      "scriptRevision": "sha256:7efdfb3d29acbf318d4a512efadf2eed29522bc6d4bc8acfb7ad084089357f22",
-      "assetRefs": [
-        {
-          "id": "alice",
-          "kind": "character-pack",
-          "tags": []
-        },
-        {
-          "id": "bg:game-a-academy-hall-fullscreen",
-          "kind": "background",
-          "tags": []
-        },
-        {
-          "id": "bg:game-a-snow-outskirts-frame",
-          "kind": "background",
-          "tags": []
-        },
-        {
-          "id": "bgm:game-a-main",
-          "kind": "bgm",
-          "tags": []
-        },
-        {
-          "id": "sfx:gentle-rain-loop",
-          "kind": "sfx",
-          "tags": []
-        },
-        {
-          "id": "voice:zh:game_a_voice_0001",
-          "kind": "voice",
-          "tags": []
-        }
-      ],
-      "characterPreloadPlan": [
-        {
-          "characterId": "alice",
-          "appearanceExpressions": [
-            ""
-          ]
-        }
-      ]
     }
   } satisfies Record<string, { scriptRevision: string; assetRefs: AssetRef[]; characterPreloadPlan: LayeredCharacterPreloadPlan }>;

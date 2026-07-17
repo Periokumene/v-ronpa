@@ -22,6 +22,7 @@ export type { PixiAssetResolver, PixiPresenterDiagnostic };
 
 export interface PixiPresenterOptions {
   host: HTMLElement;
+  active: boolean;
   characterOutlineEnabled: boolean;
   characterPreloadPlan: LayeredCharacterPreloadPlan;
   width?: number;
@@ -59,6 +60,7 @@ export interface PixiThumbnailCaptureResult<Mime extends PixiThumbnailMime = Pix
 
 export interface PixiPresenterPort {
   mount(): Promise<void>;
+  setActive(active: boolean): void;
   reconcile(snapshot: PixiStageSnapshot, options?: PixiStageReconcileOptions): void;
   captureThumbnail<Mime extends PixiThumbnailMime = "image/webp">(
     options?: PixiThumbnailCaptureOptions<Mime>
@@ -91,6 +93,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
   let resizeObserver: ResizeObserver | undefined;
   let listeningForWindowResize = false;
   let resizeFrame: number | undefined;
+  let renderingActive = options.active;
 
   const size = {
     width: () => Math.max(1, options.host.clientWidth || (initialized ? app.renderer.width : 0) || options.width || 960),
@@ -119,11 +122,19 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
         ? { ...initOptions, width: options.width, height: options.height }
         : initOptions
     );
-    await preloadBuiltInPixiFxAssets(options.assetResolver, options.onDiagnostic);
     initialized = true;
+    syncRenderingActivity();
     if (destroyed) {
       app.destroy(true);
       initialized = false;
+      return;
+    }
+    await preloadBuiltInPixiFxAssets(options.assetResolver, options.onDiagnostic);
+    if (destroyed) {
+      if (initialized) {
+        app.destroy(true);
+        initialized = false;
+      }
       return;
     }
     app.canvas.dataset.testid = "pixi-canvas";
@@ -146,12 +157,27 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     if (destroyed) return;
     app.ticker.add(tick);
     mounted = true;
+    syncRenderingActivity();
     viewportKey = currentViewportKey();
     startResizeObservation();
     if (pendingReconcile) {
       const pending = pendingReconcile;
       pendingReconcile = undefined;
       renderSnapshot(pending.snapshot, pending.options);
+    }
+  }
+
+  function setActive(active: boolean) {
+    renderingActive = active;
+    syncRenderingActivity();
+  }
+
+  function syncRenderingActivity() {
+    if (!initialized || destroyed) return;
+    if (renderingActive) {
+      app.ticker.start();
+    } else {
+      app.ticker.stop();
     }
   }
 
@@ -304,7 +330,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     mounted = false;
   }
 
-  return { mount, reconcile, captureThumbnail, clear, destroy };
+  return { mount, setActive, reconcile, captureThumbnail, clear, destroy };
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, mime: PixiThumbnailMime, quality: number): Promise<Blob | undefined> {

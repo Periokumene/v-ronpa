@@ -12,7 +12,7 @@ import {
 } from "@v-ronpa/app-vn-shell";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
-import { SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS, type AudioHandle, type AudioHandleFinishReason, type AudioPort } from "@v-ronpa/media-save";
+import { SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS } from "@v-ronpa/media-save";
 import type { PresentationTaskObservation } from "@v-ronpa/app-vn-runtime";
 import { ExplorationStage3D, TrialRoundTableStage } from "@v-ronpa/r3f-adapter";
 import { InspectorLite, RichTextFontStyles } from "@v-ronpa/ui-kit";
@@ -28,9 +28,6 @@ import { useHarnessShowcaseSaveAdapter } from "../../../interaction/useHarnessSh
 import { harnessContentManifest, harnessShowcaseCharacterPreloadPlan } from "../../contentManifest";
 
 type DebugTabId = "runtime" | "inspector";
-type VoiceSmokeAudioMode = "fast" | "fail";
-const FAST_VOICE_SMOKE_DURATION_MS = 1500;
-
 export function HarnessShowcaseScenario() {
   const flowActor = useGameFlowActor();
   const settings = useGameSettingsAdapter();
@@ -41,14 +38,9 @@ export function HarnessShowcaseScenario() {
   const dialogueBleepSettings = useMemo(() => settingsToDialogueBleepRuntimeSettings(settings.settings), [settings.settings]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
   const pixiStage = usePixiStageReadiness();
-  const smokeAudioPort = useMemo(() => {
-    const mode = selectVoiceSmokeAudioMode();
-    return mode ? createVoiceSmokeAudioPort(mode) : undefined;
-  }, []);
   const enterTrialMode = useCallback(() => flowActor.send({ type: "ENTER_TRIAL" }), [flowActor.send]);
   const enterNaviMode = useCallback(() => flowActor.send({ type: "ENTER_NAVI" }), [flowActor.send]);
   const runtime = useHarnessShowcaseRuntimeAdapter(flowActor.mode, {
-    ...(smokeAudioPort ? { audioPort: smokeAudioPort } : {}),
     assetResolver: assetRegistry,
     ...(harnessContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: harnessContentManifest.audio.dialogueBleep } : {}),
     dialogueBleepSettings,
@@ -369,77 +361,6 @@ function displayStorySpeaker(speaker: string): string {
     Narrator: "旁白"
   };
   return labels[speaker] ?? speaker;
-}
-
-function selectVoiceSmokeAudioMode(): VoiceSmokeAudioMode | undefined {
-  const mode = new URLSearchParams(window.location.search).get("voiceSmoke");
-  return mode === "fast" || mode === "fail" ? mode : undefined;
-}
-
-function createVoiceSmokeAudioPort(mode: VoiceSmokeAudioMode): AudioPort {
-  const activeHandles = new Set<SmokeAudioHandle>();
-
-  function register(handle: SmokeAudioHandle): AudioHandle {
-    activeHandles.add(handle);
-    handle.finished.finally(() => activeHandles.delete(handle));
-    return handle;
-  }
-
-  return {
-    playBgm(id) {
-      return register(createSmokeAudioHandle(id));
-    },
-    playSfx(id, _uri, options) {
-      const handle = createSmokeAudioHandle(id);
-      if (options?.loop !== true) window.setTimeout(() => handle.finish("ended"), 20);
-      return register(handle);
-    },
-    playDialogueBleep(id) {
-      return register(createSmokeAudioHandle(id));
-    },
-    playVoice(id) {
-      const handle = createSmokeAudioHandle(id);
-      window.setTimeout(
-        () => handle.finish(mode === "fail" ? "failed" : "ended"),
-        mode === "fail" ? 20 : FAST_VOICE_SMOKE_DURATION_MS
-      );
-      return register(handle);
-    },
-    stopAll() {
-      for (const handle of [...activeHandles]) handle.finish("stopped");
-    }
-  };
-}
-
-interface SmokeAudioHandle extends AudioHandle {
-  finish(reason: AudioHandleFinishReason): void;
-}
-
-function createSmokeAudioHandle(id: string): SmokeAudioHandle {
-  let released = false;
-  let resolveFinished: (result: { reason: AudioHandleFinishReason }) => void = () => {};
-  const finished = new Promise<{ reason: AudioHandleFinishReason }>((resolve) => {
-    resolveFinished = resolve;
-  });
-
-  function finish(reason: AudioHandleFinishReason) {
-    if (released) return;
-    released = true;
-    resolveFinished({ reason });
-  }
-
-  return {
-    id,
-    finished,
-    finish,
-    stop() {
-      finish("stopped");
-    },
-    fade() {},
-    fadeOutAndStop() {
-      finish("stopped");
-    }
-  };
 }
 
 function HarnessShowcaseReadout({

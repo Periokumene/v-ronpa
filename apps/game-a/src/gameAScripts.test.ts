@@ -4,10 +4,14 @@ import { compileRuntimeScript } from "../../../packages/nani-runtime-compiler/sr
 import { parseScenario } from "../../../packages/nani-parser/src/index";
 import { gameAVnEntry } from "./contentManifest";
 import { gameAOpeningLaunchDefinition, gameAOpeningNaniSource } from "./gameAScripts";
-import { gameASmokeLaunchDefinition } from "./gameATestEntries";
+import {
+  gameATestLaunchDefinitions,
+  resolveGameATestLaunchDefinition
+} from "./gameATestEntries";
 
 const openingRuntimeEntry = gameAOpeningLaunchDefinition.runtimeEntry;
-const smokeRuntimeEntry = gameASmokeLaunchDefinition.runtimeEntry;
+const smokeRuntimeEntry = gameATestLaunchDefinitions.smoke.runtimeEntry;
+const characterRuntimeEntry = gameATestLaunchDefinitions.character.runtimeEntry;
 
 describe("game-a nani scripts", () => {
   it("exposes the opening .nani source as the app runtime entry", () => {
@@ -64,19 +68,45 @@ describe("game-a nani scripts", () => {
     expect(requestedExpressions.every((expression) => preparedExpressions.has(expression))).toBe(true);
   });
 
-  it("keeps smoke coverage in a separate test-only entry", () => {
-    const parsed = parseScenario({
-      scriptPath: smokeRuntimeEntry.scriptPath,
-      sourceText: smokeRuntimeEntry.sourceText
-    });
-    const compiled = compileRuntimeScript(parsed.scenario);
-    expect(parsed.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
-    expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+  it("keeps product and test-only Nani in independent launch definitions", () => {
+    for (const runtimeEntry of [smokeRuntimeEntry, characterRuntimeEntry]) {
+      const parsed = parseScenario({
+        scriptPath: runtimeEntry.scriptPath,
+        sourceText: runtimeEntry.sourceText
+      });
+      const compiled = compileRuntimeScript(parsed.scenario);
+      expect(parsed.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+      expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+      expect(runtimeEntry.scriptPath).toMatch(/^game-a\/test\//u);
+      expect(runtimeEntry.sourceText).toContain("CHECKPOINT");
+    }
+
     expect(smokeRuntimeEntry.sourceText).toContain("CHECKPOINT SMOKE MOVIE");
-    expect(gameASmokeLaunchDefinition.characterPreloadPlan).toEqual([
+    expect(characterRuntimeEntry.sourceText).toContain("CHECKPOINT CHARACTER 04");
+    expect(gameATestLaunchDefinitions.smoke.characterPreloadPlan).toEqual([
       { characterId: "alice", appearanceExpressions: [""] }
     ]);
+    expect(gameATestLaunchDefinitions.character.characterPreloadPlan).toEqual([
+      {
+        characterId: "alice",
+        appearanceExpressions: [
+          "",
+          "EYE0,MOUTH0",
+          "EYE1,MOUTH3,ArmL2",
+          "EYE2,MOUTH2,ArmL0,ArmR0,EFFECT2",
+          "EYE4,MOUTH5,ArmL4,ArmR2,EFFECT0"
+        ]
+      }
+    ]);
     expect(gameAOpeningNaniSource).not.toContain("CHECKPOINT SMOKE");
+    expect(gameAOpeningNaniSource).not.toContain("CHECKPOINT CHARACTER");
+  });
+
+  it("resolves only explicit test entry ids", () => {
+    expect(resolveGameATestLaunchDefinition("smoke")).toBe(gameATestLaunchDefinitions.smoke);
+    expect(resolveGameATestLaunchDefinition("character")).toBe(gameATestLaunchDefinitions.character);
+    expect(resolveGameATestLaunchDefinition("opening")).toBeUndefined();
+    expect(resolveGameATestLaunchDefinition(null)).toBeUndefined();
   });
 
   it("keeps active script asset references declared on the VN entry", () => {

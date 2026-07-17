@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { WorldMapDef } from "@v-ronpa/contracts";
-import { resolveMapModelAsset } from "./stages";
+import { resolveExplorationFrameloop, resolveMapModelAsset } from "./stages";
+
+describe("R3F exploration render scheduling", () => {
+  it("renders continuously only while exploration is active", () => {
+    expect(resolveExplorationFrameloop(true)).toBe("always");
+    expect(resolveExplorationFrameloop(false)).toBe("demand");
+  });
+});
 
 describe("R3F stage asset resolution", () => {
   it("resolves map model assets from id-only WorldMapDef.assetRefs", () => {

@@ -79,6 +79,7 @@ export function PixiLayer({
     if (!host) return;
     const options = {
       host,
+      active: visible,
       characterOutlineEnabled,
       characterPreloadPlan,
       ...(assetResolver ? { assetResolver } : {}),
@@ -104,6 +105,10 @@ export function PixiLayer({
   }, [assetResolver, characterOutlineEnabled, characterPreloadPlan]);
 
   useEffect(() => {
+    presenterRef.current?.setActive(visible);
+  }, [visible]);
+
+  useEffect(() => {
     const presenter = presenterRef.current;
     if (!presenter) return;
     presenter.reconcile(snapshot, { animate, hints });
@@ -121,6 +126,7 @@ export function PixiLayer({
       data-pixi-characters={formatPixiStageCharacters(snapshot)}
       data-pixi-character-outline={characterOutlineEnabled ? "enabled" : "disabled"}
       data-pixi-character-preparation={preparation}
+      data-pixi-rendering={visible ? "active" : "paused"}
       data-pixi-hints={formatPixiHints(hints)}
       data-pixi-hint-sequence={String(hintSequence)}
       data-pixi-active-tasks={formatPixiPresentationTasks(observedTasks)}

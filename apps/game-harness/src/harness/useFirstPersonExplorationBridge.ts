@@ -14,6 +14,7 @@ const POINTER_LOCK_TRIGGER_SELECTOR = `[${POINTER_LOCK_TRIGGER_ATTRIBUTE}="true"
 const POINTER_LOCK_DENIED_DELAY_MS = 450;
 
 export interface FirstPersonExplorationBridgeOptions {
+  renderActive: boolean;
   map: WorldMapDef;
   cameraMode: CameraControlMode;
   inputLock: InputLockState;
@@ -39,6 +40,7 @@ interface PoseCommand {
 }
 
 export function useFirstPersonExplorationBridge({
+  renderActive,
   map,
   cameraMode,
   inputLock,
@@ -84,6 +86,7 @@ export function useFirstPersonExplorationBridge({
 
   const explorationStageProps = useMemo<ExplorationStageProps>(() => {
     const props: ExplorationStageProps = {
+      renderActive,
       map,
       ...(assetResolver ? { assetResolver } : {}),
       cameraMode,
@@ -116,7 +119,8 @@ export function useFirstPersonExplorationBridge({
     onInteractRequest,
     onSensorReport,
     poseCommand.pose,
-    poseCommand.signal
+    poseCommand.signal,
+    renderActive
   ]);
 
   return {

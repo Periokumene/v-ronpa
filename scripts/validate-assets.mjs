@@ -6,6 +6,7 @@ import {
   collectGameARuntimeAssets,
   collectHarnessFontFaces,
   collectHarnessRuntimeAssets,
+  generateGameATestScriptMetadataModule,
   generateGameARuntimeAssetsModule,
   generateHarnessRuntimeAssetsModule
 } from "./generate-assets.mjs";
@@ -27,6 +28,7 @@ const { resolveLayeredCharacterSourcePixelScale } = await import(
 const { pixiRuntimeAssetFragment } = await import(pathToFileURL(join(repoRoot, "packages/runtime-assets-pixi/src/index.ts")).href);
 const harnessGeneratedPath = join(repoRoot, "apps/game-harness/src/harness/generatedAssets.ts");
 const gameAGeneratedPath = join(repoRoot, "apps/game-a/src/generatedAssets.ts");
+const gameATestScriptsGeneratedPath = join(repoRoot, "apps/game-a/src/generatedTestScripts.ts");
 const gameAContentManifestPath = join(repoRoot, "apps/game-a/src/contentManifest.ts");
 const bleepAssetsRoot = join(repoRoot, "apps/game-harness/public/harness/media/bleep");
 const voiceAssetsRoot = join(repoRoot, "apps/game-harness/public/harness/media/voice");
@@ -43,7 +45,8 @@ const harnessReferenceFiles = [
 ];
 const gameAReferenceFiles = [
   gameAContentManifestPath,
-  ...fixtureNaniFiles(join(repoRoot, "apps/game-a/src/nani"))
+  ...fixtureNaniFiles(join(repoRoot, "apps/game-a/src/nani")),
+  ...fixtureNaniFiles(join(repoRoot, "apps/game-a/src/test-nani"))
 ];
 const hardcodedAssetPattern = /(["'`])(?:\/harness\/|\/game-a\/|\.\/assets\/|\.\.\/assets\/|https?:\/\/|data:image\/|blob:)[^"'`]*\.(?:json|png|webp|avif|ktx2|woff2?|ttf|otf|ogg|mp3|mp4|webm|gltf|glb)\1/u;
 const assetIdPattern = /\b(?:bg|bgm|sfx|bleep|voice|video|model|texture|fx):[a-zA-Z0-9:_./-]+/gu;
@@ -54,6 +57,7 @@ const characterPackCommandPattern = /^\s*@(char|slide)\s+([^\s]+)/gmu;
 const allowedHardcodedFiles = new Set([
   "apps/game-harness/src/harness/generatedAssets.ts",
   "apps/game-a/src/generatedAssets.ts",
+  "apps/game-a/src/generatedTestScripts.ts",
   "packages/runtime-assets-pixi/src/index.ts",
   "scripts/generate-assets.mjs",
   "scripts/validate-assets.mjs"
@@ -101,7 +105,8 @@ if (failed) process.exitCode = 1;
 function checkGeneratedAssets() {
   const generatedFiles = [
     { path: harnessGeneratedPath, expected: generateHarnessRuntimeAssetsModule() },
-    { path: gameAGeneratedPath, expected: generateGameARuntimeAssetsModule() }
+    { path: gameAGeneratedPath, expected: generateGameARuntimeAssetsModule() },
+    { path: gameATestScriptsGeneratedPath, expected: generateGameATestScriptMetadataModule() }
   ];
   for (const generated of generatedFiles) {
     const current = existsSync(generated.path) ? readFileSync(generated.path, "utf8") : "";

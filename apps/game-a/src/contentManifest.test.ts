@@ -28,7 +28,11 @@ describe("game-a content manifest", () => {
         "bg:game-a-snow-outskirts-frame"
       ])
     );
-    expect(gameAContentManifest.vnEntries.some((entry) => entry.id === "vn:game-a-smoke")).toBe(false);
+    expect(
+      gameAContentManifest.vnEntries.every(
+        (entry) => !entry.id.startsWith("vn:game-a-test-") && !entry.scriptPath.startsWith("game-a/test/")
+      )
+    ).toBe(true);
     expect(gameAContentManifest.assets).toEqual([
       { id: "sfx:ui-hover-default", kind: "sfx", tags: ["game-a", "ui"] },
       { id: "sfx:ui-click-default", kind: "sfx", tags: ["game-a", "ui"] }

@@ -1,0 +1,19 @@
+#Start
+@showUI dialog
+@showUI commandBar visible:true
+@back bg:game-a-academy-hall-fullscreen effect:fade time:0.05
+@char alice pos:50 scale:0.78,0.78,1 time:0.3 wait!
+Narrator: CHECKPOINT CHARACTER 00 - default composition.
+@char alice.EYE0,MOUTH0 pos:50 wait!
+Narrator: CHECKPOINT CHARACTER 01 - eye and mouth replacement.
+@char alice.EYE1,MOUTH3,ArmL2 pos:50 wait!
+Narrator: CHECKPOINT CHARACTER 02 - left arm replacement.
+@char alice.EYE4,MOUTH5,ArmL4,ArmR2,EFFECT0 pos:50 wait!
+Narrator: CHECKPOINT CHARACTER 03 - both arms and effect replacement.
+@char alice.EYE2,MOUTH2,ArmL0,ArmR0,EFFECT2 pos:50 wait!
+Narrator: CHECKPOINT CHARACTER 04 - final multilayer composition.
+@choice "完成角色测试" goto:#Complete
+
+#Complete
+Narrator: CHECKPOINT CHARACTER COMPLETE
+@end

@@ -29,6 +29,7 @@ import type {
 import { clampVectorToAabb } from "./first-person";
 
 export interface ExplorationStageProps {
+  renderActive: boolean;
   map?: WorldMapDef;
   activeInteractableId?: string;
   cameraMode?: CameraControlMode;
@@ -121,6 +122,7 @@ const DEFAULT_NAV_INPUT_BINDINGS = {
 const POSE_REPORT_EPSILON = 0.15;
 
 export function ExplorationStage3D({
+  renderActive,
   map,
   activeInteractableId,
   cameraMode = "orbit-debug",
@@ -149,7 +151,12 @@ export function ExplorationStage3D({
   }, [map]);
 
   return (
-    <Canvas camera={camera} data-testid="r3f-canvas">
+    <Canvas
+      camera={camera}
+      data-r3f-rendering={renderActive ? "active" : "paused"}
+      data-testid="r3f-canvas"
+      frameloop={resolveExplorationFrameloop(renderActive)}
+    >
       <color attach="background" args={["#111720"]} />
       <ambientLight intensity={0.85} />
       <directionalLight position={[4, 6, 3]} intensity={1.6} />
@@ -189,6 +196,10 @@ export function ExplorationStage3D({
       )}
     </Canvas>
   );
+}
+
+export function resolveExplorationFrameloop(renderActive: boolean): "always" | "demand" {
+  return renderActive ? "always" : "demand";
 }
 
 export function TrialRoundTableStage({
