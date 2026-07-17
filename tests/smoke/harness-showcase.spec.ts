@@ -22,6 +22,7 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
   await expect(page.locator("canvas")).toHaveCount(2);
   await expect(page.getByTestId("harness-showcase-debug-sidebar")).toBeVisible();
   await expect(page.getByTestId("harness-showcase-debug-panel-runtime")).toBeVisible();
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-outline", "enabled");
   await expect(page.getByTestId("playfield").getByTestId("harness-commands")).toHaveCount(0);
   await expect(page.getByTestId("harness-showcase-debug-panel-runtime").getByTestId("harness-showcase-runtime-controls")).toBeVisible();
   await expectNoRuntimeAssetDiagnostics(page);
@@ -325,6 +326,9 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
   await page.screenshot({ path: "test-results/harness-showcase-char-pensive-composite.png", fullPage: true });
   await advanceUntilText(page, "CHECKPOINT 02C");
   await expect(page.getByTestId("harness-showcase-pixi-characters")).toContainText("Ema/Pensive1,ArmR3@0.50,0.00");
+  await expectNoRuntimeAssetDiagnostics(page);
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: "test-results/harness-showcase-char-pensive-armr3-outline.png", fullPage: true });
   await advanceUntilText(page, "CHECKPOINT 02D");
   await expect(page.getByTestId("harness-showcase-pixi-characters")).toContainText("Ema/Pensive1,ArmR3,ArmR4@0.50,0.00");
   await page.waitForTimeout(200);

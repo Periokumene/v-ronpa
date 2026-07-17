@@ -31,6 +31,21 @@ modes are rejected because they cannot be reproduced safely after the folder is 
 blend modes, masks and supported effects inside a leaf are rasterized into that leaf. Recoverable uncommon CSP/PSD content
 is reported as a warning; inability to obtain non-empty pixels is an error.
 
+## Source-pixel invariant
+
+Every generated leaf uses `sprite.pixelsPerUnit = 1` and `localTransform.scale = { x: 1, y: 1, z: 1 }`. Therefore one
+source texel is exactly one character-local unit. Project-authored packs may use another density, but every layer in one
+pack must describe the same square source pixel:
+
+```text
+unitsPerPixelX = abs(localTransform.scale.x) / sprite.pixelsPerUnit
+unitsPerPixelY = abs(localTransform.scale.y) / sprite.pixelsPerUnit
+```
+
+Both axes must be finite and positive, X and Y must match, and every layer must match the pack-wide value within relative
+error `1e-6`. The CSP pack validator enforces this before a run is accepted. Do not edit generated density or transform
+metadata after generation; fix the source or generator and produce a new immutable run.
+
 ## Fixing a rejected run
 
 Open `workspace/outputs/<character>/<run-id>/reports/validation.json`. The failed manifest records the exact archived input,

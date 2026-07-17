@@ -29,6 +29,7 @@ export interface PixiLayerProps {
 
   // Host surface.
   visible: boolean;
+  characterOutlineEnabled: boolean;
   assetResolver?: PixiAssetResolver;
 
   // Render side effects.
@@ -44,6 +45,7 @@ export function PixiLayer({
   hintSequence,
   observedTasks = [],
   visible,
+  characterOutlineEnabled,
   assetResolver,
   onDiagnostic,
   onCaptureHandleChanged,
@@ -72,6 +74,7 @@ export function PixiLayer({
     if (!host) return;
     const options = {
       host,
+      characterOutlineEnabled,
       ...(assetResolver ? { assetResolver } : {}),
       onDiagnostic: (diagnostic: PixiPresenterDiagnostic) => onDiagnosticRef.current?.(diagnostic),
       onTasksChanged: (tasks: PixiPresentationTaskSnapshot[]) => onTasksChangedRef.current?.(tasks)
@@ -87,7 +90,7 @@ export function PixiLayer({
       presenter.destroy();
       presenterRef.current = null;
     };
-  }, [assetResolver]);
+  }, [assetResolver, characterOutlineEnabled]);
 
   useEffect(() => {
     const presenter = presenterRef.current;
@@ -105,6 +108,7 @@ export function PixiLayer({
       data-pixi-inner-background={snapshot.innerBackgroundsById[PIXI_INNER_BACKGROUND_ID]?.appearance ?? "none"}
       data-pixi-actors={formatPixiStageActors(snapshot)}
       data-pixi-characters={formatPixiStageCharacters(snapshot)}
+      data-pixi-character-outline={characterOutlineEnabled ? "enabled" : "disabled"}
       data-pixi-hints={formatPixiHints(hints)}
       data-pixi-hint-sequence={String(hintSequence)}
       data-pixi-active-tasks={formatPixiPresentationTasks(observedTasks)}

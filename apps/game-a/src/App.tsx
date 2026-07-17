@@ -112,9 +112,16 @@ export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) 
   const devVnLaunchError = devVnLaunchTarget.requested
     ? devVnLaunchTarget.error?.message ?? startLabelError?.message
     : undefined;
+  const assetDiagnosticCount = runtime.diagnostics.runtimeDiagnostics.filter(
+    (diagnostic) => diagnostic.source === "asset"
+  ).length;
 
   return (
-    <main className="game-a-shell" {...gameAUiAudioBindings}>
+    <main
+      className="game-a-shell"
+      data-game-a-asset-diagnostics-count={String(assetDiagnosticCount)}
+      {...gameAUiAudioBindings}
+    >
       <RichTextFontStyles
         assetResolver={assetRegistry}
         fonts={gameAContentManifest.fonts}
@@ -133,6 +140,7 @@ export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) 
             <VnPixiPresenterHost
               active={flow.mode === "vn" && runtime.shell.storyRuntime.active}
               assetResolver={assetRegistry}
+              characterOutlineEnabled={true}
               diagnostics={runtime.diagnostics}
               presentation={runtime.presentation}
               onCaptureHandleChanged={(handle) => {

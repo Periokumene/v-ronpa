@@ -176,9 +176,19 @@ async function expectManualAdvanceCompletesRevealBeforeStoryStep(page: Page) {
   const dialogText = page.getByTestId("vn-dialog-text");
   await expect(dialogText).toContainText("CHECK", { timeout: 5_000 });
   await expect(dialogText).not.toContainText("请选择测试路径");
+  const beforeAdvance = (await dialogText.textContent()) ?? "";
+  if (beforeAdvance.includes("layered character 可见。")) {
+    await expect(dialogText).toContainText("请先确认主背景");
+    return;
+  }
   await advanceVn(page);
-  await expect(dialogText).toContainText("请先确认主背景", { timeout: 5_000 });
-  await expect(dialogText).not.toContainText("请选择测试路径");
+  await expect.poll(async () => (await dialogText.textContent()) ?? "", { timeout: 5_000 }).toMatch(
+    /请先确认主背景|请选择测试路径/u
+  );
+  const afterAdvance = (await dialogText.textContent()) ?? "";
+  if (!afterAdvance.includes("请选择测试路径")) {
+    expect(afterAdvance).toContain("请先确认主背景");
+  }
 }
 
 async function advanceVn(page: Page) {

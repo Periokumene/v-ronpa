@@ -19,6 +19,7 @@ export type { PixiAssetResolver, PixiPresenterDiagnostic };
 
 export interface PixiPresenterOptions {
   host: HTMLElement;
+  characterOutlineEnabled: boolean;
   width?: number;
   height?: number;
   onTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
@@ -128,6 +129,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
       root: stageRoot,
       width: size.width,
       height: size.height,
+      characterOutlineEnabled: options.characterOutlineEnabled,
       renderer: app.renderer,
       ...(options.assetResolver ? { assetResolver: options.assetResolver } : {}),
       ...(options.onDiagnostic ? { onDiagnostic: options.onDiagnostic } : {})
@@ -289,6 +291,8 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     clear();
     if (!initialized) return;
     app.ticker.remove(tick);
+    actors?.destroy();
+    actors = undefined;
     app.destroy(true);
     initialized = false;
     mounted = false;

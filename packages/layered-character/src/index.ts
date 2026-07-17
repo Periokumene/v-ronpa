@@ -89,6 +89,73 @@ export interface LayeredCharacterTextureDimensions {
 
 export type LayeredCharacterTextureDimensionsByLayerId = Record<string, LayeredCharacterTextureDimensions>;
 
+export const LAYERED_CHARACTER_SOURCE_PIXEL_RELATIVE_EPSILON = 1e-6;
+
+export type LayeredCharacterSourcePixelScaleErrorCode =
+  | "empty-layer-set"
+  | "invalid-source-pixel-scale"
+  | "non-square-source-pixels"
+  | "inconsistent-source-pixel-scale";
+
+export interface LayeredCharacterSourcePixelLayer {
+  id: string;
+  metadata: LayeredCharacterLayerMetadata;
+}
+
+export type LayeredCharacterSourcePixelScaleResult =
+  | { ok: true; unitsPerPixel: number }
+  | { ok: false; code: LayeredCharacterSourcePixelScaleErrorCode; message: string };
+
+export function resolveLayeredCharacterSourcePixelScale(
+  layers: readonly LayeredCharacterSourcePixelLayer[]
+): LayeredCharacterSourcePixelScaleResult {
+  if (layers.length === 0) {
+    return {
+      ok: false,
+      code: "empty-layer-set",
+      message: "Layered character source-pixel scale requires at least one layer."
+    };
+  }
+
+  let expectedUnitsPerPixel: number | undefined;
+  let expectedLayerId = "";
+  for (const layer of layers) {
+    const scaleX = Math.abs(layer.metadata.localTransform.scale.x);
+    const scaleY = Math.abs(layer.metadata.localTransform.scale.y);
+    const pixelsPerUnit = layer.metadata.sprite.pixelsPerUnit;
+    const unitsPerPixelX = scaleX / pixelsPerUnit;
+    const unitsPerPixelY = scaleY / pixelsPerUnit;
+    if (!Number.isFinite(unitsPerPixelX) || !Number.isFinite(unitsPerPixelY) || unitsPerPixelX <= 0 || unitsPerPixelY <= 0) {
+      return {
+        ok: false,
+        code: "invalid-source-pixel-scale",
+        message: `Layered character layer '${layer.id}' has invalid source-pixel scale ${unitsPerPixelX}x${unitsPerPixelY}.`
+      };
+    }
+    if (!sourcePixelScaleMatches(unitsPerPixelX, unitsPerPixelY)) {
+      return {
+        ok: false,
+        code: "non-square-source-pixels",
+        message: `Layered character layer '${layer.id}' has non-square source pixels ${unitsPerPixelX}x${unitsPerPixelY}.`
+      };
+    }
+    if (expectedUnitsPerPixel === undefined) {
+      expectedUnitsPerPixel = unitsPerPixelX;
+      expectedLayerId = layer.id;
+      continue;
+    }
+    if (!sourcePixelScaleMatches(expectedUnitsPerPixel, unitsPerPixelX)) {
+      return {
+        ok: false,
+        code: "inconsistent-source-pixel-scale",
+        message: `Layered character layers '${expectedLayerId}' and '${layer.id}' use inconsistent source-pixel scales ${expectedUnitsPerPixel} and ${unitsPerPixelX}.`
+      };
+    }
+  }
+
+  return { ok: true, unitsPerPixel: expectedUnitsPerPixel as number };
+}
+
 export function resolveLayeredCharacter(input: ResolveLayeredCharacterInput): ResolveLayeredCharacterResult {
   const resolvedRefs = resolveLayeredCharacterLayerRefs(input);
   const diagnostics: LayeredCharacterDiagnostic[] = [...resolvedRefs.diagnostics];
@@ -294,6 +361,11 @@ function assertPositiveTextureDimensions(layerId: string, dimensions: LayeredCha
   if (!Number.isFinite(dimensions.width) || !Number.isFinite(dimensions.height) || dimensions.width <= 0 || dimensions.height <= 0) {
     throw new Error(`Invalid texture dimensions for layered character layer '${layerId}': ${dimensions.width}x${dimensions.height}.`);
   }
+}
+
+function sourcePixelScaleMatches(left: number, right: number): boolean {
+  const magnitude = Math.max(Math.abs(left), Math.abs(right), Number.MIN_VALUE);
+  return Math.abs(left - right) <= magnitude * LAYERED_CHARACTER_SOURCE_PIXEL_RELATIVE_EPSILON;
 }
 
 function activeLayerKey(group: string, layer: string): string {

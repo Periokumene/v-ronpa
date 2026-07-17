@@ -1,6 +1,6 @@
 [project]
 name = "csp-char-unpack"
-version = "0.2.0"
+version = "0.3.0"
 description = "Isolated Clip Studio Paint to V-Ronpa layered-character validation pipeline"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"

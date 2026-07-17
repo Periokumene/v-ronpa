@@ -38,6 +38,10 @@ export interface PixiPresenterSystemsOptions {
   onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
 }
 
+interface PixiActorSystemOptions extends PixiPresenterSystemsOptions {
+  characterOutlineEnabled: boolean;
+}
+
 interface ActorRecord {
   actor: PixiActorSnapshot;
   container: Container;
@@ -700,7 +704,7 @@ export class ActorSystem {
   private readonly characters: CharacterSystem;
 
   constructor(
-    private readonly options: PixiPresenterSystemsOptions,
+    private readonly options: PixiActorSystemOptions,
     private readonly filters: FilterSystem,
     private readonly tweens: TweenSystem,
     private readonly tasks: PresentationTaskController
@@ -734,6 +738,11 @@ export class ActorSystem {
 
   clear(): void {
     for (const id of [...this.actors.keys()]) this.remove(id);
+  }
+
+  destroy(): void {
+    this.clear();
+    this.characters.destroy();
   }
 
   relayoutViewport(): void {

@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { Assets, Container, Graphics, Rectangle, Sprite, Texture, TextureSource, TilingSprite, type Filter, type Ticker } from "pixi.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Assets, ColorMatrixFilter, Container, Graphics, Rectangle, Sprite, Texture, TextureSource, TilingSprite, type Filter, type Ticker } from "pixi.js";
 import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "@v-ronpa/contracts";
 import { INNER_BACKGROUND_ID, createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import {
@@ -18,6 +18,10 @@ import { CharacterSystem } from "./characters";
 
 describe("pixi presentation task system integration", () => {
   const innerBackgroundImageInsetPx = 8;
+
+  beforeEach(() => {
+    vi.stubGlobal("document", { createElement: () => ({ getContext: () => null }) });
+  });
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -296,6 +300,7 @@ describe("pixi presentation task system integration", () => {
     const system = new CharacterSystem({
       width: () => 960,
       height: () => 540,
+      characterOutlineEnabled: true,
       assetResolver: {
         resolve(input) {
           return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
@@ -315,9 +320,37 @@ describe("pixi presentation task system integration", () => {
     await waitFor(() => container.children[0]?.label === "layered-character:Ema:1");
 
     const content = container.children[0] as Container;
-    expect(content.children.map((child) => child.zIndex)).toEqual([1, 10]);
-    const body = content.children[0] as Sprite;
-    const face = content.children[1] as Sprite;
+    const outline = content.children[0] as Container;
+    const base = content.children[1] as Container;
+    expect(content.children.map((child) => child.label)).toEqual([
+      "layered-character-outline:Ema",
+      "layered-character-base:Ema"
+    ]);
+    expect(outline.children).toHaveLength(8);
+    expect(outline.filters).toEqual([expect.any(ColorMatrixFilter)]);
+    expect((outline.filters?.[0] as ColorMatrixFilter).padding).toBe(1);
+    expect(Array.from((outline.filters?.[0] as ColorMatrixFilter).matrix)).toEqual([
+      0, 0, 0, 0, 1,
+      0, 0, 0, 0, 1,
+      0, 0, 0, 0, 1,
+      0, 0, 0, 1, 0
+    ]);
+    expect(outline.children.map((child) => [child.x, child.y])).toEqual([
+      [-0.1, -0.1], [0, -0.1], [0.1, -0.1],
+      [-0.1, 0], [0.1, 0],
+      [-0.1, 0.1], [0, 0.1], [0.1, 0.1]
+    ]);
+    expect(base.children.map((child) => child.zIndex)).toEqual([1, 10]);
+    const body = base.children[0] as Sprite;
+    const face = base.children[1] as Sprite;
+    for (const copy of outline.children as Container[]) {
+      expect(copy.filters).toBeFalsy();
+      expect(copy.children).toHaveLength(2);
+      expect((copy.children[0] as Sprite).texture).toBe(body.texture);
+      expect((copy.children[1] as Sprite).texture).toBe(face.texture);
+      expect((copy.children[0] as Sprite).filters).toBeFalsy();
+      expect((copy.children[1] as Sprite).filters).toBeFalsy();
+    }
     expect(body.position.x).toBe(0);
     expect(body.position.y).toBe(-10);
     expect(face.position.x).toBe(5);
@@ -341,6 +374,7 @@ describe("pixi presentation task system integration", () => {
     const system = new CharacterSystem({
       width: () => 960,
       height: () => 540,
+      characterOutlineEnabled: false,
       assetResolver: {
         resolve(input) {
           return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
@@ -353,8 +387,10 @@ describe("pixi presentation task system integration", () => {
     await waitFor(() => container.children[0]?.label === "layered-character:Ema:1");
 
     const content = container.children[0] as Container;
-    const body = content.children[0] as Sprite;
-    const face = content.children[1] as Sprite;
+    expect(content.children.map((child) => child.label)).toEqual(["layered-character-base:Ema"]);
+    const base = content.children[0] as Container;
+    const body = base.children[0] as Sprite;
+    const face = base.children[1] as Sprite;
     expect(body.scale.x).toBeCloseTo(0.1);
     expect(body.scale.y).toBeCloseTo(0.1);
     expect(body.width).toBeCloseTo(20);
@@ -365,6 +401,134 @@ describe("pixi presentation task system integration", () => {
     expect(face.height).toBeCloseTo(60);
   });
 
+  it("scales the one-source-pixel outline with viewport and actor transforms", async () => {
+    installCharacterPackFetch();
+    vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
+    const viewport = { height: 540 };
+    const container = new Container({ label: "actor:Ema" });
+    const system = new CharacterSystem({
+      width: () => 960,
+      height: () => viewport.height,
+      characterOutlineEnabled: true,
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      }
+    });
+
+    system.render(container, characterActor("Ema", "Pensive1"), 1, () => true);
+    await waitFor(() => container.children[0]?.label === "layered-character:Ema:1");
+
+    const content = container.children[0] as Container;
+    const outline = content.children[0] as Container;
+    const rightCopy = outline.children.find((child) => child.label === "layered-character-outline-copy:1,0") as Container;
+    expect(rightCopy.x).toBeCloseTo(0.1);
+    expect(content.scale.x).toBe(1);
+
+    viewport.height = 1080;
+    system.relayout(container);
+    container.scale.set(1.5);
+
+    expect(content.scale.x).toBe(2);
+    expect(rightCopy.x * content.scale.x * container.scale.x).toBeCloseTo(0.3);
+  });
+
+  it("keeps a legitimately empty resolved expression empty without a source-pixel diagnostic", async () => {
+    installCharacterPackFetch();
+    const load = vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
+    const diagnostics: PixiPresenterDiagnostic[] = [];
+    const container = new Container({ label: "actor:Ema" });
+    const system = new CharacterSystem({
+      width: () => 960,
+      height: () => 540,
+      characterOutlineEnabled: true,
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      },
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic)
+    });
+
+    system.render(container, characterActor("Ema", "Body-,Face-"), 1, () => true);
+    await waitFor(() => container.children[0]?.label === "layered-character:Ema:1");
+
+    const content = container.children[0] as Container;
+    const base = content.children[0] as Container;
+    expect(content.children.map((child) => child.label)).toEqual(["layered-character-base:Ema"]);
+    expect(base.children).toEqual([]);
+    expect(load).not.toHaveBeenCalled();
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("rejects invalid source-pixel scale without falling back to an unoutlined character", async () => {
+    installCharacterPackFetch({
+      mutateMetadata(metadata) {
+        metadata.FacePensive.localTransform.scale.x = 0;
+      }
+    });
+    vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
+    const diagnostics: PixiPresenterDiagnostic[] = [];
+    const container = new Container({ label: "actor:Ema" });
+    const system = new CharacterSystem({
+      width: () => 960,
+      height: () => 540,
+      characterOutlineEnabled: true,
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      },
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic)
+    });
+
+    system.render(container, characterActor("Ema", "Pensive1"), 1, () => true);
+    await waitFor(() => container.children[0]?.label === "empty-character:Ema");
+
+    expect(diagnostics).toMatchObject([{
+      code: "asset-invalid-character-source-pixel-scale",
+      severity: "error",
+      assetId: "Ema",
+      kind: "character-pack"
+    }]);
+    expect(findDescendant(container, "layered-character-base:Ema", Container)).toBeUndefined();
+  });
+
+  it("destroys the shared outline filter exactly once without destroying cached textures", async () => {
+    installCharacterPackFetch();
+    const bodyTexture = textureWithSize(200, 400);
+    const faceTexture = textureWithSize(300, 600);
+    const bodyDestroy = vi.spyOn(bodyTexture, "destroy");
+    const faceDestroy = vi.spyOn(faceTexture, "destroy");
+    const filterDestroy = vi.spyOn(ColorMatrixFilter.prototype, "destroy");
+    vi.spyOn(Assets, "load").mockImplementation((uri) => (
+      Promise.resolve(String(uri).endsWith("/FacePensive.png") ? faceTexture : bodyTexture) as never
+    ));
+    const container = new Container({ label: "actor:Ema" });
+    const system = new CharacterSystem({
+      width: () => 960,
+      height: () => 540,
+      characterOutlineEnabled: true,
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      }
+    });
+
+    system.render(container, characterActor("Ema", "Pensive1"), 1, () => true);
+    await waitFor(() => container.children[0]?.label === "layered-character:Ema:1");
+    system.render(container, characterActor("Ema", "Pensive1"), 2, () => true);
+    await waitFor(() => container.children[0]?.label === "layered-character:Ema:2");
+    system.destroy();
+    system.destroy();
+
+    expect(filterDestroy).toHaveBeenCalledTimes(1);
+    expect(bodyDestroy).not.toHaveBeenCalled();
+    expect(faceDestroy).not.toHaveBeenCalled();
+  });
+
   it("does not require inactive metadata for layers overridden by the current expression", async () => {
     const fetch = installCharacterPackFetch({ includeInactiveMetadata: false });
     vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
@@ -373,6 +537,7 @@ describe("pixi presentation task system integration", () => {
     const system = new CharacterSystem({
       width: () => 960,
       height: () => 540,
+      characterOutlineEnabled: true,
       assetResolver: {
         resolve(input) {
           return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
@@ -401,6 +566,7 @@ describe("pixi presentation task system integration", () => {
     const system = new CharacterSystem({
       width: () => 960,
       height: () => 540,
+      characterOutlineEnabled: true,
       assetResolver: {
         resolve(input) {
           return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
@@ -434,6 +600,7 @@ describe("pixi presentation task system integration", () => {
     const system = new CharacterSystem({
       width: () => 960,
       height: () => 540,
+      characterOutlineEnabled: true,
       assetResolver: {
         resolve(input) {
           return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
@@ -468,6 +635,7 @@ describe("pixi presentation task system integration", () => {
     const system = new CharacterSystem({
       width: () => 960,
       height: () => 540,
+      characterOutlineEnabled: true,
       assetResolver: {
         resolve(input) {
           return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
@@ -500,6 +668,7 @@ describe("pixi presentation task system integration", () => {
     const system = new CharacterSystem({
       width: () => 960,
       height: () => 540,
+      characterOutlineEnabled: true,
       assetResolver: {
         resolve(input) {
           return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
@@ -1152,6 +1321,7 @@ describe("pixi presentation task system integration", () => {
 
 function createSystems(overrides: {
   assetResolver?: PixiAssetResolver;
+  characterOutlineEnabled?: boolean;
   onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
   viewport?: { width: number; height: number };
 } = {}) {
@@ -1161,6 +1331,7 @@ function createSystems(overrides: {
     root,
     width: () => viewport.width,
     height: () => viewport.height,
+    characterOutlineEnabled: overrides.characterOutlineEnabled ?? true,
     ...(overrides.assetResolver ? { assetResolver: overrides.assetResolver } : {}),
     ...(overrides.onDiagnostic ? { onDiagnostic: overrides.onDiagnostic } : {})
   };
@@ -1509,9 +1680,11 @@ function characterPackUri(): string {
 function installCharacterPackFetch(options: {
   includeInactiveMetadata?: boolean;
   mutatePack?: (pack: ReturnType<typeof characterPackFixture>) => void;
+  mutateMetadata?: (metadata: ReturnType<typeof characterPackFixture>["metadata"]) => void;
 } = {}) {
   const pack = characterPackFixture();
   options.mutatePack?.(pack);
+  options.mutateMetadata?.(pack.metadata);
   const responses: Record<string, unknown> = {
     [characterPackUri()]: pack.character,
     "https://assets.test/characters/Ema/layers.json": pack.layers,

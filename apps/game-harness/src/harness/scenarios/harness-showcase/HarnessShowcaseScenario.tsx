@@ -96,6 +96,7 @@ export function HarnessShowcaseScenario() {
             <VnPixiPresenterHost
               active={flow.mode !== "trial" && runtime.storyRuntime.active}
               assetResolver={assetRegistry}
+              characterOutlineEnabled={true}
               diagnostics={runtime.diagnostics}
               presentation={runtime.presentation}
               onCaptureHandleChanged={(handle) => {

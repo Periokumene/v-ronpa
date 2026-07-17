@@ -4,6 +4,7 @@ import { PixiLayer, type PixiStageCaptureHandle } from "./PixiLayer";
 
 export interface VnPixiPresenterHostProps {
   active: boolean;
+  characterOutlineEnabled: boolean;
   presentation: VnPresentationPort;
   diagnostics?: VnDiagnosticsPort;
   assetResolver?: PixiAssetResolver;
@@ -17,6 +18,7 @@ export interface VnPixiPresenterHostProps {
 export function VnPixiPresenterHost({
   active,
   assetResolver,
+  characterOutlineEnabled,
   diagnostics,
   onCaptureHandleChanged,
   presentation
@@ -26,6 +28,7 @@ export function VnPixiPresenterHost({
     <PixiLayer
       key={presentation.storySession}
       animate={stage.animate}
+      characterOutlineEnabled={characterOutlineEnabled}
       {...(assetResolver ? { assetResolver } : {})}
       hintSequence={stage.hintSequence}
       hints={stage.hints}

@@ -5,7 +5,12 @@ import type {
   LayeredCharacterLayerMetadata,
   LayeredCharacterLayers
 } from "@v-ronpa/contracts";
-import { calculateLayeredCharacterBounds, resolveLayeredCharacter, resolveLayeredCharacterLayerRefs } from "./index";
+import {
+  calculateLayeredCharacterBounds,
+  resolveLayeredCharacter,
+  resolveLayeredCharacterLayerRefs,
+  resolveLayeredCharacterSourcePixelScale
+} from "./index";
 
 describe("layered character resolver", () => {
   it("resolves default composition and layered expression tokens", () => {
@@ -91,6 +96,41 @@ describe("layered character resolver", () => {
   });
 });
 
+describe("layered character source-pixel scale", () => {
+  it("derives the shipped Alice and Ema source-pixel units", () => {
+    expect(resolveLayeredCharacterSourcePixelScale([pixelLayer("Alice", 1, 1, 1)])).toEqual({
+      ok: true,
+      unitsPerPixel: 1
+    });
+    expect(resolveLayeredCharacterSourcePixelScale([pixelLayer("Ema", 100, 0.6, 0.6)])).toEqual({
+      ok: true,
+      unitsPerPixel: 0.006
+    });
+  });
+
+  it("uses scale magnitudes and accepts only floating-point noise within the relative tolerance", () => {
+    const result = resolveLayeredCharacterSourcePixelScale([
+      pixelLayer("Body", 100, -0.6, -0.6),
+      pixelLayer("Face", 100, 0.6000005, 0.6000005)
+    ]);
+
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) expect(result.unitsPerPixel).toBe(0.006);
+  });
+
+  it("rejects empty, zero, non-square, and cross-layer inconsistent source-pixel scales", () => {
+    expect(resolveLayeredCharacterSourcePixelScale([])).toMatchObject({ ok: false, code: "empty-layer-set" });
+    expect(resolveLayeredCharacterSourcePixelScale([pixelLayer("Zero", 100, 0, 0)]))
+      .toMatchObject({ ok: false, code: "invalid-source-pixel-scale" });
+    expect(resolveLayeredCharacterSourcePixelScale([pixelLayer("Wide", 100, 0.6, 0.7)]))
+      .toMatchObject({ ok: false, code: "non-square-source-pixels" });
+    expect(resolveLayeredCharacterSourcePixelScale([
+      pixelLayer("Body", 100, 0.6, 0.6),
+      pixelLayer("Face", 100, 0.61, 0.61)
+    ])).toMatchObject({ ok: false, code: "inconsistent-source-pixel-scale" });
+  });
+});
+
 function fixture(appearanceExpression = "") {
   const character: LayeredCharacterDefinition = {
     id: "Ema",
@@ -165,4 +205,21 @@ function metadata(layer: string): LayeredCharacterLayerMetadata {
     },
     renderer: { color: { r: 1, g: 1, b: 1, a: 1 }, flipX: false, flipY: false }
   };
+}
+
+function pixelLayer(id: string, pixelsPerUnit: number, scaleX: number, scaleY: number) {
+  return {
+    id,
+    metadata: {
+      sourcePath: id,
+      drawOrder: 0,
+      sprite: { pivot: { x: 0.5, y: 0.5 }, pixelsPerUnit },
+      localTransform: {
+        position: { x: 0, y: 0, z: 0 },
+        scale: { x: scaleX, y: scaleY, z: 1 },
+        rotation: { x: 0, y: 0, z: 0 }
+      },
+      renderer: { color: { r: 1, g: 1, b: 1, a: 1 }, flipX: false, flipY: false }
+    }
+  } satisfies { id: string; metadata: LayeredCharacterLayerMetadata };
 }

@@ -13,6 +13,7 @@ test("game-a opening renders the imported Alice layered states", async ({ page }
 
   await advanceUntilText(page, "雨幕里，一个熟悉的人影停在了街角。", 24);
   await expectAliceState(page, "default");
+  await page.screenshot({ path: "test-results/game-a-alice-outline-default.png", fullPage: true });
 
   const states = [
     { text: "你真的在这里淋了这么久？", expression: "EYE0,MOUTH0" },
@@ -33,10 +34,14 @@ test("game-a opening renders the imported Alice layered states", async ({ page }
   for (const state of states) {
     await advanceUntilText(page, state.text, 4);
     await expectAliceState(page, state.expression);
+    if (state.expression === "EYE2,MOUTH2,ArmL0,ArmR0,EFFECT2") {
+      await page.screenshot({ path: "test-results/game-a-alice-outline-multilayer.png", fullPage: true });
+    }
   }
 
   await advanceUntilChoices(page, 4);
   await expect(page.getByTestId("vn-choice-0")).toHaveText("陪我去买牛奶吧");
+  await expect(page.locator("main.game-a-shell")).toHaveAttribute("data-game-a-asset-diagnostics-count", "0");
   expect(consoleErrors).toEqual([]);
 });
 
@@ -45,6 +50,7 @@ async function expectAliceState(page: Page, expression: string) {
     "data-pixi-characters",
     `alice/${expression}@0.50,0.00`
   );
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-outline", "enabled");
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-active-tasks", "empty");
   await page.waitForTimeout(500);
 }

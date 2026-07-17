@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Application } from "pixi.js";
 import type { NaniCommandCategory, NaniCommandSource, NaniCommandStatus, RuntimeCommand, RuntimeValue } from "@v-ronpa/contracts";
 import {
@@ -11,6 +11,10 @@ import { ActorSystem } from "./internal/systems";
 import { resolveRainSettingsFromCommandParams } from "./internal/rain/settings";
 
 describe("pixi presenter port", () => {
+  beforeEach(() => {
+    vi.stubGlobal("document", { createElement: () => ({ getContext: () => null }) });
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -24,7 +28,7 @@ describe("pixi presenter port", () => {
         throw new Error("mount should not be required for memory behavior");
       }
     } as unknown as HTMLElement;
-    const presenter = createPixiPresenter({ host });
+    const presenter = createPixiPresenter({ host, characterOutlineEnabled: true });
 
     expect(() => presenter.reconcile(createInitialPixiStageSnapshot())).not.toThrow();
     expect(() => presenter.clear()).not.toThrow();
@@ -71,7 +75,7 @@ describe("pixi presenter port", () => {
       clientHeight: 540,
       appendChild: vi.fn()
     } as unknown as HTMLElement;
-    const presenter = createPixiPresenter({ host });
+    const presenter = createPixiPresenter({ host, characterOutlineEnabled: true });
 
     await presenter.mount();
     presenter.reconcile(createInitialPixiStageSnapshot());

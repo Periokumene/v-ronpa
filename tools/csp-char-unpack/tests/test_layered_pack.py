@@ -148,10 +148,36 @@ def test_builds_cropped_pack_with_default_and_builtin_tokens(tmp_path: Path) -> 
     }
     metadata = json.loads((tmp_path / "assets/layers/MAIN/ArmL/0.json").read_text(encoding="utf-8"))
     assert metadata["localTransform"]["position"] == {"x": 20, "y": 80, "z": 0}
+    for metadata_path in (tmp_path / "assets/layers").rglob("*.json"):
+        generated_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        assert generated_metadata["sprite"]["pixelsPerUnit"] == 1
+        assert generated_metadata["localTransform"]["scale"] == {"x": 1, "y": 1, "z": 1}
     assert Image.open(tmp_path / "assets/layers/MAIN/ArmL/0.png").size == (20, 30)
     character = json.loads((tmp_path / "character.json").read_text(encoding="utf-8"))
     assert character["renderSpace"] == {"stageScale": 7.0, "characterAnchor": [50.0, 160.0]}
     assert validate_pack(tmp_path) == "Validated V-Ronpa character pack 'Alice'."
+
+
+@pytest.mark.parametrize("invalid_kind", ["zero", "non-square", "mixed-density"])
+def test_pack_validator_rejects_invalid_source_pixel_scale(tmp_path: Path, invalid_kind: str) -> None:
+    pack_root = tmp_path / invalid_kind
+    build_layered_character_pack(valid_inspection(), pack_root, "Alice", "/MAIN")
+    metadata_paths = sorted((pack_root / "assets/layers").rglob("*.json"))
+    first = json.loads(metadata_paths[0].read_text(encoding="utf-8"))
+    if invalid_kind == "zero":
+        first["localTransform"]["scale"]["x"] = 0
+        metadata_paths[0].write_text(json.dumps(first), encoding="utf-8")
+    elif invalid_kind == "non-square":
+        first["localTransform"]["scale"]["y"] = 2
+        metadata_paths[0].write_text(json.dumps(first), encoding="utf-8")
+    else:
+        second = json.loads(metadata_paths[1].read_text(encoding="utf-8"))
+        second["localTransform"]["scale"]["x"] = 2
+        second["localTransform"]["scale"]["y"] = 2
+        metadata_paths[1].write_text(json.dumps(second), encoding="utf-8")
+
+    with pytest.raises(ToolError, match="invalid source-pixel scale"):
+        validate_pack(pack_root)
 
 
 def test_render_parameters_and_all_sprite_bounds_fallback_are_applied(tmp_path: Path) -> None:

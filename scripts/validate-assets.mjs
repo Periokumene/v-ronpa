@@ -21,6 +21,9 @@ const {
   LayeredCharacterLayersSchema
 } = await import(pathToFileURL(join(repoRoot, "packages/contracts/src/index.ts")).href);
 const { createAssetRegistry } = await import(pathToFileURL(join(repoRoot, "packages/asset-registry/src/index.ts")).href);
+const { resolveLayeredCharacterSourcePixelScale } = await import(
+  pathToFileURL(join(repoRoot, "packages/layered-character/src/index.ts")).href
+);
 const { pixiRuntimeAssetFragment } = await import(pathToFileURL(join(repoRoot, "packages/runtime-assets-pixi/src/index.ts")).href);
 const harnessGeneratedPath = join(repoRoot, "apps/game-harness/src/harness/generatedAssets.ts");
 const gameAGeneratedPath = join(repoRoot, "apps/game-a/src/generatedAssets.ts");
@@ -207,6 +210,7 @@ function checkCharacterPacks() {
         if (!compositions.tokens.Default || compositions.tokens.Default.length === 0) {
           fail(`Character pack '${asset.id}' must define a non-empty Default composition token.`);
         }
+        const sourcePixelLayers = [];
         for (const [groupName, group] of Object.entries(layers.groups)) {
           for (const [layerName, ref] of Object.entries(group.layers)) {
             const texturePath = resolvePackPath(packRoot, ref.src);
@@ -216,8 +220,15 @@ function checkCharacterPacks() {
             else checkPngTextureDimensions(asset.id, groupName, layerName, ref.src, texturePath);
             if (!metadataPath) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} uses out-of-pack metadata path '${ref.metadata}'.`);
             else if (!existsSync(metadataPath)) fail(`Character pack '${asset.id}' layer ${groupName}>${layerName} metadata is missing: ${ref.metadata}.`);
-            else LayeredCharacterLayerMetadataSchema.parse(readJsonFile(metadataPath));
+            else {
+              const metadata = LayeredCharacterLayerMetadataSchema.parse(readJsonFile(metadataPath));
+              sourcePixelLayers.push({ id: `${groupName}>${layerName}`, metadata });
+            }
           }
+        }
+        const sourcePixelScale = resolveLayeredCharacterSourcePixelScale(sourcePixelLayers);
+        if (!sourcePixelScale.ok) {
+          fail(`Character pack '${asset.id}' has invalid source-pixel scale: ${sourcePixelScale.message}`);
         }
       } catch (error) {
         fail(`Character pack '${asset.id}' failed schema validation: ${error instanceof Error ? error.message : String(error)}`);

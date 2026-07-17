@@ -84,14 +84,23 @@ removal expressions. The tool does not generate character-specific concepts such
 
 ## Manual promotion
 
-After reviewing `reports/`, copy only the self-contained character directory into the intended app location and update the
-app manifest or script in a separate, explicitly authorized task:
+After reviewing `reports/`, mirror only the self-contained character directory into the intended app location and update
+the app manifest or script in a separate, explicitly authorized task. The destination is a replacement boundary: remove
+files that are absent from the accepted run instead of merging the run into an older character directory.
 
 ```bash
-cp -R workspace/outputs/Alice/<run-id>/character/Alice /chosen/app/asset/location
+source=workspace/outputs/Alice/<run-id>/character/Alice
+target=/chosen/app/asset/location/Alice
+mkdir -p "$target"
+rsync -a --delete "$source/" "$target/"
+
+cd /path/to/v-ronpa
+pnpm generate:assets
+pnpm validate:assets
 ```
 
-No promotion command is provided intentionally.
+Do not use `cp -R` to merge into an existing target: stale JSON, metadata, or PNG files would create a second effective
+pack standard. No promotion command or source receipt is provided intentionally; promotion remains a reviewed human step.
 
 ## Verification
 
@@ -102,4 +111,4 @@ node scripts/validate-vronpa-pack.mjs workspace/outputs/Alice/<run-id>/character
 ```
 
 QA pixel differences are descriptive and never a hard threshold. Structural errors, empty sprites, invalid geometry, token
-resolution failures and project schema failures reject the run.
+resolution failures, inconsistent source-pixel scale and project schema failures reject the run.

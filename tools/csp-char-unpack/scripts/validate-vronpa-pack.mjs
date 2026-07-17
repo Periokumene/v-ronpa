@@ -6,7 +6,10 @@ import {
   LayeredCharacterLayerMetadataSchema,
   LayeredCharacterLayersSchema
 } from "../../../packages/contracts/src/index.ts";
-import { resolveLayeredCharacterLayerRefs } from "../../../packages/layered-character/src/index.ts";
+import {
+  resolveLayeredCharacterLayerRefs,
+  resolveLayeredCharacterSourcePixelScale
+} from "../../../packages/layered-character/src/index.ts";
 
 const packRoot = resolve(process.argv[2] ?? "");
 if (!process.argv[2]) {
@@ -19,11 +22,18 @@ const character = LayeredCharacterDefinitionSchema.parse(readJson("character.jso
 const layers = LayeredCharacterLayersSchema.parse(readJson("layers.json"));
 const compositions = LayeredCharacterCompositionsSchema.parse(readJson("compositions.json"));
 
-for (const group of Object.values(layers.groups)) {
-  for (const layer of Object.values(group.layers)) {
+const sourcePixelLayers = [];
+for (const [groupName, group] of Object.entries(layers.groups)) {
+  for (const [layerName, layer] of Object.entries(group.layers)) {
     if (!existsSync(resolve(packRoot, layer.src))) throw new Error(`Missing layered character sprite: ${layer.src}`);
-    LayeredCharacterLayerMetadataSchema.parse(readJson(layer.metadata));
+    const metadata = LayeredCharacterLayerMetadataSchema.parse(readJson(layer.metadata));
+    sourcePixelLayers.push({ id: `${groupName}>${layerName}`, metadata });
   }
+}
+
+const sourcePixelScale = resolveLayeredCharacterSourcePixelScale(sourcePixelLayers);
+if (!sourcePixelScale.ok) {
+  throw new Error(`Generated character pack has invalid source-pixel scale: ${sourcePixelScale.message}`);
 }
 
 if (!compositions.tokens.Default?.length) {

@@ -1,4 +1,4 @@
-import { Assets, Container, Sprite, type Texture } from "pixi.js";
+import { Assets, ColorMatrixFilter, Container, Sprite, type Texture } from "pixi.js";
 import {
   LayeredCharacterCompositionsSchema,
   LayeredCharacterDefinitionSchema,
@@ -10,12 +10,18 @@ import {
   type LayeredCharacterCompositions,
   type PixiActorSnapshot
 } from "@v-ronpa/contracts";
-import { resolveLayeredCharacter, resolveLayeredCharacterLayerRefs, type ResolvedLayeredCharacterLayer } from "@v-ronpa/layered-character";
+import {
+  resolveLayeredCharacter,
+  resolveLayeredCharacterLayerRefs,
+  resolveLayeredCharacterSourcePixelScale,
+  type ResolvedLayeredCharacterLayer
+} from "@v-ronpa/layered-character";
 import { resolvePixiAsset, type PixiAssetResolver, type PixiPresenterDiagnostic } from "./assetResolver";
 
 export interface CharacterSystemOptions {
   width: () => number;
   height: () => number;
+  characterOutlineEnabled: boolean;
   assetResolver?: PixiAssetResolver;
   onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
 }
@@ -33,13 +39,34 @@ interface CharacterRenderFrame {
   stageScale: number;
 }
 
+const SOURCE_PIXEL_OUTLINE_OFFSETS = [
+  [-1, -1], [0, -1], [1, -1],
+  [-1, 0], [1, 0],
+  [-1, 1], [0, 1], [1, 1]
+] as const;
+
+const WHITE_SILHOUETTE_MATRIX: ColorMatrixFilter["matrix"] = [
+  0, 0, 0, 0, 1,
+  0, 0, 0, 0, 1,
+  0, 0, 0, 0, 1,
+  0, 0, 0, 1, 0
+];
+
 export class CharacterSystem {
   private readonly packs = new Map<string, Promise<LoadedCharacterPack>>();
   private readonly metadata = new Map<string, Promise<LayeredCharacterLayerMetadata>>();
   private readonly textures = new Map<string, Promise<Texture>>();
   private readonly renderHeights = new WeakMap<Container, number>();
+  private readonly whiteSilhouetteFilter: ColorMatrixFilter | undefined;
+  private destroyed = false;
 
-  constructor(private readonly options: CharacterSystemOptions) {}
+  constructor(private readonly options: CharacterSystemOptions) {
+    if (options.characterOutlineEnabled) {
+      this.whiteSilhouetteFilter = new ColorMatrixFilter();
+      this.whiteSilhouetteFilter.matrix = WHITE_SILHOUETTE_MATRIX;
+      this.whiteSilhouetteFilter.padding = 1;
+    }
+  }
 
   render(container: Container, actor: PixiActorSnapshot, generation: number, isCurrent: () => boolean): void {
     const entryUri = resolvePixiAsset(this.options.assetResolver, { id: actor.id, kind: "character-pack" }, this.options.onDiagnostic);
@@ -98,8 +125,16 @@ export class CharacterSystem {
           if (isCurrent()) this.replaceContent(container, new Container({ label: `empty-character:${actor.id}` }));
           return;
         }
+        const sourcePixelScale = resolved.activeLayers.length > 0
+          ? resolveLayeredCharacterSourcePixelScale(resolved.activeLayers)
+          : undefined;
+        if (sourcePixelScale && !sourcePixelScale.ok) {
+          this.emitInvalidSourcePixelScale(actor, sourcePixelScale.message);
+          if (isCurrent()) this.replaceContent(container, new Container({ label: `empty-character:${actor.id}` }));
+          return;
+        }
         const content = new Container({ label: `layered-character:${actor.id}:${generation}` });
-        this.drawLayers(content, pack, textures);
+        this.drawCharacter(content, pack, textures, sourcePixelScale?.ok ? sourcePixelScale.unitsPerPixel : undefined);
         this.renderHeights.set(content, this.options.height());
         this.replaceContent(container, content);
       })
@@ -115,6 +150,15 @@ export class CharacterSystem {
     const renderHeight = this.renderHeights.get(content);
     if (!renderHeight) return;
     content.scale.set(this.options.height() / renderHeight);
+  }
+
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.whiteSilhouetteFilter?.destroy();
+    this.packs.clear();
+    this.metadata.clear();
+    this.textures.clear();
   }
 
   private loadPack(entryUri: string): Promise<LoadedCharacterPack> {
@@ -210,19 +254,37 @@ export class CharacterSystem {
     });
   }
 
-  private drawLayers(
+  private emitInvalidSourcePixelScale(actor: PixiActorSnapshot, message: string): void {
+    const expression = actor.appearanceExpression?.trim() || "default";
+    this.options.onDiagnostic?.({
+      source: "asset",
+      code: "asset-invalid-character-source-pixel-scale",
+      severity: "error",
+      assetId: actor.id,
+      kind: "character-pack",
+      message: `Layered character ${actor.id} expression '${expression}' has invalid source-pixel scale: ${message}`
+    });
+  }
+
+  private drawCharacter(
     content: Container,
     pack: LoadedCharacterPack,
-    textures: Array<{ layer: ResolvedLayeredCharacterLayer; texture: Texture }>
+    textures: Array<{ layer: ResolvedLayeredCharacterLayer; texture: Texture }>,
+    unitsPerPixel: number | undefined
   ): void {
     const frame = characterRenderFrame(pack, this.options.height());
-    content.sortableChildren = true;
-
-    for (const { layer, texture } of textures) {
-      const sprite = new Sprite(texture);
-      applyLayerRenderParameters(sprite, layer, frame);
-      content.addChild(sprite);
+    if (this.whiteSilhouetteFilter && unitsPerPixel !== undefined) {
+      const outline = new Container({ label: `layered-character-outline:${pack.character.id}` });
+      const outlineStep = unitsPerPixel * frame.stageScale;
+      for (const [x, y] of SOURCE_PIXEL_OUTLINE_OFFSETS) {
+        const copy = createLayerComposition(textures, frame, `layered-character-outline-copy:${x},${y}`);
+        copy.position.set(x * outlineStep, y * outlineStep);
+        outline.addChild(copy);
+      }
+      outline.filters = [this.whiteSilhouetteFilter];
+      content.addChild(outline);
     }
+    content.addChild(createLayerComposition(textures, frame, `layered-character-base:${pack.character.id}`));
   }
 
   private replaceContent(container: Container, content: Container): void {
@@ -230,6 +292,21 @@ export class CharacterSystem {
     for (const child of previous) child.destroy({ children: true });
     container.addChild(content);
   }
+}
+
+function createLayerComposition(
+  textures: Array<{ layer: ResolvedLayeredCharacterLayer; texture: Texture }>,
+  frame: CharacterRenderFrame,
+  label: string
+): Container {
+  const composition = new Container({ label });
+  composition.sortableChildren = true;
+  for (const { layer, texture } of textures) {
+    const sprite = new Sprite(texture);
+    applyLayerRenderParameters(sprite, layer, frame);
+    composition.addChild(sprite);
+  }
+  return composition;
 }
 
 // Render-affecting parameters are declared by scope: values shared by the full

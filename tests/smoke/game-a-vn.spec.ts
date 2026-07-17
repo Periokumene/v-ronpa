@@ -124,10 +124,9 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await advanceUntilMovie(page, 5);
   await page.waitForTimeout(300);
   await page.screenshot({ path: "test-results/game-a-movie.png", fullPage: true });
-  await page.evaluate(() => {
-    document.querySelector<HTMLElement>('[data-testid="runtime-movie-skip"]')?.click();
-  });
-  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT SMOKE MOVIE");
+  await clickByTestId(page, "runtime-movie-skip");
+  await expect(page.getByTestId("runtime-movie-overlay")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT SMOKE MOVIE", { timeout: 15_000 });
 
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("backlog-overlay")).toBeVisible();
