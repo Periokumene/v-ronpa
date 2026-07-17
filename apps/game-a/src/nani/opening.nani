@@ -5,7 +5,7 @@
 
 #StoryBegin
 @stopSfx group:noise fade:2
-@sfx sfx:glug-glug-glug group:glug volume:0.2 wait!
+@sfx sfx:glug-glug-glug group:glug volume:0.2
 @sfx sfx:gentle-rain-loop group:rain loop:true volume:0.1
 @showUI dialog time:2 wait!
 nar: 最烂的天气我会投雨天一票

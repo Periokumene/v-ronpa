@@ -6,7 +6,7 @@ describe("hover provider logic", () => {
     const hover = getNaniHover("@bgm bgm:main volume:0.6", { line: 0, character: 2 });
 
     expect(hover?.contents).toContain("bgm · media · implemented");
-    expect(hover?.contents).toContain("播放背景音乐");
+    expect(hover?.contents).toContain("播放循环背景音乐");
     expect(hover?.range).toEqual({
       start: { line: 0, character: 1 },
       end: { line: 0, character: 4 }
@@ -21,6 +21,7 @@ describe("hover provider logic", () => {
     expect(volume?.contents).toContain("播放音量倍率");
     expect(volume?.contents).toContain("Recommended: 0..1");
     expect(wait?.contents).toContain("是否等待表现层或播放流程完成");
+    expect(wait?.contents).toContain("Runtime support: declared-not-consumed");
     expect(uiWait?.contents).toContain("是否等待表现层或播放流程完成");
     expect(uiWait?.contents).toContain("Runtime support: consumed");
   });

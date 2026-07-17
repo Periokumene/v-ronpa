@@ -38,6 +38,7 @@ describe("game-a nani scripts", () => {
 
     expect(parsed.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
     expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+    expect(compiled.diagnostics.filter((diagnostic) => diagnostic.code === "unsupported-command-param")).toEqual([]);
     expect(compiled.script.labels).toHaveProperty("Start");
     expect(parsed.scenario.assets).toContainEqual({ id: "alice", kind: "character-pack" });
     expect(compiled.script.commands).toContainEqual(
@@ -100,6 +101,17 @@ describe("game-a nani scripts", () => {
     ]);
     expect(gameAOpeningNaniSource).not.toContain("CHECKPOINT SMOKE");
     expect(gameAOpeningNaniSource).not.toContain("CHECKPOINT CHARACTER");
+
+    const smokeCompiled = compileRuntimeScript(parseScenario({
+      scriptPath: smokeRuntimeEntry.scriptPath,
+      sourceText: smokeRuntimeEntry.sourceText
+    }).scenario);
+    expect(smokeCompiled.script.commands).toContainEqual(
+      expect.objectContaining({
+        commandId: "flash",
+        params: expect.objectContaining({ durationMs: 50, wait: true })
+      })
+    );
   });
 
   it("resolves only explicit test entry ids", () => {

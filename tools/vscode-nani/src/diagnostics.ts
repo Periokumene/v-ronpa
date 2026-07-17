@@ -92,10 +92,77 @@ function commandLoc(command: CommandIR): CommandLoc {
 }
 
 function computeSemanticDiagnostics(commands: CommandIR[]): NaniDiagnostic[] {
-  return commands.flatMap((command) => {
-    if (command.commandId !== "showui" && command.commandId !== "hideui") return [];
-    return uiTargetDiagnostics(command);
+  return commands.flatMap((command) => [
+    ...promotedPrimaryDiagnostics(command),
+    ...(command.commandId === "showui" || command.commandId === "hideui" ? uiTargetDiagnostics(command) : [])
+  ]);
+}
+
+const primaryConsumptionCache = new Map<string, boolean>();
+const primaryProbe = "__vscode_nani_primary_probe__";
+
+function promotedPrimaryDiagnostics(command: CommandIR): NaniDiagnostic[] {
+  const definition = getNaniCommandDefinition(command.commandId);
+  if (!definition || definition.id === "set") return [];
+
+  const knownParams = new Set(
+    definition.params.flatMap((param) => [param.name, ...(param.aliases ?? [])]).map(normalize)
+  );
+  let hasPrimary = false;
+  for (const arg of command.args) {
+    if (arg.kind === "value") {
+      hasPrimary = true;
+      continue;
+    }
+    if (arg.kind !== "param") continue;
+    const key = normalize(arg.key);
+    if (key === "if" || key === "unless" || knownParams.has(key)) continue;
+    if (hasPrimary) continue;
+
+    hasPrimary = true;
+    if (commandConsumesPrimary(definition.canonicalName)) continue;
+    return [
+      {
+        message: `@${definition.canonicalName} does not declare parameter ${arg.key}, and its runtime compiler does not consume a primary value; ${arg.raw} would be ignored.`,
+        severity: "warning",
+        range: rawArgRange(command, arg.raw),
+        source: "vscode-nani",
+        code: "ignored-promoted-primary"
+      }
+    ];
+  }
+  return [];
+}
+
+function commandConsumesPrimary(commandName: string): boolean {
+  const key = normalize(commandName);
+  const cached = primaryConsumptionCache.get(key);
+  if (cached !== undefined) return cached;
+
+  const parsed = parseScenario({
+    sourceText: `@${commandName} ${primaryProbe}`,
+    scriptPath: "vscode-nani-primary-probe.nani"
   });
+  const compiled = compileRuntimeScript(parsed.scenario).script.commands[0];
+  const consumed = compiled ? containsRuntimeString(compiled.params, primaryProbe) : false;
+  primaryConsumptionCache.set(key, consumed);
+  return consumed;
+}
+
+function containsRuntimeString(value: unknown, expected: string): boolean {
+  if (value === expected) return true;
+  if (Array.isArray(value)) return value.some((item) => containsRuntimeString(item, expected));
+  if (!value || typeof value !== "object") return false;
+  return Object.values(value).some((item) => containsRuntimeString(item, expected));
+}
+
+function rawArgRange(command: CommandIR, raw: string): NaniRange {
+  const start = findArgStart(command.loc.raw, raw);
+  if (start === undefined) return lineRange(command.loc.line - 1, command.loc.raw);
+  return {
+    start: { line: command.loc.line - 1, character: start },
+    end: { line: command.loc.line - 1, character: start + raw.length }
+  };
 }
 
 const runtimeUiTargetSet = new Set<string>(RUNTIME_UI_GROUPS);
