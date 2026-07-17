@@ -3,11 +3,11 @@ import { useId } from "react";
 import type { CSSProperties } from "react";
 import { RichTextRenderer } from "./RichTextRenderer";
 import type { UiSurfacePresentationLike } from "./types";
+import { resolveVnDialogAppearance, type VnDialogAppearance } from "./vnDialogAppearance";
 import { VN_UI_LAYER_Z_INDEX } from "./vnLayers";
 
 export interface VnDialogDisplaySettings {
   textSize: "small" | "medium" | "large";
-  textboxOpacity: number;
   textSpeed: number;
 }
 
@@ -15,6 +15,7 @@ export interface VnDialogSurfaceProps {
   speaker?: string;
   text: string;
   richText?: RichTextDocument;
+  appearance?: Partial<VnDialogAppearance>;
   displaySettings?: VnDialogDisplaySettings;
   presentation?: UiSurfacePresentationLike;
   state?: VnDialogState;
@@ -24,16 +25,8 @@ export type VnDialogState = "line" | "choices" | "ended";
 
 const DEFAULT_DISPLAY_SETTINGS = {
   textSize: "medium",
-  textboxOpacity: 0.84,
   textSpeed: 0.5
 } as const satisfies VnDialogDisplaySettings;
-
-const TEXTBOX_OPACITY_LIMITS = {
-  primaryMin: 0.2,
-  secondaryMin: 0.18,
-  max: 1,
-  secondaryMultiplier: 0.92
-} as const;
 
 const TEXT_SPEED_TRANSITION_MS = {
   max: 260,
@@ -44,6 +37,7 @@ export function VnDialogSurface({
   speaker,
   text,
   richText,
+  appearance,
   displaySettings,
   presentation,
   state = "line"
@@ -53,7 +47,7 @@ export function VnDialogSurface({
   const textId = useId();
   const textSize = displaySettings?.textSize ?? DEFAULT_DISPLAY_SETTINGS.textSize;
   const textSpeed = displaySettings?.textSpeed ?? DEFAULT_DISPLAY_SETTINGS.textSpeed;
-  const textboxOpacity = displaySettings?.textboxOpacity ?? DEFAULT_DISPLAY_SETTINGS.textboxOpacity;
+  const resolvedAppearance = resolveVnDialogAppearance(appearance);
 
   return (
     <section
@@ -61,13 +55,13 @@ export function VnDialogSurface({
       aria-label="视觉小说对话"
       aria-labelledby={speakerId}
       data-state={state}
+      data-dialog-background-opacity={String(resolvedAppearance.backgroundOpacity)}
       data-text-size={textSize}
       data-text-speed={String(textSpeed)}
-      data-textbox-opacity={String(textboxOpacity)}
       data-ui-phase={presentation?.phase ?? "shown"}
       data-testid="vn-dialog-surface"
       role="region"
-      style={dialogRootStyle(textboxOpacity, presentation?.opacity ?? 1)}
+      style={dialogRootStyle(resolvedAppearance.backgroundOpacity, presentation?.opacity ?? 1)}
     >
       <div style={headerStyle}>
         <div data-testid="vn-dialog-speaker" id={speakerId} style={speakerStyle}>
@@ -107,24 +101,18 @@ const rootStyle: CSSProperties = {
   padding: "14px 16px 12px",
   border: "1px solid rgba(255, 209, 102, 0.4)",
   borderRadius: 8,
-  background: "linear-gradient(180deg, rgba(11, 16, 23, 0.91), rgba(13, 20, 31, 0.84))",
+  background: "linear-gradient(180deg, rgba(11, 16, 23, 1), rgba(13, 20, 31, 1))",
   boxShadow: "0 18px 42px rgba(0, 0, 0, 0.34)",
   color: "#edf7f8",
   backdropFilter: "blur(12px)",
   pointerEvents: "none"
 };
 
-function dialogRootStyle(textboxOpacity: number, opacity: number): CSSProperties {
-  const primaryOpacity = clamp(textboxOpacity, TEXTBOX_OPACITY_LIMITS.primaryMin, TEXTBOX_OPACITY_LIMITS.max);
-  const secondaryOpacity = clamp(
-    textboxOpacity * TEXTBOX_OPACITY_LIMITS.secondaryMultiplier,
-    TEXTBOX_OPACITY_LIMITS.secondaryMin,
-    TEXTBOX_OPACITY_LIMITS.max
-  );
+function dialogRootStyle(backgroundOpacity: number, opacity: number): CSSProperties {
   return {
     ...rootStyle,
     opacity: clamp(opacity, 0, 1),
-    background: `linear-gradient(180deg, rgba(11, 16, 23, ${primaryOpacity}), rgba(13, 20, 31, ${secondaryOpacity}))`
+    background: `linear-gradient(180deg, rgba(11, 16, 23, ${backgroundOpacity}), rgba(13, 20, 31, ${backgroundOpacity}))`
   };
 }
 

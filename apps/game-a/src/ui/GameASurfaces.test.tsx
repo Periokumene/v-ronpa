@@ -63,13 +63,15 @@ describe("game-a interaction surfaces", () => {
       hoverThrottleMs: 60
     });
     expect(gameAUiConfig.dialog.frameAssetId).toBe("texture:ui:game-a-dialog-frame");
+    expect(gameAUiConfig.dialog.appearance).toEqual({ backgroundOpacity: 1 });
     expect(assets.diagnostics).toEqual([]);
     expect(root?.props).toMatchObject({ "data-frame": "resolved" });
     expect((root?.props as { style?: Record<string, string | number> }).style).toMatchObject({
       pointerEvents: "none",
       opacity: 0.75,
-      "--dialog-opacity": 0.92
+      "--game-a-dialog-background-opacity": 0.92
     });
+    expect(root?.props).toMatchObject({ "data-dialog-background-opacity": "0.92" });
   });
 
   it("renders a reference-style floating speaker plate while keeping state text screen-reader only", () => {
@@ -382,7 +384,7 @@ describe("game-a interaction surfaces", () => {
 
     const displayElement = createSettingsContentElement("display");
     expect(findElementByTestId(displayElement, "settings-group-display")).toBeDefined();
-    expect(findElementByTestId(displayElement, "settings-display-textbox-opacity")).toBeDefined();
+    expect(findElementByTestId(displayElement, "settings-display-textbox-opacity")).toBeUndefined();
     expect(findElementByTestId(displayElement, "settings-sound-master")).toBeUndefined();
 
     const automationElement = createSettingsContentElement("automation");
@@ -480,7 +482,8 @@ function createDialogModel(): VnDialogViewModel {
     speakerLabel: "Mira",
     text: "The corridor light flickers once.",
     state: "line",
-    display: { textSize: "medium", textboxOpacity: 0.92, textSpeed: 0.5 },
+    appearance: { backgroundOpacity: 0.92 },
+    display: { textSize: "medium", textSpeed: 0.5 },
     presentation: { targetVisible: false, mounted: true, opacity: 0.75, phase: "hiding" }
   };
 }

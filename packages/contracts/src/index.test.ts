@@ -907,11 +907,11 @@ describe("contracts", () => {
     expect(InteractionCapabilitySnapshotSchema.parse({ canBack: true })).not.toHaveProperty("canBack");
     expect(InteractionCapabilitySnapshotSchema.parse({ canQuickSave: true })).not.toHaveProperty("canQuickSave");
 
-    expect(SettingsSnapshotSchema.parse({ version: 1 })).toEqual(createDefaultSettingsSnapshot());
+    expect(SettingsSnapshotSchema.parse({ version: 2 })).toEqual(createDefaultSettingsSnapshot());
     expect(createDefaultSettingsSnapshot()).toMatchObject({
-      version: 1,
+      version: 2,
       system: { language: "zh-CN", skipAll: false, preferFullscreen: false },
-      display: { textSpeed: 0.5, textSize: "medium", textboxOpacity: 0.75, fontFamilyId: "font:default" },
+      display: { textSpeed: 0.5, textSize: "medium", fontFamilyId: "font:default" },
       sound: {
         masterVolume: 1,
         bgmVolume: 0.25,
@@ -923,11 +923,13 @@ describe("contracts", () => {
       },
       automation: { autoSpeed: 0.5, skipSpeed: 0.5 }
     });
-    expect(() => SettingsSnapshotSchema.parse({ version: 1, placeholder: true })).toThrow();
-    expect(() => SettingsSnapshotSchema.parse({ version: 1, sound: { masterVolume: 1.2 } })).toThrow();
+    expect(() => SettingsSnapshotSchema.parse({ version: 1 })).toThrow();
+    expect(() => SettingsSnapshotSchema.parse({ version: 2, display: { textboxOpacity: 0.75 } })).toThrow();
+    expect(() => SettingsSnapshotSchema.parse({ version: 2, placeholder: true })).toThrow();
+    expect(() => SettingsSnapshotSchema.parse({ version: 2, sound: { masterVolume: 1.2 } })).toThrow();
     expect(
       SettingsSnapshotSchema.parse({
-        version: 1,
+        version: 2,
         sound: { masterVolume: 0.5, bgmVolume: 0.2, sfxVolume: 0.6, voiceVolume: 0.8, uiVolume: 0.7, muted: false }
       }).sound.bleepVolume
     ).toBe(1);

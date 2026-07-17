@@ -8,7 +8,6 @@
 }
 
 .game-a-dialog-surface {
-  --dialog-opacity: 0.96;
   --game-a-dialog-left: 11.7vw;
   --game-a-dialog-right: 11.7vw;
   --game-a-dialog-bottom: 0px;
@@ -39,7 +38,7 @@
   z-index: -2;
   border: 2px solid var(--game-a-dialog-line);
   border-bottom: 0;
-  background: rgba(0, 0, 0, var(--dialog-opacity));
+  background: rgba(0, 0, 0, var(--game-a-dialog-background-opacity));
 }
 
 .game-a-screen-reader-only {

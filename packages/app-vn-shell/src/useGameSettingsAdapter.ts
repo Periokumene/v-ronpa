@@ -11,7 +11,7 @@ import {
 } from "@v-ronpa/story-play";
 import type { VnDialogDisplaySettings } from "./GameInteractionViewModels";
 
-export const GAME_SETTINGS_STORAGE_KEY = "v-ronpa:settings:v1";
+export const GAME_SETTINGS_STORAGE_KEY = "v-ronpa:settings:v2";
 export const GAME_SETTINGS_WRITE_DEBOUNCE_MS = 120;
 
 export interface GameSettingsStorage {
@@ -194,7 +194,6 @@ export function settingsToStoryPlayTimingPolicy(settings: SettingsSnapshot): Sto
 export function settingsToDialogDisplaySettings(settings: SettingsSnapshot): VnDialogDisplaySettings {
   return {
     textSize: settings.display.textSize,
-    textboxOpacity: settings.display.textboxOpacity,
     textSpeed: settings.display.textSpeed
   };
 }

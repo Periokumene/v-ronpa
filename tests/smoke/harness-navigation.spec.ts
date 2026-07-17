@@ -25,13 +25,12 @@ test("harness Navi, settings, interaction, and Trial flow", async ({ page }) => 
   await expect(page.getByTestId("settings-group-sound")).toBeVisible();
   await expect(page.getByTestId("settings-overlay").getByTestId("vn-dialog-text")).toHaveCount(0);
   await page.getByTestId("settings-display-text-size").selectOption("large");
-  await page.getByTestId("settings-display-textbox-opacity").fill("50");
+  await expect(page.getByTestId("settings-display-textbox-opacity")).toHaveCount(0);
   await page.getByTestId("settings-overlay-close").click();
   await expect(page.getByTestId("settings-overlay")).toBeHidden();
   await page.getByTestId("title-settings").click();
   await expect(page.getByTestId("settings-display-text-size")).toHaveValue("large");
-  await expect(page.getByTestId("settings-display-textbox-opacity")).toHaveValue("50");
-  await expect(page.getByTestId("settings-display-textbox-opacity-value")).toHaveText("50%");
+  await expect(page.getByTestId("settings-display-textbox-opacity")).toHaveCount(0);
   await page.getByTestId("settings-overlay-close").click();
   await expect(page.getByTestId("settings-overlay")).toBeHidden();
   await page.getByTestId("title-load").click();

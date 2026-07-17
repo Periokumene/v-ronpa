@@ -20,12 +20,12 @@ test.setTimeout(180_000);
 test("harness VN shell, save/load, and main interaction branch", async ({ page }) => {
   const consoleErrors = watchUnexpectedConsoleErrors(page);
   await bootHarness(page);
-  await configureTitleDisplay(page, { textSpeed: "1", textSize: "large", textboxOpacity: "50" });
+  await configureTitleDisplay(page, { textSpeed: "1", textSize: "large" });
   await startNavi(page);
   await startStoryOverlay(page);
 
   await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-text-size", "large");
-  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-textbox-opacity", "0.5");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-dialog-background-opacity", "1");
   await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-ui-phase", "shown");
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("aria-hidden", "false");
   await expect(page.getByTestId("vn-dialog-speaker")).toHaveText("旁白");
@@ -67,12 +67,11 @@ test("harness VN shell, save/load, and main interaction branch", async ({ page }
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
   await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
   await page.getByTestId("settings-display-text-size").selectOption("small");
-  await page.getByTestId("settings-display-textbox-opacity").fill("40");
-  await expect(page.getByTestId("settings-display-textbox-opacity-value")).toHaveText("40%");
+  await expect(page.getByTestId("settings-display-textbox-opacity")).toHaveCount(0);
   await page.getByTestId("pause-surface-close").click();
   await expect(page.getByTestId("settings-overlay")).toBeHidden();
   await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-text-size", "small");
-  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-textbox-opacity", "0.4");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-dialog-background-opacity", "1");
 
   await page.getByTestId("vn-command-backlog").click();
   await expect(page.getByTestId("backlog-overlay")).toBeVisible();
@@ -104,7 +103,7 @@ test("harness VN shell, save/load, and main interaction branch", async ({ page }
   await expect(page.getByTestId("save-load-overlay")).toBeHidden();
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
   await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-text-size", "small");
-  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-textbox-opacity", "0.4");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-dialog-background-opacity", "1");
   await blurActiveElement(page);
   await page.keyboard.press("Space");
   await movementPulse(page, "ArrowUp");

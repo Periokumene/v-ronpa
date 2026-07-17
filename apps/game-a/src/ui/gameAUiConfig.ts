@@ -1,7 +1,10 @@
 export const gameAUiConfig = {
   dialog: {
     showSpeakerName: true,
-    frameAssetId: "texture:ui:game-a-dialog-frame"
+    frameAssetId: "texture:ui:game-a-dialog-frame",
+    appearance: {
+      backgroundOpacity: 1
+    }
   },
   uiAudio: {
     defaults: {

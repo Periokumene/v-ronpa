@@ -76,18 +76,13 @@ describe("SettingsOverlay", () => {
     const text = collectText(element).join(" ");
 
     expect(ids).toContain("settings-overlay");
-    expect(ids).toContain("settings-display-textbox-opacity");
+    expect(ids).not.toContain("settings-display-textbox-opacity");
     expect(ids).toContain("settings-sound-bleep");
     expect(ids).toContain("settings-automation-auto-speed");
     expect(ids).not.toContain("vn-dialog-text");
     expect(typeNames).not.toContain("VnDialogSurface");
     expect(typeNames.some((typeName) => /draft|preview|subtitle/i.test(typeName))).toBe(false);
     expect(text.toLowerCase()).not.toContain("preview");
-
-    const opacityControl = findElementByProp(element, "testId", "settings-display-textbox-opacity");
-    expect(opacityControl).toBeDefined();
-    (opacityControl?.props as { onChange: (value: number) => void }).onChange(0.42);
-    expect(onPatchSettings).toHaveBeenCalledWith({ display: { textboxOpacity: 0.42 } });
 
     const bleepControl = findElementByProp(element, "testId", "settings-sound-bleep");
     expect(bleepControl).toBeDefined();

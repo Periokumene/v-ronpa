@@ -26,7 +26,11 @@ describe("VnDialogSurface", () => {
     expect(collectText(state).join("")).toBe("阅读中");
     expect(root?.props).not.toHaveProperty("tabIndex");
     expect(root?.props).not.toHaveProperty("onKeyDown");
-    expect((root?.props as { style?: Record<string, unknown> }).style).toMatchObject({ pointerEvents: "none" });
+    expect(root?.props).toMatchObject({ "data-dialog-background-opacity": "1" });
+    expect((root?.props as { style?: Record<string, unknown> }).style).toMatchObject({
+      background: "linear-gradient(180deg, rgba(11, 16, 23, 1), rgba(13, 20, 31, 1))",
+      pointerEvents: "none"
+    });
     expect(findElementByTestId(element, "vn-dialog-advance")).toBeUndefined();
     expect(findElementByTestId(element, "vn-dialog-cancel")).toBeUndefined();
     expect(findElementByTestId(element, "vn-dialog-choices")).toBeUndefined();
@@ -48,6 +52,29 @@ describe("VnDialogSurface", () => {
     expect(collectText(state).join("")).toBe("等待选择");
     expect(richRuns.length).toBeGreaterThanOrEqual(1);
     expect((richRuns[0]?.props as { style?: Record<string, unknown> }).style).toMatchObject({ color: "#ff5577", fontWeight: 700 });
+  });
+
+  it("applies bounded background appearance without replacing transition opacity", () => {
+    const element = VnDialogSurface({
+      appearance: { backgroundOpacity: 0.4 },
+      presentation: { targetVisible: true, mounted: true, opacity: 0.25, phase: "showing" },
+      text: "Part"
+    });
+    const root = findElementByTestId(element, "vn-dialog-surface");
+
+    expect(root?.props).toMatchObject({
+      "data-dialog-background-opacity": "0.4",
+      "data-ui-phase": "showing"
+    });
+    expect((root?.props as { style?: Record<string, unknown> }).style).toMatchObject({
+      background: "linear-gradient(180deg, rgba(11, 16, 23, 0.4), rgba(13, 20, 31, 0.4))",
+      opacity: 0.25
+    });
+
+    const invalid = VnDialogSurface({ appearance: { backgroundOpacity: Number.NaN }, text: "Part" });
+    expect(findElementByTestId(invalid, "vn-dialog-surface")?.props).toMatchObject({
+      "data-dialog-background-opacity": "1"
+    });
   });
 });
 

@@ -82,6 +82,7 @@ export function GameADialogSurface({
       aria-label="视觉小说对话"
       as="section"
       data-frame={assets.dialogFrameUri ? "resolved" : "fallback"}
+      data-dialog-background-opacity={String(model.appearance.backgroundOpacity)}
       data-state={model.state}
       data-ui-phase={model.presentation.phase}
       data-testid="vn-dialog-surface"
@@ -178,7 +179,7 @@ function formatGameACommandLabel(label: string): string {
 function gameADialogStyle(model: VnDialogViewModel): CSSProperties & Record<string, string | number> {
   return {
     opacity: model.presentation.opacity,
-    "--dialog-opacity": model.display?.textboxOpacity ?? 0.96
+    "--game-a-dialog-background-opacity": model.appearance.backgroundOpacity
   };
 }
 
@@ -533,14 +534,6 @@ function renderGameASettingsRows({
               onChange={(textSpeed) => actions.patchSettings({ display: { textSpeed } })}
               testId="settings-display-text-speed"
               value={settings.display.textSpeed}
-            />
-          </GameASettingRow>
-          <GameASettingRow label="文本框透明度" testId="settings-display-textbox-opacity">
-            <GameAStepMeter
-              label="文本框透明度"
-              onChange={(textboxOpacity) => actions.patchSettings({ display: { textboxOpacity } })}
-              testId="settings-display-textbox-opacity"
-              value={settings.display.textboxOpacity}
             />
           </GameASettingRow>
         </>

@@ -13,7 +13,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   });
 
   await page.addInitScript(() => {
-    localStorage.removeItem("v-ronpa:game-a:settings:v1");
+    localStorage.removeItem("v-ronpa:game-a:settings:v2");
     indexedDB.deleteDatabase("v-ronpa-game-a-saves-v9");
   });
   await page.goto("/?vnEntry=smoke");
@@ -33,11 +33,12 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("settings-sound-ui-value")).toHaveText("60%");
   await page.waitForTimeout(160);
   await expect.poll(async () => page.evaluate(() => {
-    const raw = localStorage.getItem("v-ronpa:game-a:settings:v1");
+    const raw = localStorage.getItem("v-ronpa:game-a:settings:v2");
     return raw ? (JSON.parse(raw) as { sound?: { uiVolume?: number } }).sound?.uiVolume : undefined;
   })).toBe(0.6);
   await page.screenshot({ path: "test-results/game-a-settings-sound.png", fullPage: true });
   await clickByTestId(page, "settings-subtab-display");
+  await expect(page.getByTestId("settings-display-textbox-opacity")).toHaveCount(0);
   await clickByTestId(page, "settings-display-text-size-next");
   await clickByTestId(page, "settings-display-text-speed-next");
   await page.screenshot({ path: "test-results/game-a-settings.png", fullPage: true });
@@ -47,6 +48,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("game-a-mode")).toHaveText("视觉小说");
   await advanceUntilText(page, "CHECKPOINT SMOKE 00", 6);
   await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-frame", "resolved");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveAttribute("data-dialog-background-opacity", "1");
   await expect(page.getByTestId("pixi-layer")).toBeVisible();
   await page.screenshot({ path: "test-results/game-a-vn-dialog.png", fullPage: true });
 

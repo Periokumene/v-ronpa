@@ -41,6 +41,7 @@ import {
   type VnChoicesViewModel,
   type VnCommandBarActions,
   type VnCommandBarViewModel,
+  type VnDialogAppearance,
   type VnDialogDisplaySettings,
   type VnDialogViewModel
 } from "./GameInteractionViewModels";
@@ -93,6 +94,7 @@ export function shouldRenderVnAdvanceHitPlane({
 
 export function GameInteractionShell({
   children,
+  dialogAppearance,
   dialogDisplay,
   flow,
   formatStorySpeaker,
@@ -102,6 +104,7 @@ export function GameInteractionShell({
   surfaces
 }: {
   children: ReactNode;
+  dialogAppearance?: Partial<VnDialogAppearance>;
   dialogDisplay?: VnDialogDisplaySettings;
   flow: GameFlowShellAdapter;
   formatStorySpeaker?: (speaker: string) => string;
@@ -152,6 +155,7 @@ export function GameInteractionShell({
   });
   const models = createGameInteractionShellViewModels({
     ...(commandAvailability ? { commandAvailability } : {}),
+    ...(dialogAppearance ? { dialogAppearance } : {}),
     ...(dialogDisplay ? { dialogDisplay } : {}),
     flow,
     host,
@@ -320,6 +324,7 @@ function DefaultDialogSurface({ model }: SurfaceSlotProps<VnDialogViewModel>) {
   return (
     <VnDialogSurface
       {...(model.speakerLabel ? { speaker: model.speakerLabel } : {})}
+      appearance={model.appearance}
       text={model.text}
       {...(model.richText ? { richText: model.richText } : {})}
       {...(model.display ? { displaySettings: model.display } : {})}

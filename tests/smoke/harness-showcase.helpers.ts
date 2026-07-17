@@ -12,7 +12,7 @@ export function watchUnexpectedConsoleErrors(page: Page): string[] {
 
 export async function bootHarness(page: Page) {
   await page.addInitScript(() => {
-    localStorage.removeItem("v-ronpa:settings:v1");
+    localStorage.removeItem("v-ronpa:settings:v2");
     indexedDB.deleteDatabase("v-ronpa-harness-showcase-v9");
   });
   await page.goto("/");
@@ -36,13 +36,12 @@ export async function bootHarness(page: Page) {
 
 export async function configureTitleDisplay(
   page: Page,
-  options: { textSpeed?: string; textSize?: string; textboxOpacity?: string }
+  options: { textSpeed?: string; textSize?: string }
 ) {
   await page.getByTestId("title-settings").click();
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
   if (options.textSpeed) await page.getByTestId("settings-display-text-speed").fill(options.textSpeed);
   if (options.textSize) await page.getByTestId("settings-display-text-size").selectOption(options.textSize);
-  if (options.textboxOpacity) await page.getByTestId("settings-display-textbox-opacity").fill(options.textboxOpacity);
   await page.getByTestId("settings-overlay-close").click();
   await expect(page.getByTestId("settings-overlay")).toBeHidden();
 }

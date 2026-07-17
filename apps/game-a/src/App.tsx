@@ -34,7 +34,7 @@ export function App({ launchDefinition = gameAOpeningLaunchDefinition }: { launc
     []
   );
   const didAutoStartDevLaunch = useRef(false);
-  const settings = useGameSettingsAdapter({ storageKey: "v-ronpa:game-a:settings:v1" });
+  const settings = useGameSettingsAdapter({ storageKey: "v-ronpa:game-a:settings:v2" });
   const assetRegistry = useMemo(() => createAssetRegistry(gameAContentManifest), []);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
@@ -152,6 +152,7 @@ export function App({ launchDefinition = gameAOpeningLaunchDefinition }: { launc
       />
       <section className="game-a-playfield" data-testid="game-a-playfield">
         <GameInteractionShell
+          dialogAppearance={gameAUiConfig.dialog.appearance}
           dialogDisplay={dialogDisplay}
           flow={flow}
           formatStorySpeaker={displaySpeaker}

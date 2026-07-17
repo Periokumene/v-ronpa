@@ -34,6 +34,7 @@ export { ScenarioTabs } from "./surfaces/ScenarioTabs";
 export { SurfaceFrame } from "./surfaces/SurfaceFrame";
 export { VnChoiceOverlay } from "./surfaces/VnChoiceOverlay";
 export { VnDialogSurface } from "./surfaces/VnDialogSurface";
+export { DEFAULT_VN_DIALOG_APPEARANCE, resolveVnDialogAppearance } from "./surfaces/vnDialogAppearance";
 export type {
   GameOverlayHostProps,
   ReadOnlyBacklogOverlayProps,
@@ -53,3 +54,4 @@ export type {
 } from "./surfaces/RuntimeUiSurfaces";
 export type { VnChoiceOverlayProps } from "./surfaces/VnChoiceOverlay";
 export type { VnDialogDisplaySettings, VnDialogState, VnDialogSurfaceProps } from "./surfaces/VnDialogSurface";
+export type { VnDialogAppearance } from "./surfaces/vnDialogAppearance";

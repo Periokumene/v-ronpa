@@ -70,7 +70,8 @@ describe("GameInteractionShell view models", () => {
     });
 
     const models = createGameInteractionShellViewModels({
-      dialogDisplay: { textSize: "large", textboxOpacity: 0.5, textSpeed: 0.75 },
+      dialogAppearance: { backgroundOpacity: 0.5 },
+      dialogDisplay: { textSize: "large", textSpeed: 0.75 },
       flow,
       formatStorySpeaker: (speaker) => `Speaker ${speaker}`,
       runtime
@@ -82,7 +83,8 @@ describe("GameInteractionShell view models", () => {
       speakerLabel: "Speaker Mira",
       text: "Par",
       state: "choices",
-      display: { textSize: "large", textboxOpacity: 0.5, textSpeed: 0.75 }
+      appearance: { backgroundOpacity: 0.5 },
+      display: { textSize: "large", textSpeed: 0.75 }
     });
     expect(models.choices).toMatchObject({ visible: true, choices: [choice] });
     expect(models.commandBar?.commands.map((command) => command.testId)).toEqual([
@@ -109,6 +111,29 @@ describe("GameInteractionShell view models", () => {
     const titleModels = createGameInteractionShellViewModels({ flow: createFlow({ mode: "title" }), runtime });
     expect(titleModels.title).toMatchObject({ visible: true, title: "V-Ronpa" });
     expect(titleModels.dialog).toBeUndefined();
+  });
+
+  it("defaults and bounds dialog appearance independently from transition opacity", () => {
+    const flow = createFlow({ mode: "vn" });
+    const runtime = createRuntime({
+      uiRuntimeState: uiRuntimeStateWithSurfaces({
+        dialog: { targetVisible: true, mounted: true, opacity: 0.4, phase: "showing" }
+      })
+    });
+
+    expect(createGameInteractionShellViewModels({ flow, runtime }).dialog).toMatchObject({
+      appearance: { backgroundOpacity: 1 },
+      presentation: { opacity: 0.4 }
+    });
+    expect(createGameInteractionShellViewModels({ dialogAppearance: { backgroundOpacity: -0.5 }, flow, runtime }).dialog?.appearance).toEqual({
+      backgroundOpacity: 0
+    });
+    expect(createGameInteractionShellViewModels({ dialogAppearance: { backgroundOpacity: 2 }, flow, runtime }).dialog?.appearance).toEqual({
+      backgroundOpacity: 1
+    });
+    expect(createGameInteractionShellViewModels({ dialogAppearance: { backgroundOpacity: Number.NaN }, flow, runtime }).dialog?.appearance).toEqual({
+      backgroundOpacity: 1
+    });
   });
 
   it("keeps fading-out UI mounted and omits terminal hidden UI from view models", () => {

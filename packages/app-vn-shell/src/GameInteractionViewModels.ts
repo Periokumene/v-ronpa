@@ -15,6 +15,10 @@ import type {
 } from "@v-ronpa/contracts";
 import type { VnRuntimeShellPort } from "@v-ronpa/app-vn-runtime";
 import {
+  resolveVnDialogAppearance,
+  type VnDialogAppearance as SharedVnDialogAppearance
+} from "@v-ronpa/ui-kit";
+import {
   selectUiSurfacePresentation,
   type RuntimeInputPrompt,
   type RuntimeToast,
@@ -36,9 +40,10 @@ export interface GameFlowShellAdapter {
 
 export interface VnDialogDisplaySettings {
   textSize: "small" | "medium" | "large";
-  textboxOpacity: number;
   textSpeed: number;
 }
+
+export type VnDialogAppearance = SharedVnDialogAppearance;
 
 export interface SurfaceSlotProps<TModel, TActions = Record<string, never>> {
   model: TModel;
@@ -69,6 +74,7 @@ export type VnDialogState = "line" | "choices" | "ended";
 export interface VnDialogViewModel {
   visible: boolean;
   presentation: UiSurfacePresentation;
+  appearance: VnDialogAppearance;
   speakerId?: string | undefined;
   speakerLabel?: string | undefined;
   text: string;
@@ -254,6 +260,7 @@ export interface GameInteractionShellSurfaces {
 
 export interface CreateGameInteractionShellViewModelsInput {
   commandAvailability?: GameCommandAvailability | undefined;
+  dialogAppearance?: Partial<VnDialogAppearance> | undefined;
   dialogDisplay?: VnDialogDisplaySettings | undefined;
   flow: Pick<GameFlowShellAdapter, "activeOverlay" | "pauseSection" | "capabilities" | "mode">;
   formatStorySpeaker?: ((speaker: string) => string) | undefined;
@@ -276,6 +283,7 @@ const COMMAND_BAR_COMMANDS: Array<{ action: GameUiAction; label: string; testId:
 
 export function createGameInteractionShellViewModels({
   commandAvailability,
+  dialogAppearance,
   dialogDisplay,
   flow,
   formatStorySpeaker,
@@ -307,6 +315,7 @@ export function createGameInteractionShellViewModels({
           dialog: {
             visible: true,
             presentation: dialogPresentation,
+            appearance: resolveVnDialogAppearance(dialogAppearance),
             ...(currentLine?.speaker ? { speakerId: currentLine.speaker } : {}),
             ...(currentLine?.speaker
               ? { speakerLabel: formatStorySpeaker ? formatStorySpeaker(currentLine.speaker) : currentLine.speaker }

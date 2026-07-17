@@ -22,6 +22,7 @@ describe("game settings adapter helpers", () => {
   it("loads defaults when storage is empty", () => {
     const storage = createMemorySettingsStorage();
 
+    expect(GAME_SETTINGS_STORAGE_KEY).toBe("v-ronpa:settings:v2");
     expect(loadGameSettings(storage)).toEqual({
       settings: createDefaultSettingsSnapshot(),
       normalized: false
@@ -29,10 +30,20 @@ describe("game settings adapter helpers", () => {
     expect(storage.getItem(GAME_SETTINGS_STORAGE_KEY)).toBeNull();
   });
 
+  it("does not read or delete the version 1 storage key", () => {
+    const legacyStorageKey = "v-ronpa:settings:v1";
+    const legacyValue = JSON.stringify({ version: 1, display: { textSize: "large" } });
+    const storage = createMemorySettingsStorage({ [legacyStorageKey]: legacyValue });
+
+    expect(initializeGameSettings(storage)).toEqual(createDefaultSettingsSnapshot());
+    expect(storage.getItem(legacyStorageKey)).toBe(legacyValue);
+    expect(storage.getItem(GAME_SETTINGS_STORAGE_KEY)).toBeNull();
+  });
+
   it("fills current-schema defaults and writes the normalized snapshot", () => {
     const storage = createMemorySettingsStorage({
       [GAME_SETTINGS_STORAGE_KEY]: JSON.stringify({
-        version: 1,
+        version: 2,
         display: { textSize: "large" }
       })
     });
@@ -40,13 +51,12 @@ describe("game settings adapter helpers", () => {
     const settings = initializeGameSettings(storage);
 
     expect(settings.display.textSize).toBe("large");
-    expect(settings.display.textboxOpacity).toBe(0.75);
     expect(settings.sound.bgmVolume).toBe(0.25);
     expect(settings.sound.bleepVolume).toBe(1);
     expect(JSON.parse(storage.getItem(GAME_SETTINGS_STORAGE_KEY) ?? "")).toEqual(settings);
   });
 
-  it("rejects legacy settings fields instead of preserving an old schema", () => {
+  it("hard-rejects version 1 settings instead of preserving or migrating them", () => {
     const storage = createMemorySettingsStorage({
       [GAME_SETTINGS_STORAGE_KEY]: JSON.stringify({
         version: 1,
@@ -109,11 +119,11 @@ describe("game settings adapter helpers", () => {
 
   it("patches canonical settings without replacing unrelated groups", () => {
     const settings = applySettingsPatch(createDefaultSettingsSnapshot(), {
-      display: { textSize: "small", textboxOpacity: 0.4 },
+      display: { textSize: "small", textSpeed: 0.4 },
       automation: { autoSpeed: 1 }
     });
 
-    expect(settings.display).toMatchObject({ textSize: "small", textboxOpacity: 0.4 });
+    expect(settings.display).toMatchObject({ textSize: "small", textSpeed: 0.4 });
     expect(settings.automation.autoSpeed).toBe(1);
     expect(settings.sound.bgmVolume).toBe(0.25);
   });
@@ -122,8 +132,8 @@ describe("game settings adapter helpers", () => {
     vi.useFakeTimers();
     const storage = createMemorySettingsStorage();
     const writer = createDebouncedSettingsWriter({ storage, debounceMs: 100 });
-    const first = applySettingsPatch(createDefaultSettingsSnapshot(), { display: { textboxOpacity: 0.4 } });
-    const second = applySettingsPatch(first, { display: { textboxOpacity: 0.8 } });
+    const first = applySettingsPatch(createDefaultSettingsSnapshot(), { display: { textSpeed: 0.4 } });
+    const second = applySettingsPatch(first, { display: { textSpeed: 0.8 } });
 
     writer.schedule(first);
     writer.schedule(second);
@@ -138,7 +148,6 @@ describe("game settings adapter helpers", () => {
     expect(settingsToStoryPlayTimingPolicy(defaults)).toEqual(defaultStoryPlayTimingPolicy);
     expect(settingsToDialogDisplaySettings(defaults)).toEqual({
       textSize: "medium",
-      textboxOpacity: 0.75,
       textSpeed: 0.5
     });
     expect(settingsToVoiceRuntimeSettings(defaults)).toEqual({

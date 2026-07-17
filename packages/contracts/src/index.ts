@@ -2034,7 +2034,6 @@ export const SettingsDisplaySnapshotSchema = z
   .object({
     textSpeed: NormalizedSettingSchema.default(0.5),
     textSize: SettingsTextSizeSchema.default("medium"),
-    textboxOpacity: NormalizedSettingSchema.default(0.75),
     fontFamilyId: IdSchema.default("font:default")
   })
   .strict();
@@ -2070,7 +2069,6 @@ const DEFAULT_SETTINGS_SYSTEM_SNAPSHOT = {
 const DEFAULT_SETTINGS_DISPLAY_SNAPSHOT = {
   textSpeed: 0.5,
   textSize: "medium",
-  textboxOpacity: 0.75,
   fontFamilyId: "font:default"
 } as const;
 
@@ -2091,7 +2089,7 @@ const DEFAULT_SETTINGS_AUTOMATION_SNAPSHOT = {
 
 export const SettingsSnapshotSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(2),
     system: SettingsSystemSnapshotSchema.default(DEFAULT_SETTINGS_SYSTEM_SNAPSHOT),
     display: SettingsDisplaySnapshotSchema.default(DEFAULT_SETTINGS_DISPLAY_SNAPSHOT),
     sound: SettingsSoundSnapshotSchema.default(DEFAULT_SETTINGS_SOUND_SNAPSHOT),
@@ -2108,7 +2106,7 @@ export interface SettingsPatch {
 }
 
 export function createDefaultSettingsSnapshot(): SettingsSnapshot {
-  return SettingsSnapshotSchema.parse({ version: 1 });
+  return SettingsSnapshotSchema.parse({ version: 2 });
 }
 
 export const SaveModeSchema = z.enum(["vn", "navi", "trial"]);

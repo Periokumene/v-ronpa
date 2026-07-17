@@ -384,12 +384,6 @@ export function SettingsOverlay({ embedded = false, onClose, onPatchSettings, on
             testId="settings-display-text-speed"
             value={settings.display.textSpeed}
           />
-          <SettingsSlider
-            label="Textbox opacity"
-            onChange={(textboxOpacity) => onPatchSettings({ display: { textboxOpacity } })}
-            testId="settings-display-textbox-opacity"
-            value={settings.display.textboxOpacity}
-          />
           <SettingsSelect
             label="Textbox font"
             testId="settings-display-font"
