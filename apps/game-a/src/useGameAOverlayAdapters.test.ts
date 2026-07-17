@@ -2,13 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { useGameAOverlayAdapters } from "./useGameAOverlayAdapters";
 
 describe("game-a overlay adapters", () => {
-  it("enters VN only when starting a new game succeeds", () => {
+  it("delegates new-game startup to the readiness-gated launch transaction", () => {
     const started = createAdapters({ startNewGame: () => true });
     started.dispatchUiAction("new-game");
-    expect(started.flowSend).toHaveBeenCalledWith({ type: "START_NEW_GAME", mode: "vn" });
+    expect(started.beginNewGame).toHaveBeenCalledOnce();
 
     const blocked = createAdapters({ startNewGame: () => false });
     blocked.dispatchUiAction("new-game");
+    expect(blocked.beginNewGame).toHaveBeenCalledOnce();
     expect(blocked.flowSend).not.toHaveBeenCalled();
   });
 
@@ -49,8 +50,7 @@ describe("game-a overlay adapters", () => {
     });
     adapters.dispatchUiAction("quick-save");
     adapters.dispatchUiAction("quick-load");
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(adapters.quickSaveSlot).toHaveBeenCalledOnce();
     expect(adapters.quickLoadSlot).toHaveBeenCalledOnce();
     expect(adapters.flowSend).toHaveBeenCalledWith({ type: "ENTER_VN" });
@@ -64,17 +64,36 @@ describe("game-a overlay adapters", () => {
     expect(title.quickSaveSlot).not.toHaveBeenCalled();
     expect(title.quickLoadSlot).not.toHaveBeenCalled();
   });
+
+  it("does not restore or enter VN when the stage readiness barrier is unavailable", async () => {
+    const adapters = createAdapters({
+      mode: "vn",
+      presentationReady: false,
+      quickLoadResult: true,
+      quickSlot: { id: "slot:game-a:quick", label: "Quick Save", savedAt: "2026-07-08T00:00:00.000Z", mode: "vn" },
+      startNewGame: () => true
+    });
+
+    adapters.dispatchUiAction("quick-load");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(adapters.ensureVnPresentationReady).toHaveBeenCalledOnce();
+    expect(adapters.quickLoadSlot).not.toHaveBeenCalled();
+    expect(adapters.flowSend).not.toHaveBeenCalled();
+  });
 });
 
 function createAdapters({
   mode = "title",
   pauseSection,
+  presentationReady = true,
   quickLoadResult = false,
   quickSlot,
   startNewGame
 }: {
   mode?: "title" | "vn" | "paused";
   pauseSection?: "backlog" | "save" | "load" | "settings";
+  presentationReady?: boolean;
   quickLoadResult?: boolean;
   quickSlot?: { id: string; label: string; savedAt: string; mode: "vn" };
   startNewGame: () => boolean;
@@ -85,6 +104,8 @@ function createAdapters({
   const quickLoadSlot = vi.fn(async () => quickLoadResult);
   const quickSaveSlot = vi.fn(async () => undefined);
   const resetRuntime = vi.fn();
+  const beginNewGame = vi.fn(async () => startNewGame());
+  const ensureVnPresentationReady = vi.fn(async () => presentationReady);
   const adapters = useGameAOverlayAdapters({
     flow: {
       activeOverlay: undefined,
@@ -102,6 +123,8 @@ function createAdapters({
       closeOverlay: vi.fn(),
       resumeFromPause: vi.fn()
     },
+    beginNewGame,
+    ensureVnPresentationReady,
     runtime: {
       startNewGame,
       lifecycle: { resetRuntime },
@@ -127,5 +150,5 @@ function createAdapters({
     settings: { settings: {}, patchSettings: vi.fn(), resetSettings: vi.fn() }
   } as unknown as Parameters<typeof useGameAOverlayAdapters>[0]);
 
-  return { ...adapters, flowSend, openOverlay, openPauseSection, quickLoadSlot, quickSaveSlot, resetRuntime };
+  return { ...adapters, beginNewGame, ensureVnPresentationReady, flowSend, openOverlay, openPauseSection, quickLoadSlot, quickSaveSlot, resetRuntime };
 }

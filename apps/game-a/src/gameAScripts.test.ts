@@ -3,8 +3,11 @@ import type { AssetRef, RuntimeCommand } from "@v-ronpa/contracts";
 import { compileRuntimeScript } from "../../../packages/nani-runtime-compiler/src/index";
 import { parseScenario } from "../../../packages/nani-parser/src/index";
 import { gameAVnEntry } from "./contentManifest";
-import { gameAOpeningNaniSource, gameAOpeningRuntimeEntry } from "./gameAScripts";
-import { gameASmokeRuntimeEntry } from "./gameATestEntries";
+import { gameAOpeningLaunchDefinition, gameAOpeningNaniSource } from "./gameAScripts";
+import { gameASmokeLaunchDefinition } from "./gameATestEntries";
+
+const openingRuntimeEntry = gameAOpeningLaunchDefinition.runtimeEntry;
+const smokeRuntimeEntry = gameASmokeLaunchDefinition.runtimeEntry;
 
 describe("game-a nani scripts", () => {
   it("exposes the opening .nani source as the app runtime entry", () => {
@@ -17,14 +20,14 @@ describe("game-a nani scripts", () => {
     expect(gameAOpeningNaniSource).not.toContain("TODO");
     expect(gameAOpeningNaniSource).not.toMatch(/\$\{[^}]+\}/u);
 
-    expect(gameAOpeningRuntimeEntry.scriptPath).toBe(gameAVnEntry.scriptPath);
-    expect(gameAOpeningRuntimeEntry.startLabel).toBe(gameAVnEntry.startLabel);
-    expect(gameAOpeningRuntimeEntry.sourceText).toBe(gameAOpeningNaniSource);
+    expect(openingRuntimeEntry.scriptPath).toBe(gameAVnEntry.scriptPath);
+    expect(openingRuntimeEntry.startLabel).toBe(gameAVnEntry.startLabel);
+    expect(openingRuntimeEntry.sourceText).toBe(gameAOpeningNaniSource);
   });
 
   it("parses and compiles the opening .nani script without error diagnostics", () => {
     const parsed = parseScenario({
-      scriptPath: gameAOpeningRuntimeEntry.scriptPath,
+      scriptPath: openingRuntimeEntry.scriptPath,
       sourceText: gameAOpeningNaniSource
     });
     const compiled = compileRuntimeScript(parsed.scenario);
@@ -46,34 +49,39 @@ describe("game-a nani scripts", () => {
         })
       })
     );
-    expect(
-      compiled.script.commands
-        .filter((command) => command.commandId === "char")
-        .map((command) => command.params.appearanceExpression)
-    ).toEqual([
-      "",
-      "EYE0,MOUTH0",
-      "EYE1,MOUTH3,ArmL2",
-      "EYE4,MOUTH5,ArmL4,ArmR2,EFFECT0",
-      "EYE2,MOUTH2,ArmL0,ArmR0,EFFECT2"
-    ]);
+    const alicePreload = gameAOpeningLaunchDefinition.characterPreloadPlan.find(
+      (entry) => entry.characterId === "alice"
+    );
+    const preparedExpressions = new Set(alicePreload?.appearanceExpressions);
+    const requestedExpressions = compiled.script.commands
+      .filter((command) => command.commandId === "char" && stringParam(command, "target") === "alice")
+      .flatMap((command) => {
+        const expression = stringParam(command, "appearanceExpression");
+        return expression === undefined ? [] : [expression];
+      });
+
+    expect(alicePreload).toBeDefined();
+    expect(requestedExpressions.every((expression) => preparedExpressions.has(expression))).toBe(true);
   });
 
   it("keeps smoke coverage in a separate test-only entry", () => {
     const parsed = parseScenario({
-      scriptPath: gameASmokeRuntimeEntry.scriptPath,
-      sourceText: gameASmokeRuntimeEntry.sourceText
+      scriptPath: smokeRuntimeEntry.scriptPath,
+      sourceText: smokeRuntimeEntry.sourceText
     });
     const compiled = compileRuntimeScript(parsed.scenario);
     expect(parsed.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
     expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
-    expect(gameASmokeRuntimeEntry.sourceText).toContain("CHECKPOINT SMOKE MOVIE");
+    expect(smokeRuntimeEntry.sourceText).toContain("CHECKPOINT SMOKE MOVIE");
+    expect(gameASmokeLaunchDefinition.characterPreloadPlan).toEqual([
+      { characterId: "alice", appearanceExpressions: [""] }
+    ]);
     expect(gameAOpeningNaniSource).not.toContain("CHECKPOINT SMOKE");
   });
 
   it("keeps active script asset references declared on the VN entry", () => {
     const parsed = parseScenario({
-      scriptPath: gameAOpeningRuntimeEntry.scriptPath,
+      scriptPath: openingRuntimeEntry.scriptPath,
       sourceText: gameAOpeningNaniSource
     });
     const compiled = compileRuntimeScript(parsed.scenario);

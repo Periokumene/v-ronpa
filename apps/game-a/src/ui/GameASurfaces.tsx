@@ -47,17 +47,19 @@ export interface GameASurfaceNavigation {
 export function createGameASurfaces({
   assets,
   config,
-  navigation
+  navigation,
+  vnPreparationPending
 }: {
   assets: GameAUiAssets;
   config: GameAUiConfig;
   navigation: GameASurfaceNavigation;
+  vnPreparationPending: boolean;
 }): GameInteractionShellSurfaces {
   return {
     Dialog: (props) => <GameADialogSurface {...props} assets={assets} config={config} />,
     Choices: GameAChoiceOverlay,
     CommandBar: GameACommandBar,
-    Title: (props) => <GameATitleSurface {...props} config={config} />,
+    Title: (props) => <GameATitleSurface {...props} config={config} vnPreparationPending={vnPreparationPending} />,
     ToastLayer: GameAToastLayer,
     InputPrompt: GameAInputPrompt,
     PauseSurface: GameAPauseSurface,
@@ -185,15 +187,20 @@ function formatSaveLoadOverlayTitle(mode: SaveLoadOverlayViewModel["mode"], cont
   return mode === "save" ? "保存数据" : "读取数据";
 }
 
-function GameATitleSurface({ actions, config, model }: SurfaceSlotProps<TitleViewModel, TitleActions> & { config: GameAUiConfig }) {
+function GameATitleSurface({
+  actions,
+  config,
+  model,
+  vnPreparationPending
+}: SurfaceSlotProps<TitleViewModel, TitleActions> & { config: GameAUiConfig; vnPreparationPending: boolean }) {
   if (!model.visible) return null;
   return (
     <section aria-label="标题菜单" data-testid="title-surface" className="game-a-title-surface">
       <div className="game-a-title-panel">
         <span className="game-a-title-kicker">视觉小说框架</span>
         <h1>{config.title.title}</h1>
-        <button data-testid="title-new-game" disabled={!model.capabilities.canStartNewGame} onClick={() => actions.dispatch("new-game")} type="button">
-          开始游戏
+        <button data-testid="title-new-game" disabled={!model.capabilities.canStartNewGame || vnPreparationPending} onClick={() => actions.dispatch("new-game")} type="button">
+          {vnPreparationPending ? "角色资源准备中…" : "开始游戏"}
         </button>
         <button data-testid="title-load" disabled={!model.capabilities.canLoad} onClick={() => actions.dispatch("open-load")} type="button">
           读取

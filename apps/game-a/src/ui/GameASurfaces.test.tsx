@@ -27,7 +27,7 @@ import { resolveGameAUiAssets } from "./resolveGameAUiAssets";
 describe("game-a interaction surfaces", () => {
   it("provides custom implementations for every first-pass surface slot", () => {
     const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
-    const surfaces = createGameASurfaces({ assets, config: gameAUiConfig, navigation: createNavigation({}) });
+    const surfaces = createGameASurfaces({ assets, config: gameAUiConfig, navigation: createNavigation({}), vnPreparationPending: false });
 
     expect(Object.keys(surfaces).sort()).toEqual([
       "BacklogOverlay",
@@ -95,7 +95,7 @@ describe("game-a interaction surfaces", () => {
 
   it("renders centered choice skin without changing choice dispatch", () => {
     const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
-    const surfaces = createGameASurfaces({ assets, config: gameAUiConfig, navigation: createNavigation({}) });
+    const surfaces = createGameASurfaces({ assets, config: gameAUiConfig, navigation: createNavigation({}), vnPreparationPending: false });
     const ChoiceSurface = surfaces.Choices;
     const choose = vi.fn();
     const element = <ChoiceSurface actions={{ choose }} model={createChoiceModel()} />;
@@ -120,7 +120,7 @@ describe("game-a interaction surfaces", () => {
 
   it("keeps disabled choices inert for game-a choice skin", () => {
     const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
-    const surfaces = createGameASurfaces({ assets, config: gameAUiConfig, navigation: createNavigation({}) });
+    const surfaces = createGameASurfaces({ assets, config: gameAUiConfig, navigation: createNavigation({}), vnPreparationPending: false });
     const ChoiceSurface = surfaces.Choices;
     const choose = vi.fn();
     const element = <ChoiceSurface actions={{ choose }} model={createChoiceModel([{ text: "Locked", enabled: false }])} />;
@@ -218,6 +218,7 @@ describe("game-a interaction surfaces", () => {
     const surfaces = createGameASurfaces({
       assets: resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig),
       config: gameAUiConfig,
+      vnPreparationPending: false,
       navigation: createNavigation({ pauseSection: "backlog", dispatch })
     });
     const PauseSurface = surfaces.PauseSurface;
@@ -261,6 +262,7 @@ describe("game-a interaction surfaces", () => {
     const surfaces = createGameASurfaces({
       assets,
       config: gameAUiConfig,
+      vnPreparationPending: false,
       navigation: createNavigation({ pauseSection: "save" })
     });
     const SaveLoadSurface = surfaces.SaveLoadOverlay;
@@ -284,6 +286,7 @@ describe("game-a interaction surfaces", () => {
     const loadSurfaces = createGameASurfaces({
       assets,
       config: gameAUiConfig,
+      vnPreparationPending: false,
       navigation: createNavigation({ pauseSection: "load" })
     });
     const LoadSurface = loadSurfaces.SaveLoadOverlay;
@@ -314,6 +317,7 @@ describe("game-a interaction surfaces", () => {
     const surfaces = createGameASurfaces({
       assets: resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig),
       config: gameAUiConfig,
+      vnPreparationPending: false,
       navigation: createNavigation({ pauseSection: "load" })
     });
     const SaveLoadSurface = surfaces.SaveLoadOverlay;
@@ -335,6 +339,7 @@ describe("game-a interaction surfaces", () => {
     const surfaces = createGameASurfaces({
       assets: resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig),
       config: gameAUiConfig,
+      vnPreparationPending: false,
       navigation: createNavigation({ pauseSection: "settings" })
     });
     const SettingsSurface = surfaces.SettingsOverlay;
@@ -457,6 +462,7 @@ describe("game-a interaction surfaces", () => {
     const surfaces = createGameASurfaces({
       assets: resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig),
       config: gameAUiConfig,
+      vnPreparationPending: false,
       navigation: createNavigation({})
     });
     const SaveLoadSurface = surfaces.SaveLoadOverlay;

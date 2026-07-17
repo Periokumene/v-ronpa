@@ -28,7 +28,7 @@ describe("pixi presenter port", () => {
         throw new Error("mount should not be required for memory behavior");
       }
     } as unknown as HTMLElement;
-    const presenter = createPixiPresenter({ host, characterOutlineEnabled: true });
+    const presenter = createPixiPresenter({ host, characterOutlineEnabled: true, characterPreloadPlan: [] });
 
     expect(() => presenter.reconcile(createInitialPixiStageSnapshot())).not.toThrow();
     expect(() => presenter.clear()).not.toThrow();
@@ -75,7 +75,7 @@ describe("pixi presenter port", () => {
       clientHeight: 540,
       appendChild: vi.fn()
     } as unknown as HTMLElement;
-    const presenter = createPixiPresenter({ host, characterOutlineEnabled: true });
+    const presenter = createPixiPresenter({ host, characterOutlineEnabled: true, characterPreloadPlan: [] });
 
     await presenter.mount();
     presenter.reconcile(createInitialPixiStageSnapshot());
@@ -98,6 +98,39 @@ describe("pixi presenter port", () => {
     expect(cancelAnimationFrame).toHaveBeenCalledTimes(1);
     expect(reconcile).toHaveBeenCalledTimes(1);
     expect(relayout).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps queued reconciliation behind the character preparation readiness barrier", async () => {
+    const deferred = createDeferred<void>();
+    vi.spyOn(Application.prototype, "init").mockImplementation(async function (this: Application) {
+      Object.defineProperty(this, "renderer", { configurable: true, value: { width: 960, height: 540 } });
+      Object.defineProperty(this, "ticker", { configurable: true, value: { add: vi.fn(), remove: vi.fn() } });
+      Object.defineProperty(this, "canvas", { configurable: true, value: { dataset: {} } });
+    });
+    vi.spyOn(Application.prototype, "destroy").mockImplementation(() => undefined);
+    const preload = vi.spyOn(ActorSystem.prototype, "preloadCharacters").mockReturnValue(deferred.promise);
+    const reconcile = vi.spyOn(ActorSystem.prototype, "reconcile");
+    const host = {
+      clientWidth: 960,
+      clientHeight: 540,
+      appendChild: vi.fn()
+    } as unknown as HTMLElement;
+    const characterPreloadPlan = [{ characterId: "alice", appearanceExpressions: [""] }] as const;
+    const presenter = createPixiPresenter({ host, characterOutlineEnabled: true, characterPreloadPlan });
+
+    const ready = presenter.mount();
+    presenter.reconcile(createInitialPixiStageSnapshot());
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(preload).toHaveBeenCalledWith(characterPreloadPlan);
+    expect(reconcile).not.toHaveBeenCalled();
+
+    deferred.resolve();
+    await ready;
+
+    expect(reconcile).toHaveBeenCalledOnce();
+    presenter.destroy();
   });
 
   it("reduces persistent VN commands into a terminal Pixi stage snapshot", () => {
@@ -731,6 +764,14 @@ function flushFrames(frameCallbacks: Map<number, FrameRequestCallback>): void {
     frameCallbacks.delete(frame);
     callback(16);
   }
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
 
 function runtimeCommand(

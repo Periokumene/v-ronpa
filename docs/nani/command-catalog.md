@@ -195,8 +195,11 @@ Shared shorthand:
 - Layered characters use `@char Character.Expression` as the only appearance
   syntax. The runtime stores `appearanceExpression` in `PixiStageSnapshot`;
   `appearance:` remains a cataloged Naninovel actor parameter but is not consumed
-  by layered `@char`. Use `@slide`, `@arrange`, and `@hideChars` for
-  transform-only changes. `@slide Character.Expression` updates appearance,
+  by layered `@char`. An omitted `time` on `@char` compiles to the single 120 ms
+  character-transition default. Explicit `time` overrides it, `time:0` is
+  instantaneous, and initial entrances should declare their intended duration.
+  This default does not apply to `@slide`, `@arrange`, or `@hideChars`. Use
+  those commands for transform-only changes. `@slide Character.Expression` updates appearance,
   while `@slide Character` is transform-only and does not create a
   `character-pack` resource reference.
 - Inner backgrounds use project command `@inback bg:id`. V1 writes the reserved

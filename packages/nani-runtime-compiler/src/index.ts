@@ -41,6 +41,8 @@ interface CommandShape {
   unless?: CommandIR["unless"];
 }
 
+const DEFAULT_CHAR_TRANSITION_DURATION_MS = 120;
+
 export function compileRuntimeScript(scenario: ScenarioIR): CompileRuntimeScriptResult {
   const diagnostics: RuntimeCompilerDiagnostic[] = [];
   const commands: RuntimeCommand[] = [];
@@ -592,6 +594,7 @@ function normalizeInbackCommand(command: CommandShape): NormalizedCommandParams 
 
 function normalizeCharCommand(command: CommandShape): NormalizedCommandParams {
   const named = splitNamedAppearanceExpression(runtimeCommandValue(command.primary) ?? runtimeParam(command, "idAndAppearance"));
+  const transform = normalizeActorTransformParams(command);
   return {
     params: compactParams({
       target: runtimeParam(command, "id") ?? named.id,
@@ -602,7 +605,8 @@ function normalizeCharCommand(command: CommandShape): NormalizedCommandParams {
       dissolve: runtimeParam(command, "dissolve"),
       look: runtimeParam(command, "look"),
       avatar: runtimeParam(command, "avatar"),
-      ...normalizeActorTransformParams(command)
+      ...transform,
+      durationMs: transform.durationMs ?? DEFAULT_CHAR_TRANSITION_DURATION_MS
     }),
     consumesParams: [
       "idAndAppearance",

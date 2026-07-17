@@ -396,6 +396,30 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands[3]?.params).not.toHaveProperty("intensity");
   });
 
+  it("owns the layered-character transition default without changing shared timing commands", () => {
+    const { scenario } = parseScenario({
+      sourceText: [
+        "@char Ema.Pensive1 wait!",
+        "@char Ema.Pensive2 time:0 wait!",
+        "@char Ema.Pensive3 time:0.3",
+        "@char Ema.Pensive4 time:{tokenSeconds}",
+        "@slide Ema.Pensive5 from:50,0 to:50,0"
+      ].join("\n"),
+      scriptPath: "char-transition-default.nani"
+    });
+    const result = compileRuntimeScript(scenario);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.script.commands.slice(0, 4).map((command) => command.params.durationMs)).toEqual([
+      120,
+      0,
+      300,
+      { type: "expression", source: "(tokenSeconds)*1000" }
+    ]);
+    expect(result.script.commands[0]?.params).toMatchObject({ wait: true, durationMs: 120 });
+    expect(result.script.commands[4]?.params).not.toHaveProperty("durationMs");
+  });
+
   it("does not treat legacy char appearance params as layered expressions", () => {
     const { scenario } = parseScenario({
       sourceText: "@char Ema appearance:LegacyPortrait",

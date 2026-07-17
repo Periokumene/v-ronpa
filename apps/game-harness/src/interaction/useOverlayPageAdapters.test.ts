@@ -33,8 +33,7 @@ describe("harness overlay page adapters", () => {
     const adapters = createAdapters({ quickLoadResult: true, withQuickSlot: true });
     adapters.dispatchUiAction("quick-save");
     adapters.dispatchUiAction("quick-load");
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(adapters.quickSaveSlot).toHaveBeenCalledOnce();
     expect(adapters.quickLoadSlot).toHaveBeenCalledOnce();
     expect(adapters.flowSend).toHaveBeenCalledWith({ type: "ENTER_NAVI" });
@@ -49,15 +48,27 @@ describe("harness overlay page adapters", () => {
     expect(adapters.resetShowcase).toHaveBeenCalledOnce();
     expect(adapters.flowSend).toHaveBeenCalledWith({ type: "RETURN_TITLE" });
   });
+
+  it("does not restore or change mode when the VN stage is not ready", async () => {
+    const adapters = createAdapters({ presentationReady: false, quickLoadResult: true, withQuickSlot: true });
+
+    adapters.dispatchUiAction("quick-load");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(adapters.ensureVnPresentationReady).toHaveBeenCalledOnce();
+    expect(adapters.quickLoadSlot).not.toHaveBeenCalled();
+    expect(adapters.flowSend).not.toHaveBeenCalled();
+  });
 });
 
-function createAdapters({ quickLoadResult = false, withQuickSlot = false } = {}) {
+function createAdapters({ presentationReady = true, quickLoadResult = false, withQuickSlot = false } = {}) {
   const flowSend = vi.fn();
   const openOverlay = vi.fn();
   const openPauseSection = vi.fn();
   const quickLoadSlot = vi.fn(async () => quickLoadResult);
   const quickSaveSlot = vi.fn(async () => undefined);
   const resetShowcase = vi.fn();
+  const ensureVnPresentationReady = vi.fn(async () => presentationReady);
   const adapters = useOverlayPageAdapters({
     flow: {
       activeOverlay: undefined,
@@ -71,6 +82,7 @@ function createAdapters({ quickLoadResult = false, withQuickSlot = false } = {})
       resumeFromPause: vi.fn(),
       dispatchAction: vi.fn()
     },
+    ensureVnPresentationReady,
     runtime: {
       resetShowcase,
       stopStoryAutomation: vi.fn(),
@@ -96,5 +108,5 @@ function createAdapters({ quickLoadResult = false, withQuickSlot = false } = {})
     },
     settings: { settings: {}, patchSettings: vi.fn(), resetSettings: vi.fn() }
   } as unknown as Parameters<typeof useOverlayPageAdapters>[0]);
-  return { ...adapters, flowSend, openOverlay, openPauseSection, quickLoadSlot, quickSaveSlot, resetShowcase };
+  return { ...adapters, ensureVnPresentationReady, flowSend, openOverlay, openPauseSection, quickLoadSlot, quickSaveSlot, resetShowcase };
 }

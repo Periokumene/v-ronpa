@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { AssetResolver } from "@v-ronpa/asset-registry";
 import {
   useVnRuntime,
@@ -87,6 +87,7 @@ export interface HarnessShowcaseRuntimeAdapterOptions {
   assetResolver?: AssetResolver;
   onEnterTrial?: () => void;
   onEnterNavi?: () => void;
+  ensureVnPresentationReady: () => Promise<boolean>;
 }
 
 export const harnessShowcasePosePresets: PosePreset[] = [
@@ -104,7 +105,7 @@ const initialMap = harnessShowcaseMaps[0] ?? createFallbackMap();
 
 export function useHarnessShowcaseRuntimeAdapter(
   flowMode: GameMode,
-  options: HarnessShowcaseRuntimeAdapterOptions = {}
+  options: HarnessShowcaseRuntimeAdapterOptions
 ) {
   const trialDefinitionDiagnostics = useMemo(() => validateTrialDefinition(harnessShowcaseTrial), []);
   const trialRuntimeDiagnostics = useMemo(
@@ -122,6 +123,7 @@ export function useHarnessShowcaseRuntimeAdapter(
   const [trialRuntime, setTrialRuntime] = useState<TrialRuntime>(() => createInitialHarnessShowcaseTrialRuntime());
   const [lastOutcome, setLastOutcome] = useState("spawn");
   const [lastAction, setLastAction] = useState("boot");
+  const startStoryPromiseRef = useRef<Promise<void> | undefined>(undefined);
   const activeMap = getActiveMap(navi);
   const currentCameraMode = navi.inputLock === "none" && flowMode === "navi" ? "first-person" : "locked";
   const inputActionsRef = useKeyboardInputActions(defaultHarnessInputBindings, "navi", navi.inputLock === "none" && flowMode === "navi");
@@ -193,10 +195,10 @@ export function useHarnessShowcaseRuntimeAdapter(
       if (resolution.outcome.type === "change-map" && resolution.navi.playerPose) {
         firstPersonBridge.issuePoseCommand(resolution.navi.playerPose);
       }
-      if (resolution.outcome.type === "start-script") startStoryOverlay();
+      if (resolution.outcome.type === "start-script") void startStoryOverlay();
       if (resolution.outcome.type === "start-trial") startTrial(resolution.outcome);
     },
-    [activeMap, gameplay, navi, onEnterTrial, runtime]
+    [activeMap, gameplay, navi, onEnterTrial, options.ensureVnPresentationReady, runtime]
   );
 
   const firstPersonBridge = useFirstPersonExplorationBridge({
@@ -245,9 +247,21 @@ export function useHarnessShowcaseRuntimeAdapter(
     setLastOutcome(focused.view.activeInteractableId ? `focused:${focused.view.activeInteractableId}` : focused.view.blockedReason ?? "none");
   }
 
-  function startStoryOverlay() {
-    setTrialRuntime(createInitialHarnessShowcaseTrialRuntime());
-    runtime.lifecycle.startStory();
+  function startStoryOverlay(): Promise<void> {
+    if (startStoryPromiseRef.current) return startStoryPromiseRef.current;
+    const promise = (async () => {
+      try {
+        setLastAction("story:prepare");
+        setLastOutcome("preparing");
+        if (!(await options.ensureVnPresentationReady())) return;
+        setTrialRuntime(createInitialHarnessShowcaseTrialRuntime());
+        runtime.lifecycle.startStory();
+      } finally {
+        startStoryPromiseRef.current = undefined;
+      }
+    })();
+    startStoryPromiseRef.current = promise;
+    return promise;
   }
 
   function startTrial(outcome: Extract<ExplorationOutcome, { type: "start-trial" }>) {

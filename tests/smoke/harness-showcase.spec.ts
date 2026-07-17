@@ -23,6 +23,7 @@ test("harness showcase connects Navi exploration, gameplay state, VN dialog, and
   await expect(page.getByTestId("harness-showcase-debug-sidebar")).toBeVisible();
   await expect(page.getByTestId("harness-showcase-debug-panel-runtime")).toBeVisible();
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-outline", "enabled");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-preparation", "ready", { timeout: 30_000 });
   await expect(page.getByTestId("playfield").getByTestId("harness-commands")).toHaveCount(0);
   await expect(page.getByTestId("harness-showcase-debug-panel-runtime").getByTestId("harness-showcase-runtime-controls")).toBeVisible();
   await expectNoRuntimeAssetDiagnostics(page);

@@ -22,12 +22,14 @@ export function useOverlayPageAdapters({
   flow,
   runtime,
   save,
-  settings
+  settings,
+  ensureVnPresentationReady
 }: {
   flow: GameFlowAdapter;
   runtime: HarnessShowcaseRuntimeAdapter;
   save: HarnessShowcaseSaveAdapter;
   settings: GameSettingsAdapter;
+  ensureVnPresentationReady(): Promise<boolean>;
 }) {
   function dispatchUiAction(action: GameUiAction) {
     if (action === "toggle-auto") {
@@ -56,7 +58,7 @@ export function useOverlayPageAdapters({
     if (action === "quick-load") {
       if (save.busy) return;
       if (!flow.capabilities.canLoad || !save.quickSlot) return;
-      void save.quickLoadSlot().then((loaded) => {
+      void ensureVnPresentationReady().then((ready) => ready && save.quickLoadSlot()).then((loaded) => {
         if (!loaded) return;
         flow.send({ type: "ENTER_NAVI" });
       });
@@ -150,7 +152,7 @@ export function useOverlayPageAdapters({
             cancelLoad: save.cancelLoadSlot,
             close,
             confirmLoad: () => {
-              void save.confirmLoadSlot().then((loaded) => {
+              void ensureVnPresentationReady().then((ready) => ready && save.confirmLoadSlot()).then((loaded) => {
                 if (!loaded) return;
                 flow.send({ type: "ENTER_NAVI" });
               });

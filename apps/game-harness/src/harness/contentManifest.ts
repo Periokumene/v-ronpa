@@ -13,6 +13,8 @@ export const harnessShowcaseScriptPath = "harness/harness-showcase.nani";
 const harnessShowcaseScriptMetadata = harnessScriptMetadataByPath[harnessShowcaseScriptPath];
 if (!harnessShowcaseScriptMetadata) throw new Error(`Missing generated metadata for '${harnessShowcaseScriptPath}'.`);
 
+export const harnessShowcaseCharacterPreloadPlan = harnessShowcaseScriptMetadata.characterPreloadPlan;
+
 export const harnessShowcaseVnEntry = {
   id: "vn:harness-showcase",
   title: "Harness Showcase",

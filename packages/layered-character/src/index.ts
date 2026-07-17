@@ -40,6 +40,13 @@ export interface ResolveLayeredCharacterLayerRefsInput {
   appearanceExpression?: string;
 }
 
+export interface LayeredCharacterPreloadPlanEntry {
+  characterId: string;
+  appearanceExpressions: readonly string[];
+}
+
+export type LayeredCharacterPreloadPlan = readonly LayeredCharacterPreloadPlanEntry[];
+
 export interface ResolvedLayeredCharacterLayerRef {
   id: string;
   group: string;

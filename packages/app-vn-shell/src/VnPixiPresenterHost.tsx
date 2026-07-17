@@ -1,14 +1,15 @@
 import type { VnDiagnosticsPort, VnPresentationPort, PresentationTaskObservation } from "@v-ronpa/app-vn-runtime";
-import type { PixiAssetResolver, PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
-import { PixiLayer, type PixiStageCaptureHandle } from "./PixiLayer";
+import type { LayeredCharacterPreloadPlan, PixiAssetResolver, PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
+import { PixiLayer, type PixiStageHandle } from "./PixiLayer";
 
 export interface VnPixiPresenterHostProps {
   active: boolean;
   characterOutlineEnabled: boolean;
+  characterPreloadPlan: LayeredCharacterPreloadPlan;
   presentation: VnPresentationPort;
   diagnostics?: VnDiagnosticsPort;
   assetResolver?: PixiAssetResolver;
-  onCaptureHandleChanged?: (handle: PixiStageCaptureHandle | undefined) => void;
+  onStageHandleChanged?: (handle: PixiStageHandle | undefined) => void;
 }
 
 /**
@@ -19,22 +20,23 @@ export function VnPixiPresenterHost({
   active,
   assetResolver,
   characterOutlineEnabled,
+  characterPreloadPlan,
   diagnostics,
-  onCaptureHandleChanged,
+  onStageHandleChanged,
   presentation
 }: VnPixiPresenterHostProps) {
   const stage = presentation.pixiStageRuntime;
   return (
     <PixiLayer
-      key={presentation.storySession}
       animate={stage.animate}
       characterOutlineEnabled={characterOutlineEnabled}
+      characterPreloadPlan={characterPreloadPlan}
       {...(assetResolver ? { assetResolver } : {})}
       hintSequence={stage.hintSequence}
       hints={stage.hints}
       observedTasks={stage.presentationTasks}
       {...(diagnostics ? { onDiagnostic: diagnostics.observeAssetDiagnostic } : {})}
-      {...(onCaptureHandleChanged ? { onCaptureHandleChanged } : {})}
+      {...(onStageHandleChanged ? { onStageHandleChanged } : {})}
       onTasksChanged={(tasks) => presentation.updatePixiPresentationTasks(tasks.map(toTaskObservation))}
       snapshot={stage.snapshot}
       visible={active}

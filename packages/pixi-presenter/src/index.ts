@@ -1,3 +1,4 @@
+import "pixi.js/prepare";
 import { Application, Container, Rectangle, type Ticker } from "pixi.js";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import {
@@ -13,13 +14,16 @@ import { preloadBuiltInPixiFxAssets } from "./internal/fxAssets";
 import type { PixiAssetResolver, PixiPresenterDiagnostic } from "./internal/assetResolver";
 import { PresentationTaskController, type PixiPresentationTaskSnapshot } from "./internal/presentationTasks";
 import { type PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
+import type { LayeredCharacterPreloadPlan } from "@v-ronpa/layered-character";
 
 export type { PixiPresentationTaskSnapshot } from "./internal/presentationTasks";
+export type { LayeredCharacterPreloadPlan } from "@v-ronpa/layered-character";
 export type { PixiAssetResolver, PixiPresenterDiagnostic };
 
 export interface PixiPresenterOptions {
   host: HTMLElement;
   characterOutlineEnabled: boolean;
+  characterPreloadPlan: LayeredCharacterPreloadPlan;
   width?: number;
   height?: number;
   onTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
@@ -138,6 +142,8 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     weather = new WeatherSystem(systemOptions, filters, tweens, tasks);
     screenOverlays = new ScreenOverlaySystem(systemOptions, tweens, tasks);
     effects = new TransientEffectSystem(systemOptions, actors, rootFilters, tweens, tasks);
+    await actors.preloadCharacters(options.characterPreloadPlan);
+    if (destroyed) return;
     app.ticker.add(tick);
     mounted = true;
     viewportKey = currentViewportKey();

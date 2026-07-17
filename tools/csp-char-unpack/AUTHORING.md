@@ -46,6 +46,11 @@ Both axes must be finite and positive, X and Y must match, and every layer must 
 error `1e-6`. The CSP pack validator enforces this before a run is accepted. Do not edit generated density or transform
 metadata after generation; fix the source or generator and produce a new immutable run.
 
+This invariant is consumed twice downstream: project asset validation rejects the promoted pack, and Pixi converts the one
+source texel through the character and actor transforms into final-Filter sampling vectors. VN entries preload only the
+layers named by their generated expression plans. Do not solve a rejected run by adding another density field, renderer
+override, per-layer outline, or a second export standard.
+
 ## Fixing a rejected run
 
 Open `workspace/outputs/<character>/<run-id>/reports/validation.json`. The failed manifest records the exact archived input,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
@@ -8,7 +8,7 @@ import {
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings,
   useGameSettingsAdapter,
-  type PixiStageCaptureHandle
+  usePixiStageReadiness
 } from "@v-ronpa/app-vn-shell";
 import { SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS } from "@v-ronpa/media-save";
 import { RichTextFontStyles } from "@v-ronpa/ui-kit";
@@ -19,12 +19,12 @@ import { useGameAOverlayAdapters } from "./useGameAOverlayAdapters";
 import { useGameASaveAdapter } from "./useGameASaveAdapter";
 import { useGameAVnRuntime } from "./useGameAVnRuntime";
 import { createGameASurfaces, type GameASurfaceNavigation } from "./ui/GameASurfaces";
-import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
 import { gameAUiConfig } from "./ui/gameAUiConfig";
 import { resolveGameAUiAssets } from "./ui/resolveGameAUiAssets";
 import { useGameAUiAudio } from "./ui/useGameAUiAudio";
+import { gameAOpeningLaunchDefinition, type GameAVnLaunchDefinition } from "./gameAScripts";
 
-export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) {
+export function App({ launchDefinition = gameAOpeningLaunchDefinition }: { launchDefinition?: GameAVnLaunchDefinition } = {}) {
   const devVnLaunchTarget = useMemo(
     () =>
       resolveGameAVnLaunchTarget({
@@ -41,13 +41,14 @@ export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) 
   const dialogRevealSettings = useMemo(() => ({ textSpeed: dialogDisplay.textSpeed }), [dialogDisplay.textSpeed]);
   const dialogueBleepSettings = useMemo(() => settingsToDialogueBleepRuntimeSettings(settings.settings), [settings.settings]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
-  const pixiCaptureHandleRef = useRef<PixiStageCaptureHandle | undefined>(undefined);
+  const startPromiseRef = useRef<Promise<boolean> | undefined>(undefined);
+  const pixiStage = usePixiStageReadiness();
   const runtime = useGameAVnRuntime({
     assetResolver: assetRegistry,
     ...(gameAContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: gameAContentManifest.audio.dialogueBleep } : {}),
     dialogueBleepSettings,
     dialogRevealSettings,
-    ...(entryOverride ? { entryOverride } : {}),
+    entry: launchDefinition.runtimeEntry,
     storyPlayTiming,
     ...(devVnLaunchTarget.startLabelOverride ? { startLabelOverride: devVnLaunchTarget.startLabelOverride } : {}),
     voiceSettings
@@ -55,11 +56,33 @@ export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) 
   const flow = useGameAFlowActor(runtime.shell.interactionFacts);
   const save = useGameASaveAdapter({
     canSave: () => flow.capabilities.canSave,
-    capturePreview: () => pixiCaptureHandleRef.current?.captureThumbnail(SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS),
+    capturePreview: () => pixiStage.handle?.captureThumbnail(SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS),
     getCheckpoint: runtime.lifecycle.createVnSaveCheckpoint,
     onLoad: runtime.restoreFromSave
   });
-  const overlayPages = useGameAOverlayAdapters({ flow, runtime, save, settings });
+  const beginNewGame = useCallback(() => {
+    if (startPromiseRef.current) return startPromiseRef.current;
+    const promise = (async () => {
+      try {
+        if (!(await pixiStage.waitUntilReady())) return false;
+        if (!runtime.startNewGame()) return false;
+        flow.send({ type: "START_NEW_GAME", mode: "vn" });
+        return true;
+      } finally {
+        startPromiseRef.current = undefined;
+      }
+    })();
+    startPromiseRef.current = promise;
+    return promise;
+  }, [flow, pixiStage.waitUntilReady, runtime]);
+  const overlayPages = useGameAOverlayAdapters({
+    flow,
+    runtime,
+    save,
+    settings,
+    beginNewGame,
+    ensureVnPresentationReady: pixiStage.waitUntilReady
+  });
   const gameAUiAssets = useMemo(() => resolveGameAUiAssets(assetRegistry, gameAUiConfig), [assetRegistry]);
   const gameAUiAudioBindings = useGameAUiAudio({
     assets: gameAUiAssets.uiAudio,
@@ -82,13 +105,12 @@ export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) 
       createGameASurfaces({
         assets: gameAUiAssets,
         config: gameAUiConfig,
-        navigation: gameASurfaceNavigation
+        navigation: gameASurfaceNavigation,
+        vnPreparationPending: pixiStage.pending
       }),
-    [gameAUiAssets, gameASurfaceNavigation]
+    [gameAUiAssets, gameASurfaceNavigation, pixiStage.pending]
   );
   const startLabelError = runtime.startLabelError;
-  const startNewGame = runtime.startNewGame;
-  const sendFlowEvent = flow.send;
 
   useEffect(() => {
     gameAUiAssets.diagnostics.forEach(runtime.diagnostics.observeAssetDiagnostic);
@@ -105,9 +127,10 @@ export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) 
       return;
     }
 
+    if (!pixiStage.handle) return;
     didAutoStartDevLaunch.current = true;
-    if (startNewGame()) sendFlowEvent({ type: "ENTER_VN" });
-  }, [devVnLaunchTarget, sendFlowEvent, startLabelError, startNewGame]);
+    void beginNewGame();
+  }, [beginNewGame, devVnLaunchTarget, pixiStage.handle, startLabelError]);
 
   const devVnLaunchError = devVnLaunchTarget.requested
     ? devVnLaunchTarget.error?.message ?? startLabelError?.message
@@ -141,11 +164,10 @@ export function App({ entryOverride }: { entryOverride?: VnRuntimeEntry } = {}) 
               active={flow.mode === "vn" && runtime.shell.storyRuntime.active}
               assetResolver={assetRegistry}
               characterOutlineEnabled={true}
+              characterPreloadPlan={launchDefinition.characterPreloadPlan}
               diagnostics={runtime.diagnostics}
               presentation={runtime.presentation}
-              onCaptureHandleChanged={(handle) => {
-                pixiCaptureHandleRef.current = handle;
-              }}
+              onStageHandleChanged={pixiStage.onStageHandleChanged}
             />
           </div>
         </GameInteractionShell>

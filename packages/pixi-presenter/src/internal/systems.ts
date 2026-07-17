@@ -22,10 +22,11 @@ import type {
   PixiWeatherSnapshot
 } from "@v-ronpa/contracts";
 import { INNER_BACKGROUND_ID, type PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
+import type { LayeredCharacterPreloadPlan } from "@v-ronpa/layered-character";
 import { getBuiltInPixiFxTexture } from "./fxAssets";
 import type { PixiPresentationTaskHandle, PixiPresentationTaskKind, PresentationTaskController } from "./presentationTasks";
 import { pixiAssetLoadFailed, resolvePixiAsset, type PixiAssetResolver, type PixiPresenterDiagnostic } from "./assetResolver";
-import { CharacterSystem } from "./characters";
+import { CharacterSystem, type CharacterPresentation } from "./characters";
 import { RainShaderRenderer } from "./rain/RainShaderRenderer";
 import { resolveRainSettingsFromCommandParams } from "./rain/settings";
 
@@ -46,7 +47,7 @@ interface ActorRecord {
   actor: PixiActorSnapshot;
   container: Container;
   contentKey: string;
-  contentGeneration: number;
+  backgroundGeneration: number;
   layout?: ActorLayoutRecord;
   positionTransition?: ActorPositionTransition;
   filterLive: NumericLiveState;
@@ -80,6 +81,7 @@ interface InnerBackgroundLayoutRecord {
 
 interface CharacterLayoutRecord {
   kind: "character";
+  presentation: CharacterPresentation;
 }
 
 interface ActorPositionTransition {
@@ -736,6 +738,10 @@ export class ActorSystem {
     this.characterLayer.sortableChildren = true;
   }
 
+  preloadCharacters(plan: LayeredCharacterPreloadPlan): Promise<void> {
+    return this.characters.preload(plan);
+  }
+
   clear(): void {
     for (const id of [...this.actors.keys()]) this.remove(id);
   }
@@ -760,39 +766,50 @@ export class ActorSystem {
 
   private upsert(actor: PixiActorSnapshot, animate: boolean, revision: number): void {
     const record = this.ensure(actor);
-    const previous = record.actor;
+    const isNewActor = record.contentKey === "";
+    const previous = isNewActor ? { ...record.actor, visible: false, alpha: 0 } : record.actor;
     const contentKey = actor.kind === "character"
       ? `${actor.kind}:${actor.id}:${actor.appearanceExpression}:${actor.pose ?? ""}`
       : `${actor.kind}:${actor.appearance ?? "missing"}:${actor.pose ?? ""}`;
     const shouldAnimate = animate && actor.transition.durationMs > 0;
     const transition = shouldAnimate ? this.createActorTransitionScheduler(actor, revision) : undefined;
     const filtersChanged = !sameActorFilters(actor.filters, previous.filters);
-    let contentAlphaAnimated = false;
     if (record.contentKey !== contentKey) {
-      record.contentGeneration += 1;
       if (actor.kind === "background") {
+        record.backgroundGeneration += 1;
         for (const child of record.container.removeChildren()) child.destroy({ children: true });
         if (actor.id === INNER_BACKGROUND_ID) this.drawInnerBackground(record, actor);
         else this.drawBackground(record, actor);
       }
       else {
-        record.layout = { kind: "character" };
-        this.drawCharacter(record, actor);
+        const presentation = record.layout?.kind === "character"
+          ? record.layout.presentation
+          : this.createCharacterPresentation(record, actor.id);
+        const crossfade = shouldAnimate && !isNewActor && previous.visible && actor.visible && previous.alpha > 0 && actor.alpha > 0;
+        const contentTransition = presentation.replace(this.characters.instantiate(actor), crossfade);
+        if (contentTransition && transition) {
+          transition.onStop(contentTransition.settle);
+          transition.tween(
+            contentTransition.outgoing as unknown as Record<string, number>,
+            { value: 0 },
+            actor.transition.durationMs,
+            actor.transition.easing,
+            undefined,
+            contentTransition.syncOutgoing
+          );
+          transition.tween(
+            contentTransition.incoming as unknown as Record<string, number>,
+            { value: 1 },
+            actor.transition.durationMs,
+            actor.transition.easing,
+            contentTransition.settle,
+            contentTransition.syncIncoming
+          );
+        }
       }
       record.contentKey = contentKey;
-      const targetAlpha = actor.visible ? actor.alpha : 0;
-      if (shouldAnimate && targetAlpha > 0) {
-        record.container.alpha = 0;
-        transition?.tween(
-          record.container as unknown as Record<string, number>,
-          { alpha: targetAlpha },
-          actor.transition.durationMs,
-          actor.transition.easing
-        );
-        contentAlphaAnimated = true;
-      }
     }
-    this.applyTransform(record.container, actor, previous, animate, transition, contentAlphaAnimated);
+    this.applyTransform(record, actor, previous, animate, transition);
     if (shouldAnimate && filtersChanged) {
       transition?.tween(
         record.filterLive,
@@ -810,6 +827,7 @@ export class ActorSystem {
     }
     record.actor = actor;
     this.filters.applyActorFilters(record.container, actor, record.filterLive);
+    if (record.layout?.kind === "character") record.layout.presentation.syncOutlineTransform();
   }
 
   private ensure(actor: PixiActorSnapshot): ActorRecord {
@@ -826,7 +844,7 @@ export class ActorSystem {
       actor,
       container,
       contentKey: "",
-      contentGeneration: 0,
+      backgroundGeneration: 0,
       filterLive: { blur: actor.filters.blur ?? 0 }
     };
     this.actors.set(actor.id, record);
@@ -838,6 +856,7 @@ export class ActorSystem {
     if (!record) return;
     this.tasks.cancelTarget(id);
     this.filters.releaseActorFilters(record.container);
+    if (record.layout?.kind === "character") record.layout.presentation.destroy();
     record.container.removeFromParent();
     record.container.destroy({ children: true });
     this.actors.delete(id);
@@ -853,10 +872,18 @@ export class ActorSystem {
       onUpdate?: () => void
     ) => void;
     hasWork: () => boolean;
+    onStop: (callback: () => void) => void;
   } {
     let task: PixiPresentationTaskHandle | undefined;
     let pending = 0;
     const handles: TweenHandle[] = [];
+    const stopCallbacks: Array<() => void> = [];
+    const settleCallbacks: Array<() => void> = [];
+    const stop = (settle: boolean) => {
+      handles.forEach((handle) => handle.stop());
+      if (settle) settleCallbacks.splice(0).forEach((callback) => callback());
+      stopCallbacks.splice(0).forEach((callback) => callback());
+    };
     const completeOne = () => {
       pending -= 1;
       if (pending <= 0 && task?.isCurrent()) task.complete();
@@ -867,16 +894,22 @@ export class ActorSystem {
         target: actor.id,
         revision,
         durationMs: actor.transition.durationMs,
-        onCancel: () => handles.forEach((handle) => handle.stop()),
-        onSettle: () => handles.forEach((handle) => handle.stop())
+        onCancel: () => stop(false),
+        onSettle: () => stop(true)
       });
       return task;
     };
     return {
       hasWork: () => pending > 0 || Boolean(task),
+      onStop: (callback) => stopCallbacks.push(callback),
       tween: (target, to, durationMs, easingName, onComplete, onUpdate) => {
         ensureTask();
         pending += 1;
+        settleCallbacks.push(() => {
+          Object.assign(target, to);
+          onUpdate?.();
+          onComplete?.();
+        });
         const handle = this.tweens.tween(target, to, durationMs, easingName, () => {
           if (task?.isCurrent()) onComplete?.();
           completeOne();
@@ -886,9 +919,17 @@ export class ActorSystem {
     };
   }
 
+  private createCharacterPresentation(record: ActorRecord, actorId: string): CharacterPresentation {
+    for (const child of record.container.removeChildren()) child.destroy({ children: true });
+    const presentation = this.characters.createPresentation(actorId);
+    record.layout = { kind: "character", presentation };
+    record.container.addChild(presentation.root);
+    return presentation;
+  }
+
   private drawBackground(record: ActorRecord, actor: PixiActorSnapshot): void {
     const container = record.container;
-    const contentGeneration = record.contentGeneration;
+    const backgroundGeneration = record.backgroundGeneration;
     const fallback = this.createFallbackBackground(actor);
     const layout: BackgroundLayoutRecord = { kind: "background", fallback };
     record.layout = layout;
@@ -903,7 +944,7 @@ export class ActorSystem {
       layout.sprite = sprite;
       void Assets.load<Texture>(backgroundUrl)
         .then((texture) => {
-          if (!sprite.parent || record.contentGeneration !== contentGeneration || record.layout !== layout) return;
+          if (!sprite.parent || record.backgroundGeneration !== backgroundGeneration || record.layout !== layout) return;
           sprite.texture = texture;
           layout.texture = texture;
           this.relayoutBackground(layout);
@@ -931,7 +972,7 @@ export class ActorSystem {
 
   private drawInnerBackground(record: ActorRecord, actor: PixiActorSnapshot): void {
     const container = record.container;
-    const contentGeneration = record.contentGeneration;
+    const backgroundGeneration = record.backgroundGeneration;
     const frameRoot = new Container({ label: `inner-background-frame:${actor.id}` });
     const masked = new Container({ label: `inner-background-content:${actor.id}` });
     const matte = new Graphics();
@@ -958,7 +999,7 @@ export class ActorSystem {
       layout.sprite = sprite;
       void Assets.load<Texture>(backgroundUrl)
         .then((texture) => {
-          if (!sprite.parent || record.contentGeneration !== contentGeneration || record.layout !== layout) return;
+          if (!sprite.parent || record.backgroundGeneration !== backgroundGeneration || record.layout !== layout) return;
           sprite.texture = texture;
           layout.texture = texture;
           this.relayoutInnerBackground(layout);
@@ -995,7 +1036,7 @@ export class ActorSystem {
       this.relayoutInnerBackground(layout);
       return;
     }
-    this.characters.relayout(record.container);
+    layout.presentation.relayout();
   }
 
   private relayoutBackground(layout: BackgroundLayoutRecord): void {
@@ -1041,28 +1082,34 @@ export class ActorSystem {
     layout.title.y = frame.y + 26;
   }
 
-  private drawCharacter(record: ActorRecord, actor: PixiActorSnapshot): void {
-    const contentGeneration = record.contentGeneration;
-    this.characters.render(record.container, actor, contentGeneration, () => record.contentGeneration === contentGeneration);
-  }
-
   private applyTransform(
-    container: Container,
+    record: ActorRecord,
     actor: PixiActorSnapshot,
     previous: PixiActorSnapshot,
     animate: boolean,
-    transition?: ReturnType<ActorSystem["createActorTransitionScheduler"]>,
-    contentAlphaAnimated = false
+    transition?: ReturnType<ActorSystem["createActorTransitionScheduler"]>
   ): void {
+    const container = record.container;
+    const presentation = record.layout?.kind === "character" ? record.layout.presentation : undefined;
+    const opacityTarget = (presentation?.opacity ?? container) as unknown as Record<string, number>;
+    const opacityValue = () => presentation ? presentation.opacity.value : container.alpha;
+    const applyOpacity = (value: number) => {
+      if (presentation) {
+        presentation.opacity.value = value;
+        container.alpha = 1;
+        presentation.syncOpacity();
+      } else {
+        container.alpha = value;
+      }
+    };
     const target = this.toScreenPosition(actor, actor.pos);
     const shouldAnimate = animate && actor.transition.durationMs > 0;
     const targetAlpha = actor.visible ? actor.alpha : 0;
-    const record = this.actors.get(actor.id);
     if (shouldAnimate && !actor.transition.lazy) {
       const previousTarget = this.toScreenPosition(previous, previous.pos);
       container.x = previousTarget.x;
       container.y = previousTarget.y;
-      container.alpha = previous.visible ? previous.alpha : 0;
+      applyOpacity(previous.visible ? previous.alpha : 0);
       container.visible = previous.visible || actor.visible;
     }
     container.visible = actor.visible || (shouldAnimate && previous.visible);
@@ -1087,18 +1134,19 @@ export class ActorSystem {
       container.x = target.x;
       container.y = target.y;
     }
-    if (shouldAnimate && !contentAlphaAnimated && container.alpha !== targetAlpha) {
+    if (shouldAnimate && opacityValue() !== targetAlpha) {
       transition?.tween(
-        container as unknown as Record<string, number>,
-        { alpha: targetAlpha },
+        opacityTarget,
+        presentation ? { value: targetAlpha } : { alpha: targetAlpha },
         actor.transition.durationMs,
         actor.transition.easing,
         () => {
           if (targetAlpha <= 0) container.visible = false;
-        }
+        },
+        presentation ? () => presentation.syncOpacity() : undefined
       );
     } else {
-      container.alpha = targetAlpha;
+      applyOpacity(targetAlpha);
       if (targetAlpha <= 0) container.visible = false;
     }
     const scale = actor.scale?.[0] ?? 1;

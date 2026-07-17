@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PIXI_INNER_BACKGROUND_ID, PIXI_MAIN_BACKGROUND_ID, type PixiStageSnapshot } from "@v-ronpa/contracts";
 import {
   createPixiPresenter,
@@ -6,6 +6,7 @@ import {
   type PixiPresenterDiagnostic,
   type PixiPresentationTaskSnapshot,
   type PixiPresenterPort,
+  type LayeredCharacterPreloadPlan,
   type PixiThumbnailMime,
   type PixiThumbnailCaptureOptions,
   type PixiThumbnailCaptureResult,
@@ -13,7 +14,8 @@ import {
 import type { PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
 import type { PresentationTaskObservation } from "@v-ronpa/app-vn-runtime";
 
-export interface PixiStageCaptureHandle {
+export interface PixiStageHandle {
+  ready: Promise<void>;
   captureThumbnail<Mime extends PixiThumbnailMime = "image/webp">(
     options?: PixiThumbnailCaptureOptions<Mime>
   ): Promise<PixiThumbnailCaptureResult<Mime> | undefined>;
@@ -30,12 +32,13 @@ export interface PixiLayerProps {
   // Host surface.
   visible: boolean;
   characterOutlineEnabled: boolean;
+  characterPreloadPlan: LayeredCharacterPreloadPlan;
   assetResolver?: PixiAssetResolver;
 
   // Render side effects.
   onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
   onTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
-  onCaptureHandleChanged?: (handle: PixiStageCaptureHandle | undefined) => void;
+  onStageHandleChanged?: (handle: PixiStageHandle | undefined) => void;
 }
 
 export function PixiLayer({
@@ -46,16 +49,18 @@ export function PixiLayer({
   observedTasks = [],
   visible,
   characterOutlineEnabled,
+  characterPreloadPlan,
   assetResolver,
   onDiagnostic,
-  onCaptureHandleChanged,
+  onStageHandleChanged,
   onTasksChanged
 }: PixiLayerProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const presenterRef = useRef<PixiPresenterPort | null>(null);
+  const [preparation, setPreparation] = useState<"preparing" | "ready">("preparing");
   const onTasksChangedRef = useRef<typeof onTasksChanged>(onTasksChanged);
   const onDiagnosticRef = useRef<typeof onDiagnostic>(onDiagnostic);
-  const onCaptureHandleChangedRef = useRef<typeof onCaptureHandleChanged>(onCaptureHandleChanged);
+  const onStageHandleChangedRef = useRef<typeof onStageHandleChanged>(onStageHandleChanged);
 
   useEffect(() => {
     onTasksChangedRef.current = onTasksChanged;
@@ -66,8 +71,8 @@ export function PixiLayer({
   }, [onDiagnostic]);
 
   useEffect(() => {
-    onCaptureHandleChangedRef.current = onCaptureHandleChanged;
-  }, [onCaptureHandleChanged]);
+    onStageHandleChangedRef.current = onStageHandleChanged;
+  }, [onStageHandleChanged]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -75,22 +80,28 @@ export function PixiLayer({
     const options = {
       host,
       characterOutlineEnabled,
+      characterPreloadPlan,
       ...(assetResolver ? { assetResolver } : {}),
       onDiagnostic: (diagnostic: PixiPresenterDiagnostic) => onDiagnosticRef.current?.(diagnostic),
       onTasksChanged: (tasks: PixiPresentationTaskSnapshot[]) => onTasksChangedRef.current?.(tasks)
     };
     const presenter = createPixiPresenter(options);
     presenterRef.current = presenter;
-    onCaptureHandleChangedRef.current?.({
+    setPreparation("preparing");
+    const ready = presenter.mount();
+    onStageHandleChangedRef.current?.({
+      ready,
       captureThumbnail: (captureOptions) => presenter.captureThumbnail(captureOptions)
     });
-    void presenter.mount();
+    void ready.then(() => {
+      if (presenterRef.current === presenter) setPreparation("ready");
+    });
     return () => {
-      onCaptureHandleChangedRef.current?.(undefined);
+      onStageHandleChangedRef.current?.(undefined);
       presenter.destroy();
       presenterRef.current = null;
     };
-  }, [assetResolver, characterOutlineEnabled]);
+  }, [assetResolver, characterOutlineEnabled, characterPreloadPlan]);
 
   useEffect(() => {
     const presenter = presenterRef.current;
@@ -109,6 +120,7 @@ export function PixiLayer({
       data-pixi-actors={formatPixiStageActors(snapshot)}
       data-pixi-characters={formatPixiStageCharacters(snapshot)}
       data-pixi-character-outline={characterOutlineEnabled ? "enabled" : "disabled"}
+      data-pixi-character-preparation={preparation}
       data-pixi-hints={formatPixiHints(hints)}
       data-pixi-hint-sequence={String(hintSequence)}
       data-pixi-active-tasks={formatPixiPresentationTasks(observedTasks)}

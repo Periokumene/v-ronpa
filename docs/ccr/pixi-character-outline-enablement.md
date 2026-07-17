@@ -1,5 +1,9 @@
 # Contract Change Request
 
+> Superseded in part by [`pixi-character-preload-readiness.md`](./pixi-character-preload-readiness.md). The explicit
+> enablement switch and source-pixel validation below remain current; the eight-copy rendering and runtime-loading lifecycle
+> are historical and must not be reintroduced.
+
 ## Requested Change
 
 Make final-character white outline enablement an explicit required boolean across the Pixi presenter and canonical VN Pixi
@@ -39,8 +43,9 @@ pack-wide relative tolerance of `1e-6`. Project asset validation and the CSP pac
 Runtime emits `asset-invalid-character-source-pixel-scale` and renders empty rather than silently dropping the outline.
 Legitimately empty resolved expressions remain empty without a diagnostic.
 
-The outline consists of eight complete shared-texture composition copies under one white silhouette filter, followed by the
-base composition. Per-layer filters and source-sized render textures are outside this contract.
+The original eight-copy implementation described by this request has been replaced by a complete-composition final-color
+Filter pipeline. See the superseding CCRs for current readiness and crossfade-opacity semantics. Per-layer filters and
+source-sized render textures remain outside the contract.
 
 ## Fixtures And Tests
 

@@ -22,12 +22,16 @@ export function useGameAOverlayAdapters({
   flow,
   runtime,
   save,
-  settings
+  settings,
+  beginNewGame,
+  ensureVnPresentationReady
 }: {
   flow: GameAFlowAdapter;
   runtime: GameAVnRuntime;
   save: GameASaveAdapter;
   settings: GameASettingsAdapter;
+  beginNewGame(): Promise<boolean>;
+  ensureVnPresentationReady(): Promise<boolean>;
 }) {
   function dispatchUiAction(action: GameUiAction) {
     if (action === "toggle-auto") {
@@ -39,7 +43,7 @@ export function useGameAOverlayAdapters({
       return;
     }
     if (action === "new-game") {
-      if (runtime.startNewGame()) flow.send({ type: "START_NEW_GAME", mode: "vn" });
+      void beginNewGame();
       return;
     }
     if (action === "quick-save") {
@@ -51,7 +55,7 @@ export function useGameAOverlayAdapters({
     if (action === "quick-load") {
       if (save.busy) return;
       if (!flow.capabilities.canLoad || !save.quickSlot) return;
-      void save.quickLoadSlot().then((loaded) => {
+      void ensureVnPresentationReady().then((ready) => ready && save.quickLoadSlot()).then((loaded) => {
         if (!loaded) return;
         flow.send({ type: "ENTER_VN" });
       });
@@ -127,7 +131,7 @@ export function useGameAOverlayAdapters({
             cancelLoad: save.cancelLoadSlot,
             close,
             confirmLoad: () => {
-              void save.confirmLoadSlot().then((loaded) => {
+              void ensureVnPresentationReady().then((ready) => ready && save.confirmLoadSlot()).then((loaded) => {
                 if (!loaded) return;
                 flow.send({ type: "ENTER_VN" });
               });

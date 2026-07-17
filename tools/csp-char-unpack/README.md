@@ -102,6 +102,12 @@ pnpm validate:assets
 Do not use `cp -R` to merge into an existing target: stale JSON, metadata, or PNG files would create a second effective
 pack standard. No promotion command or source receipt is provided intentionally; promotion remains a reviewed human step.
 
+After generation and asset validation, the app asset generator compiles each VN entry into an exact layered-character
+preload plan. The Pixi stage fetches, decodes, and uploads only those referenced layers before the app enters VN; runtime
+`@char` changes are synchronous and a persistent final-color Filter supplies the one-source-pixel white outline. CSP output
+must therefore keep one consistent square source-pixel scale across the pack. Do not compensate downstream with per-layer
+outlines, eight full-character copies, full-pack preload, source-sized RenderTextures, or a compatibility density field.
+
 ## Verification
 
 ```bash

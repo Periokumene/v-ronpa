@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ButtonHTMLAttributes } from "react";
+import { useCallback, useMemo, useState, type ButtonHTMLAttributes } from "react";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
@@ -8,7 +8,7 @@ import {
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings,
   useGameSettingsAdapter,
-  type PixiStageCaptureHandle
+  usePixiStageReadiness
 } from "@v-ronpa/app-vn-shell";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
@@ -25,7 +25,7 @@ import {
   harnessShowcasePosePresets
 } from "../../../interaction/useHarnessShowcaseRuntimeAdapter";
 import { useHarnessShowcaseSaveAdapter } from "../../../interaction/useHarnessShowcaseSaveAdapter";
-import { harnessContentManifest } from "../../contentManifest";
+import { harnessContentManifest, harnessShowcaseCharacterPreloadPlan } from "../../contentManifest";
 
 type DebugTabId = "runtime" | "inspector";
 type VoiceSmokeAudioMode = "fast" | "fail";
@@ -40,7 +40,7 @@ export function HarnessShowcaseScenario() {
   const dialogRevealSettings = useMemo(() => ({ textSpeed: dialogDisplay.textSpeed }), [dialogDisplay.textSpeed]);
   const dialogueBleepSettings = useMemo(() => settingsToDialogueBleepRuntimeSettings(settings.settings), [settings.settings]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
-  const pixiCaptureHandleRef = useRef<PixiStageCaptureHandle | undefined>(undefined);
+  const pixiStage = usePixiStageReadiness();
   const smokeAudioPort = useMemo(() => {
     const mode = selectVoiceSmokeAudioMode();
     return mode ? createVoiceSmokeAudioPort(mode) : undefined;
@@ -56,18 +56,25 @@ export function HarnessShowcaseScenario() {
     storyPlayTiming,
     voiceSettings,
     onEnterTrial: enterTrialMode,
-    onEnterNavi: enterNaviMode
+    onEnterNavi: enterNaviMode,
+    ensureVnPresentationReady: pixiStage.waitUntilReady
   });
   const flow = flowActor.withInteractionFacts(runtime.interactionFacts, runtime.hostInteractionFacts);
   const save = useHarnessShowcaseSaveAdapter(runtime, {
     canSave: () => flow.capabilities.canSave,
-    capturePreview: () => pixiCaptureHandleRef.current?.captureThumbnail(SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS)
+    capturePreview: () => pixiStage.handle?.captureThumbnail(SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS)
   });
-  const overlayPages = useOverlayPageAdapters({ flow, runtime, save, settings });
+  const overlayPages = useOverlayPageAdapters({
+    flow,
+    runtime,
+    save,
+    settings,
+    ensureVnPresentationReady: pixiStage.waitUntilReady
+  });
   const [activeDebugTab, setActiveDebugTab] = useState<DebugTabId>("runtime");
 
   return (
-    <main className="app-shell app-shell-harness">
+    <main className="app-shell app-shell-harness" data-vn-preparation={pixiStage.pending ? "preparing" : "idle"}>
       <RichTextFontStyles
         assetResolver={assetRegistry}
         fonts={harnessContentManifest.fonts}
@@ -97,11 +104,10 @@ export function HarnessShowcaseScenario() {
               active={flow.mode !== "trial" && runtime.storyRuntime.active}
               assetResolver={assetRegistry}
               characterOutlineEnabled={true}
+              characterPreloadPlan={harnessShowcaseCharacterPreloadPlan}
               diagnostics={runtime.diagnostics}
               presentation={runtime.presentation}
-              onCaptureHandleChanged={(handle) => {
-                pixiCaptureHandleRef.current = handle;
-              }}
+              onStageHandleChanged={pixiStage.onStageHandleChanged}
             />
           </div>
         </GameInteractionShell>

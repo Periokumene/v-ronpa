@@ -7,7 +7,6 @@ import {
   type VnRuntimeEntry
 } from "@v-ronpa/app-vn-runtime";
 import type { SaveData } from "@v-ronpa/contracts";
-import { gameAOpeningRuntimeEntry } from "./gameAScripts";
 
 export type UseGameAVnRuntimeOptions = Pick<
   UseVnRuntimeOptions,
@@ -19,16 +18,16 @@ export type UseGameAVnRuntimeOptions = Pick<
   | "voiceSettings"
 > & {
   startLabelOverride?: string;
-  entryOverride?: VnRuntimeEntry;
+  entry: VnRuntimeEntry;
 };
 
-export function useGameAVnRuntime({ entryOverride, startLabelOverride, ...options }: UseGameAVnRuntimeOptions = {}) {
+export function useGameAVnRuntime({ entry: baseEntry, startLabelOverride, ...options }: UseGameAVnRuntimeOptions) {
   const entry = useMemo(
     () => ({
-      ...(entryOverride ?? gameAOpeningRuntimeEntry),
+      ...baseEntry,
       ...(startLabelOverride ? { startLabel: startLabelOverride } : {})
     }),
-    [entryOverride, startLabelOverride]
+    [baseEntry, startLabelOverride]
   );
   const runtime = useVnRuntime({
     ...options,

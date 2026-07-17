@@ -4,6 +4,8 @@ export * from "./PixiLayer";
 export * from "./VnPixiPresenterHost";
 export * from "./useGameSettingsAdapter";
 export * from "./useSaveSlotController";
+export * from "./usePixiStageReadiness";
 export * from "./vnShellActions";
 export * from "./settingsDescriptors";
 export * from "./escapeCapture";
+export type { LayeredCharacterPreloadPlan } from "@v-ronpa/pixi-presenter";

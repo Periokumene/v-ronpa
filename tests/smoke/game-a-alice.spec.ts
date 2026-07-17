@@ -2,6 +2,31 @@ import { expect, test, type Page } from "@playwright/test";
 
 test.setTimeout(120_000);
 
+test("game-a stays on title until planned character textures are uploaded", async ({ page }) => {
+  const delayedRequests: string[] = [];
+  await page.route("**/game-a/characters/alice/assets/layers/**/*.png", async (route) => {
+    delayedRequests.push(route.request().url());
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+    await route.continue();
+  });
+
+  await page.goto("/?vnEntry=smoke", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("title-surface")).toBeVisible();
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-preparation", "preparing");
+  await page.getByTestId("title-new-game").click();
+
+  await expect(page.getByTestId("game-a-mode")).toHaveText("标题");
+  await expect(page.getByTestId("title-new-game")).toBeDisabled();
+  await expect(page.getByTestId("title-new-game")).toHaveText("角色资源准备中…");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-preparation", "preparing");
+
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-preparation", "ready", { timeout: 15_000 });
+  await expect(page.getByTestId("game-a-mode")).toHaveText("视觉小说");
+  expect(delayedRequests.length).toBeGreaterThan(0);
+  await expect(page.locator("main.game-a-shell")).toHaveAttribute("data-game-a-asset-diagnostics-count", "0");
+  await expect(page.locator("main.game-a-shell")).not.toContainText("presentation-wait-timeout");
+});
+
 test("game-a opening renders the imported Alice layered states", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
@@ -13,10 +38,28 @@ test("game-a opening renders the imported Alice layered states", async ({ page }
 
   await advanceUntilText(page, "雨幕里，一个熟悉的人影停在了街角。", 24);
   await expectAliceState(page, "default");
-  await page.screenshot({ path: "test-results/game-a-alice-outline-default.png", fullPage: true });
+  const steadyInterior = await captureCharacterInterior(page, "test-results/game-a-alice-outline-default.png");
+
+  await advanceVn(page);
+  await page.waitForTimeout(16);
+  expectCharacterInteriorToMatch(steadyInterior, await captureCharacterInterior(
+    page,
+    "test-results/game-a-alice-transition-first-frame.png"
+  ));
+  await page.waitForTimeout(80);
+  expectCharacterInteriorToMatch(steadyInterior, await captureCharacterInterior(
+    page,
+    "test-results/game-a-alice-transition-mid-frame.png"
+  ));
+  await page.waitForTimeout(160);
+  expectCharacterInteriorToMatch(steadyInterior, await captureCharacterInterior(
+    page,
+    "test-results/game-a-alice-transition-end-frame.png"
+  ));
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("你真的在这里淋了这么久？");
+  await expectAliceState(page, "EYE0,MOUTH0");
 
   const states = [
-    { text: "你真的在这里淋了这么久？", expression: "EYE0,MOUTH0" },
     {
       text: "妈妈让我来找你。她说牛奶再不买，店就要关门了。",
       expression: "EYE1,MOUTH3,ArmL2"
@@ -51,6 +94,7 @@ async function expectAliceState(page: Page, expression: string) {
     `alice/${expression}@0.50,0.00`
   );
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-outline", "enabled");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-preparation", "ready");
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-active-tasks", "empty");
   await page.waitForTimeout(500);
 }
@@ -77,4 +121,54 @@ async function advanceUntilChoices(page: Page, maxSteps: number) {
 async function advanceVn(page: Page) {
   const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
   await page.mouse.click(viewport.width / 2, viewport.height / 2);
+}
+
+const characterInteriorPoints = [
+  [640, 200],
+  [620, 250],
+  [640, 280],
+  [610, 300],
+  [660, 300]
+] as const;
+
+type CharacterInteriorSample = readonly [red: number, green: number, blue: number, alpha: number];
+
+async function captureCharacterInterior(page: Page, path: string): Promise<CharacterInteriorSample[]> {
+  const screenshot = await page.screenshot({ path });
+  const samples = await page.evaluate(async ({ base64, points }) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("2D screenshot sampling context is unavailable");
+    context.drawImage(image, 0, 0);
+    return points.map(([x, y]) => [...context.getImageData(x, y, 1, 1).data]);
+  }, { base64: screenshot.toString("base64"), points: characterInteriorPoints });
+
+  const [skin] = samples;
+  expect(skin).toBeDefined();
+  expect(skin?.[3]).toBe(255);
+  expect(skin?.[0]).toBeGreaterThan(150);
+  expect(skin?.[0]).toBeLessThan(245);
+  expect((skin?.[0] ?? 0) - (skin?.[1] ?? 0)).toBeGreaterThan(5);
+  expect((skin?.[1] ?? 0) - (skin?.[2] ?? 0)).toBeGreaterThan(5);
+  return samples as CharacterInteriorSample[];
+}
+
+function expectCharacterInteriorToMatch(
+  steady: readonly CharacterInteriorSample[],
+  transition: readonly CharacterInteriorSample[]
+) {
+  expect(transition).toHaveLength(steady.length);
+  for (let sampleIndex = 0; sampleIndex < steady.length; sampleIndex += 1) {
+    const expected = steady[sampleIndex];
+    const actual = transition[sampleIndex];
+    expect(actual).toBeDefined();
+    for (let channel = 0; channel < 4; channel += 1) {
+      expect(Math.abs((actual?.[channel] ?? 0) - (expected?.[channel] ?? 0))).toBeLessThanOrEqual(8);
+    }
+  }
 }

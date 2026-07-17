@@ -6,7 +6,11 @@
 
 ## Status
 
-- State: `Done`
+- State: `Superseded`
+- Superseded by: [`pixi-character-outline-transition-transaction.md`](./pixi-character-outline-transition-transaction.md)
+
+The source-pixel resolver, explicit enablement switch, and asset/CSP validation remain current. The eight-copy silhouette,
+runtime loading, and its structural test expectations are historical and must not be used as the current architecture.
 
 ## Dependency Changes
 
