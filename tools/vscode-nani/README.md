@@ -11,10 +11,9 @@ VS Code language support for V-Ronpa `.nani` scripts.
 - Provides current-file label completion for `@goto #` and `goto:#`.
 - Discovers the nearest `asset.config.mjs` for an opened `.nani` file and completes generated background, BGM, SFX, video, and layered-character resources.
 - Completes layered-character expression tokens from the matching `compositions.json`, including comma-separated `@char` and `@slide` expressions.
-- Provides parser diagnostics from `parseScenario`.
-- Provides runtime compiler diagnostics from `compileRuntimeScript` with approximate command-line ranges.
-- Provides VS Code-only semantic warnings for invalid `showUI` / `hideUI` runtime UI targets.
-- Warns when an unknown `key:value` is silently promoted to a primary value that the runtime compiler does not consume.
+- Publishes parser and runtime-compiler diagnostics with exact original-source UTF-16 ranges.
+- Preserves shared diagnostic codes and severities under the single VS Code diagnostic source `nani`.
+- Surfaces compiler-owned warnings for invalid `showUI` / `hideUI` runtime UI targets and ignored promoted-primary values.
 
 Examples:
 
@@ -38,14 +37,17 @@ Layered-character token names are read directly from each generated character pa
 
 Use **V-Ronpa Nani: Refresh Project Assets** from the Command Palette if an external tool changes files without producing a filesystem notification. Missing or malformed project metadata is reported in the **V-Ronpa Nani** output channel and never disables parser, compiler, hover, or catalog completion features. The asset index is completion-only: unknown IDs are not diagnosed because external paths and dynamic IDs remain valid authoring inputs.
 
-Compiler diagnostics in this first version are not parameter-accurate because `RuntimeCompilerDiagnostic` does not currently expose source locations. They are mapped to the most likely command line when possible, otherwise to the start of the document.
+The parser source map is the only diagnostic-location authority. The extension converts each half-open offset span with `TextDocument.positionAt`; it does not inspect messages, search source text, or manufacture fallback ranges. Results computed for an older document version are discarded. If a parser/compiler or span invariant fails, the extension records the error in the **V-Ronpa Nani** output channel and clears diagnostics for that unchanged document version rather than publishing a guessed range.
 
 ## Local Verification
 
 ```bash
 pnpm --filter v-ronpa-nani test
+pnpm --filter v-ronpa-nani test:extension
 pnpm --filter v-ronpa-nani build
 pnpm --filter v-ronpa-nani package:vsix
 ```
 
 The package command reads the extension version from `package.json` and writes `v-ronpa-nani-<version>.vsix`.
+Extension Host tests run directly on macOS and Windows; on Linux the launcher uses
+`xvfb-run -a` and therefore requires Xvfb to be installed.

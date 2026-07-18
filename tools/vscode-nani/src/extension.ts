@@ -1,6 +1,10 @@
 import * as vscode from "vscode";
 import { getNaniCompletions, type NaniCompletionKind } from "./completionProvider";
-import { computeNaniDiagnostics, type NaniDiagnostic } from "./diagnostics";
+import {
+  assertValidNaniDiagnosticSpan,
+  computeNaniDiagnostics,
+  type NaniDiagnostic
+} from "./diagnostics";
 import { getNaniHover } from "./hoverProvider";
 import { NANI_LANGUAGE_ID } from "./languageFacts";
 import type { NaniRange } from "./documentContext";
@@ -58,8 +62,12 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument((document) => refreshDiagnostics(document, diagnostics)),
-    vscode.workspace.onDidChangeTextDocument((event) => scheduleDiagnostics(event.document, diagnostics, timers)),
+    vscode.workspace.onDidOpenTextDocument(
+      (document) => void refreshDiagnostics(document, diagnostics, output)
+    ),
+    vscode.workspace.onDidChangeTextDocument((event) =>
+      scheduleDiagnostics(event.document, diagnostics, timers, output)
+    ),
     vscode.workspace.onDidCloseTextDocument((document) => {
       clearScheduledDiagnostic(document, timers);
       diagnostics.delete(document.uri);
@@ -67,7 +75,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   for (const document of vscode.workspace.textDocuments) {
-    refreshDiagnostics(document, diagnostics);
+    void refreshDiagnostics(document, diagnostics, output);
   }
 }
 
@@ -78,7 +86,8 @@ export function deactivate(): void {
 function scheduleDiagnostics(
   document: vscode.TextDocument,
   diagnostics: vscode.DiagnosticCollection,
-  timers: Map<string, ReturnType<typeof setTimeout>>
+  timers: Map<string, ReturnType<typeof setTimeout>>,
+  output: vscode.OutputChannel
 ): void {
   if (!isNaniDocument(document)) return;
   clearScheduledDiagnostic(document, timers);
@@ -87,7 +96,7 @@ function scheduleDiagnostics(
     key,
     setTimeout(() => {
       timers.delete(key);
-      refreshDiagnostics(document, diagnostics);
+      void refreshDiagnostics(document, diagnostics, output);
     }, 250)
   );
 }
@@ -103,10 +112,31 @@ function clearScheduledDiagnostic(
   timers.delete(key);
 }
 
-function refreshDiagnostics(document: vscode.TextDocument, diagnostics: vscode.DiagnosticCollection): void {
+async function refreshDiagnostics(
+  document: vscode.TextDocument,
+  diagnostics: vscode.DiagnosticCollection,
+  output: vscode.OutputChannel
+): Promise<void> {
   if (!isNaniDocument(document)) return;
+  const version = document.version;
+  const sourceText = document.getText();
   const scriptPath = document.uri.fsPath || document.uri.toString();
-  diagnostics.set(document.uri, computeNaniDiagnostics(document.getText(), scriptPath).map(toVscodeDiagnostic));
+  await Promise.resolve();
+  try {
+    const computedDiagnostics = computeNaniDiagnostics(sourceText, scriptPath);
+    if (document.isClosed || document.version !== version) return;
+    const vscodeDiagnostics = computedDiagnostics.map((diagnostic) =>
+      toVscodeDiagnostic(document, diagnostic, sourceText.length)
+    );
+    if (document.isClosed || document.version !== version) return;
+    diagnostics.set(document.uri, vscodeDiagnostics);
+  } catch (error) {
+    if (document.isClosed || document.version !== version) return;
+    output.appendLine(
+      `[diagnostics] Failed to map ${document.uri.toString()} at version ${version}: ${errorText(error)}`
+    );
+    diagnostics.delete(document.uri);
+  }
 }
 
 function isNaniDocument(document: vscode.TextDocument): boolean {
@@ -123,15 +153,28 @@ function toVscodeCompletion(completion: ReturnType<typeof getNaniCompletions>[nu
   return item;
 }
 
-function toVscodeDiagnostic(diagnostic: NaniDiagnostic): vscode.Diagnostic {
+function toVscodeDiagnostic(
+  document: vscode.TextDocument,
+  diagnostic: NaniDiagnostic,
+  sourceLength: number
+): vscode.Diagnostic {
+  assertValidNaniDiagnosticSpan(diagnostic, sourceLength);
   const vscodeDiagnostic = new vscode.Diagnostic(
-    toVscodeRange(diagnostic.range),
+    new vscode.Range(
+      document.positionAt(diagnostic.span.start),
+      document.positionAt(diagnostic.span.end)
+    ),
     diagnostic.message,
     diagnosticSeverity(diagnostic.severity)
   );
   vscodeDiagnostic.source = diagnostic.source;
-  if (diagnostic.code) vscodeDiagnostic.code = diagnostic.code;
+  vscodeDiagnostic.code = diagnostic.code;
   return vscodeDiagnostic;
+}
+
+function errorText(error: unknown): string {
+  if (error instanceof Error) return error.stack ?? error.message;
+  return String(error);
 }
 
 function toVscodeRange(range: NaniRange): vscode.Range {

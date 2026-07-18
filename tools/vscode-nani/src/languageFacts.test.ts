@@ -61,7 +61,7 @@ describe("language facts", () => {
 
   it("bundles the current compiler default for omitted char transition time", () => {
     const parsed = parseScenario({ sourceText: "@char alice.Default", scriptPath: "char-default.nani" });
-    const compiled = compileRuntimeScript(parsed.scenario);
+    const compiled = compileRuntimeScript(parsed);
 
     expect(compiled.script.commands[0]?.params).toMatchObject({
       target: "alice",

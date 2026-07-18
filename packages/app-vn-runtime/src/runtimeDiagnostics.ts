@@ -4,6 +4,7 @@ import type {
   UiRuntimeDiagnostic,
   VnRuntimeTransactionDiagnostic
 } from "@v-ronpa/app-vn-dispatch";
+import type { VnSessionDiagnostics } from "@v-ronpa/app-vn-session";
 import type { RuntimeScript } from "@v-ronpa/contracts";
 import type { StoryStepperDiagnostic } from "@v-ronpa/story-engine";
 
@@ -15,20 +16,12 @@ export interface VnRuntimeDiagnostic {
   severity: "info" | "warning" | "error";
   message: string;
   loc?: string;
+  span?: { start: number; end: number };
   commandId?: string;
 }
 
-export interface VnRuntimeParserDiagnosticLike {
-  severity: "info" | "warning" | "error";
-  message: string;
-  loc?: { scriptPath: string; line: number; column: number };
-}
-
-export interface VnRuntimeCompilerDiagnosticLike {
-  code: string;
-  severity?: "info" | "warning" | "error";
-  message: string;
-}
+type VnRuntimeParserDiagnostic = VnSessionDiagnostics["parser"][number];
+type VnRuntimeCompilerDiagnostic = VnSessionDiagnostics["compiler"][number];
 
 export interface CollectVnRuntimeDiagnosticsInput {
   mediaDiagnostics?: MediaRuntimeDiagnostic[];
@@ -41,8 +34,8 @@ export const MAX_VN_RUNTIME_DIAGNOSTICS = 50;
 export const INVALID_VN_START_LABEL_DIAGNOSTIC_CODE = "invalid-start-label";
 
 export function createInitialVnRuntimeDiagnostics(
-  parserDiagnostics: VnRuntimeParserDiagnosticLike[],
-  compilerDiagnostics: VnRuntimeCompilerDiagnosticLike[]
+  parserDiagnostics: readonly VnRuntimeParserDiagnostic[],
+  compilerDiagnostics: readonly VnRuntimeCompilerDiagnostic[]
 ): VnRuntimeDiagnostic[] {
   return limitVnRuntimeDiagnostics([
     ...parserDiagnostics.map(toVnParserDiagnostic),
@@ -115,13 +108,14 @@ export function createVnMediaPortErrorDiagnostic(message: string): VnRuntimeDiag
   return { source: "media", code: "media-port-error", severity: "warning", message };
 }
 
-function toVnParserDiagnostic(diagnostic: VnRuntimeParserDiagnosticLike): VnRuntimeDiagnostic {
+function toVnParserDiagnostic(diagnostic: VnRuntimeParserDiagnostic): VnRuntimeDiagnostic {
   return {
     source: "parser",
-    code: "parser-diagnostic",
+    code: diagnostic.code,
     severity: diagnostic.severity,
     message: diagnostic.message,
-    ...(diagnostic.loc ? { loc: formatDiagnosticLocation(diagnostic.loc) } : {})
+    loc: formatDiagnosticLocation(diagnostic.loc),
+    span: diagnostic.span
   };
 }
 
@@ -132,12 +126,14 @@ function normalizeVnRuntimeStartLabel(startLabel: string | undefined): string {
   return withoutPrefix.trim();
 }
 
-function toVnCompilerDiagnostic(diagnostic: VnRuntimeCompilerDiagnosticLike): VnRuntimeDiagnostic {
+function toVnCompilerDiagnostic(diagnostic: VnRuntimeCompilerDiagnostic): VnRuntimeDiagnostic {
   return {
     source: "compiler",
     code: diagnostic.code,
-    severity: diagnostic.severity ?? "warning",
-    message: diagnostic.message
+    severity: diagnostic.severity,
+    message: diagnostic.message,
+    loc: formatDiagnosticLocation(diagnostic.loc),
+    span: diagnostic.span
   };
 }
 
@@ -180,6 +176,6 @@ function toVnUiDiagnostic(diagnostic: UiRuntimeDiagnostic): VnRuntimeDiagnostic 
   };
 }
 
-function formatDiagnosticLocation(loc: NonNullable<VnRuntimeParserDiagnosticLike["loc"]>): string {
+function formatDiagnosticLocation(loc: { scriptPath: string; line: number; column: number }): string {
   return `${loc.scriptPath}:${loc.line}:${loc.column}`;
 }

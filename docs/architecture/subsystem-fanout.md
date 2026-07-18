@@ -4,7 +4,8 @@ Use this after the contract and harness baseline is frozen.
 
 | Worktree | Allowed paths | Primary gate |
 |---|---|---|
-| nani-parser | `packages/nani-parser/**`, parser fixtures | `.nani` AST/IR snapshots |
+| nani-parser | `packages/nani-parser/**`, parser fixtures | `.nani` IR and exact-source-map tests |
+| nani-runtime-compiler | `packages/nani-runtime-compiler/**` | RuntimeScript parity, binding, registry, and exact diagnostic spans |
 | story-engine | `packages/story-engine/**` | runtime state snapshots |
 | story-play | `packages/story-play/**` | playback mode and schedule tests |
 | app-vn-session | `packages/app-vn-session/**` | VN boot/advance/choice/input/runtime-wait/presentation-wait/restore tests |

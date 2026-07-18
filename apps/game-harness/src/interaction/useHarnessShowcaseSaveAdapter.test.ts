@@ -170,7 +170,7 @@ describe("harness showcase save adapter", () => {
 
 function compileScenario(sourceText: string, scriptPath: string): RuntimeScript {
   const parsed = parseScenario({ sourceText, scriptPath });
-  const compiled = compileRuntimeScript(parsed.scenario);
+  const compiled = compileRuntimeScript(parsed);
   expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
   return compiled.script;
 }

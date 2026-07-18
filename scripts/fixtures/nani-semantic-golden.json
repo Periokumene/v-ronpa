@@ -1,0 +1,122 @@
+{
+  "baseline": "a7bb0091234f7796df3db93a7bfe3f0ae948e300",
+  "canonicalization": "stable-json-v1",
+  "corpora": {
+    "game-a-opening": {
+      "sourceFile": "apps/game-a/src/nani/opening.nani",
+      "scriptPath": "game-a/opening.nani",
+      "sourceSha256": "607f18610cd3b11b5f96af4c400846ef15e21250af2fd71c3921e74476ab9922",
+      "sourceUtf16Length": 3219,
+      "statementCount": 89,
+      "commandCount": 84,
+      "scenarioIRSha256": "042d07881e2bdb261429c4937180c0cd60490ae23a23f0e1ca170459ec3673f0",
+      "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "runtimeScriptSha256": "2a7e12093b97b7ea4fdd8824d11b590e2c20b744c60319c8ae8be26b3d02b45a",
+      "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "scenarioAssetsSha256": "46df50c3cb94ec109f8bdaf9c4808ad3cbdf14b03a75a010f60384df675b3802",
+      "runtimeAssetsSha256": "ec75148cd18a76a0873d659def180136a936dd2a37cae799381cd583b3b6485c",
+      "dependenciesSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "game-a-smoke": {
+      "sourceFile": "apps/game-a/src/test-nani/smoke.nani",
+      "scriptPath": "game-a/test/smoke.nani",
+      "sourceSha256": "faf75690ff3939192d92c848b89c5f82e0610e2c70eb02d42907ad68379413c9",
+      "sourceUtf16Length": 1681,
+      "statementCount": 39,
+      "commandCount": 35,
+      "scenarioIRSha256": "ff481bd37671cc2a628f0c8507c49561a5848136711d14db1788f0966d58fba4",
+      "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "runtimeScriptSha256": "fd8bb4f0bb5a0c23aef1a0ea91c362ba84603b90ed27b6c8fc1fbbb00a3218e6",
+      "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "scenarioAssetsSha256": "50ab8044b9c532bb998b544d827575004ba97b0e73c20593f1ed8b4f2d148e2c",
+      "runtimeAssetsSha256": "586ef200af21c02a69116fadfeb9e711443fc6d9a46e408bea1baf83fdb0d6e8",
+      "dependenciesSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "game-a-character-smoke": {
+      "sourceFile": "apps/game-a/src/test-nani/character-smoke.nani",
+      "scriptPath": "game-a/test/character-smoke.nani",
+      "sourceSha256": "7143873d30547246f2a3cf1421e0d80c6d170760817e2f4edccb3722dfcee1d6",
+      "sourceUtf16Length": 764,
+      "statementCount": 18,
+      "commandCount": 16,
+      "scenarioIRSha256": "38cd121c9e5111a34ce4af3ee105e6110ae96fac6af485a0200e19315ba2ca38",
+      "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "runtimeScriptSha256": "79110808fb63b95b60e372b931bce148ec5c3dc562218600d7f63f80cbfd9c5e",
+      "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "scenarioAssetsSha256": "d0c717ea321dba6ac51bf9677fab66fd481b1076044003a091532405d15ecad6",
+      "runtimeAssetsSha256": "887aaabd8eac3866662f1d688df7234fc921f25fc8e90c3eef15cbce544065c0",
+      "dependenciesSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "basic-navi-p1": {
+      "sourceFile": "packages/nani-parser/fixtures/basic-navi.p1.nani",
+      "scriptPath": "basic-navi.p1.nani",
+      "sourceSha256": "f2be34f52d74943366c58788c3a0f0f14ffbc036981b7a35baffac05718b8854",
+      "sourceUtf16Length": 1087,
+      "statementCount": 27,
+      "commandCount": 20,
+      "scenarioIRSha256": "44a1ce686d1435914fe2887a129bea00706699f279061f5e09c1a13c67dd9b10",
+      "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "runtimeScriptSha256": "afc50927aa3e1cf73223c0a8107a28955616c5397dde3769d8d6b861eae6164e",
+      "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "scenarioAssetsSha256": "2e444c45b1b2fe7c1c19b19b70809e1dee600718ea80ed97ced3163a3aab3447",
+      "runtimeAssetsSha256": "a0737cd9268bab18d8e4fe9038473c8c5119e96cd97e3010167d61e62ca82956",
+      "dependenciesSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "basic-trial-discussion-p1": {
+      "sourceFile": "packages/nani-parser/fixtures/basic-trial-discussion.p1.nani",
+      "scriptPath": "basic-trial-discussion.p1.nani",
+      "sourceSha256": "c031974822706c6500c24afda07982b59db598430d70ffa4e32eff52ebdf9f4c",
+      "sourceUtf16Length": 1139,
+      "statementCount": 27,
+      "commandCount": 20,
+      "scenarioIRSha256": "58b5cdd7c95f8520781f3197d716fd22a0d3cdbee7966f18bc970bed4cceaa83",
+      "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "runtimeScriptSha256": "115f08ebc472f6c5721d194e721469d601306935dbf38cbeaf68403a40a16c8b",
+      "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "scenarioAssetsSha256": "ec5fd4c81eca047e32a5c346ee7f5ec8d4167921d350b4a9424541907e112e0b",
+      "runtimeAssetsSha256": "b6f210107f9a8ca1228b08d1e88c8fa9e6dd8a730ffa8930dcef400e071288ab",
+      "dependenciesSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "harness-showcase": {
+      "sourceFile": "apps/game-harness/src/harness/showcase/script.ts",
+      "scriptPath": "harness/harness-showcase.nani",
+      "sourceSha256": "4c2ba5d94cca13a6b5373839a6f4f4b9e1dcffdcd4ce8d651a454338abead0bd",
+      "sourceUtf16Length": 13406,
+      "statementCount": 202,
+      "commandCount": 195,
+      "scenarioIRSha256": "8495e9391ad940585e761e90c381acd8000d1933f0621d94af4e9846696a4ac6",
+      "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "runtimeScriptSha256": "c19aff12adbd6eab02b899c5d6845339ac1dbbe4fc8d58c23dadd427ddb1bbe8",
+      "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "scenarioAssetsSha256": "e3108b440d549de2be663dcc99213ff3baf2fbb38b4a6a78aa03e1a502eb4544",
+      "runtimeAssetsSha256": "d6c5dcbe5de6f3547c6fee3bbfde9bd9ee6f0085b2238ad9b0c3f92eb4e39b6a",
+      "dependenciesSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  },
+  "generatedMetadata": {
+    "game-a/opening.nani": {
+      "scriptRevision": "sha256:1a3d0dbd1ca33a44199143bddef846a09b98e1c7baf4a044437886fd9c2f2bcc",
+      "metadataSha256": "5d5d5b1fbddb560eb86af350728c5a0a43f6f3ddcddedf01cb23f05aad63efa3",
+      "assetRefsSha256": "2442137159443315283d17be9f0c4afb6ec954238321283f0448d19f5e166b1f",
+      "characterPreloadPlanSha256": "338d38a50929d18ad55d47b75fdf2721226300944f45b903d21fe703085129b2"
+    },
+    "game-a/test/smoke.nani": {
+      "scriptRevision": "sha256:dadf7120afb81f4e8b7a4047276547be849b10a17d68c7ee84eaec1679570ef6",
+      "metadataSha256": "f236a47d4a81c6b325e82751fcb068bb15130816151b1b73167eda400db6189c",
+      "assetRefsSha256": "7f027f1c3dffdb1db964deb1db6de58868f865dc94cb6bb56cc42ee00a63b366",
+      "characterPreloadPlanSha256": "c333d973b62ff1fb6985414c061cebd4b2b1398dfa645224482cd90552d94781"
+    },
+    "game-a/test/character-smoke.nani": {
+      "scriptRevision": "sha256:566b52066e57a8e08c85c6dea367149308e8504f23fa747c8ad1ff67cf3cce45",
+      "metadataSha256": "cb164ed7ef016d0af40bf1000a976974778897ba8c5d777fbbfc3e0b4df4e034",
+      "assetRefsSha256": "1c7cf5e56650cbf03efe819b5efdf6ab76948a330581e7844235c78266b04908",
+      "characterPreloadPlanSha256": "73ab351adc3f52a59ccbfd87a737505a6a12e88cc4958bb0871267773753becf"
+    },
+    "harness/harness-showcase.nani": {
+      "scriptRevision": "sha256:0b482f4f9b8776fb36acc7c85bf90db4426966d72d858cabc6d36fe3a2984ac7",
+      "metadataSha256": "8f49aaa6632889312e42ebac6e5eabc03530fe235fd9706e1044e16b01314016",
+      "assetRefsSha256": "2ce5be61341e80b0dc2c63fa80548301d36b78ba72f7ef35185c171b72a63a5c",
+      "characterPreloadPlanSha256": "7b8efb3d0fffba81c10c7a81362b1206c58f0f3ede2ebd5910e5e6467562b440"
+    }
+  }
+}

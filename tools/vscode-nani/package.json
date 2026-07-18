@@ -3,7 +3,7 @@
   "displayName": "V-Ronpa Nani",
   "description": "VS Code language support for V-Ronpa .nani scripts.",
   "publisher": "v-ronpa",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "main": "./dist/extension.cjs",
@@ -53,6 +53,8 @@
     "build": "pnpm run check-types && node scripts/esbuild.mjs",
     "build:prod": "pnpm run check-types && node scripts/esbuild.mjs --production",
     "test": "vitest run",
+    "compile:test:extension": "tsc -p tsconfig.test.json --pretty false",
+    "test:extension": "pnpm run build:prod && pnpm run compile:test:extension && node scripts/run-extension-tests.mjs",
     "vscode:prepublish": "pnpm run build:prod",
     "package:vsix": "node scripts/package-vsix.mjs"
   },
@@ -62,8 +64,11 @@
     "@v-ronpa/nani-runtime-compiler": "workspace:*"
   },
   "devDependencies": {
+    "@types/mocha": "10.0.10",
     "@types/node": "^24.0.0",
     "@types/vscode": "1.99.0",
+    "@vscode/test-cli": "0.0.15",
+    "@vscode/test-electron": "3.0.0",
     "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.1",
     "typescript": "^5.9.0",

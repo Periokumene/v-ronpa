@@ -2,7 +2,7 @@
 
 `packages/contracts/src/index.ts` owns the command catalog. It is the single
 declaration source for `.nani` commands. StoryEngine handler registration,
-diagnostics, future editor support, and app routing must derive from this
+diagnostics, editor completion/hover metadata, and app routing must derive from this
 catalog instead of redefining command metadata elsewhere.
 
 Runtime command ids are lowercase. `canonicalName` preserves the official or
@@ -79,9 +79,12 @@ release mechanism.
   catalog. This keeps the official parameter list auditable.
 - `nani-runtime-compiler` binds catalog metadata to compiled RuntimeCommand
   output. It rejects or diagnoses commands and params against the catalog.
-- Parser IR remains generic. It preserves ordered command args with raw token
-  text plus compatibility `primary`/`params`/`flags`; the runtime compiler owns
-  catalog-derived primary-vs-param decisions, validation, and normalization.
+- Parser IR remains generic. Ordered `CommandIR.args` are the compiler's sole
+  binding authority. Parser-derived `primary`/`params`/`flags` remain read
+  projections for IR consumers and are never compiler fallback input.
+- The parser returns an exact source-map sidecar beside the IR. The runtime
+  compiler consumes both, owns catalog and runtime-boundary diagnostics, and
+  emits required source spans without adding provenance to RuntimeCommand.
 - Implemented RuntimeCommand params use canonical runtime field names only.
   Raw aliases stay in `sourceCommand`.
 - `{...}` parameter expressions are preserved by the compiler and evaluated by
@@ -99,6 +102,8 @@ release mechanism.
   when all targets are valid. `hud`, debug/harness UI, shell overlays, and
   lifecycle-owned `inputPrompt` / `movieOverlay` are outside the current
   implementation.
+- Invalid `showUI` / `hideUI` targets and ignored promoted-primary values are
+  compiler diagnostics. Editor adapters must not reimplement those rules.
 
 ## Official Naninovel Commands
 

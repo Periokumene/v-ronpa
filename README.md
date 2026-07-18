@@ -14,6 +14,7 @@ shared foundation.
 corepack enable pnpm
 pnpm install
 pnpm validate:baseline
+pnpm validate:nani-diagnostics-quality
 pnpm --filter @v-ronpa/game-a build
 pnpm --filter @v-ronpa/game-harness build
 pnpm --filter @v-ronpa/game-a dev
@@ -28,7 +29,11 @@ pnpm --filter @v-ronpa/game-harness dev
 - `packages/app-vn-dispatch`: headless RuntimeCommand routing/transaction helpers plus VN media/UI/dialog reveal/dialog audio planners.
 - `packages/app-vn-shell`: React VN shell, `VnRuntimeDispatcher`/`PixiLayer` mounting, reusable settings adapter, shared save-slot controller, and shell action/save-load helpers; app-specific overlay pages stay in apps.
 - `packages/contracts`: Zod schemas and public content/runtime contracts.
-- `packages/nani-parser`: handwritten `.nani` lexer/parser and AST/IR contract.
+- `packages/nani-parser`: handwritten `.nani` lexer/parser, public IR, and
+  required exact-source provenance sidecar used by compiler diagnostics.
+- `packages/nani-runtime-compiler`: catalog-aware binding, validation, and
+  RuntimeScript lowering; consumes parser IR and source provenance together,
+  with ordered `CommandIR.args` as its sole binding authority.
 - `packages/story-engine`: story reducer, variables, choices, waits, emitted RuntimeCommands, and backlog.
 - `packages/game-flow-machine`: XState top-level mode machine.
 - `packages/gameplay`: exploration, inventory/evidence, character, trial domain logic.

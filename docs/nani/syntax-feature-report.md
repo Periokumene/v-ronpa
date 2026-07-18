@@ -9,8 +9,10 @@ outside the current contract.
 
 P1 follows the current V-Ronpa contract and architecture:
 
-- Parser output is generic `.nani` AST/IR.
-- Parser diagnostics are message-based and do not add diagnostic codes.
+- Parser output is generic `.nani` `ScenarioIR` plus a required exact-source
+  `NaniSourceMap` sidecar; provenance is not embedded in the IR.
+- Parser diagnostics expose stable codes and exact original-source UTF-16 spans.
+  `SourceLocation` remains coarse statement metadata for IR/runtime logging.
 - StoryEngine, Gameplay, TrialDirector, rendering, persistence, localization,
   and app harness behavior are outside this parser task. The parser preserves
   expression values; RuntimeCommand compilation preserves them, and StoryEngine
@@ -47,9 +49,9 @@ Inline commands also preserve a source location and `inlineIndex`.
 P1 parser commands are generic IR, not command execution. The parser preserves:
 
 - normalized `commandId`
-- optional primary argument
-- `params`
-- `flags`
+- ordered `args`, including every primary, named parameter, and flag occurrence
+- derived `primary`, `params`, and `flags` read projections; compiler binding
+  uses only ordered `args`
 - optional `condition`
 - optional `unless`
 - source location
@@ -93,7 +95,7 @@ P1 fixtures use local labels and local jumps:
 @goto #End
 ```
 
-Parser diagnostics should cover:
+Parser diagnostics cover:
 
 - duplicate labels
 - missing local label references in command primary values such as `@goto #Missing`
@@ -154,7 +156,7 @@ is stable:
   patches
 - external script dependency modeling for cross-file jumps or calls
 
-Any P2 change that alters `packages/nani-parser/src/types.ts` requires a CCR.
+Any P2 change that alters `packages/nani-parser/src/types/**` requires a CCR.
 
 ## 3.1 Rich Text First Pass
 
@@ -188,10 +190,11 @@ P3 and later work belongs outside this parser baseline:
 
 - full Naninovel-compatible expression parsing or evaluation beyond the
   restricted StoryEngine runtime resolver
-- command schema validation
+- validation beyond the current command catalog and runtime-boundary rules
 - runtime command execution
 - StoryEngine scheduling and multi-track execution
-- editor tooling for visual script authoring
+- visual script authoring beyond the current exact diagnostics, catalog hover,
+  completion, and resource-completion tooling
 - localization, voice, and managed-text build pipelines
 - renderer-specific effects or Unity compatibility layers
 

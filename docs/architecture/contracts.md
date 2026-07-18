@@ -3,6 +3,11 @@
 `packages/contracts` and compiled `.nani` IR are public API. Contract changes
 require a CCR and contract regression tests.
 
+The parser's exact source-map sidecar is also public frontend API, but it is not
+part of `ScenarioIR`, RuntimeCommand, RuntimeScript, or saves. Parser/compiler
+API changes require a CCR and must preserve runtime contract snapshots. See
+[Nani Source Diagnostics](nani-source-diagnostics.md).
+
 ## SaveData v7
 
 SaveData has one accepted version: `7`. It requires top-level `gameId`. A VN

@@ -269,7 +269,7 @@ function collectScriptMetadata(entries, config) {
         sourceText = match[1];
       }
       const parsed = parseScenario({ sourceText, scriptPath: entry.scriptPath });
-      const compiled = compileRuntimeScript(parsed.scenario);
+      const compiled = compileRuntimeScript(parsed);
       const errors = [...parsed.diagnostics, ...compiled.diagnostics].filter((diagnostic) => diagnostic.severity === "error");
       if (errors.length > 0) {
         throw new Error(`${entry.sourceFile} failed compilation: ${errors.map((diagnostic) => diagnostic.message).join("; ")}`);

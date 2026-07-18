@@ -1,7 +1,16 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { CommandIR, NaniValue, ParseScenarioResult, TextIR } from "./index";
-import { parseScenario } from "./index";
+import type {
+  CommandArgIR,
+  CommandIR,
+  NaniCommandArgumentSourceMap,
+  NaniSourceRef,
+  NaniValue,
+  ParseScenarioResult,
+  TextIR,
+  TextSpan
+} from "./index";
+import { parseScenario, resolveNaniSourceRef } from "./index";
 
 const baselineScript = `; comment
 #Start
@@ -304,6 +313,26 @@ describe("nani parser", () => {
     expect(result.scenario.assets).toEqual([
       { id: "Ema", kind: "character-pack" },
       { id: "Rina", kind: "character-pack" }
+    ]);
+  });
+
+  it("preserves raw actor asset metadata for expression and scalar primaries", () => {
+    const result = parseScenario({
+      sourceText: [
+        "@char {actor}",
+        "@char {actor.pose}",
+        "@char 50",
+        "@char true",
+        "@slide {actor.pose}"
+      ].join("\n"),
+      scriptPath: "raw-character-assets.nani"
+    });
+
+    expect(result.scenario.assets).toEqual([
+      { id: "{actor}", kind: "character-pack" },
+      { id: "{actor", kind: "character-pack" },
+      { id: "50", kind: "character-pack" },
+      { id: "true", kind: "character-pack" }
     ]);
   });
 
@@ -836,6 +865,16 @@ describe("nani parser", () => {
     expect(result.scenario.statements).toHaveLength(5);
   });
 
+  it("anchors promoted raw local-label references to the whole source argument", () => {
+    const source = ["@goto #:", "@goto #:x"].join("\n");
+    const result = parseScenario({ sourceText: source, scriptPath: "promoted-label-spans.nani" });
+
+    expect(result.diagnostics.map((diagnostic) => [diagnostic.code, sourceSlice(source, diagnostic.span)])).toEqual([
+      ["missing-local-label", "#:"],
+      ["missing-local-label", "#:x"]
+    ]);
+  });
+
   it("accepts known local label references in command primary and goto params", () => {
     const result = parseScenario({
       sourceText: `#Start
@@ -923,6 +962,20 @@ describe("nani parser", () => {
     ]);
   });
 
+  it("derives primary, params, and flags only from the ordered args projection", () => {
+    const result = parseScenario({
+      sourceText: "@print First text:one text:two wait! !wait if:{ready} unless:{blocked}",
+      scriptPath: "ir-projection.nani"
+    });
+    const command = result.scenario.statements[0];
+    if (command?.kind !== "command") throw new Error("Test fixture must parse as a command.");
+
+    const projected = projectCommandArgs(command.args);
+    expect(command.primary).toEqual(projected.primary);
+    expect(command.params).toEqual(projected.params);
+    expect(command.flags).toEqual(projected.flags);
+  });
+
   it("warns when whitespace prevents command params from parsing normally without changing IR", () => {
     const result = parseScenario({
       sourceText: ["@bgm Piano volume :0.8", "@sfx Door volume: 0.5"].join("\n"),
@@ -971,10 +1024,8 @@ describe("nani parser", () => {
       {
         line: 1,
         commandId: "bgm",
-        primary: undefined,
-        params: {
-          "Piano volume": 0.8
-        }
+        primary: "Piano volume:0.8",
+        params: {}
       },
       {
         line: 2,
@@ -1005,7 +1056,365 @@ describe("nani parser", () => {
     expect(text.tokens.filter((token) => token.kind === "inline-command")).toHaveLength(3);
     expect(text.printParams).toEqual({ speed: { type: "string", value: "fast" } });
   });
+
+  it("targets each invalid inline-command argument form", () => {
+    const source = "Felix: [> extra] and [< other:value]";
+    const result = parseScenario({ sourceText: source, scriptPath: "inline-argument-spans.nani" });
+
+    expect(result.diagnostics.map((diagnostic) => [diagnostic.code, sourceSlice(source, diagnostic.span)])).toEqual([
+      ["invalid-inline-command-argument", "extra"],
+      ["invalid-inline-command-argument", "other:value"]
+    ]);
+    expectCompleteSourceCoverage(source, result);
+  });
+
+  it("maps structural source refs through CRLF, emoji, repeated text, lists, flags, and inline commands", () => {
+    const source = [
+      "\t#Start",
+      '  @choice "😀 repeated repeated" goto:#Missing,#Start wait! !lazy',
+      "  Felix.Happy: 😀 before [< speed:fast] repeated|#line_id|[>]"
+    ].join("\r\n");
+    const result = parseScenario({ sourceText: source, scriptPath: "mapped.nani" });
+    const slice = (ref: NaniSourceRef): string => sourceSlice(source, resolveNaniSourceRef(result.sourceMap, ref));
+
+    expect(slice({ kind: "statement", statementIndex: 0, part: "marker" })).toBe("#");
+    expect(slice({ kind: "label-name", statementIndex: 0 })).toBe("Start");
+    expect(slice({ kind: "statement", statementIndex: 1, part: "whole" })).toBe(
+      '@choice "😀 repeated repeated" goto:#Missing,#Start wait! !lazy'
+    );
+    expect(slice({ kind: "command-name", statementIndex: 1 })).toBe("choice");
+    expect(slice({ kind: "command-argument", statementIndex: 1, argumentIndex: 0, part: "whole" })).toBe(
+      '"😀 repeated repeated"'
+    );
+    expect(slice({ kind: "command-argument", statementIndex: 1, argumentIndex: 0, part: "value" })).toBe(
+      "😀 repeated repeated"
+    );
+    expect(slice({ kind: "command-argument", statementIndex: 1, argumentIndex: 1, part: "key" })).toBe("goto");
+    expect(slice({ kind: "command-argument", statementIndex: 1, argumentIndex: 1, part: "colon" })).toBe(":");
+    expect(slice({ kind: "command-argument", statementIndex: 1, argumentIndex: 1, part: "value", itemIndex: 0 })).toBe(
+      "#Missing"
+    );
+    expect(slice({ kind: "command-argument", statementIndex: 1, argumentIndex: 1, part: "value", itemIndex: 1 })).toBe(
+      "#Start"
+    );
+    expect(slice({ kind: "command-argument", statementIndex: 1, argumentIndex: 2, part: "flag-marker" })).toBe("!");
+    expect(slice({ kind: "command-argument", statementIndex: 1, argumentIndex: 3, part: "key" })).toBe("lazy");
+    expect(slice({ kind: "text-part", statementIndex: 2, part: "speaker" })).toBe("Felix");
+    expect(slice({ kind: "text-part", statementIndex: 2, part: "appearance" })).toBe("Happy");
+    expect(slice({ kind: "text-part", statementIndex: 2, part: "body" })).toBe(
+      "😀 before [< speed:fast] repeated|#line_id|[>]"
+    );
+    expect(slice({ kind: "inline-command", statementIndex: 2, tokenIndex: 1, part: "whole" })).toBe("[< speed:fast]");
+    expect(slice({ kind: "inline-command", statementIndex: 2, tokenIndex: 1, part: "name" })).toBe("<");
+    expect(
+      slice({ kind: "inline-command-argument", statementIndex: 2, tokenIndex: 1, argumentIndex: 0, part: "value" })
+    ).toBe("fast");
+    expect(slice({ kind: "inline-command", statementIndex: 2, tokenIndex: 3, part: "name" })).toBe(">");
+    expect(slice({ kind: "text-id", statementIndex: 2, markerIndex: 0, part: "whole" })).toBe("|#line_id|");
+    expect(slice({ kind: "text-id", statementIndex: 2, markerIndex: 0, part: "value" })).toBe("line_id");
+    expect(result.diagnostics.map((diagnostic) => [diagnostic.code, sourceSlice(source, diagnostic.span)])).toEqual([
+      ["invalid-inline-command-value", "fast"],
+      ["missing-local-label", "#Missing"]
+    ]);
+    expectCompleteSourceCoverage(source, result);
+  });
+
+  it("rejects forged source refs whose list occurrence is attached to a non-value part", () => {
+    const source = "@choice Pick goto:#Missing,#Other";
+    const result = parseScenario({ sourceText: source, scriptPath: "forged-ref.nani" });
+    const forged = {
+      kind: "command-argument",
+      statementIndex: 0,
+      argumentIndex: 1,
+      part: "key",
+      itemIndex: 0
+    } as unknown as NaniSourceRef;
+
+    expect(() => resolveNaniSourceRef(result.sourceMap, forged)).toThrow(/Unable to resolve Nani source ref/u);
+    expect(() =>
+      resolveNaniSourceRef(
+        { ...result.sourceMap, sourceLength: Number.NaN },
+        { kind: "command-name", statementIndex: 0 }
+      )
+    ).toThrow(/outside forged-ref\.nani/u);
+
+    const forgedRefs = [
+      { kind: "bogus", statementIndex: 0 },
+      { kind: "statement", statementIndex: 0, part: "bogus" },
+      { kind: "statement", statementIndex: "0", part: "whole" },
+      { kind: "statement", statementIndex: 0.5, part: "whole" },
+      { kind: "command-argument", statementIndex: 0, argumentIndex: "0", part: "whole" },
+      { kind: "command-argument", statementIndex: 0, argumentIndex: 1, part: "value", itemIndex: -1 },
+      { kind: "label-name", statementIndex: 0 },
+      { kind: "text-part", statementIndex: 0, part: "whole" },
+      { kind: "inline-command", statementIndex: 0, tokenIndex: 0, part: "whole" },
+      { kind: "text-id", statementIndex: 0, markerIndex: 0, part: "value" }
+    ] as const;
+    for (const invalidRef of forgedRefs) {
+      expect(() =>
+        resolveNaniSourceRef(result.sourceMap, invalidRef as unknown as NaniSourceRef)
+      ).toThrow(/Unable to resolve Nani source ref/u);
+    }
+
+    expect(() =>
+      resolveNaniSourceRef(
+        {
+          ...result.sourceMap,
+          statements: [
+            { ...result.sourceMap.statements[0]!, kind: "bogus" as "command" }
+          ]
+        },
+        { kind: "statement", statementIndex: 0, part: "whole" }
+      )
+    ).toThrow(/invalid statement kind/u);
+  });
+
+  it("keeps Unicode whitespace and repeated speaker/body text structurally distinct", () => {
+    const source = "\u00a0@choice Echo\u2003goto:#Missing\nEcho.Echo: Echo [< speed:fast] Echo";
+    const result = parseScenario({ sourceText: source, scriptPath: "unicode-whitespace.nani" });
+
+    expect(result.scenario.statements).toHaveLength(2);
+    expect(sourceSlice(source, resolveNaniSourceRef(result.sourceMap, {
+      kind: "command-argument",
+      statementIndex: 0,
+      argumentIndex: 1,
+      part: "value"
+    }))).toBe("#Missing");
+    expect(sourceSlice(source, resolveNaniSourceRef(result.sourceMap, {
+      kind: "text-part",
+      statementIndex: 1,
+      part: "speaker"
+    }))).toBe("Echo");
+    expect(sourceSlice(source, resolveNaniSourceRef(result.sourceMap, {
+      kind: "text-part",
+      statementIndex: 1,
+      part: "body"
+    }))).toBe("Echo [< speed:fast] Echo");
+    expectCompleteSourceCoverage(source, result);
+  });
+
+  it("uses non-empty structural anchors for diagnostics on empty syntax slots", () => {
+    const source = ["#", "#", "@", "Felix: []", "Felix: |#|"].join("\n");
+    const result = parseScenario({ sourceText: source, scriptPath: "empty-slots.nani" });
+
+    expect(result.diagnostics.map((diagnostic) => [diagnostic.code, sourceSlice(source, diagnostic.span)])).toEqual([
+      ["duplicate-label", "#"],
+      ["unsupported-inline-command", "["],
+      ["invalid-text-id", "|#|"]
+    ]);
+    expect(
+      sourceSlice(source, resolveNaniSourceRef(result.sourceMap, { kind: "command-name", statementIndex: 2 }))
+    ).toBe("@");
+    expectCompleteSourceCoverage(source, result);
+  });
+
+  it("targets the whole inline argument when its value is empty", () => {
+    const source = "Felix: x [< speed:]";
+    const result = parseScenario({ sourceText: source, scriptPath: "empty-inline-value.nani" });
+
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]).toMatchObject({ code: "invalid-inline-command-value" });
+    expect(sourceSlice(source, result.diagnostics[0]!.span)).toBe("speed:");
+    expectCompleteSourceCoverage(source, result);
+  });
+
+  it("reports command scanner diagnostics from exact quote, expression, and spacing spans", () => {
+    const source = [
+      '@print "😀 volume : repeated',
+      "@print Hello if:{ready repeated",
+      "@bgm Piano volume :0.8 repeated :0",
+      "@sfx Door volume:   0.5"
+    ].join("\n");
+    const result = parseScenario({ sourceText: source, scriptPath: "scanner-spans.nani" });
+
+    expect(result.diagnostics.map((diagnostic) => [diagnostic.code, sourceSlice(source, diagnostic.span)])).toEqual([
+      ["unclosed-command-quote", '"😀 volume : repeated'],
+      ["unclosed-command-expression", "{ready repeated"],
+      ["invalid-command-param-spacing", " "],
+      ["invalid-command-param-spacing", " "],
+      ["invalid-command-param-spacing", "   "]
+    ]);
+    expectCompleteSourceCoverage(source, result);
+  });
+
+  it.each([
+    ["unsupported tag name", "Mira: <color=#f00>x</color>", "color"],
+    ["unsupported attribute key", 'Mira: <b class="loud">x</b>', "class"],
+    ["unsupported font attribute key", '@toast "<font onclick=\\"x\\">x</font>"', "onclick"],
+    ["duplicate font attribute key", '@toast "<font color=\\"red\\" color=\\"blue\\">x</font>"', "color"],
+    ["invalid font attribute value", '@toast "<font color=\\"not-a-color\\">x</font>"', "not-a-color"],
+    ["malformed attribute fragment", '@toast "<font broken>x</font>"', "broken"],
+    ["mismatched closing tag name", "Mira: <b>x</i>", "i"],
+    ["empty closing tag name", "Mira: </>", "</>"],
+    ["empty self-closing tag name", "Mira: < />", "< />"],
+    ["punctuation attribute fragment", "Mira: <b =>x</b>", "="],
+    ["empty quoted font value", 'Mira: <font color="">x</font>', '""'],
+    ["unclosed tag tail", "Mira: <b>x", "<b>x"]
+  ])("anchors rich-text diagnostic to the smallest source part: %s", (_caseName, source, expectedSlice) => {
+    const result = parseScenario({ sourceText: source, scriptPath: "rich-span.nani" });
+
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]?.code).toBe("invalid-rich-text");
+    expect(sourceSlice(source, result.diagnostics[0]!.span)).toBe(expectedSlice);
+    expectCompleteSourceCoverage(source, result);
+  });
+
+  it("anchors textId diagnostics to invalid values, the second marker, and the duplicate value", () => {
+    const source = [
+      "Felix: Empty|#|",
+      "Mira: Bad|#bad id|",
+      "Ren: Many|#one| then |#two|",
+      "Narrator: First|#dup|",
+      "Narrator: Second|#dup|"
+    ].join("\n");
+    const result = parseScenario({ sourceText: source, scriptPath: "text-id-spans.nani" });
+
+    expect(result.diagnostics.map((diagnostic) => [diagnostic.code, sourceSlice(source, diagnostic.span)])).toEqual([
+      ["invalid-text-id", "|#|"],
+      ["invalid-text-id", "bad id"],
+      ["multiple-text-ids", "|#two|"],
+      ["duplicate-text-id", "dup"]
+    ]);
+    expectCompleteSourceCoverage(source, result);
+  });
 });
+
+function sourceSlice(source: string, span: TextSpan): string {
+  return source.slice(span.start, span.end);
+}
+
+function expectCompleteSourceCoverage(source: string, result: ParseScenarioResult): void {
+  expect(result.sourceMap.sourceLength).toBe(source.length);
+  expect(result.sourceMap.statements).toHaveLength(result.scenario.statements.length);
+  for (const diagnostic of result.diagnostics) {
+    expect(Number.isInteger(diagnostic.span.start)).toBe(true);
+    expect(Number.isInteger(diagnostic.span.end)).toBe(true);
+    expect(diagnostic.span.start).toBeGreaterThanOrEqual(0);
+    expect(diagnostic.span.end).toBeGreaterThan(diagnostic.span.start);
+    expect(diagnostic.span.end).toBeLessThanOrEqual(source.length);
+    expect(sourceSlice(source, diagnostic.span).length).toBeGreaterThan(0);
+  }
+
+  for (const statement of result.sourceMap.statements) {
+    expectSpanWithinSource(statement.span, source);
+    for (const span of [
+      statement.markerSpan,
+      statement.nameSpan,
+      statement.speakerSpan,
+      statement.appearanceSpan,
+      statement.bodySpan
+    ]) {
+      if (span) expectSpanWithinSource(span, source);
+    }
+    if (statement.command) expectCommandSourceWithinSource(statement.command, source);
+    for (const inline of statement.inlineCommands) expectCommandSourceWithinSource(inline.command, source);
+    for (const marker of statement.textIds) {
+      expectSpanWithinSource(marker.span, source);
+      expectSpanWithinSource(marker.valueSpan, source);
+    }
+  }
+  for (const ref of generatedSourceRefs(result)) {
+    expectSpanWithinSource(resolveNaniSourceRef(result.sourceMap, ref), source);
+  }
+}
+
+function generatedSourceRefs(result: ParseScenarioResult): NaniSourceRef[] {
+  const refs: NaniSourceRef[] = [];
+  for (const [statementIndex, statement] of result.sourceMap.statements.entries()) {
+    refs.push({ kind: "statement", statementIndex, part: "whole" });
+    if (statement.markerSpan) refs.push({ kind: "statement", statementIndex, part: "marker" });
+    if (statement.nameSpan) refs.push({ kind: "statement", statementIndex, part: "name" });
+    if (statement.kind === "label") refs.push({ kind: "label-name", statementIndex });
+    if (statement.kind === "text") {
+      refs.push({ kind: "text-part", statementIndex, part: "whole" });
+      if (statement.speakerSpan) refs.push({ kind: "text-part", statementIndex, part: "speaker" });
+      if (statement.appearanceSpan) refs.push({ kind: "text-part", statementIndex, part: "appearance" });
+      if (statement.bodySpan) refs.push({ kind: "text-part", statementIndex, part: "body" });
+      for (const inline of statement.inlineCommands) {
+        refs.push(
+          { kind: "inline-command", statementIndex, tokenIndex: inline.tokenIndex, part: "whole" },
+          { kind: "inline-command", statementIndex, tokenIndex: inline.tokenIndex, part: "marker" },
+          { kind: "inline-command", statementIndex, tokenIndex: inline.tokenIndex, part: "name" }
+        );
+        refs.push(...commandArgumentRefs(statementIndex, inline.command.arguments, inline.tokenIndex));
+      }
+      for (const markerIndex of statement.textIds.keys()) {
+        refs.push(
+          { kind: "text-id", statementIndex, markerIndex, part: "whole" },
+          { kind: "text-id", statementIndex, markerIndex, part: "value" }
+        );
+      }
+    }
+    if (statement.kind === "command" && statement.command) {
+      refs.push({ kind: "command-name", statementIndex });
+      refs.push(...commandArgumentRefs(statementIndex, statement.command.arguments));
+    }
+  }
+  return refs;
+}
+
+function commandArgumentRefs(
+  statementIndex: number,
+  args: readonly NaniCommandArgumentSourceMap[],
+  tokenIndex?: number
+): NaniSourceRef[] {
+  const refs: NaniSourceRef[] = [];
+  for (const [argumentIndex, argument] of args.entries()) {
+    const base = tokenIndex === undefined
+      ? { kind: "command-argument" as const, statementIndex, argumentIndex }
+      : { kind: "inline-command-argument" as const, statementIndex, tokenIndex, argumentIndex };
+    refs.push({ ...base, part: "whole" });
+    if (argument.keySpan) refs.push({ ...base, part: "key" });
+    if (argument.colonSpan) refs.push({ ...base, part: "colon" });
+    if (argument.valueSpan) refs.push({ ...base, part: "value" });
+    if (argument.flagMarkerSpan) refs.push({ ...base, part: "flag-marker" });
+    for (const itemIndex of argument.itemSpans.keys()) refs.push({ ...base, part: "value", itemIndex });
+  }
+  return refs;
+}
+
+function expectCommandSourceWithinSource(
+  command: NonNullable<ParseScenarioResult["sourceMap"]["statements"][number]["command"]>,
+  source: string
+): void {
+  for (const span of [command.span, command.markerSpan, command.nameSpan]) expectSpanWithinSource(span, source);
+  for (const argument of command.arguments) {
+    expectSpanWithinSource(argument.span, source);
+    for (const span of [
+      argument.keySpan,
+      argument.colonSpan,
+      argument.valueSpan,
+      argument.flagMarkerSpan,
+      ...argument.itemSpans
+    ]) {
+      if (span) expectSpanWithinSource(span, source);
+    }
+  }
+}
+
+function expectSpanWithinSource(span: TextSpan, source: string): void {
+  expect(Number.isInteger(span.start)).toBe(true);
+  expect(Number.isInteger(span.end)).toBe(true);
+  expect(span.start).toBeGreaterThanOrEqual(0);
+  expect(span.end).toBeGreaterThanOrEqual(span.start);
+  expect(span.end).toBeLessThanOrEqual(source.length);
+}
+
+function projectCommandArgs(args: readonly CommandArgIR[]): {
+  primary?: NaniValue;
+  params: Record<string, NaniValue>;
+  flags: Record<string, boolean>;
+} {
+  let primary: NaniValue | undefined;
+  const params: Record<string, NaniValue> = {};
+  const flags: Record<string, boolean> = {};
+  for (const arg of args) {
+    if (arg.kind === "value") primary ??= arg.value;
+    else if (arg.kind === "flag") flags[arg.key] = arg.value;
+    else if (arg.key !== "if" && arg.key !== "unless") params[arg.key] = arg.value;
+  }
+  return { ...(primary ? { primary } : {}), params, flags };
+}
 
 function parseFixture(name: string): ParseScenarioResult {
   return parseScenario({ sourceText: readFixture(name), scriptPath: name });

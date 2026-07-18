@@ -10,11 +10,12 @@
 
 ## Status
 
-- State: `Review`
+- State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-17`
 - Updated: `2026-07-17`
-- Completed Commit: `TBD`
+- Completed Commit: `a7bb0091234f7796df3db93a7bfe3f0ae948e300`
+- Completed Tag: `vscode-nani-adapter-baseline-2026-07-17`
 - Archive Target: `docs/archive/completed-tasks/vscode-nani-latest-alignment.md`
 
 ## Goal

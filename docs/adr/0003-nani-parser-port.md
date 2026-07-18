@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR 0005](0005-nani-source-provenance.md).
 
 ## Decision
 
@@ -21,3 +21,7 @@ depend on `ParserPort` and IR, not implementation details.
 - The first parser supports only the baseline grammar.
 - Parser snapshots become public API evidence.
 - Langium migration must preserve the `ParserPort` output contract.
+
+This section records the historical decision. The active parser contract no
+longer exposes `ParserPort`; exact source provenance is carried by the required
+sidecar described in ADR 0005.

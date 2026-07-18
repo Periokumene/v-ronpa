@@ -13,6 +13,11 @@ interaction state back into the machine.
 ## Package ownership
 
 - `contracts`: public schemas, SaveData v7, `.nani` runtime IR.
+- `nani-parser`: generic `.nani` ScenarioIR plus a required UTF-16 source-map
+  sidecar; owns syntax diagnostics and cooked-to-source projection.
+- `nani-runtime-compiler`: catalog binding, validation, normalization, and
+  runtime-boundary diagnostics; consumes parser IR and source map together,
+  binding only from ordered `CommandIR.args`.
 - `app-vn-session`: story session orchestration.
 - `app-vn-dispatch`: headless command fanout and pure UI/media transactions.
 - `pixi-stage-model`: pure Pixi snapshot reducer, hints, waits, diagnostics.
@@ -32,4 +37,9 @@ presentation. R3F owns exploration and 3D trial staging. Gameplay and state
 packages cannot depend on any renderer, browser storage, or audio implementation.
 
 See [VN integration](app-vn-integration.md), [presentation](presentation-pipeline.md),
-[assets](asset-pipeline.md), and [contracts](contracts.md).
+[assets](asset-pipeline.md), [contracts](contracts.md), and
+[Nani source diagnostics](nani-source-diagnostics.md).
+
+The exact-source boundary is continuously checked by
+`pnpm validate:nani-diagnostics-cleanup` and the deterministic stress/performance
+gate `pnpm validate:nani-diagnostics-quality`.

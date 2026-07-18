@@ -1,5 +1,5 @@
 import type { RuntimeCommand, RuntimeScript, StoryRuntimeSnapshot } from "@v-ronpa/contracts";
-import { parseScenario, type Diagnostic as ParserDiagnostic } from "@v-ronpa/nani-parser";
+import { parseScenario, type NaniParserDiagnostic } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript, type RuntimeCompilerDiagnostic } from "@v-ronpa/nani-runtime-compiler";
 import {
   createInitialStoryState,
@@ -27,7 +27,7 @@ export interface VnEntrySource {
 }
 
 export interface VnSessionDiagnostics {
-  parser: ParserDiagnostic[];
+  parser: NaniParserDiagnostic[];
   compiler: RuntimeCompilerDiagnostic[];
 }
 
@@ -65,7 +65,7 @@ export interface VnSessionRestoreInput {
 
 export function createVnSession(entry: VnEntrySource): VnSessionStep {
   const parsed = parseScenario({ sourceText: entry.sourceText, scriptPath: entry.scriptPath });
-  const compiled = compileRuntimeScript(parsed.scenario);
+  const compiled = compileRuntimeScript(parsed);
   const initialStory = createInitialStoryState(compiled.script);
   const jumped = entry.startLabel
     ? storyReducer(initialStory, { type: "JUMP", script: compiled.script, label: entry.startLabel })
@@ -73,7 +73,7 @@ export function createVnSession(entry: VnEntrySource): VnSessionStep {
   const play = createInitialStoryPlayState();
   const session = {
     active: true,
-    diagnostics: { parser: parsed.diagnostics, compiler: compiled.diagnostics },
+    diagnostics: { parser: [...parsed.diagnostics], compiler: compiled.diagnostics },
     script: compiled.script,
     story: jumped.state,
     play

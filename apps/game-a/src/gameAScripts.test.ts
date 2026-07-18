@@ -34,7 +34,7 @@ describe("game-a nani scripts", () => {
       scriptPath: openingRuntimeEntry.scriptPath,
       sourceText: gameAOpeningNaniSource
     });
-    const compiled = compileRuntimeScript(parsed.scenario);
+    const compiled = compileRuntimeScript(parsed);
 
     expect(parsed.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
     expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
@@ -75,7 +75,7 @@ describe("game-a nani scripts", () => {
         scriptPath: runtimeEntry.scriptPath,
         sourceText: runtimeEntry.sourceText
       });
-      const compiled = compileRuntimeScript(parsed.scenario);
+      const compiled = compileRuntimeScript(parsed);
       expect(parsed.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
       expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
       expect(runtimeEntry.scriptPath).toMatch(/^game-a\/test\//u);
@@ -102,10 +102,11 @@ describe("game-a nani scripts", () => {
     expect(gameAOpeningNaniSource).not.toContain("CHECKPOINT SMOKE");
     expect(gameAOpeningNaniSource).not.toContain("CHECKPOINT CHARACTER");
 
-    const smokeCompiled = compileRuntimeScript(parseScenario({
+    const smokeParsed = parseScenario({
       scriptPath: smokeRuntimeEntry.scriptPath,
       sourceText: smokeRuntimeEntry.sourceText
-    }).scenario);
+    });
+    const smokeCompiled = compileRuntimeScript(smokeParsed);
     expect(smokeCompiled.script.commands).toContainEqual(
       expect.objectContaining({
         commandId: "flash",
@@ -126,7 +127,7 @@ describe("game-a nani scripts", () => {
       scriptPath: openingRuntimeEntry.scriptPath,
       sourceText: gameAOpeningNaniSource
     });
-    const compiled = compileRuntimeScript(parsed.scenario);
+    const compiled = compileRuntimeScript(parsed);
     const entryRefs = new Set(gameAVnEntry.assetRefs.map((ref) => `${ref.kind}:${ref.id}`));
 
     expect(collectRuntimeCommandAssetRefs(compiled.script.commands)).toEqual(
