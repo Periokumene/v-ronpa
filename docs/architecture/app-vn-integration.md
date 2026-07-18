@@ -39,3 +39,18 @@ read-only `VnRuntimeDebugSnapshot` to the four canonical ports. Game A's
 development workbench uses the entry's headless inspector/materializer and
 commits only through `VnLifecyclePort.restoreVnState()`; see
 [Nani devtools](vn-devtools.md).
+
+## Game viewport ownership
+
+The app playfield is the only geometry boundary shared by Game A DOM surfaces
+and Pixi. Product UI dimensions and breakpoints are relative to the playfield
+container, not the browser window. Pixi continues to measure the host supplied
+by `VnPixiPresenterHost`; apps and development tools must not send presenter
+resize commands or mirror its dimensions into runtime state.
+
+Development chrome stays outside this boundary. Game A may provide an
+app-internal wrapper around the playfield for DEV-only scaling or letterboxing,
+but `GameInteractionShell`, runtime ports, checkpoints, and Pixi remain children
+of one logical playfield. The production call omits the wrapper and must not
+mount development DOM or observers. Host preview modes are app tooling state,
+not `app-vn-devtools`, runtime, save, or presentation contracts.

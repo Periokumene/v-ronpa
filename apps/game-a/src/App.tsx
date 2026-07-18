@@ -57,13 +57,15 @@ interface GameAAppCoreProps {
   characterPreloadPlan: LayeredCharacterPreloadPlan;
   className?: string;
   renderAfterPlayfield?: (context: GameAAppContext) => ReactNode;
+  wrapPlayfield?: (playfield: ReactNode) => ReactNode;
 }
 
 export function GameAAppCore({
   activeEntry,
   characterPreloadPlan,
   className,
-  renderAfterPlayfield
+  renderAfterPlayfield,
+  wrapPlayfield
 }: GameAAppCoreProps) {
   const settings = useGameSettingsAdapter({ storageKey: "v-ronpa:game-a:settings:v2" });
   const assetRegistry = useMemo(() => createAssetRegistry(gameAContentManifest), []);
@@ -149,6 +151,39 @@ export function GameAAppCore({
     (diagnostic) => diagnostic.source === "asset"
   ).length;
 
+  const playfield = (
+    <section className="game-a-playfield" data-testid="game-a-playfield">
+      <GameInteractionShell
+        dialogAppearance={gameAUiConfig.dialog.appearance}
+        dialogDisplay={dialogDisplay}
+        flow={flow}
+        formatStorySpeaker={displaySpeaker}
+        overlayPages={overlayPages}
+        runtime={runtime.shell}
+        surfaces={gameASurfaces}
+      >
+        <div className="game-a-scene" data-testid="game-a-vn-shell">
+          <VnPixiPresenterHost
+            active={flow.mode === "vn" && runtime.shell.storyRuntime.active}
+            assetResolver={assetRegistry}
+            characterOutlineEnabled={true}
+            characterPreloadPlan={characterPreloadPlan}
+            diagnostics={runtime.diagnostics}
+            presentation={runtime.presentation}
+            onStageHandleChanged={pixiStage.onStageHandleChanged}
+          />
+        </div>
+      </GameInteractionShell>
+      <div className="game-a-hud">
+        <div className="game-a-status">
+          <span data-testid="game-a-app-id">game-a</span>
+          <strong>视觉小说框架</strong>
+          <small data-testid="game-a-mode">{formatGameAMode(flow.mode)}</small>
+        </div>
+      </div>
+    </section>
+  );
+
   return (
     <main
       className={className ? `game-a-shell ${className}` : "game-a-shell"}
@@ -160,36 +195,7 @@ export function GameAAppCore({
         fonts={gameAContentManifest.fonts}
         onDiagnostic={runtime.diagnostics.observeAssetDiagnostic}
       />
-      <section className="game-a-playfield" data-testid="game-a-playfield">
-        <GameInteractionShell
-          dialogAppearance={gameAUiConfig.dialog.appearance}
-          dialogDisplay={dialogDisplay}
-          flow={flow}
-          formatStorySpeaker={displaySpeaker}
-          overlayPages={overlayPages}
-          runtime={runtime.shell}
-          surfaces={gameASurfaces}
-        >
-          <div className="game-a-scene" data-testid="game-a-vn-shell">
-            <VnPixiPresenterHost
-              active={flow.mode === "vn" && runtime.shell.storyRuntime.active}
-              assetResolver={assetRegistry}
-              characterOutlineEnabled={true}
-              characterPreloadPlan={characterPreloadPlan}
-              diagnostics={runtime.diagnostics}
-              presentation={runtime.presentation}
-              onStageHandleChanged={pixiStage.onStageHandleChanged}
-            />
-          </div>
-        </GameInteractionShell>
-        <div className="game-a-hud">
-          <div className="game-a-status">
-            <span data-testid="game-a-app-id">game-a</span>
-            <strong>视觉小说框架</strong>
-            <small data-testid="game-a-mode">{formatGameAMode(flow.mode)}</small>
-          </div>
-        </div>
-      </section>
+      {wrapPlayfield ? wrapPlayfield(playfield) : playfield}
       {renderAfterPlayfield?.({ runtime, flow })}
     </main>
   );

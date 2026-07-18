@@ -19,6 +19,8 @@ const forbidden = [
   "v-ronpa:nani-devtools-update",
   "v-ronpa:game-a:nani-devtools",
   "game-a-shell-with-devtools",
+  "game-a-dev-viewport-toolbar",
+  "Game preview layout",
   "await-session"
 ];
 const failures = [];

@@ -65,6 +65,7 @@ authorities and a distorted composite scene.
 - `apps/game-a/src/**/*.test.ts`
 - `apps/game-a/src/**/*.test.tsx`
 - `tests/smoke/game-a-vn.spec.ts`
+- `scripts/validate-game-a-production.mjs`
 - `docs/architecture/vn-devtools.md`
 - `docs/architecture/app-vn-integration.md`
 - `docs/tasks/game-a-devtools-viewport-isolation.md`

@@ -15,7 +15,6 @@ import type {
 } from "@v-ronpa/app-vn-runtime";
 import type { SaveableVnState } from "@v-ronpa/contracts";
 import initialNaniCandidates from "virtual:v-ronpa-nani-devtools-initial";
-import "./GameANaniDevtools.css";
 
 const SESSION_KEY = "v-ronpa:game-a:nani-devtools:v1";
 

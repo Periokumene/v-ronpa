@@ -123,13 +123,37 @@ Game A is the only mutation authority. It installs a successful candidate by:
 Restore validates game, entry, and revision before mutation. The workbench never
 writes the save database, and it never stores checkpoints or source text.
 
-## Dock interaction and persistence
+## Dock and game viewport isolation
 
-The desktop layout gives the game `minmax(0, 1fr)` and a 420px Dock. The Dock is
-resizable from 320px to 720px while capped at 45vw, becomes an overlay below
-900px, and collapses to a small status button. It remains outside the product
-interaction shell, so authored UI visibility commands cannot hide it. Pixi sizes
-from its game-column container instead of the browser window.
+The desktop host gives a Game A preview cell `minmax(0, 1fr)` and a 420px Dock.
+The Dock is resizable from 320px to 720px while capped at 45vw, becomes an
+overlay below 900px, and collapses to a small status button. It remains outside
+the product interaction shell, so authored UI visibility commands cannot hide
+it.
+
+The Dock never owns game dimensions or renderer resize. Game A's DEV host wraps
+only the product playfield in an app-local preview frame with two explicit modes:
+
+- `fidelity` is the default editing mode. The logical game viewport remains the
+  browser viewport. Opening or resizing the Dock changes only a uniform display
+  scale and centered letterboxing; it cannot reflow Story UI, change Pixi host
+  geometry, remount the runtime, or alter a checkpoint.
+- `responsive` is an intentional multi-resolution test mode. The remaining
+  preview cell becomes the logical game viewport at scale 1. Game A DOM surfaces
+  use playfield `cqw`/`cqh` units and a named container query, while Pixi reads
+  the same playfield host through its existing `ResizeObserver`.
+
+The preview frame, observer, transform, toolbar, and mode state are compiled only
+through Game A's lazy DEV module. `GameAAppCore` exposes one optional app-internal
+playfield wrapper; when omitted by the product path it emits the original
+playfield directly, with no extra DOM, observer, storage, or DEV state. The
+generic `app-vn-devtools` package remains unaware of Game A layout, Pixi, and
+preview modes.
+
+This separation is intentional: fidelity mode protects authored presentation
+while editing Nani, and responsive mode exposes real container adaptation only
+when the developer asks to test it. There is no Dock-specific Pixi resize path
+and no second viewport state in runtime or saves.
 
 Source browsing, search, label navigation, selection, and inspection are inert.
 Only the explicit Preview action or a successful armed fixed-point update can

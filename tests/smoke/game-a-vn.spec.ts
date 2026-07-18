@@ -43,10 +43,31 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   expect(initialWorkbenchWidth).toBeGreaterThanOrEqual(320);
   expect(initialWorkbenchWidth).toBeLessThanOrEqual(720);
   expect(initialWorkbenchWidth).toBeLessThanOrEqual(1280 * 0.45 + 1);
+  const initialViewportGeometry = await readDevViewportGeometry(page);
+  expect(initialViewportGeometry).toMatchObject({
+    mode: "fidelity",
+    logicalWidth: 1280,
+    logicalHeight: 720,
+    playfieldOffsetWidth: 1280,
+    playfieldOffsetHeight: 720,
+    pixiLayerOffsetWidth: 1280,
+    pixiLayerOffsetHeight: 720
+  });
+  expect(initialViewportGeometry.scale).toBeLessThan(1);
+  expect(initialViewportGeometry.stageWidth).toBeCloseTo(initialViewportGeometry.cellWidth, 0);
+  const storySessionBeforeLayoutChanges = await readDevtoolsStorySession(page);
   await page.screenshot({ path: "test-results/game-a-workbench-expanded.png", fullPage: true });
   await workbench.getByRole("button", { name: "Collapse Nani Workbench" }).click();
   await expect(page.getByTestId("vn-devtools-collapsed-button")).toBeVisible();
   await expect.poll(async () => (await page.getByTestId("game-a-playfield").boundingBox())?.width ?? 0).toBeGreaterThan(initialPlayfieldWidth);
+  await expect.poll(async () => (await readDevViewportGeometry(page)).scale).toBe(1);
+  expect(await readDevViewportGeometry(page)).toMatchObject({
+    mode: "fidelity",
+    logicalWidth: 1280,
+    logicalHeight: 720,
+    playfieldOffsetWidth: 1280,
+    playfieldOffsetHeight: 720
+  });
   await page.screenshot({ path: "test-results/game-a-workbench-collapsed.png", fullPage: true });
   await page.getByTestId("vn-devtools-collapsed-button").click();
   await expect(workbench).toBeVisible();
@@ -54,6 +75,22 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await page.getByTestId("vn-devtools-resizer").focus();
   await page.keyboard.press("ArrowLeft");
   await expect.poll(async () => (await workbench.boundingBox())?.width ?? 0).toBeGreaterThan(widthBeforeKeyboardResize);
+  const resizedFidelityGeometry = await readDevViewportGeometry(page);
+  expect(resizedFidelityGeometry.logicalWidth).toBe(1280);
+  expect(resizedFidelityGeometry.logicalHeight).toBe(720);
+  expect(resizedFidelityGeometry.scale).toBeLessThan(initialViewportGeometry.scale);
+  await page.getByTestId("game-a-dev-viewport-responsive").click();
+  await expect(page.getByTestId("game-a-dev-viewport-responsive")).toHaveAttribute("aria-pressed", "true");
+  const responsiveGeometry = await readDevViewportGeometry(page);
+  expect(responsiveGeometry).toMatchObject({ mode: "responsive", scale: 1 });
+  expect(responsiveGeometry.logicalWidth).toBe(responsiveGeometry.cellWidth);
+  expect(responsiveGeometry.logicalHeight).toBe(responsiveGeometry.cellHeight);
+  expect(responsiveGeometry.playfieldOffsetWidth).toBe(responsiveGeometry.cellWidth);
+  expect(responsiveGeometry.pixiLayerOffsetWidth).toBe(responsiveGeometry.playfieldOffsetWidth);
+  expect(responsiveGeometry.pixiLayerOffsetHeight).toBe(responsiveGeometry.playfieldOffsetHeight);
+  expect(await readDevtoolsStorySession(page)).toBe(storySessionBeforeLayoutChanges);
+  await page.getByTestId("game-a-dev-viewport-fidelity").click();
+  await expect(page.getByTestId("game-a-dev-viewport-fidelity")).toHaveAttribute("aria-pressed", "true");
   await page.setViewportSize({ width: 820, height: 720 });
   await expect.poll(async () => page.evaluate(() => {
     const dock = document.querySelector<HTMLElement>('[data-testid="vn-devtools-dock"]');
@@ -144,6 +181,22 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
   await expect(page.getByTestId("pixi-layer")).toBeVisible();
   await page.screenshot({ path: "test-results/game-a-vn-dialog.png", fullPage: true });
+
+  const fidelityDialogGeometry = await readNormalizedElementGeometry(page, "vn-dialog-surface");
+  expect(fidelityDialogGeometry.left).toBeCloseTo(0.117, 2);
+  const storySessionBeforeViewportMode = await readDevtoolsStorySession(page);
+  await page.getByTestId("game-a-dev-viewport-responsive").click();
+  await expect(page.getByTestId("game-a-dev-viewport-responsive")).toHaveAttribute("aria-pressed", "true");
+  const responsiveDialogGeometry = await readNormalizedElementGeometry(page, "vn-dialog-surface");
+  expect(responsiveDialogGeometry.left).toBeCloseTo(0.117, 2);
+  expect(responsiveDialogGeometry.width).toBeCloseTo(fidelityDialogGeometry.width, 2);
+  expect(await readDevtoolsStorySession(page)).toBe(storySessionBeforeViewportMode);
+  await page.screenshot({ path: "test-results/game-a-workbench-responsive.png", fullPage: true });
+  await page.getByTestId("game-a-dev-viewport-fidelity").click();
+  await expect(page.getByTestId("game-a-dev-viewport-fidelity")).toHaveAttribute("aria-pressed", "true");
+  const restoredFidelityDialogGeometry = await readNormalizedElementGeometry(page, "vn-dialog-surface");
+  expect(restoredFidelityDialogGeometry.left).toBeCloseTo(fidelityDialogGeometry.left, 3);
+  expect(restoredFidelityDialogGeometry.width).toBeCloseTo(fidelityDialogGeometry.width, 3);
 
   await exerciseNaniSourceSaveFlow(page, workbench);
   await exerciseWorkbenchDecisionFlow(page, workbench, firstStableLine);
@@ -351,6 +404,64 @@ async function advanceUntilInputPrompt(page: Page) {
 async function readDevtoolsStorySession(page: Page): Promise<number> {
   const snapshot = await readGameSnapshot(page).catch(() => undefined);
   return snapshot?.story.storySession ?? -1;
+}
+
+interface DevViewportGeometry {
+  mode: string;
+  logicalWidth: number;
+  logicalHeight: number;
+  scale: number;
+  cellWidth: number;
+  cellHeight: number;
+  stageWidth: number;
+  stageHeight: number;
+  playfieldOffsetWidth: number;
+  playfieldOffsetHeight: number;
+  pixiLayerOffsetWidth: number;
+  pixiLayerOffsetHeight: number;
+}
+
+async function readDevViewportGeometry(page: Page): Promise<DevViewportGeometry> {
+  return page.evaluate(() => {
+    const viewport = document.querySelector<HTMLElement>('[data-testid="game-a-dev-viewport"]');
+    const stage = document.querySelector<HTMLElement>('[data-testid="game-a-dev-viewport-stage"]');
+    const playfield = document.querySelector<HTMLElement>('[data-testid="game-a-playfield"]');
+    const pixiLayer = document.querySelector<HTMLElement>('[data-testid="pixi-layer"]');
+    if (!viewport || !stage || !playfield || !pixiLayer) {
+      throw new Error("Game A DEV viewport geometry is unavailable.");
+    }
+    const stageRect = stage.getBoundingClientRect();
+    return {
+      mode: viewport.dataset.mode ?? "missing",
+      logicalWidth: Number(viewport.dataset.logicalWidth),
+      logicalHeight: Number(viewport.dataset.logicalHeight),
+      scale: Number(viewport.dataset.displayScale),
+      cellWidth: viewport.clientWidth,
+      cellHeight: viewport.clientHeight,
+      stageWidth: stageRect.width,
+      stageHeight: stageRect.height,
+      playfieldOffsetWidth: playfield.offsetWidth,
+      playfieldOffsetHeight: playfield.offsetHeight,
+      pixiLayerOffsetWidth: pixiLayer.offsetWidth,
+      pixiLayerOffsetHeight: pixiLayer.offsetHeight
+    };
+  });
+}
+
+async function readNormalizedElementGeometry(page: Page, testId: string) {
+  return page.evaluate((id) => {
+    const element = document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+    const playfield = document.querySelector<HTMLElement>('[data-testid="game-a-playfield"]');
+    if (!element || !playfield) throw new Error(`Cannot normalize missing geometry for ${id}.`);
+    const rect = element.getBoundingClientRect();
+    const playfieldRect = playfield.getBoundingClientRect();
+    return {
+      left: (rect.left - playfieldRect.left) / playfieldRect.width,
+      top: (rect.top - playfieldRect.top) / playfieldRect.height,
+      width: rect.width / playfieldRect.width,
+      height: rect.height / playfieldRect.height
+    };
+  }, testId);
 }
 
 interface GameATextSnapshot {

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
 import type { SaveableVnState } from "@v-ronpa/contracts";
 import { GameAAppCore, type GameAAppContext } from "../App";
 import type { GameAVnLaunchDefinition } from "../gameAScripts";
 import { GameANaniDevtools } from "./GameANaniDevtools";
+import { GameADevViewport } from "./GameADevViewport";
 import { prepareGameACandidateLaunch, stabilizeGameACandidateLaunch } from "./gameACandidateLaunch";
 import {
   canRollbackGameADevtoolsCommit,
@@ -56,6 +57,7 @@ export function GameADevApp({
       activeEntry={activeLaunchDefinition.runtimeEntry}
       characterPreloadPlan={activeLaunchDefinition.characterPreloadPlan}
       className="game-a-shell-with-devtools"
+      wrapPlayfield={wrapGameADevPlayfield}
       renderAfterPlayfield={({ runtime, flow }) => (
         <GameADevtoolsHost
           activeLaunchDefinition={activeLaunchDefinition}
@@ -67,6 +69,10 @@ export function GameADevApp({
       )}
     />
   );
+}
+
+function wrapGameADevPlayfield(playfield: ReactNode): ReactNode {
+  return <GameADevViewport>{playfield}</GameADevViewport>;
 }
 
 interface GameADevtoolsHostProps extends GameAAppContext {
