@@ -61,11 +61,13 @@ import type {
   VnDevtoolsDecision,
   VnDevtoolsDecisionSubmission,
   VnDevtoolsDiagnostic,
+  VnDevtoolsLayoutState,
   VnDevtoolsLinePreviewability,
   VnDevtoolsRuntimeSummaries,
   VnDevtoolsSourceLine,
   VnDevtoolsStatus
 } from "./types";
+import { mergeVnDevtoolsLayout, resolveVnDevtoolsSelection } from "./controllerViewState";
 import type {
   NaniDevtoolsViteDiagnostic,
   NaniDevtoolsViteInitialCandidate,
@@ -120,6 +122,7 @@ type VnDevtoolsHostMutation =
 interface VnDevtoolsSessionSnapshot {
   collapsed: boolean;
   width: number;
+  layout: VnDevtoolsLayoutState;
   pinnedTarget?: VnDebugTargetAnchor;
   decisions: VnDebugDecisionTrace;
 }
@@ -154,10 +157,15 @@ export function useVnDevtoolsController({
   const [searchQuery, setSearchQuery] = useState("");
   const [collapsed, setCollapsed] = useState(initialSession.collapsed);
   const [width, setWidth] = useState(initialSession.width);
+  const [layout, setLayout] = useState(initialSession.layout);
   const [pinnedTarget, setPinnedTarget] = useState<VnDebugTargetAnchor | undefined>(initialSession.pinnedTarget);
   const armedTargetRef = useRef<VnDebugTargetAnchor | undefined>(initialSession.pinnedTarget);
   const [decisions, setDecisions] = useState<VnDebugDecisionTrace>(() => restoreDecisions(initialSession.decisions));
-  const [status, setStatus] = useState<VnDevtoolsStatus>({ phase: "inspecting", message: "Inspecting active Nani source." });
+  const [status, setStatus] = useState<VnDevtoolsStatus>({
+    phase: "inspecting",
+    message: "Inspecting active Nani source.",
+    cancellable: true
+  });
   const [pendingDecision, setPendingDecision] = useState<PendingDecisionContext | undefined>(undefined);
   const [lastCheckpoint, setLastCheckpoint] = useState<SaveableVnState | undefined>(undefined);
   const lastCheckpointRef = useRef<SaveableVnState | undefined>(undefined);
@@ -179,15 +187,19 @@ export function useVnDevtoolsController({
   const initializedEntryRef = useRef<string | undefined>(undefined);
   const expectedHostEntryIdentitiesRef = useRef(new Set<string>());
   const hostCommitInFlightRef = useRef<number | undefined>(undefined);
+  const selectedTargetRef = useRef<VnDebugTargetAnchor | undefined>(undefined);
+  const selectionInspectionRef = useRef<VnDebugEntryInspection | undefined>(undefined);
   const sessionSnapshotRef = useRef<VnDevtoolsSessionSnapshot>({
     collapsed: initialSession.collapsed,
     width: initialSession.width,
+    layout: initialSession.layout,
     ...(initialSession.pinnedTarget ? { pinnedTarget: initialSession.pinnedTarget } : {}),
     decisions: restoreDecisions(initialSession.decisions)
   });
   sessionSnapshotRef.current = {
     collapsed,
     width,
+    layout,
     ...(pinnedTarget ? { pinnedTarget } : {}),
     decisions
   };
@@ -195,6 +207,7 @@ export function useVnDevtoolsController({
   const persistSession = useCallback((next?: {
     collapsed?: boolean;
     width?: number;
+    layout?: Partial<VnDevtoolsLayoutState>;
     pinnedTarget?: VnDebugTargetAnchor | null;
     decisions?: VnDebugDecisionTrace;
   }) => {
@@ -204,9 +217,11 @@ export function useVnDevtoolsController({
     const nextPinnedTarget = hasPinnedTargetUpdate
       ? next?.pinnedTarget ?? undefined
       : current.pinnedTarget;
+    const nextLayout = mergeVnDevtoolsLayout(current.layout, next?.layout ?? {});
     const snapshot: VnDevtoolsSessionSnapshot = {
       collapsed: next?.collapsed ?? current.collapsed,
       width: next?.width ?? current.width,
+      layout: nextLayout,
       ...(nextPinnedTarget ? { pinnedTarget: nextPinnedTarget } : {}),
       decisions: next?.decisions ?? current.decisions
     };
@@ -214,10 +229,19 @@ export function useVnDevtoolsController({
     saveVnDevtoolsSessionState(storage, sessionKey, {
       collapsed: snapshot.collapsed,
       width: snapshot.width,
+      layout: snapshot.layout,
       ...(nextPinnedTarget ? { pinnedTarget: nextPinnedTarget } : {}),
       decisions: [...snapshot.decisions.choices, ...snapshot.decisions.inputs]
     });
   }, [sessionKey, storage]);
+
+  const updateLayout = useCallback((patch: Partial<VnDevtoolsLayoutState>) => {
+    setLayout((current) => {
+      const next = mergeVnDevtoolsLayout(current, patch);
+      persistSession({ layout: next });
+      return next;
+    });
+  }, [persistSession]);
 
   const installFixedPoint = useCallback((
     target: VnDebugTargetAnchor | undefined,
@@ -274,6 +298,13 @@ export function useVnDevtoolsController({
           if (acceptedFixedPoint) return;
           acceptedFixedPoint = fixedPointCoordinatorRef.current!.accept(result.resolvedTarget);
           hostCommitInFlightRef.current = acceptedFixedPoint.epoch;
+          setStatus({
+            phase: "materializing",
+            message: "Checkpoint accepted; finishing the host restore.",
+            cancellable: false,
+            degraded: result.degraded,
+            ...(updateId !== undefined ? { updateId } : {})
+          });
           // Host acceptance is the linearization point: later HMR work must
           // materialize from this target even while the atomic restore settles.
         }
@@ -381,6 +412,7 @@ export function useVnDevtoolsController({
     setStatus({
       phase: "materializing",
       message: "Replaying from the canonical entry without side effects.",
+      cancellable: true,
       ...(updateId !== undefined ? { updateId } : {})
     });
     const result = await materializeVnDebugTarget({
@@ -417,7 +449,7 @@ export function useVnDevtoolsController({
       ? createReadOnlyVnDevtoolsInspectionDisplay(current.inspection)
       : current);
     setBridgeDiagnostics([]);
-    setStatus({ phase: "inspecting", message: "Inspecting active Nani source." });
+    setStatus({ phase: "inspecting", message: "Inspecting active Nani source.", cancellable: true });
     if (initialCandidate) {
       setBridgeDiagnostics(toBridgeDiagnostics(initialCandidate.diagnostics, "initial"));
       void prepareVnDevtoolsInitialCandidate({
@@ -603,7 +635,12 @@ export function useVnDevtoolsController({
       setPendingDecision(undefined);
       setBridgeDiagnostics(toBridgeDiagnostics(update.diagnostics, String(update.updateId)));
       setHasUpdateBadge(collapsed);
-      setStatus({ phase: "updating", message: "Checking the latest saved source.", updateId: update.updateId });
+      setStatus({
+        phase: "updating",
+        message: "Checking the latest saved source.",
+        updateId: update.updateId,
+        cancellable: true
+      });
       const fixedTarget = armedTargetRef.current;
       void prepareVnDevtoolsCandidateUpdate({
         activeEntry: entry,
@@ -739,7 +776,31 @@ export function useVnDevtoolsController({
     [runtime.diagnostics.runtimeDiagnostics, status]
   );
 
+  useEffect(() => {
+    if (!inspection || selectionInspectionRef.current === inspection) return;
+    selectionInspectionRef.current = inspection;
+    const resolved = resolveVnDevtoolsSelection({
+      inspection,
+      lines: lineModel.lines,
+      anchorsByLineId: lineModel.anchorByLineId,
+      ...(selectedTargetRef.current ? { previousAnchor: selectedTargetRef.current } : {})
+    });
+    setSelectedLineId(resolved.lineId);
+    selectedTargetRef.current = resolved.anchor;
+  }, [inspection, lineModel]);
+
+  useEffect(() => {
+    if (status.phase === "blocked" || status.phase === "error") {
+      updateLayout({ bottomPanelOpen: true, activePanel: "problems" });
+    }
+  }, [status, updateLayout]);
+
+  useEffect(() => {
+    if (decision) updateLayout({ bottomPanelOpen: true });
+  }, [decision, updateLayout]);
+
   const previewLine = useCallback((lineId: string) => {
+    updateLayout({ bottomPanelOpen: true, activePanel: "state" });
     if (!previewAuthorizationRef.current.isAuthorized() || !inspection || !canMaterializeVnDevtoolsInspection(inspectionDisplay)) {
       setStatus({
         phase: "blocked",
@@ -754,7 +815,7 @@ export function useVnDevtoolsController({
       target,
       ...(inspectionDisplay.expectedRevision ? { expectedRevision: inspectionDisplay.expectedRevision } : {})
     });
-  }, [inspection, inspectionDisplay, lineModel.anchorByLineId, runMaterialization]);
+  }, [inspection, inspectionDisplay, lineModel.anchorByLineId, runMaterialization, updateLayout]);
 
   const submitDecision = useCallback((submission: VnDevtoolsDecisionSubmission) => {
     if (!pendingDecision) return;
@@ -765,7 +826,11 @@ export function useVnDevtoolsController({
     const context = pendingDecision;
     setPendingDecision(undefined);
     const task = latestTasksRef.current.begin();
-    setStatus({ phase: "materializing", message: "Continuing with the selected temporary decision." });
+    setStatus({
+      phase: "materializing",
+      message: "Continuing with the selected temporary decision.",
+      cancellable: true
+    });
     void materializeVnDebugTarget({
       entry: context.inspection.entry,
       inspection: context.inspection,
@@ -810,13 +875,17 @@ export function useVnDevtoolsController({
     searchQuery,
     collapsed,
     width,
+    layout,
     status: effectiveStatus,
     diagnostics,
     summaries,
     ...(decision ? { decision } : {}),
     hasUpdateBadge,
     actions: {
-      selectLine: setSelectedLineId,
+      selectLine(lineId) {
+        setSelectedLineId(lineId);
+        selectedTargetRef.current = lineModel.anchorByLineId.get(lineId);
+      },
       previewLine,
       pinCurrent() {
         if (hostCommitInFlightRef.current !== undefined) {
@@ -867,6 +936,7 @@ export function useVnDevtoolsController({
         setWidth(next);
         persistSession({ width: next });
       },
+      updateLayout,
       search: setSearchQuery,
       submitDecision,
       cancelDecision() {
@@ -898,8 +968,23 @@ export function useVnDevtoolsController({
       },
       copyLocation(location) {
         const value = `${location.scriptPath}:${location.lineNumber}`;
-        if (copyText) void copyText(value);
-        else if (typeof navigator !== "undefined") void navigator.clipboard?.writeText(value);
+        void Promise.resolve().then(async () => {
+          if (copyText) {
+            await copyText(value);
+          } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+            await navigator.clipboard.writeText(value);
+          } else {
+            throw new Error("Clipboard access is unavailable");
+          }
+          setStatus({ phase: "ready", message: `Copied ${value}.` });
+        }).catch((error: unknown) => {
+          setStatus({
+            phase: "error",
+            message: error instanceof Error
+              ? `Could not copy the source location (${error.message}).`
+              : "Could not copy the source location."
+          });
+        });
       }
     }
   };

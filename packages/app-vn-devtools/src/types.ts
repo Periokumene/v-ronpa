@@ -1,6 +1,17 @@
 export const VN_DEVTOOLS_DEFAULT_WIDTH = 420;
 export const VN_DEVTOOLS_MIN_WIDTH = 320;
 export const VN_DEVTOOLS_MAX_WIDTH = 720;
+export const VN_DEVTOOLS_DEFAULT_PANEL_HEIGHT = 180;
+export const VN_DEVTOOLS_MIN_PANEL_HEIGHT = 120;
+export const VN_DEVTOOLS_MAX_PANEL_HEIGHT = 360;
+
+export type VnDevtoolsPanelId = "problems" | "state";
+
+export interface VnDevtoolsLayoutState {
+  bottomPanelOpen: boolean;
+  activePanel: VnDevtoolsPanelId;
+  bottomPanelHeight: number;
+}
 
 export type VnDevtoolsDiagnosticSeverity = "info" | "warning" | "error";
 
@@ -47,6 +58,7 @@ export interface VnDevtoolsStatus {
   message?: string;
   updateId?: number;
   degraded?: boolean;
+  cancellable?: boolean;
 }
 
 export type VnDevtoolsSummaryTone = "neutral" | "accent" | "warning" | "error";
@@ -107,6 +119,7 @@ export interface VnDevtoolsActions {
   unpin: () => void;
   setCollapsed: (collapsed: boolean) => void;
   resize: (width: number) => void;
+  updateLayout: (patch: Partial<VnDevtoolsLayoutState>) => void;
   search: (query: string) => void;
   submitDecision: (submission: VnDevtoolsDecisionSubmission) => void;
   cancelDecision: () => void;
@@ -123,6 +136,7 @@ export interface VnDevtoolsController {
   searchQuery: string;
   collapsed: boolean;
   width: number;
+  layout: VnDevtoolsLayoutState;
   status: VnDevtoolsStatus;
   diagnostics: readonly VnDevtoolsDiagnostic[];
   summaries: VnDevtoolsRuntimeSummaries;
@@ -141,20 +155,14 @@ export function clampVnDevtoolsWidth(width: number): number {
   return Math.min(VN_DEVTOOLS_MAX_WIDTH, Math.max(VN_DEVTOOLS_MIN_WIDTH, Math.round(width)));
 }
 
-export function canPreviewVnDevtoolsLine(line: VnDevtoolsSourceLine): boolean {
-  return line.previewability !== "blocked" && line.previewability !== "no-stable-result";
+export function clampVnDevtoolsPanelHeight(height: number): number {
+  if (!Number.isFinite(height)) return VN_DEVTOOLS_DEFAULT_PANEL_HEIGHT;
+  return Math.min(
+    VN_DEVTOOLS_MAX_PANEL_HEIGHT,
+    Math.max(VN_DEVTOOLS_MIN_PANEL_HEIGHT, Math.round(height))
+  );
 }
 
-export function filterVnDevtoolsLines(
-  lines: readonly VnDevtoolsSourceLine[],
-  query: string
-): readonly VnDevtoolsSourceLine[] {
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  if (normalizedQuery.length === 0) return lines;
-  return lines.filter((line) =>
-    [String(line.lineNumber), line.sourceText, line.label ?? "", line.command ?? ""]
-      .join("\n")
-      .toLocaleLowerCase()
-      .includes(normalizedQuery)
-  );
+export function canPreviewVnDevtoolsLine(line: VnDevtoolsSourceLine): boolean {
+  return line.previewability !== "blocked" && line.previewability !== "no-stable-result";
 }

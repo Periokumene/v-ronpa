@@ -1,11 +1,18 @@
-import { clampVnDevtoolsWidth, VN_DEVTOOLS_DEFAULT_WIDTH } from "./types";
+import {
+  clampVnDevtoolsPanelHeight,
+  clampVnDevtoolsWidth,
+  VN_DEVTOOLS_DEFAULT_PANEL_HEIGHT,
+  VN_DEVTOOLS_DEFAULT_WIDTH,
+  type VnDevtoolsLayoutState,
+  type VnDevtoolsPanelId
+} from "./types";
 import type {
   VnDebugChoiceDecision,
   VnDebugInputDecision,
   VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
 
-export const VN_DEVTOOLS_SESSION_VERSION = 1 as const;
+export const VN_DEVTOOLS_SESSION_VERSION = 2 as const;
 
 export interface VnDevtoolsStorageLike {
   getItem: (key: string) => string | null;
@@ -18,6 +25,7 @@ export interface VnDevtoolsPersistedSessionState {
   version: typeof VN_DEVTOOLS_SESSION_VERSION;
   collapsed: boolean;
   width: number;
+  layout: VnDevtoolsLayoutState;
   pinnedTarget?: VnDebugTargetAnchor;
   decisions?: readonly VnDevtoolsPersistedDecision[];
 }
@@ -34,11 +42,14 @@ export function loadVnDevtoolsSessionState(
     const value: unknown = JSON.parse(raw);
     if (!isRecord(value) || value.version !== VN_DEVTOOLS_SESSION_VERSION) return undefined;
     if (typeof value.collapsed !== "boolean" || typeof value.width !== "number") return undefined;
+    const layout = canonicalizeLayout(value.layout);
+    if (layout === undefined) return undefined;
 
     const state: VnDevtoolsPersistedSessionState = {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: value.collapsed,
-      width: clampVnDevtoolsWidth(value.width)
+      width: clampVnDevtoolsWidth(value.width),
+      layout
     };
     const pinnedTarget = canonicalizeTargetAnchor(value.pinnedTarget);
     if (pinnedTarget !== undefined) state.pinnedTarget = pinnedTarget;
@@ -62,7 +73,8 @@ export function saveVnDevtoolsSessionState(
     const normalized: VnDevtoolsPersistedSessionState = {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: state.collapsed,
-      width: clampVnDevtoolsWidth(state.width)
+      width: clampVnDevtoolsWidth(state.width),
+      layout: canonicalizeLayout(state.layout) ?? createDefaultVnDevtoolsLayoutState()
     };
     const pinnedTarget = canonicalizeTargetAnchor(state.pinnedTarget);
     if (pinnedTarget !== undefined) normalized.pinnedTarget = pinnedTarget;
@@ -91,12 +103,39 @@ export function createDefaultVnDevtoolsSessionState(): VnDevtoolsPersistedSessio
   return {
     version: VN_DEVTOOLS_SESSION_VERSION,
     collapsed: false,
-    width: VN_DEVTOOLS_DEFAULT_WIDTH
+    width: VN_DEVTOOLS_DEFAULT_WIDTH,
+    layout: createDefaultVnDevtoolsLayoutState()
+  };
+}
+
+export function createDefaultVnDevtoolsLayoutState(): VnDevtoolsLayoutState {
+  return {
+    bottomPanelOpen: true,
+    activePanel: "state",
+    bottomPanelHeight: VN_DEVTOOLS_DEFAULT_PANEL_HEIGHT
   };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function canonicalizeLayout(value: unknown): VnDevtoolsLayoutState | undefined {
+  if (!isRecord(value)
+    || typeof value.bottomPanelOpen !== "boolean"
+    || !isVnDevtoolsPanelId(value.activePanel)
+    || typeof value.bottomPanelHeight !== "number") {
+    return undefined;
+  }
+  return {
+    bottomPanelOpen: value.bottomPanelOpen,
+    activePanel: value.activePanel,
+    bottomPanelHeight: clampVnDevtoolsPanelHeight(value.bottomPanelHeight)
+  };
+}
+
+function isVnDevtoolsPanelId(value: unknown): value is VnDevtoolsPanelId {
+  return value === "problems" || value === "state";
 }
 
 function canonicalizePersistedDecision(value: unknown): VnDevtoolsPersistedDecision | undefined {

@@ -1,15 +1,19 @@
 export { VnDevtoolsDock } from "./VnDevtoolsDock";
 export {
   VN_DEVTOOLS_DEFAULT_WIDTH,
+  VN_DEVTOOLS_DEFAULT_PANEL_HEIGHT,
+  VN_DEVTOOLS_MAX_PANEL_HEIGHT,
   VN_DEVTOOLS_MAX_WIDTH,
+  VN_DEVTOOLS_MIN_PANEL_HEIGHT,
   VN_DEVTOOLS_MIN_WIDTH,
   canPreviewVnDevtoolsLine,
+  clampVnDevtoolsPanelHeight,
   clampVnDevtoolsWidth,
-  filterVnDevtoolsLines
 } from "./types";
 export {
   VN_DEVTOOLS_SESSION_VERSION,
   clearVnDevtoolsSessionState,
+  createDefaultVnDevtoolsLayoutState,
   createDefaultVnDevtoolsSessionState,
   loadVnDevtoolsSessionState,
   saveVnDevtoolsSessionState
@@ -26,6 +30,8 @@ export type {
   VnDevtoolsDockProps,
   VnDevtoolsInputDecision,
   VnDevtoolsLinePreviewability,
+  VnDevtoolsLayoutState,
+  VnDevtoolsPanelId,
   VnDevtoolsRuntimeSummaries,
   VnDevtoolsSourceLine,
   VnDevtoolsSourceLocation,
@@ -39,6 +45,20 @@ export type {
   VnDevtoolsPersistedSessionState,
   VnDevtoolsStorageLike
 } from "./sessionPersistence";
+export {
+  createVnDevtoolsFindResult,
+  findNearestVnDevtoolsLabel,
+  highlightVnDevtoolsSource,
+  stepVnDevtoolsFindMatch
+} from "./sourceViewModel";
+export type {
+  VnDevtoolsFindMatch,
+  VnDevtoolsFindMatchKind,
+  VnDevtoolsFindResult,
+  VnDevtoolsSourceRange,
+  VnDevtoolsSyntaxToken,
+  VnDevtoolsSyntaxTokenKind
+} from "./sourceViewModel";
 export { useVnDevtoolsController } from "./useVnDevtoolsController";
 export type {
   UseVnDevtoolsControllerOptions,
