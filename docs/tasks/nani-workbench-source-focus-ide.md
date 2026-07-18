@@ -17,11 +17,11 @@ still validates the complete branch.
 
 ## Status
 
-- State: `In Progress`
+- State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-18`
 - Updated: `2026-07-18`
-- Completed Commit: `TBD`
+- Completed Commit: `eb351b6`
 - Archive Target: `docs/archive/completed-tasks/nani-workbench-source-focus-ide.md`
 
 ## Goal
@@ -222,11 +222,34 @@ pnpm validate:baseline
 
 ## Review Packet
 
-- Changed-files summary, including hard-removed legacy view exports.
-- Regression matrix with test names and gate outputs.
-- Screenshot paths and Design QA iteration history.
-- Production-marker scan evidence.
-- Residual P3 polish and all explicit non-goals.
+- Implementation lineage: authorization `0204d92`, IDE hard upgrade `392d816`,
+  tests/docs/Design QA `eb351b6`.
+- `app-vn-devtools` now owns the split IDE shell, full-source Find and syntax
+  view models, Symbols navigation, session-v2 layout, stable-anchor selection,
+  dynamic cancellability, and internal Problems/State/Branch descriptors. The
+  legacy filtering helper and card/form Dock are removed rather than retained
+  behind aliases.
+- Focused verification: 23 files / 130 tests; repository verification: 84
+  files / 626 tests; contract verification: 48 files / 410 tests.
+- All eight Playwright smoke scenarios pass, including Game A Find/Symbols,
+  exact Dock resize, panel routing, decision input, persisted reload, HMR,
+  last-known-good, Alice expression preparation, and the complete Harness VN /
+  Navi / Trial / Pixi suite.
+- `design-qa.md` records the exact visual source, same-input 1672x941
+  comparison, 720/default/320/overlay evidence, compiler-error and Branch
+  states, three resolved P2 iterations, and `final result: passed`.
+- Game A's production guard passed after adding Workbench panel, Find,
+  Phosphor, and session markers; the DEV-only package and icon runtime do not
+  enter production output.
+- Task boundary, subsystem, and full baseline gates pass from the exact stacked
+  base. Subsystem/baseline smoke used isolated `VITE_DEV_PORT=6179` because the
+  configured local Game A port was already occupied by the user's server.
+- Residual P3: the 720px command strip intentionally remains compact, and very
+  large scripts may eventually justify virtualization. Neither is an actionable
+  P0/P1/P2 issue. The existing Vite large-chunk advisory is unchanged.
+- Non-goals remain unchanged: no localization, editor/file writing, Monaco,
+  public panel plugin API, runtime/compiler/Pixi/Game A product DOM changes, or
+  Harness Workbench.
 
 ## Merge Target
 
