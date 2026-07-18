@@ -15,11 +15,11 @@
 
 ## Status
 
-- State: `In Progress`
+- State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-18`
 - Updated: `2026-07-18`
-- Completed Commit: `TBD`
+- Completed Commit: `5ac9e3d392e6b3b41014cf077a514f3132b5bc3a`
 - Archive Target: `docs/archive/completed-tasks/editor-tools-latest-baseline-convergence.md`
 
 ## Goal
@@ -135,9 +135,9 @@ resolution.
 | Game A launch | Baseline introduced launch definitions, character preload, and isolated test modes; Editor Tools introduced a DEV candidate entry | One active launch definition; a verified candidate atomically replaces its runtime entry and the preload plan derived from the same compiled script; no URL or start-label override | Static call-chain audit, Game A launch/candidate tests, typecheck | Verified; no code change |
 | Script metadata and revision | Baseline split product/test generated metadata; Editor Tools centralized canonical semantic revision | Compiler serializer plus Node generator/browser digest adapters; generated outputs come from the generator | Compiler golden tests, asset freshness, Game A script tests | Verified; no code change |
 | Runtime ports | Baseline consumers used product actions; Editor Tools hard-cut debug from the root result | Four canonical product ports; explicit read-only debug entry only | Runtime/Game A/Harness tests and both cleanup guards | Verified; no code change |
-| Pixi and Alice | Baseline added preload readiness, source-pixel outline, and transition hardening; Editor Tools must preserve presenter identity on equivalent updates | Baseline Pixi behavior plus app-owned equivalent-plan reuse; no presenter bypass | Candidate-plan tests, unchanged forbidden presenter paths, character smoke pending | Verified statically; smoke pending |
-| Playwright isolation | Baseline added separate servers/modes and Metal worker policy; Editor Tools added workbench coverage and Vite cache isolation | Keep both exact-mode servers and mode-specific cache isolation | Playwright config audit/tests; full smoke pending | Verified statically; smoke pending |
-| Production cleanup | Baseline excludes smoke/test markers; Editor Tools excludes devtools/HMR/session markers | Effective union of current markers; no stale legacy runtime wiring | Production guard audit, cleanup guards; production build pending | Verified statically; build pending |
+| Pixi and Alice | Baseline added preload readiness, source-pixel outline, and transition hardening; Editor Tools must preserve presenter identity on equivalent updates | Baseline Pixi behavior plus app-owned equivalent-plan reuse; no presenter bypass | Candidate-plan tests, unchanged forbidden presenter paths, character smoke | Verified; no code change |
+| Playwright isolation | Baseline added separate servers/modes and Metal worker policy; Editor Tools added workbench coverage and Vite cache isolation | Keep both exact-mode servers and mode-specific cache isolation | Playwright config tests and 8-case smoke | Verified; no code change |
+| Production cleanup | Baseline excludes smoke/test markers; Editor Tools excludes devtools/HMR/session markers | Effective union of current markers; no stale legacy runtime wiring | Both production builds, production content scan, cleanup guards | Verified; no code change |
 | Documentation | Baseline updated Harness/test/VS Code workflow; Editor Tools documented the workbench and runtime hard cut | One current call chain with no old dispatcher, query, or product debug-port descriptions | Architecture/task review and command-doc freshness | Verified; no code change |
 
 Additional findings must be appended before their implementation.
@@ -225,6 +225,35 @@ pnpm validate:baseline
 - Changed-files and hard-deletion audit.
 - Test, gate, build, smoke, and screenshot evidence.
 - Any authorized additional development and residual risks.
+
+## Completion Evidence
+
+- The transplant commit `59aea0c7c4a7740f83f0b0c47c8bb035e9b9989c`
+  differs from preserved tip `a787a565aaa5e3adab48d17d61bf3c826326c20d`
+  only by this task card; all other tracked paths are byte-equivalent.
+- `a7bb0091234f7796df3db93a7bfe3f0ae948e300` is a direct ancestor and
+  `a7bb009..HEAD` contains no merge commit.
+- All four latest-baseline deletions remain absent and every latest-baseline
+  addition remains present.
+- Four-way semantic review found no implementation repair requirement. It
+  clarified that a DEV candidate atomically replaces one active launch
+  definition containing both the runtime entry and preload plan derived from
+  the same compiled script.
+- Targeted tests passed: 34 files and 249 tests. Contract/subsystem tests passed:
+  46 files and 400 tests. Full tests passed: 81 files and 612 tests.
+- Typecheck, command-document freshness, asset freshness, boundaries, CCR,
+  app cleanup, VN runtime cleanup, Game A production marker scan, and both
+  production builds passed.
+- The task-boundary gate, full subsystem gate, and `pnpm validate:baseline`
+  passed. Playwright passed all 8 smoke cases with two Metal workers.
+- Screenshot evidence includes `test-results/game-a-workbench-expanded.png`,
+  `test-results/game-a-workbench-collapsed.png`,
+  `test-results/game-a-workbench-overlay.png`,
+  `test-results/game-a-workbench-preview.png`, and the Alice/Harness evidence
+  images in the same ignored directory.
+- No public contracts, `.nani` IR, save schemas, RuntimeCommand shape, forbidden
+  paths, or new dependencies were changed during convergence. No separate code
+  fix commit was needed.
 
 ## Merge Target
 
