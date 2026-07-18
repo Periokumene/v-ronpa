@@ -3,6 +3,12 @@
 ## Base Branch
 
 - `integration/v-ronpa-baseline`
+- Task delta base: `4c49a69e2798d31e3129ab63c162ddaa69f252b6`
+
+This task is stacked after the completed Editor Tools convergence on the same
+branch. Path and subsystem validation use the task authorization commit above
+so earlier accepted Editor Tools changes are not misclassified as this task's
+diff; the final baseline gate still validates the complete branch.
 
 ## Branch Name
 
@@ -10,11 +16,11 @@
 
 ## Status
 
-- State: `In Progress`
+- State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-18`
 - Updated: `2026-07-18`
-- Completed Commit: `TBD`
+- Completed Commit: `3ec19471e452086e0bca869276fe583ac441135b`
 - Archive Target: `docs/archive/completed-tasks/game-a-devtools-viewport-isolation.md`
 
 ## Goal
@@ -140,7 +146,7 @@ pnpm validate:boundaries
 pnpm validate:app-cleanup
 pnpm --filter @v-ronpa/game-a build
 pnpm test:smoke
-BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/game-a-devtools-viewport-isolation.md
+BASE_REF=4c49a69e2798d31e3129ab63c162ddaa69f252b6 pnpm validate:subsystem -- --task docs/tasks/game-a-devtools-viewport-isolation.md
 pnpm validate:baseline
 ```
 
@@ -164,11 +170,32 @@ pnpm validate:baseline
 
 ## Review Packet
 
-- Boundary and changed-files summary.
-- Layout-mode behavior and geometry assertions.
-- Unit, build, smoke, subsystem, and baseline output.
-- Screenshot paths and visual findings.
-- Residual responsive-layout limitations.
+- Boundary: the production call omits the app-internal wrapper; DEV observer,
+  toolbar, transform, and mode state live under `apps/game-a/src/devtools`. No
+  shared runtime, devtools package, shell, Pixi, contracts, or Harness files
+  changed.
+- Geometry: fidelity keeps a browser-sized logical playfield and changes only a
+  centered uniform display scale. Responsive uses the preview cell at scale 1;
+  Game A DOM container units and the Pixi host resolve to the same dimensions.
+  Mode and Dock changes preserve the Story session.
+- Automated evidence: 4 layout unit cases, 72 Game A unit cases, 400 contract
+  gate cases, 616 repository unit cases, Game A/Harness production builds, and
+  all 8 Playwright smoke cases passed. Production marker scanning confirms the
+  DEV viewport UI is absent from the Game A build.
+- Repository evidence: task-boundary validation passed from the recorded stacked
+  task base; subsystem and complete baseline gates passed using isolated Vite
+  ports so the existing developer server was not interrupted.
+- Screenshots: `test-results/game-a-workbench-expanded.png`,
+  `test-results/game-a-workbench-preview.png`,
+  `test-results/game-a-workbench-responsive.png`, and
+  `test-results/game-a-workbench-overlay.png` were inspected at original detail.
+  Fidelity retains the wide authored composition, responsive intentionally
+  exposes the narrower composition, and the small-screen Dock remains an
+  overlay.
+- Residual limitation: responsive mode exposes Game A's current authored
+  multi-resolution behavior rather than masking it. Fidelity uses browser-sized
+  logical rendering scaled down inside the preview cell, so very narrow cells
+  can trade visual sharpness for composition fidelity.
 
 ## Merge Target
 
