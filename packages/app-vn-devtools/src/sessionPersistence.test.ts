@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   VN_DEVTOOLS_SESSION_VERSION,
   clearVnDevtoolsSessionState,
+  createDefaultVnDevtoolsLayoutState,
   createDefaultVnDevtoolsSessionState,
   loadVnDevtoolsSessionState,
   saveVnDevtoolsSessionState,
@@ -28,6 +29,12 @@ describe("VN devtools session persistence", () => {
     const stateWithExtras = {
       collapsed: true,
       width: 999,
+      layout: {
+        bottomPanelOpen: false,
+        activePanel: "problems" as const,
+        bottomPanelHeight: 999,
+        branch: "must-not-persist"
+      },
       pinnedTarget: anchorWithExtras,
       decisions: [
         {
@@ -55,6 +62,11 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: true,
       width: 720,
+      layout: {
+        bottomPanelOpen: false,
+        activePanel: "problems",
+        bottomPanelHeight: 360
+      },
       pinnedTarget: anchor,
       decisions: [
         { anchor, choiceId: "route", text: "Left", goto: "LeftRoute" },
@@ -87,6 +99,7 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
       transientRootState: "must-not-load",
       pinnedTarget: { ...anchor, sourceCommand: "must-not-load" },
       decisions: [
@@ -114,6 +127,7 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
       pinnedTarget: anchor,
       decisions: [
         { anchor, choiceId: "route", text: "Left", goto: "LeftRoute" },
@@ -127,12 +141,13 @@ describe("VN devtools session persistence", () => {
 
   it("rejects stale or malformed data and survives unavailable storage", () => {
     const storage = memoryStorage();
-    storage.setItem("old", JSON.stringify({ version: 0, collapsed: false, width: 420 }));
+    storage.setItem("old", JSON.stringify({ version: 1, collapsed: false, width: 420 }));
     storage.setItem("bad", "not json");
     storage.setItem("invalid-shapes", JSON.stringify({
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
       pinnedTarget: { textId: "not-an-anchor" },
       decisions: [{ choiceId: "not-a-decision" }]
     }));
@@ -140,6 +155,7 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
       pinnedTarget: {
         kind: "command",
         scriptPath: "game-a/opening.nani",
@@ -149,19 +165,35 @@ describe("VN devtools session persistence", () => {
         ordinal: 0
       }
     }));
+    storage.setItem("invalid-panel", JSON.stringify({
+      version: VN_DEVTOOLS_SESSION_VERSION,
+      collapsed: false,
+      width: 420,
+      layout: { bottomPanelOpen: true, activePanel: "branch", bottomPanelHeight: 180 }
+    }));
+    storage.setItem("invalid-layout", JSON.stringify({
+      version: VN_DEVTOOLS_SESSION_VERSION,
+      collapsed: false,
+      width: 420,
+      layout: { bottomPanelOpen: "yes", activePanel: "state", bottomPanelHeight: 180 }
+    }));
     expect(loadVnDevtoolsSessionState(storage, "old")).toBeUndefined();
     expect(loadVnDevtoolsSessionState(storage, "bad")).toBeUndefined();
     expect(loadVnDevtoolsSessionState(storage, "invalid-shapes")).toEqual({
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
       decisions: []
     });
     expect(loadVnDevtoolsSessionState(storage, "invalid-coordinates")).toEqual({
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
-      width: 420
+      width: 420,
+      layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 }
     });
+    expect(loadVnDevtoolsSessionState(storage, "invalid-panel")).toBeUndefined();
+    expect(loadVnDevtoolsSessionState(storage, "invalid-layout")).toBeUndefined();
 
     const unavailable: VnDevtoolsStorageLike = {
       getItem: vi.fn(() => {
@@ -175,14 +207,23 @@ describe("VN devtools session persistence", () => {
       })
     };
     expect(loadVnDevtoolsSessionState(unavailable, "key")).toBeUndefined();
-    expect(saveVnDevtoolsSessionState(unavailable, "key", { collapsed: false, width: 420 })).toBe(false);
+    expect(saveVnDevtoolsSessionState(unavailable, "key", {
+      collapsed: false,
+      width: 420,
+      layout: createDefaultVnDevtoolsLayoutState()
+    })).toBe(false);
     expect(clearVnDevtoolsSessionState(unavailable, "key")).toBe(false);
   });
 
   it("provides the open 420px first-visit default and can clear a saved session", () => {
     const storage = memoryStorage();
     storage.setItem("key", "value");
-    expect(createDefaultVnDevtoolsSessionState()).toEqual({ version: 1, collapsed: false, width: 420 });
+    expect(createDefaultVnDevtoolsSessionState()).toEqual({
+      version: 2,
+      collapsed: false,
+      width: 420,
+      layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 }
+    });
     expect(clearVnDevtoolsSessionState(storage, "key")).toBe(true);
     expect(storage.getItem("key")).toBeNull();
   });

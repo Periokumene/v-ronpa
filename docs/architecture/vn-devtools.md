@@ -123,6 +123,72 @@ Game A is the only mutation authority. It installs a successful candidate by:
 Restore validates game, entry, and revision before mutation. The workbench never
 writes the save database, and it never stores checkpoints or source text.
 
+## Source-first IDE workspace
+
+`app-vn-devtools` renders one fixed-height IDE grid rather than a vertically
+scrolling form:
+
+```text
+file + phase
+command strip
+Source > #nearest-label > Ln N
+independently scrolling full source
+resizable Problems / State / transient Branch panel
+revision + current + pin + update + message status bar
+```
+
+The source is always the main stage and always keeps every authored line in its
+original order. IDE Find matches source characters, labels, command metadata,
+and line numbers without filtering the source model. Exact source hits carry
+character ranges for highlighting; metadata-only hits highlight the line. Find
+keeps a local current/total cursor and supports Enter/Shift+Enter cycling.
+Symbols are a searchable label popover reached from the current-label
+breadcrumb. Neither tool changes Story or clears the other tool's query.
+
+Syntax coloring is a presentational lexer only. Its label, leading-command,
+speaker, and string spans concatenate byte-for-byte to `sourceText` and are
+never used by inspection, anchors, previewability, or materialization. The
+source view keeps contextual Run-to-line controls and uses `content-visibility`
+for long scripts without introducing a virtual list, Monaco, Worker, or second
+source authority.
+
+The bottom tool area uses an internal descriptor registry:
+
+- `Problems` contains the current blocked/error operation plus parser,
+  compiler, runtime, and asset diagnostics. Errors and blocked work open it;
+  warnings update its count without stealing focus.
+- `State` shows compact read-only Story, Pixi, UI, and persistent-media trees.
+  An explicit preview opens it before materialization.
+- `Branch` is a transient forced panel. It appears only while a choice or input
+  decision is pending, preserves native radio/input semantics, and returns to
+  the previously persisted State/Problems page after completion.
+
+The primary command reflects actual transaction state: Preview when the selected
+line can produce a stable result; Cancel only while inspection, source update,
+or pre-acceptance materialization owns an abortable task; disabled Finishing
+after the host has accepted a checkpoint; and Resolve decision while Branch
+needs focus. The host-acceptance boundary is therefore visible and never
+pretends that an accepted restore can be rolled back.
+
+Layout persistence is schema v2 and is a hard cut: v1 values are ignored rather
+than migrated. A tab stores only collapsed state, Dock width, bottom-panel open
+state, persisted State/Problems page, clamped `120–360px` panel height, fixed
+anchor, and temporary decision trace. Search, current match, selected line,
+Symbols/Find popovers, source, diagnostics, and checkpoints are never persisted.
+Selection rematches through its stable anchor when source mapping changes; when
+that is impossible it falls back to current, pinned, then the first previewable
+line, never the old line number.
+
+The Dock uses Phosphor icons and the existing dark VN tooling palette. Container
+queries change command density at 520px and 400px without changing the width
+contract: the default remains 420px, the range remains 320–720px, and desktop
+width remains capped at 45vw. Below 900px it remains an overlay.
+
+The internal descriptor registry is deliberately not a public plugin API.
+Future Harness or host read-only panels may justify a constrained contribution
+surface, but the title bar, source rows, runtime state, and mutation actions do
+not expose slots pre-emptively.
+
 ## Dock and game viewport isolation
 
 The desktop host gives a Game A preview cell `minmax(0, 1fr)` and a 420px Dock.
@@ -155,23 +221,24 @@ while editing Nani, and responsive mode exposes real container adaptation only
 when the developer asks to test it. There is no Dock-specific Pixi resize path
 and no second viewport state in runtime or saves.
 
-Source browsing, search, label navigation, selection, and inspection are inert.
+Source browsing, Find, Symbols navigation, selection, panel navigation, and
+inspection are inert.
 Only the explicit Preview action or a successful armed fixed-point update can
 commit. The Dock distinguishes current execution and the fixed point, supports
-keyboard preview and search focus, isolates Escape from the game shell, and can
-copy `path:line` for use in the editor.
+keyboard preview/Find/Symbols/panel shortcuts, isolates Escape from the game
+shell, and can copy `path:line` for use in the editor. Clipboard completion is
+reported only after the browser confirms success; failure opens Problems.
 
-Parser and compiler diagnostics retain authored line/column locations. Outline
-and diagnostic navigation clears an obstructing search when necessary, selects
-the source line, and scrolls it into view. Presenter/asset warning or error
+Parser and compiler diagnostics retain authored line/column locations. Symbols
+and diagnostic navigation preserve Find, select the source line, and scroll it
+into view. Presenter/asset warning or error
 diagnostics promote the visible workbench status to `degraded`, including errors
 that arrive asynchronously after a stable checkpoint was installed.
 
-Per-tab session storage contains only collapsed state, width, fixed anchor, and
-temporary decisions. On browser refresh these values trigger fresh Node/browser
-source verification, inspection, and materialization. Source errors or handshake
-mismatches after refresh show diagnostics and a neutral game surface rather than
-restoring an unverified old visual scene.
+On browser refresh the v2 session values trigger fresh Node/browser source
+verification, inspection, anchor resolution, and materialization. Source errors
+or handshake mismatches after refresh show diagnostics and a neutral game
+surface rather than restoring an unverified old visual scene.
 
 ## Explicit non-goals
 

@@ -1,16 +1,27 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { VnDevtoolsDock } from "./VnDevtoolsDock";
-import type { VnDevtoolsActions, VnDevtoolsController, VnDevtoolsDecisionSubmission, VnDevtoolsSourceLocation } from "./types";
+import type {
+  VnDevtoolsActions,
+  VnDevtoolsController,
+  VnDevtoolsDecisionSubmission,
+  VnDevtoolsSourceLocation
+} from "./types";
 
 type TestElement = ReactElement<Record<string, unknown>>;
 
 describe("VnDevtoolsDock", () => {
-  it("renders source navigation, explicit preview controls, markers, diagnostics, state, and an accessible resizer", () => {
+  it("renders the six-region IDE shell, full source, Phosphor controls, state tree, and both accessible resizers", () => {
     const actions = createActions();
     const element = VnDevtoolsDock({ controller: createController(actions) });
 
     expect(findByTestId(element, "vn-devtools-dock")).toBeDefined();
+    expect(findByTestId(element, "vn-devtools-file-bar")).toBeDefined();
+    expect(findByTestId(element, "vn-devtools-command-strip")).toBeDefined();
+    expect(findByTestId(element, "vn-devtools-symbols")).toBeDefined();
+    expect(findByTestId(element, "vn-devtools-source-editor")).toBeDefined();
+    expect(findByTestId(element, "vn-devtools-bottom-panel")?.props["data-active-panel"]).toBe("state");
+    expect(findByTestId(element, "vn-devtools-status-bar")).toBeDefined();
     expect(findByTestId(element, "vn-devtools-resizer")?.props).toMatchObject({
       role: "separator",
       "aria-orientation": "vertical",
@@ -19,27 +30,82 @@ describe("VnDevtoolsDock", () => {
       "aria-valuenow": 420,
       tabIndex: 0
     });
-    expect(findByTestId(element, "vn-devtools-line-line:dialog")?.props).toMatchObject({
-      "data-previewability": "previewable"
+    expect(findByTestId(element, "vn-devtools-panel-resizer")?.props).toMatchObject({
+      role: "separator",
+      "aria-orientation": "horizontal",
+      "aria-valuemin": 120,
+      "aria-valuemax": 360,
+      "aria-valuenow": 180,
+      tabIndex: 0
     });
+    expect(findAllByDataAttribute(element, "data-line-id")).toHaveLength(3);
     expect(findByAriaLabel(element, "Current runtime position")).toBeDefined();
     expect(findByAriaLabel(element, "Pinned preview target")).toBeDefined();
-    expect(collectText(element).join(" ")).toContain("Missing portrait asset");
-    expect(collectText(element).join(" ")).toContain("Stable state");
-    expect(collectText(element).join(" ")).toContain("background");
+    expect(collectText(findByTestId(element, "vn-devtools-panel-state")).join(" ")).toContain("background");
 
-    const preview = findButtonWithin(findByTestId(element, "vn-devtools-line-line:dialog"), "Preview");
-    expect(preview).toBeDefined();
-    (preview?.props as { onClick: () => void }).onClick();
+    const runToLine = findButtonByAriaLabel(
+      findByTestId(element, "vn-devtools-line-line:dialog"),
+      "Run to line 2"
+    );
+    (runToLine?.props as { onClick: () => void }).onClick();
     expect(actions.previewLine).toHaveBeenCalledWith("line:dialog");
-
-    const endPreview = findButtonWithin(findByTestId(element, "vn-devtools-line-line:end"), "Preview");
-    expect(endPreview?.props.disabled).toBe(true);
+    expect(findButtonByAriaLabel(element, "Run to line 3")?.props.disabled).toBe(true);
   });
 
-  it("renders branch decisions and wires label selection, search, collapse, and copy actions", () => {
+  it("keeps complete source during IDE Find and exposes exact match navigation instead of filtering lines", () => {
     const actions = createActions();
     const element = VnDevtoolsDock({
+      controller: createController(actions, { searchQuery: "hello" })
+    });
+
+    expect(findAllByDataAttribute(element, "data-line-id")).toHaveLength(3);
+    expect(findByTestId(element, "vn-devtools-find-count") && collectText(findByTestId(element, "vn-devtools-find-count")).join("")).toBe("1 / 1");
+    expect(findByTestId(element, "vn-devtools-line-line:dialog")?.props["data-find-current"]).toBe("true");
+    expect(findAll(element, (node) => node.type === "mark").map((node) => collectText(node).join(""))).toEqual(["Hello"]);
+
+    const search = findByTestId(element, "vn-devtools-search");
+    (search?.props as { onChange: (event: { currentTarget: { value: string } }) => void }).onChange({
+      currentTarget: { value: "rain" }
+    });
+    expect(actions.search).toHaveBeenCalledWith("rain");
+  });
+
+  it("wires Symbols, copy, collapse, panel tabs, and the default Preview primary action", () => {
+    const actions = createActions();
+    const element = VnDevtoolsDock({ controller: createController(actions) });
+
+    const symbol = findButtonContaining(element, "StartLn 1");
+    (symbol?.props as { onClick: (event: { currentTarget: { closest: () => null } }) => void }).onClick({
+      currentTarget: { closest: () => null }
+    });
+    expect(actions.selectLine).toHaveBeenCalledWith("line:start");
+
+    (findButtonByAriaLabel(element, "Copy location")?.props as { onClick: () => void }).onClick();
+    expect(actions.copyLocation).toHaveBeenCalledWith({ scriptPath: "game-a/opening.nani", lineNumber: 2 });
+
+    (findButtonByAriaLabel(element, "Collapse Nani Workbench")?.props as { onClick: () => void }).onClick();
+    expect(actions.setCollapsed).toHaveBeenCalledWith(true);
+
+    (findButtonContaining(element, "Problems1")?.props as { onClick: () => void }).onClick();
+    expect(actions.updateLayout).toHaveBeenCalledWith({ activePanel: "problems", bottomPanelOpen: true });
+
+    (findByTestId(element, "vn-devtools-primary-action")?.props as { onClick: () => void }).onClick();
+    expect(actions.previewLine).toHaveBeenCalledWith("line:dialog");
+  });
+
+  it("renders Problems and transient Branch panels with native decision inputs", () => {
+    const actions = createActions();
+    const problems = VnDevtoolsDock({
+      controller: createController(actions, {
+        layout: { bottomPanelOpen: true, activePanel: "problems", bottomPanelHeight: 200 },
+        status: { phase: "error", message: "Compiler rejected the candidate." }
+      })
+    });
+    const problemText = collectText(findByTestId(problems, "vn-devtools-panel-problems")).join(" ");
+    expect(problemText).toContain("Compiler rejected the candidate.");
+    expect(problemText).toContain("Missing portrait asset");
+
+    const decision = VnDevtoolsDock({
       controller: createController(actions, {
         decision: {
           kind: "choice",
@@ -52,133 +118,104 @@ describe("VnDevtoolsDock", () => {
         }
       })
     });
-
-    expect(findByTestId(element, "vn-devtools-decision")).toBeDefined();
-    const labelButton = findButtonContaining(element, "Start1");
-    (labelButton?.props as { onClick: () => void }).onClick();
-    expect(actions.selectLine).toHaveBeenCalledWith("line:start");
-
-    const search = findByTestId(element, "vn-devtools-search");
-    (search?.props as { onChange: (event: { currentTarget: { value: string } }) => void }).onChange({ currentTarget: { value: "rain" } });
-    expect(actions.search).toHaveBeenCalledWith("rain");
-
-    const copy = findButton(element, "Copy path:line");
-    (copy?.props as { onClick: () => void }).onClick();
-    expect(actions.copyLocation).toHaveBeenCalledWith({ scriptPath: "game-a/opening.nani", lineNumber: 2 });
-
-    const collapse = findButtonByAriaLabel(element, "Collapse Nani Workbench");
-    (collapse?.props as { onClick: () => void }).onClick();
-    expect(actions.setCollapsed).toHaveBeenCalledWith(true);
+    expect(findByTestId(decision, "vn-devtools-bottom-panel")?.props["data-active-panel"]).toBe("branch");
+    expect(findByTestId(decision, "vn-devtools-decision")).toBeDefined();
+    expect(findAll(decision, (node) => node.type === "input" && node.props.type === "radio")).toHaveLength(2);
+    expect(findByTestId(decision, "vn-devtools-primary-action") && collectText(findByTestId(decision, "vn-devtools-primary-action")).join(" ")).toContain("Resolve decision");
   });
 
-  it("collapses to a small status-bearing button that restores the Dock", () => {
+  it("switches the primary action between Cancel and disabled Finishing based on true cancellability", () => {
+    const actions = createActions();
+    const cancellable = VnDevtoolsDock({
+      controller: createController(actions, {
+        status: { phase: "materializing", cancellable: true }
+      })
+    });
+    const cancel = findByTestId(cancellable, "vn-devtools-primary-action");
+    expect(collectText(cancel).join(" ")).toContain("Cancel");
+    (cancel?.props as { onClick: () => void }).onClick();
+    expect(actions.cancelCandidate).toHaveBeenCalledOnce();
+
+    const finishing = findByTestId(VnDevtoolsDock({
+      controller: createController(actions, {
+        status: { phase: "materializing", cancellable: false }
+      })
+    }), "vn-devtools-primary-action");
+    expect(collectText(finishing).join(" ")).toContain("Finishing…");
+    expect(finishing?.props.disabled).toBe(true);
+  });
+
+  it("supports IDE shortcuts and isolates Escape in decision, Symbols, Find, and cancellable busy priority", () => {
+    const actions = createActions();
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+    const focus = vi.fn();
+    const closeDetails = { open: true, querySelector: () => ({ focus }) };
+    const createEvent = (overrides: Record<string, unknown> = {}) => ({
+      key: "Escape",
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+      target: null,
+      currentTarget: { querySelector: () => null, focus },
+      preventDefault,
+      stopPropagation,
+      ...overrides
+    });
+
+    const decisionDock = findByTestId(VnDevtoolsDock({
+      controller: createController(actions, {
+        decision: { kind: "choice", id: "choice", prompt: "Pick", options: [] }
+      })
+    }), "vn-devtools-dock");
+    (decisionDock?.props as { onKeyDownCapture: (value: unknown) => void }).onKeyDownCapture(createEvent());
+    expect(actions.cancelDecision).toHaveBeenCalledOnce();
+
+    const symbolDock = findByTestId(VnDevtoolsDock({ controller: createController(actions) }), "vn-devtools-dock");
+    (symbolDock?.props as { onKeyDownCapture: (value: unknown) => void }).onKeyDownCapture(createEvent({
+      currentTarget: {
+        querySelector: (selector: string) => selector.includes("[open]") ? closeDetails : null,
+        focus
+      }
+    }));
+    expect(closeDetails.open).toBe(false);
+
+    const searchDock = findByTestId(VnDevtoolsDock({
+      controller: createController(actions, { searchQuery: "hello" })
+    }), "vn-devtools-dock");
+    (searchDock?.props as { onKeyDownCapture: (value: unknown) => void }).onKeyDownCapture(createEvent());
+    expect(actions.search).toHaveBeenCalledWith("");
+
+    const busyDock = findByTestId(VnDevtoolsDock({
+      controller: createController(actions, { status: { phase: "updating", cancellable: true } })
+    }), "vn-devtools-dock");
+    (busyDock?.props as { onKeyDownCapture: (value: unknown) => void }).onKeyDownCapture(createEvent());
+    expect(actions.cancelCandidate).toHaveBeenCalled();
+
+    const previewDock = findByTestId(VnDevtoolsDock({ controller: createController(actions) }), "vn-devtools-dock");
+    (previewDock?.props as { onKeyDownCapture: (value: unknown) => void }).onKeyDownCapture(createEvent({
+      key: "Enter",
+      metaKey: true
+    }));
+    expect(actions.previewLine).toHaveBeenCalledWith("line:dialog");
+
+    (previewDock?.props as { onKeyDownCapture: (value: unknown) => void }).onKeyDownCapture(createEvent({
+      key: "j",
+      ctrlKey: true
+    }));
+    expect(actions.updateLayout).toHaveBeenCalledWith({ bottomPanelOpen: false });
+  });
+
+  it("collapses to an icon control with status and update badges", () => {
     const actions = createActions();
     const element = VnDevtoolsDock({
       controller: createController(actions, { collapsed: true, hasUpdateBadge: true })
     });
     const button = findByTestId(element, "vn-devtools-collapsed-button");
-
     expect(button?.props).toMatchObject({ "data-status": "ready" });
     expect(String(button?.props["aria-label"])).toContain("1 errors");
     (button?.props as { onClick: () => void }).onClick();
     expect(actions.setCollapsed).toHaveBeenCalledWith(false);
-  });
-
-  it("supports keyboard preview and focuses search without leaking shortcuts to the game shell", () => {
-    const actions = createActions();
-    const dock = findByTestId(VnDevtoolsDock({ controller: createController(actions) }), "vn-devtools-dock");
-    const onKeyDown = (dock?.props as { onKeyDownCapture: (event: unknown) => void }).onKeyDownCapture;
-    const preventDefault = vi.fn();
-    const stopPropagation = vi.fn();
-    const focus = vi.fn();
-
-    onKeyDown({
-      key: "Enter",
-      metaKey: true,
-      ctrlKey: false,
-      target: null,
-      currentTarget: { querySelector: () => ({ focus }) },
-      preventDefault,
-      stopPropagation
-    });
-    expect(actions.previewLine).toHaveBeenCalledWith("line:dialog");
-
-    onKeyDown({
-      key: "/",
-      metaKey: false,
-      ctrlKey: false,
-      target: null,
-      currentTarget: { querySelector: () => ({ focus }) },
-      preventDefault,
-      stopPropagation
-    });
-    expect(focus).toHaveBeenCalledOnce();
-    expect(preventDefault).toHaveBeenCalledTimes(2);
-    expect(stopPropagation).toHaveBeenCalledTimes(2);
-  });
-
-  it("gives Escape priority to a decision, then search, before cancelling candidate work", () => {
-    const actions = createActions();
-    const choice = {
-      kind: "choice" as const,
-      id: "choice:route",
-      prompt: "Choose a route",
-      options: [{ id: "left", label: "Left", enabled: true }]
-    };
-    const decisionDock = findByTestId(VnDevtoolsDock({
-      controller: createController(actions, {
-        decision: choice,
-        searchQuery: "rain",
-        status: { phase: "materializing" }
-      })
-    }), "vn-devtools-dock");
-    const event = {
-      key: "Escape",
-      metaKey: false,
-      ctrlKey: false,
-      target: null,
-      currentTarget: { querySelector: () => null },
-      preventDefault: vi.fn(),
-      stopPropagation: vi.fn()
-    };
-    (decisionDock?.props as { onKeyDownCapture: (value: unknown) => void }).onKeyDownCapture(event);
-    expect(actions.cancelDecision).toHaveBeenCalledOnce();
-    expect(actions.search).not.toHaveBeenCalled();
-    expect(actions.cancelCandidate).not.toHaveBeenCalled();
-
-    const searchDock = findByTestId(VnDevtoolsDock({
-      controller: createController(actions, {
-        searchQuery: "rain",
-        status: { phase: "materializing" }
-      })
-    }), "vn-devtools-dock");
-    (searchDock?.props as { onKeyDownCapture: (value: unknown) => void }).onKeyDownCapture(event);
-    expect(actions.search).toHaveBeenCalledWith("");
-    expect(actions.cancelCandidate).not.toHaveBeenCalled();
-  });
-
-  it("isolates Escape and cancels an in-flight candidate task", () => {
-    const actions = createActions();
-    const element = VnDevtoolsDock({
-      controller: createController(actions, { status: { phase: "materializing" } })
-    });
-    const dock = findByTestId(element, "vn-devtools-dock");
-    const preventDefault = vi.fn();
-    const stopPropagation = vi.fn();
-
-    (dock?.props as { onKeyDownCapture: (event: unknown) => void }).onKeyDownCapture({
-      key: "Escape",
-      metaKey: false,
-      ctrlKey: false,
-      target: null,
-      currentTarget: { querySelector: () => null },
-      preventDefault,
-      stopPropagation
-    });
-
-    expect(preventDefault).toHaveBeenCalledOnce();
-    expect(stopPropagation).toHaveBeenCalledOnce();
-    expect(actions.cancelCandidate).toHaveBeenCalledOnce();
   });
 });
 
@@ -191,13 +228,7 @@ function createController(
     scriptPath: "game-a/opening.nani",
     scriptRevision: "sha256:1234567890abcdef",
     lines: [
-      {
-        id: "line:start",
-        lineNumber: 1,
-        sourceText: "#Start",
-        label: "Start",
-        previewability: "previewable"
-      },
+      { id: "line:start", lineNumber: 1, sourceText: "#Start", label: "Start", previewability: "previewable" },
       {
         id: "line:dialog",
         lineNumber: 2,
@@ -207,18 +238,13 @@ function createController(
         current: true,
         pinned: true
       },
-      {
-        id: "line:end",
-        lineNumber: 3,
-        sourceText: "@end",
-        command: "end",
-        previewability: "no-stable-result"
-      }
+      { id: "line:end", lineNumber: 3, sourceText: "@end", command: "end", previewability: "no-stable-result" }
     ],
     selectedLineId: "line:dialog",
     searchQuery: "",
     collapsed: false,
     width: 420,
+    layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
     status: { phase: "ready", message: "Pinned target is stable." },
     diagnostics: [
       { id: "missing-portrait", severity: "error", message: "Missing portrait asset", lineId: "line:dialog", lineNumber: 2 }
@@ -234,7 +260,7 @@ function createController(
   };
 }
 
-function createActions() {
+function createActions(): VnDevtoolsActions {
   return {
     selectLine: vi.fn<(lineId: string) => void>(),
     previewLine: vi.fn<(lineId: string) => void>(),
@@ -242,28 +268,21 @@ function createActions() {
     unpin: vi.fn<() => void>(),
     setCollapsed: vi.fn<(collapsed: boolean) => void>(),
     resize: vi.fn<(width: number) => void>(),
+    updateLayout: vi.fn<VnDevtoolsActions["updateLayout"]>(),
     search: vi.fn<(query: string) => void>(),
     submitDecision: vi.fn<(submission: VnDevtoolsDecisionSubmission) => void>(),
     cancelDecision: vi.fn<() => void>(),
     cancelCandidate: vi.fn<() => void>(),
     copyLocation: vi.fn<(location: VnDevtoolsSourceLocation) => void>()
-  } satisfies VnDevtoolsActions;
+  };
 }
 
 function findByTestId(node: ReactNode, testId: string): TestElement | undefined {
   return find(node, (element) => element.props["data-testid"] === testId);
 }
 
-function findButton(node: ReactNode, text: string, predicate: (button: TestElement) => boolean = () => true): TestElement | undefined {
-  return find(node, (element) => element.type === "button" && collectText(element).join("") === text && predicate(element));
-}
-
 function findButtonContaining(node: ReactNode, text: string): TestElement | undefined {
   return find(node, (element) => element.type === "button" && collectText(element).join("").includes(text));
-}
-
-function findButtonWithin(node: ReactNode, text: string): TestElement | undefined {
-  return findButton(node, text);
 }
 
 function findButtonByAriaLabel(node: ReactNode, label: string): TestElement | undefined {
@@ -274,13 +293,21 @@ function findByAriaLabel(node: ReactNode, label: string): TestElement | undefine
   return find(node, (element) => element.props["aria-label"] === label);
 }
 
+function findAllByDataAttribute(node: ReactNode, attribute: string): TestElement[] {
+  return findAll(node, (element) => element.props[attribute] !== undefined);
+}
+
 function find(node: ReactNode, predicate: (element: TestElement) => boolean): TestElement | undefined {
-  let match: TestElement | undefined;
+  return findAll(node, predicate)[0];
+}
+
+function findAll(node: ReactNode, predicate: (element: TestElement) => boolean): TestElement[] {
+  const matches: TestElement[] = [];
   visit(node, (current) => {
-    if (match || !isValidElement<Record<string, unknown>>(current)) return;
-    if (predicate(current)) match = current;
+    if (!isValidElement<Record<string, unknown>>(current)) return;
+    if (predicate(current)) matches.push(current);
   });
-  return match;
+  return matches;
 }
 
 function collectText(node: ReactNode): string[] {

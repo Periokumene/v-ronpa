@@ -30,8 +30,10 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("title-surface")).toHaveClass(/game-a-title-surface/);
   const workbench = page.getByTestId("vn-devtools-dock");
   await expect(workbench).toBeVisible();
-  await expect(workbench).toContainText("Nani Workbench");
-  await expect(workbench).toContainText("game-a/test/smoke.nani");
+  await expect(workbench).toHaveAttribute("aria-label", "Nani Workbench");
+  await expect(workbench).toContainText("test / smoke.nani");
+  await expect(page.getByTestId("vn-devtools-source-editor")).toBeVisible();
+  await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "state");
   await expect(workbench.getByLabel("Current runtime position")).toHaveCount(0);
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute(
     "data-pixi-character-preparation",
@@ -57,6 +59,44 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   expect(initialViewportGeometry.stageWidth).toBeCloseTo(initialViewportGeometry.cellWidth, 0);
   const storySessionBeforeLayoutChanges = await readDevtoolsStorySession(page);
   await page.screenshot({ path: "test-results/game-a-workbench-expanded.png", fullPage: true });
+
+  const sourceLineCount = await page.locator('[data-testid^="vn-devtools-line-"]').count();
+  await page.keyboard.press("Control+f");
+  const sourceFind = page.getByTestId("vn-devtools-search");
+  await expect(sourceFind).toBeFocused();
+  await sourceFind.fill("CHECKPOINT SMOKE");
+  await expect(page.locator('[data-testid^="vn-devtools-line-"]')).toHaveCount(sourceLineCount);
+  await expect(page.getByTestId("vn-devtools-find-count")).not.toHaveText("0 / 0");
+  await sourceFind.press("Enter");
+  await expect(page.locator('.vn-devtools-source-line[data-find-current="true"]')).toBeInViewport();
+  await page.keyboard.press("Escape");
+  await expect(sourceFind).toHaveValue("");
+
+  await page.keyboard.press("Control+Shift+o");
+  const symbolSearch = page.getByTestId("vn-devtools-symbol-search");
+  await expect(symbolSearch).toBeFocused();
+  await symbolSearch.fill("Interaction");
+  await page.getByRole("option", { name: /Interaction/ }).click();
+  await expect(page.locator(".vn-devtools-source-line.is-selected")).toContainText("#Interaction");
+  expect(await readDevtoolsStorySession(page)).toBe(storySessionBeforeLayoutChanges);
+
+  await page.setViewportSize({ width: 1672, height: 941 });
+  await page.getByTestId("vn-devtools-resizer").focus();
+  await page.keyboard.press("End");
+  await expect.poll(async () => Math.round((await workbench.boundingBox())?.width ?? 0)).toBe(720);
+  await page.screenshot({ path: "test-results/game-a-workbench-ide-720.png", fullPage: true });
+  await page.keyboard.press("Home");
+  await expect.poll(async () => Math.round((await workbench.boundingBox())?.width ?? 0)).toBe(320);
+  await page.screenshot({ path: "test-results/game-a-workbench-ide-320.png", fullPage: true });
+  const minWidthResizer = await page.getByTestId("vn-devtools-resizer").boundingBox();
+  if (!minWidthResizer) throw new Error("Workbench resizer is unavailable.");
+  await page.mouse.move(minWidthResizer.x + minWidthResizer.width / 2, minWidthResizer.y + 24);
+  await page.mouse.down();
+  await page.mouse.move(minWidthResizer.x + minWidthResizer.width / 2 - 100, minWidthResizer.y + 24);
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await workbench.boundingBox())?.width ?? 0)).toBe(420);
+  await page.setViewportSize({ width: 1280, height: 720 });
+
   await workbench.getByRole("button", { name: "Collapse Nani Workbench" }).click();
   await expect(page.getByTestId("vn-devtools-collapsed-button")).toBeVisible();
   await expect.poll(async () => (await page.getByTestId("game-a-playfield").boundingBox())?.width ?? 0).toBeGreaterThan(initialPlayfieldWidth);
@@ -134,9 +174,10 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await advanceUntilText(page, "CHECKPOINT SMOKE 00", 6);
   const storySessionBeforePreview = await readDevtoolsStorySession(page);
   const firstStableLine = page.locator('[data-testid^="vn-devtools-line-"]').filter({ hasText: "CHECKPOINT SMOKE 00" }).first();
-  await firstStableLine.hover();
-  await firstStableLine.locator(".vn-devtools-preview-button").click();
+  await firstStableLine.locator(".vn-devtools-line-select").click();
+  await page.getByTestId("vn-devtools-primary-action").click();
   await expect(workbench).toContainText("Stable checkpoint installed");
+  await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "state");
   await expect(firstStableLine.getByLabel("Pinned preview target")).toBeVisible();
   await expect(firstStableLine.getByLabel("Current runtime position")).toBeVisible();
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT SMOKE 00");
@@ -200,6 +241,24 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
 
   await exerciseNaniSourceSaveFlow(page, workbench);
   await exerciseWorkbenchDecisionFlow(page, workbench, firstStableLine);
+  const persistedWorkbenchSession = await page.evaluate(() => {
+    const raw = sessionStorage.getItem("v-ronpa:game-a:nani-devtools:v1");
+    return raw ? JSON.parse(raw) as {
+      version?: number;
+      layout?: { bottomPanelOpen?: boolean; activePanel?: string; bottomPanelHeight?: number };
+      decisions?: unknown[];
+    } : undefined;
+  });
+  expect(persistedWorkbenchSession).toMatchObject({
+    version: 2,
+    layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 360 }
+  });
+  expect(persistedWorkbenchSession?.decisions).toHaveLength(2);
+  await page.reload();
+  await expect(page.getByTestId("game-a-mode")).toHaveText("视觉小说", { timeout: 15_000 });
+  await expect(page.getByTestId("vn-dialog-text")).toContainText(smokePreviewText);
+  await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "state");
+  await expect(page.getByTestId("vn-devtools-panel-resizer")).toHaveAttribute("aria-valuenow", "360");
 
   await advanceUntilChoices(page, 4);
   await expect(page.getByTestId("vn-choice-0")).toHaveText("交互与存档");
@@ -251,8 +310,9 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("load-confirmation")).toBeVisible();
   await page.screenshot({ path: "test-results/game-a-save-load.png", fullPage: true });
   const workbenchSearch = page.getByTestId("vn-devtools-search");
+  await page.keyboard.press("Control+f");
+  await expect(workbenchSearch).toBeFocused();
   await workbenchSearch.fill("CHECKPOINT");
-  await workbenchSearch.focus();
   await page.keyboard.press("Escape");
   await expect(workbenchSearch).toHaveValue("");
   await expect(page.getByTestId("load-confirmation")).toBeVisible();
@@ -539,6 +599,7 @@ async function exerciseNaniSourceSaveFlow(page: Page, workbench: ReturnType<Page
     const invalidCompilerSource = `${semanticUpdateSource.trimEnd()}\n@back bg:main time:fast\n`;
     await writeFile(smokeSourceFile, invalidCompilerSource, "utf8");
     await expect.poll(async () => (await readGameSnapshot(page)).workbench.phase, { timeout: 15_000 }).toBe("error");
+    await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "problems");
     await expect.poll(async () => (await readGameSnapshot(page)).workbench.message)
       .toContain("last-known-good");
     const rejected = await readGameSnapshot(page);
@@ -563,6 +624,11 @@ async function exerciseNaniSourceSaveFlow(page: Page, workbench: ReturnType<Page
   await expect.poll(async () => (await readGameSnapshot(page)).workbench.phase, { timeout: 15_000 }).toBe("ready");
 
   const persistedWidth = (await workbench.boundingBox())?.width ?? 0;
+  await workbench.getByRole("tab", { name: /^State$/ }).click();
+  await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "state");
+  await page.getByTestId("vn-devtools-panel-resizer").focus();
+  await page.keyboard.press("End");
+  await expect(page.getByTestId("vn-devtools-panel-resizer")).toHaveAttribute("aria-valuenow", "360");
   await workbench.getByRole("button", { name: "Collapse Nani Workbench" }).click();
   await expect(page.getByTestId("vn-devtools-collapsed-button")).toBeVisible();
   await page.reload();
@@ -574,6 +640,8 @@ async function exerciseNaniSourceSaveFlow(page: Page, workbench: ReturnType<Page
   await expect(page.getByTestId("game-a-mode")).toHaveText("视觉小说", { timeout: 15_000 });
   await expect(page.getByTestId("vn-dialog-text")).toContainText(smokePreviewText);
   await expect(workbench).toContainText("Stable checkpoint installed");
+  await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "state");
+  await expect(page.getByTestId("vn-devtools-panel-resizer")).toHaveAttribute("aria-valuenow", "360");
   await expect(
     page.locator('[data-testid^="vn-devtools-line-"]').filter({ hasText: "CHECKPOINT SMOKE 00" }).first()
       .getByLabel("Pinned preview target")
@@ -592,6 +660,8 @@ async function exerciseWorkbenchDecisionFlow(
   await inputTarget.locator(".vn-devtools-preview-button").click();
 
   const decision = page.getByTestId("vn-devtools-decision");
+  await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "branch");
+  await expect(page.getByTestId("vn-devtools-primary-action")).toContainText("Resolve decision");
   await expect(decision).toContainText("Choose a branch");
   await decision.getByLabel("交互与存档").check();
   await decision.getByRole("button", { name: "Continue preview" }).click();
