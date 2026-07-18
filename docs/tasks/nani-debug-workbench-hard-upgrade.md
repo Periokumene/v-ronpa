@@ -14,7 +14,7 @@
 - Owner: `Codex`
 - Created: `2026-07-18`
 - Updated: `2026-07-18`
-- Completed Commit: `b35a158d8d9fc1d916b1a8a7c357f2a61d4f2470`
+- Completed Commit: `59aea0c7c4a7740f83f0b0c47c8bb035e9b9989c`
 - Archive Target: `docs/archive/completed-tasks/nani-debug-workbench-hard-upgrade.md`
 
 ## Goal
@@ -179,6 +179,9 @@ BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tas
 
 ## Completion Evidence
 
+- The accepted final tree was transplanted without content changes onto local
+  baseline `a7bb0091234f7796df3db93a7bfe3f0ae948e300`; the preserved pre-rebase tip
+  is `a787a565aaa5e3adab48d17d61bf3c826326c20d`.
 - `pnpm validate:baseline` passed with 400 contract/subsystem tests, 612 full
   unit tests, both production builds, cleanup guards, and 8 Playwright smoke
   cases.

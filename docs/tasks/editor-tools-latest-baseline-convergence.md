@@ -15,7 +15,7 @@
 
 ## Status
 
-- State: `Ready`
+- State: `In Progress`
 - Owner: `Codex`
 - Created: `2026-07-18`
 - Updated: `2026-07-18`
@@ -132,13 +132,13 @@ resolution.
 
 | Area | Evidence and intents | Final authority | Paths and regression evidence | Status |
 |---|---|---|---|---|
-| Game A launch | Baseline introduced launch definitions, character preload, and isolated test modes; Editor Tools introduced a DEV candidate entry | One app launch definition; DEV host may replace only its runtime entry; no URL or start-label override | Game A app, launch, Vite, and smoke tests | Pending audit |
-| Script metadata and revision | Baseline split product/test generated metadata; Editor Tools centralized canonical semantic revision | Compiler serializer plus generator/browser digest adapters; generated outputs are regenerated | Compiler, asset generator, Game A script tests | Pending audit |
-| Runtime ports | Baseline consumers used product actions; Editor Tools hard-cut debug from the root result | Four canonical product ports; explicit read-only debug entry only | Runtime, Game A, Harness, cleanup tests | Pending audit |
-| Pixi and Alice | Baseline added preload readiness, source-pixel outline, and transition hardening; Editor Tools must preserve presenter identity on equivalent updates | Baseline Pixi behavior plus app-owned equivalent-plan reuse; no presenter bypass | Game A character and workbench smoke | Pending audit |
-| Playwright isolation | Baseline added separate servers/modes and Metal worker policy; Editor Tools added workbench coverage and Vite cache isolation | Keep both exact-mode servers and cache isolation | Playwright config tests and smoke | Pending audit |
-| Production cleanup | Baseline excludes smoke/test markers; Editor Tools excludes devtools/HMR/session markers | Effective union of current markers; no stale legacy names | Production build and cleanup guards | Pending audit |
-| Documentation | Baseline updated Harness/test/VS Code workflow; Editor Tools documented the workbench and runtime hard cut | One current call chain with no old dispatcher, query, or debug-port descriptions | Documentation review and freshness guards | Pending audit |
+| Game A launch | Baseline introduced launch definitions, character preload, and isolated test modes; Editor Tools introduced a DEV candidate entry | One active launch definition; a verified candidate atomically replaces its runtime entry and the preload plan derived from the same compiled script; no URL or start-label override | Static call-chain audit, Game A launch/candidate tests, typecheck | Verified; no code change |
+| Script metadata and revision | Baseline split product/test generated metadata; Editor Tools centralized canonical semantic revision | Compiler serializer plus Node generator/browser digest adapters; generated outputs come from the generator | Compiler golden tests, asset freshness, Game A script tests | Verified; no code change |
+| Runtime ports | Baseline consumers used product actions; Editor Tools hard-cut debug from the root result | Four canonical product ports; explicit read-only debug entry only | Runtime/Game A/Harness tests and both cleanup guards | Verified; no code change |
+| Pixi and Alice | Baseline added preload readiness, source-pixel outline, and transition hardening; Editor Tools must preserve presenter identity on equivalent updates | Baseline Pixi behavior plus app-owned equivalent-plan reuse; no presenter bypass | Candidate-plan tests, unchanged forbidden presenter paths, character smoke pending | Verified statically; smoke pending |
+| Playwright isolation | Baseline added separate servers/modes and Metal worker policy; Editor Tools added workbench coverage and Vite cache isolation | Keep both exact-mode servers and mode-specific cache isolation | Playwright config audit/tests; full smoke pending | Verified statically; smoke pending |
+| Production cleanup | Baseline excludes smoke/test markers; Editor Tools excludes devtools/HMR/session markers | Effective union of current markers; no stale legacy runtime wiring | Production guard audit, cleanup guards; production build pending | Verified statically; build pending |
+| Documentation | Baseline updated Harness/test/VS Code workflow; Editor Tools documented the workbench and runtime hard cut | One current call chain with no old dispatcher, query, or product debug-port descriptions | Architecture/task review and command-doc freshness | Verified; no code change |
 
 Additional findings must be appended before their implementation.
 
