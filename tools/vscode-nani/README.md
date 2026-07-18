@@ -12,6 +12,7 @@ VS Code language support for V-Ronpa `.nani` scripts.
 - Discovers the nearest `asset.config.mjs` for an opened `.nani` file and completes generated background, BGM, SFX, video, and layered-character resources.
 - Completes layered-character expression tokens from the matching `compositions.json`, including comma-separated `@char` and `@slide` expressions.
 - Renders a native 320x420 hover preview when the pointer is over the static identity value of an `@char` command.
+- Lazily renders native IntelliSense details for a selected `@char` appearance-token candidate, showing its local image and the complete projected character without adding a persistent panel.
 - Publishes parser and runtime-compiler diagnostics with exact original-source UTF-16 ranges.
 - Preserves shared diagnostic codes and severities under the single VS Code diagnostic source `nani`.
 - Surfaces compiler-owned warnings for invalid `showUI` / `hideUI` runtime UI targets and ignored promoted-primary values.
@@ -45,6 +46,12 @@ Hover the identity expression in a command such as `@char alice.EYE1,MOUTH3` to 
 Command-name and non-identity parameter hovers continue to show language documentation. Preview failures are reported inside the hover and under `[char-preview]` in the **V-Ronpa Nani** output channel; they are never added to Problems. During a same-line edit, the last valid image remains visible with an explicit updating or invalid warning. Inserting or deleting a newline clears that conservative line cache.
 
 Use **V-Ronpa Nani: Preview Character at Cursor** to move the caret to the current line's character identity and open the native hover. The command has no default keybinding and never edits the script. Dynamic IDs, dynamic appearance expressions, and wildcard targets are not guessed.
+
+### Completion Preview
+
+Type a partial appearance token such as `@char alice.EYE1,MO` and select a character token in IntelliSense. The native completion details area lazily shows the candidate's newly active image content and the complete character that would result if the candidate were accepted. Creating or filtering the completion list does not read character PNGs; preview work begins only when VS Code resolves a selected completion item.
+
+Completion previews close with IntelliSense and do not create a Webview, panel, editor decoration, or background image. The UI intentionally omits token expansion and internal layer provenance. A candidate that only removes layers shows the projected complete character with a short no-new-image state. Preview failures stay in the completion documentation and the `[char-preview]` output channel.
 
 The parser source map is the only diagnostic-location authority. The extension converts each half-open offset span with `TextDocument.positionAt`; it does not inspect messages, search source text, or manufacture fallback ranges. Results computed for an older document version are discarded. If a parser/compiler or span invariant fails, the extension records the error in the **V-Ronpa Nani** output channel and clears diagnostics for that unchanged document version rather than publishing a guessed range.
 

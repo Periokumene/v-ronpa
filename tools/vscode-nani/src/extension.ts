@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { CharacterPreviewArtifactCache } from "./character-preview/artifactCache";
 import { CharacterPreviewController } from "./character-preview/controller";
 import { CharacterPreviewEngine } from "./character-preview/engine";
+import { CharacterCompletionPreviewProvider } from "./integration/completionPreviewProvider";
 import { registerHoverCoordinator } from "./integration/hoverCoordinator";
 import { registerLanguageFeatures } from "./language/register";
 import { NaniProjectAssetService } from "./project-resources";
@@ -15,15 +16,16 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   const previewEngine = new CharacterPreviewEngine(artifactCache);
   const characterPreview = new CharacterPreviewController(previewEngine, projectAssets, output);
+  const completionPreview = new CharacterCompletionPreviewProvider(previewEngine, projectAssets, output);
 
-  context.subscriptions.push(output, projectAssets, characterPreview);
+  context.subscriptions.push(output, projectAssets, characterPreview, completionPreview);
   context.subscriptions.push(
     vscode.commands.registerCommand("v-ronpa-nani.refreshProjectAssets", () => {
       projectAssets.refreshAll();
       void vscode.window.showInformationMessage("V-Ronpa Nani project assets refreshed.");
     })
   );
-  registerLanguageFeatures(context, projectAssets, output);
+  registerLanguageFeatures(context, projectAssets, output, completionPreview);
   registerHoverCoordinator(context, characterPreview);
   void characterPreview.initialize().catch((error) => {
     output.appendLine(`[char-preview] Failed to initialize artifact cache: ${errorMessage(error)}`);

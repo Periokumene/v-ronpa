@@ -2,7 +2,11 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadResolvedCharacterPreview, pngDimensions } from "./packLoader";
+import {
+  loadResolvedCharacterCompletionPreview,
+  loadResolvedCharacterPreview,
+  pngDimensions
+} from "./packLoader";
 import type { CharacterPreviewRequest } from "./types";
 
 const roots: string[] = [];
@@ -37,6 +41,31 @@ describe("layered character preview pack loading", () => {
       return import("node:fs/promises").then((fs) => fs.readFile(path));
     })).rejects.toMatchObject({ code: "invalid-appearance" });
     expect(reads.some((path) => path.endsWith(".png"))).toBe(false);
+  });
+
+  it("derives a candidate contribution without including the layer it replaces", async () => {
+    const fixture = packFixture();
+    const loaded = await loadResolvedCharacterCompletionPreview(
+      fixture.descriptor,
+      request("EYE1"),
+      ""
+    );
+
+    expect(loaded.complete.layers.map((layer) => layer.id)).toEqual(["MAIN>BODY", "MAIN/EYE>1"]);
+    expect(loaded.contribution?.layers.map((layer) => layer.id)).toEqual(["MAIN/EYE>1"]);
+    expect(loaded.contribution?.fingerprint).not.toBe(loaded.complete.fingerprint);
+  });
+
+  it("keeps a complete projection when a candidate only removes layers", async () => {
+    const fixture = packFixture();
+    const loaded = await loadResolvedCharacterCompletionPreview(
+      fixture.descriptor,
+      request("EYEOff"),
+      ""
+    );
+
+    expect(loaded.complete.layers.map((layer) => layer.id)).toEqual(["MAIN>BODY"]);
+    expect(loaded.contribution).toBeUndefined();
   });
 
   it("reports missing active metadata and malformed PNGs as local preview failures", async () => {
@@ -101,7 +130,8 @@ function packFixture() {
   writeJson(join(root, "compositions.json"), {
     tokens: {
       Default: ["MAIN>BODY", "MAIN/EYE>0"],
-      EYE1: ["MAIN/EYE>1"]
+      EYE1: ["MAIN/EYE>1"],
+      EYEOff: ["MAIN/EYE-"]
     }
   });
   writeJson(join(root, "assets/layers/BODY.json"), metadata(0));

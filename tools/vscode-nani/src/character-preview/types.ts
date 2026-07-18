@@ -49,10 +49,20 @@ export interface ResolvedCharacterPreview {
   packRoot: string;
 }
 
+export interface ResolvedCharacterCompletionPreview {
+  complete: ResolvedCharacterPreview;
+  contribution?: ResolvedCharacterPreview;
+}
+
 export interface PreviewArtifact {
   fingerprint: string;
   path: string;
   layerCount: number;
+}
+
+export interface CharacterCompletionPreviewArtifacts {
+  complete: PreviewArtifact;
+  contribution?: PreviewArtifact;
 }
 
 export interface CharacterPreviewArtifactRenderer {

@@ -22,6 +22,13 @@ describe("static SVG character renderer", () => {
     const hrefs = [...svg.matchAll(/href="([^"]+)"/gu)].map((match) => match[1]);
     expect(hrefs.every((href) => href?.startsWith("data:image/png;base64,"))).toBe(true);
   });
+
+  it("supports a compact canvas for completion token previews", () => {
+    const svg = new StaticSvgCharacterPreviewRenderer({ width: 320, height: 180 }).render(preview());
+
+    expect(svg).toContain('width="320" height="180" viewBox="0 0 320 180"');
+    expect(svg).toContain('<rect width="320" height="180" fill="url(#checker)"/>');
+  });
 });
 
 function preview(): ResolvedCharacterPreview {

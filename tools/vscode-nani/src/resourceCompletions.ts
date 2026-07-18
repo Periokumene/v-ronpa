@@ -9,7 +9,15 @@ export interface NaniResourceCompletion {
   range: NaniRange;
   detail: string;
   documentation?: string;
+  deferredDocumentation?: NaniDeferredCompletionDocumentation;
   sortText: string;
+}
+
+export interface NaniDeferredCompletionDocumentation {
+  kind: "character-appearance-token";
+  characterId: string;
+  baseAppearanceExpression: string;
+  candidateToken: string;
 }
 
 export interface NaniResourceCompletionResult {
@@ -20,6 +28,7 @@ export interface NaniResourceCompletionResult {
 interface ResourceSlot {
   kind: RuntimeAssetKind;
   character: boolean;
+  characterCompletionPreview: boolean;
 }
 
 const primarySlots: Readonly<Record<string, ResourceSlot>> = {
@@ -31,7 +40,7 @@ const primarySlots: Readonly<Record<string, ResourceSlot>> = {
   sfxfast: slot("sfx"),
   stopsfx: slot("sfx"),
   movie: slot("video"),
-  char: slot("character-pack", true),
+  char: slot("character-pack", true, true),
   slide: slot("character-pack", true)
 };
 
@@ -44,7 +53,7 @@ const paramSlots: Readonly<Record<string, Readonly<Record<string, ResourceSlot>>
   sfxfast: { sfxpath: slot("sfx") },
   stopsfx: { sfxpath: slot("sfx") },
   movie: { moviepath: slot("video") },
-  char: { idandappearance: slot("character-pack", true) },
+  char: { idandappearance: slot("character-pack", true, true) },
   slide: { idandappearance: slot("character-pack", true) }
 };
 
@@ -101,7 +110,15 @@ function resourceResult(
   combineWithParams: boolean
 ): NaniResourceCompletionResult {
   if (resourceSlot.character) {
-    return characterResult(index, rawPrefix, line, start, end, combineWithParams);
+    return characterResult(
+      index,
+      rawPrefix,
+      line,
+      start,
+      end,
+      combineWithParams,
+      resourceSlot.characterCompletionPreview
+    );
   }
   const prefix = rawPrefix.toLowerCase();
   return {
@@ -125,7 +142,8 @@ function characterResult(
   line: number,
   start: number,
   end: number,
-  combineWithParams: boolean
+  combineWithParams: boolean,
+  completionPreviewEnabled: boolean
 ): NaniResourceCompletionResult {
   const dot = rawPrefix.indexOf(".");
   if (dot < 0) {
@@ -149,6 +167,7 @@ function characterResult(
   const expression = rawPrefix.slice(dot + 1);
   const segmentStart = expression.lastIndexOf(",") + 1;
   const prefix = expression.slice(segmentStart).toLowerCase();
+  const baseAppearanceExpression = expression.slice(0, segmentStart).replace(/,+$/u, "");
   const tokens = index.characterTokens[characterId] ?? index.characterTokens[normalize(characterId)] ?? [];
   const replaceStart = start + dot + 1 + segmentStart;
   return {
@@ -159,6 +178,14 @@ function characterResult(
         insertText: token,
         range: range(line, replaceStart, end),
         detail: `${characterId} composition token`,
+        ...(completionPreviewEnabled ? {
+          deferredDocumentation: {
+            kind: "character-appearance-token" as const,
+            characterId,
+            baseAppearanceExpression,
+            candidateToken: token
+          }
+        } : {}),
         sortText: `0-${tokenIndex.toString().padStart(4, "0")}`
       })),
     combineWithParams: false
@@ -173,8 +200,12 @@ function paramSlot(commandId: string, token: string): { slot: ResourceSlot; pref
   return { slot: resourceSlot, prefix: token.slice(colon + 1), valueOffset: colon + 1 };
 }
 
-function slot(kind: RuntimeAssetKind, character = false): ResourceSlot {
-  return { kind, character };
+function slot(
+  kind: RuntimeAssetKind,
+  character = false,
+  characterCompletionPreview = false
+): ResourceSlot {
+  return { kind, character, characterCompletionPreview };
 }
 
 function range(line: number, start: number, end: number): NaniRange {

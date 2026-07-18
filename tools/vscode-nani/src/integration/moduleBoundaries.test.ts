@@ -26,6 +26,13 @@ describe("VS Code adapter module boundaries", () => {
     expect(source).toContain("registerLanguageFeatures");
     expect(source).toContain("registerHoverCoordinator");
   });
+
+  it("keeps completion previews native, lazy, and independent from editor surfaces", () => {
+    const source = read(join(sourceRoot, "integration/completionPreviewProvider.ts"));
+    expect(source).not.toMatch(/createWebview|registerWebview|createTextEditorDecorationType|editor\.action\.showHover/iu);
+    expect(source).not.toMatch(/computeNaniDiagnostics|createDiagnosticCollection/iu);
+    expect(source).not.toMatch(/expandedExpressions|tokenExpressions/iu);
+  });
 });
 
 function sourceFiles(directory: string): string[] {

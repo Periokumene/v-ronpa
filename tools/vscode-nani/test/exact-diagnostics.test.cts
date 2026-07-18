@@ -199,6 +199,40 @@ suite("V-Ronpa Nani exact diagnostics", () => {
     assert.equal(artifactUriFromHover(invalid).toString(), validArtifact);
   });
 
+  test("lazily resolves token-local and projected character images in completion documentation", async () => {
+    await createCharacterPreviewFixture();
+    const source = "@char alice.EYE1,MO";
+    const document = await openWorkspaceNaniDocument("preview/completion.nani", source);
+    const position = new vscode.Position(0, source.length);
+
+    const unresolved = await executeCompletions(document.uri, position, 0);
+    const unresolvedMouth = unresolved.items.find((item) => completionLabel(item) === "MOUTH0");
+    assert.ok(unresolvedMouth, "MOUTH0 is offered from the live character pack");
+    assert.equal(unresolvedMouth.documentation, undefined, "candidate list creation does not load preview documentation");
+
+    const resolved = await executeCompletions(document.uri, position, 20);
+    const mouth = resolved.items.find((item) => completionLabel(item) === "MOUTH0");
+    assert.ok(mouth, "resolved MOUTH0 completion exists");
+    const documentation = completionDocumentation(mouth);
+    assert.match(documentation, /当前候选/u);
+    assert.match(documentation, /应用后的角色/u);
+    assert.doesNotMatch(documentation, /MAIN\/MOUTH|展开/u);
+    const artifactUris = artifactUrisFromMarkdown(documentation);
+    assert.equal(artifactUris.length, 2, `expected contribution and complete images: ${documentation}`);
+    const [contributionUri, completeUri] = artifactUris;
+    assert.ok(contributionUri && completeUri);
+    for (const uri of artifactUris) {
+      const info = await vscode.workspace.fs.stat(uri);
+      assert.ok(info.size > 0, `completion preview artifact exists: ${uri.toString()}`);
+    }
+    const contributionSvg = Buffer.from(await vscode.workspace.fs.readFile(contributionUri)).toString("utf8");
+    const completeSvg = Buffer.from(await vscode.workspace.fs.readFile(completeUri)).toString("utf8");
+    assert.match(contributionSvg, /data-layer="MAIN\/MOUTH&gt;0"/u);
+    assert.doesNotMatch(contributionSvg, /data-layer="MAIN&gt;BODY"/u);
+    assert.match(completeSvg, /data-layer="MAIN&gt;BODY"/u);
+    assert.match(completeSvg, /data-layer="MAIN\/MOUTH&gt;0"/u);
+  });
+
   test("registers Preview Character at Cursor and moves selection to the identity without editing", async () => {
     await createCharacterPreviewFixture();
     const source = "@char alice.EYE1 pos:center";
@@ -260,19 +294,31 @@ async function createCharacterPreviewFixture(): Promise<{ bodyPng: vscode.Uri; p
       "MAIN/EYE": { layers: {
         "0": { src: "assets/layers/EYE0.png", metadata: "assets/layers/EYE0.json" },
         "1": { src: "assets/layers/EYE1.png", metadata: "assets/layers/EYE1.json" }
+      } },
+      "MAIN/MOUTH": { layers: {
+        "0": { src: "assets/layers/MOUTH0.png", metadata: "assets/layers/MOUTH0.json" },
+        "2": { src: "assets/layers/MOUTH2.png", metadata: "assets/layers/MOUTH2.json" }
       } }
     }
   });
   await writeJson(vscode.Uri.joinPath(pack, "compositions.json"), {
-    tokens: { Default: ["MAIN>BODY", "MAIN/EYE>0"], EYE1: ["MAIN/EYE>1"] }
+    tokens: {
+      Default: ["MAIN>BODY", "MAIN/EYE>0", "MAIN/MOUTH>2"],
+      EYE1: ["MAIN/EYE>1"],
+      MOUTH0: ["MAIN/MOUTH>0"]
+    }
   });
   await writeJson(vscode.Uri.joinPath(layers, "BODY.json"), previewMetadata(0));
   await writeJson(vscode.Uri.joinPath(layers, "EYE0.json"), previewMetadata(1));
   await writeJson(vscode.Uri.joinPath(layers, "EYE1.json"), previewMetadata(2));
+  await writeJson(vscode.Uri.joinPath(layers, "MOUTH0.json"), previewMetadata(3));
+  await writeJson(vscode.Uri.joinPath(layers, "MOUTH2.json"), previewMetadata(3));
   const bodyPng = vscode.Uri.joinPath(layers, "BODY.png");
   await vscode.workspace.fs.writeFile(bodyPng, png);
   await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(layers, "EYE0.png"), png);
   await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(layers, "EYE1.png"), png);
+  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(layers, "MOUTH0.png"), png);
+  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(layers, "MOUTH2.png"), png);
   await vscode.commands.executeCommand("v-ronpa-nani.refreshProjectAssets");
   return { bodyPng, png };
 }
@@ -327,6 +373,39 @@ function artifactUriFromHover(hover: string): vscode.Uri {
   const match = /<img src="([^"]+)"/u.exec(hover);
   assert.ok(match?.[1], `Expected artifact image URI in hover: ${hover}`);
   return vscode.Uri.parse(match[1].replace(/&amp;/gu, "&"));
+}
+
+async function executeCompletions(
+  uri: vscode.Uri,
+  position: vscode.Position,
+  itemResolveCount: number
+): Promise<vscode.CompletionList> {
+  const completions = await vscode.commands.executeCommand<vscode.CompletionList>(
+    "vscode.executeCompletionItemProvider",
+    uri,
+    position,
+    undefined,
+    itemResolveCount
+  );
+  assert.ok(completions, `Expected completions at ${position.line}:${position.character}`);
+  return completions;
+}
+
+function completionLabel(item: vscode.CompletionItem): string {
+  return typeof item.label === "string" ? item.label : item.label.label;
+}
+
+function completionDocumentation(item: vscode.CompletionItem): string {
+  const documentation = item.documentation;
+  assert.ok(documentation, `Expected resolved documentation for ${completionLabel(item)}`);
+  return typeof documentation === "string" ? documentation : documentation.value;
+}
+
+function artifactUrisFromMarkdown(markdown: string): vscode.Uri[] {
+  return [...markdown.matchAll(/<img src="([^"]+)"/gu)].map((match) => {
+    assert.ok(match[1]);
+    return vscode.Uri.parse(match[1].replace(/&amp;/gu, "&"));
+  });
 }
 
 async function openNaniDocument(content: string): Promise<vscode.TextDocument> {

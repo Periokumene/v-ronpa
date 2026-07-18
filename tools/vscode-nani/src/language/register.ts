@@ -1,5 +1,9 @@
 import * as vscode from "vscode";
-import { getNaniCompletions, type NaniCompletionKind } from "../completionProvider";
+import {
+  getNaniCompletions,
+  type NaniCompletion,
+  type NaniCompletionKind
+} from "../completionProvider";
 import {
   assertValidNaniDiagnosticSpan,
   computeNaniDiagnostics,
@@ -8,26 +12,62 @@ import {
 import { NANI_LANGUAGE_ID } from "../languageFacts";
 import type { NaniProjectAssetService } from "../project-resources";
 
+export interface DeferredCompletionDocumentationContext {
+  documentUri: vscode.Uri;
+  documentVersion: number;
+  line: number;
+  completion: NaniCompletion;
+  deferredDocumentation: NonNullable<NaniCompletion["deferredDocumentation"]>;
+}
+
+export interface DeferredCompletionDocumentationProvider {
+  provideCompletionDocumentation(
+    context: DeferredCompletionDocumentationContext,
+    token: vscode.CancellationToken
+  ): Promise<vscode.MarkdownString | undefined>;
+}
+
 export function registerLanguageFeatures(
   context: vscode.ExtensionContext,
   projectAssets: NaniProjectAssetService,
-  output: vscode.OutputChannel
+  output: vscode.OutputChannel,
+  deferredDocumentationProvider?: DeferredCompletionDocumentationProvider
 ): void {
   const diagnostics = vscode.languages.createDiagnosticCollection(NANI_LANGUAGE_ID);
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  const completionProvider: vscode.CompletionItemProvider<NaniVscodeCompletionItem> = {
+    async provideCompletionItems(document, position) {
+      const assetIndex = await projectAssets.getIndex(document.uri);
+      return getNaniCompletions(document.getText(), {
+        line: position.line,
+        character: position.character
+      }, assetIndex).map((completion) => toVscodeCompletion(
+        completion,
+        document.uri,
+        document.version,
+        position.line
+      ));
+    },
+    async resolveCompletionItem(item, token) {
+      const completion = item.completion;
+      const deferredDocumentation = completion.deferredDocumentation;
+      if (!deferredDocumentationProvider || !deferredDocumentation) return item;
+      const documentation = await deferredDocumentationProvider.provideCompletionDocumentation({
+        documentUri: item.documentUri,
+        documentVersion: item.documentVersion,
+        line: item.line,
+        completion,
+        deferredDocumentation
+      }, token);
+      if (documentation && !token.isCancellationRequested) item.documentation = documentation;
+      return item;
+    }
+  };
   context.subscriptions.push(diagnostics);
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(
       { language: NANI_LANGUAGE_ID },
-      {
-        async provideCompletionItems(document, position) {
-          const assetIndex = await projectAssets.getIndex(document.uri);
-          return getNaniCompletions(document.getText(), {
-            line: position.line,
-            character: position.character
-          }, assetIndex).map(toVscodeCompletion);
-        }
-      },
+      completionProvider,
       "@", " ", ":", "#", "[", "!", ".", ","
     ),
     vscode.workspace.onDidOpenTextDocument(
@@ -99,8 +139,24 @@ function isNaniDocument(document: vscode.TextDocument): boolean {
   return document.languageId === NANI_LANGUAGE_ID || document.fileName.endsWith(".nani");
 }
 
-function toVscodeCompletion(completion: ReturnType<typeof getNaniCompletions>[number]): vscode.CompletionItem {
-  const item = new vscode.CompletionItem(completion.label, completionKind(completion.kind));
+class NaniVscodeCompletionItem extends vscode.CompletionItem {
+  constructor(
+    readonly completion: NaniCompletion,
+    readonly documentUri: vscode.Uri,
+    readonly documentVersion: number,
+    readonly line: number
+  ) {
+    super(completion.label, completionKind(completion.kind));
+  }
+}
+
+function toVscodeCompletion(
+  completion: NaniCompletion,
+  documentUri: vscode.Uri,
+  documentVersion: number,
+  line: number
+): NaniVscodeCompletionItem {
+  const item = new NaniVscodeCompletionItem(completion, documentUri, documentVersion, line);
   item.insertText = completion.isSnippet ? new vscode.SnippetString(completion.insertText) : completion.insertText;
   item.range = toVscodeRange(completion.range);
   if (completion.detail) item.detail = completion.detail;

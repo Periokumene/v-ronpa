@@ -6,12 +6,20 @@ import {
   LayeredCharacterDefinitionSchema,
   LayeredCharacterLayerMetadataSchema,
   LayeredCharacterLayersSchema,
-  type LayeredCharacterLayerMetadata
+  type LayeredCharacterCompositions,
+  type LayeredCharacterDefinition,
+  type LayeredCharacterLayerMetadata,
+  type LayeredCharacterLayers
 } from "@v-ronpa/contracts";
 import { resolveLayeredCharacter, resolveLayeredCharacterLayerRefs } from "@v-ronpa/layered-character";
 import type { NaniCharacterPackDescriptor } from "../project-resources";
 import { calculateLayerGeometry, unionPreviewBounds } from "./geometry";
-import type { CharacterPreviewRequest, ResolvedCharacterPreview, ResolvedPreviewLayer } from "./types";
+import type {
+  CharacterPreviewRequest,
+  ResolvedCharacterCompletionPreview,
+  ResolvedCharacterPreview,
+  ResolvedPreviewLayer
+} from "./types";
 
 export const CHARACTER_PREVIEW_RENDERER_VERSION = "static-svg-v1";
 
@@ -24,104 +32,184 @@ export class CharacterPreviewLoadError extends Error {
   }
 }
 
+interface LoadedCharacterPackCore {
+  root: string;
+  character: LayeredCharacterDefinition;
+  layers: LayeredCharacterLayers;
+  compositions: LayeredCharacterCompositions;
+  fingerprintEntries: readonly (readonly [string, Buffer])[];
+}
+
 export async function loadResolvedCharacterPreview(
   descriptor: NaniCharacterPackDescriptor,
   request: CharacterPreviewRequest,
   fileReader: CharacterPreviewFileReader = readFile
 ): Promise<ResolvedCharacterPreview> {
   try {
-    const root = resolve(descriptor.rootPath);
-    const corePaths = {
-      character: safePackPath(root, relative(root, descriptor.characterPath)),
-      layers: safePackPath(root, "layers.json"),
-      compositions: safePackPath(root, "compositions.json")
-    };
-    const [characterBytes, layersBytes, compositionsBytes] = await Promise.all([
-      fileReader(corePaths.character),
-      fileReader(corePaths.layers),
-      fileReader(corePaths.compositions)
-    ]);
-    const character = LayeredCharacterDefinitionSchema.parse(parseJson(characterBytes, corePaths.character));
-    const layers = LayeredCharacterLayersSchema.parse(parseJson(layersBytes, corePaths.layers));
-    const compositions = LayeredCharacterCompositionsSchema.parse(parseJson(compositionsBytes, corePaths.compositions));
-    const refs = resolveLayeredCharacterLayerRefs({
-      character,
-      layers,
-      compositions,
-      appearanceExpression: request.appearanceExpression
-    });
-    assertNoResolverDiagnostics(refs.diagnostics, request);
+    const core = await loadCharacterPackCore(descriptor, fileReader);
+    return await loadResolvedPreviewFromCore(core, request, fileReader);
+  } catch (error) {
+    throw normalizePackLoadError(error, request);
+  }
+}
 
-    const metadataByPath: Record<string, LayeredCharacterLayerMetadata> = {};
-    const metadataBytesByPath = new Map<string, Buffer>();
-    const metadataPaths = [...new Set(refs.activeLayers.map((layer) => layer.metadataPath))];
-    await Promise.all(metadataPaths.map(async (metadataPath) => {
-      const path = safePackPath(root, metadataPath);
-      const bytes = await fileReader(path);
-      metadataBytesByPath.set(metadataPath, bytes);
-      metadataByPath[metadataPath] = LayeredCharacterLayerMetadataSchema.parse(parseJson(bytes, path));
-    }));
-
-    const resolved = resolveLayeredCharacter({
-      character,
-      layers,
-      compositions,
-      metadataByPath,
-      appearanceExpression: request.appearanceExpression
+export async function loadResolvedCharacterCompletionPreview(
+  descriptor: NaniCharacterPackDescriptor,
+  request: CharacterPreviewRequest,
+  baseAppearanceExpression: string,
+  fileReader: CharacterPreviewFileReader = readFile
+): Promise<ResolvedCharacterCompletionPreview> {
+  try {
+    const core = await loadCharacterPackCore(descriptor, fileReader);
+    const baseRefs = resolveLayeredCharacterLayerRefs({
+      character: core.character,
+      layers: core.layers,
+      compositions: core.compositions,
+      appearanceExpression: baseAppearanceExpression
     });
-    assertNoResolverDiagnostics(resolved.diagnostics, request);
-    if (resolved.activeLayers.length === 0) {
-      throw new CharacterPreviewLoadError("empty-layer-set", "角色组成没有任何活动图层。");
-    }
-
-    const pngBytesByPath = new Map<string, Buffer>();
-    await Promise.all([...new Set(resolved.activeLayers.map((layer) => layer.src))].map(async (sourcePath) => {
-      const path = safePackPath(root, sourcePath);
-      pngBytesByPath.set(sourcePath, await fileReader(path));
-    }));
-    const previewLayers: ResolvedPreviewLayer[] = resolved.activeLayers.map((layer) => {
-      const path = safePackPath(root, layer.src);
-      const png = pngBytesByPath.get(layer.src);
-      if (!png) throw new CharacterPreviewLoadError("missing-png", `未加载活动图层 PNG：${path}`);
-      const dimensions = pngDimensions(png, path);
-      return { id: layer.id, png, ...dimensions, metadata: layer.metadata };
-    });
-    const stageScale = character.renderSpace.stageScale;
-    const characterAnchor = character.renderSpace.characterAnchor;
-    const bounds = unionPreviewBounds(previewLayers.map((layer) => calculateLayerGeometry({
-      width: layer.width,
-      height: layer.height,
-      metadata: layer.metadata,
-      stageScale,
-      characterAnchor
-    }).bounds));
-    const fingerprint = previewFingerprint(
-      request,
-      [
-        ["character.json", characterBytes],
-        ["layers.json", layersBytes],
-        ["compositions.json", compositionsBytes],
-        ...[...metadataBytesByPath.entries()],
-        ...[...pngBytesByPath.entries()]
-      ]
-    );
+    assertNoResolverDiagnostics(baseRefs.diagnostics, request);
+    const complete = await loadResolvedPreviewFromCore(core, request, fileReader);
+    const previousLayerIds = new Set(baseRefs.activeLayers.map((layer) => layer.id));
+    const contributionLayers = complete.layers.filter((layer) => !previousLayerIds.has(layer.id));
+    if (contributionLayers.length === 0) return { complete };
     return {
-      request,
-      stageScale,
-      characterAnchor,
-      layers: previewLayers,
-      bounds,
-      fingerprint,
-      packRoot: root
+      complete,
+      contribution: {
+        ...complete,
+        layers: contributionLayers,
+        bounds: previewBounds(
+          contributionLayers,
+          complete.stageScale,
+          complete.characterAnchor
+        ),
+        fingerprint: contributionFingerprint(
+          complete.fingerprint,
+          baseAppearanceExpression,
+          contributionLayers.map((layer) => layer.id)
+        )
+      }
     };
   } catch (error) {
-    if (error instanceof CharacterPreviewLoadError) throw error;
-    throw new CharacterPreviewLoadError(
-      "pack-load-failed",
-      `无法加载角色 '${request.characterId}'：${errorMessage(error)}`,
-      { cause: error }
-    );
+    throw normalizePackLoadError(error, request);
   }
+}
+
+async function loadCharacterPackCore(
+  descriptor: NaniCharacterPackDescriptor,
+  fileReader: CharacterPreviewFileReader
+): Promise<LoadedCharacterPackCore> {
+  const root = resolve(descriptor.rootPath);
+  const corePaths = {
+    character: safePackPath(root, relative(root, descriptor.characterPath)),
+    layers: safePackPath(root, "layers.json"),
+    compositions: safePackPath(root, "compositions.json")
+  };
+  const [characterBytes, layersBytes, compositionsBytes] = await Promise.all([
+    fileReader(corePaths.character),
+    fileReader(corePaths.layers),
+    fileReader(corePaths.compositions)
+  ]);
+  return {
+    root,
+    character: LayeredCharacterDefinitionSchema.parse(parseJson(characterBytes, corePaths.character)),
+    layers: LayeredCharacterLayersSchema.parse(parseJson(layersBytes, corePaths.layers)),
+    compositions: LayeredCharacterCompositionsSchema.parse(parseJson(compositionsBytes, corePaths.compositions)),
+    fingerprintEntries: [
+      ["character.json", characterBytes],
+      ["layers.json", layersBytes],
+      ["compositions.json", compositionsBytes]
+    ]
+  };
+}
+
+async function loadResolvedPreviewFromCore(
+  core: LoadedCharacterPackCore,
+  request: CharacterPreviewRequest,
+  fileReader: CharacterPreviewFileReader
+): Promise<ResolvedCharacterPreview> {
+  const refs = resolveLayeredCharacterLayerRefs({
+    character: core.character,
+    layers: core.layers,
+    compositions: core.compositions,
+    appearanceExpression: request.appearanceExpression
+  });
+  assertNoResolverDiagnostics(refs.diagnostics, request);
+  const metadataByPath: Record<string, LayeredCharacterLayerMetadata> = {};
+  const metadataBytesByPath = new Map<string, Buffer>();
+  const metadataPaths = [...new Set(refs.activeLayers.map((layer) => layer.metadataPath))];
+  await Promise.all(metadataPaths.map(async (metadataPath) => {
+    const path = safePackPath(core.root, metadataPath);
+    const bytes = await fileReader(path);
+    metadataBytesByPath.set(metadataPath, bytes);
+    metadataByPath[metadataPath] = LayeredCharacterLayerMetadataSchema.parse(parseJson(bytes, path));
+  }));
+  const resolved = resolveLayeredCharacter({
+    character: core.character,
+    layers: core.layers,
+    compositions: core.compositions,
+    metadataByPath,
+    appearanceExpression: request.appearanceExpression
+  });
+  assertNoResolverDiagnostics(resolved.diagnostics, request);
+  if (resolved.activeLayers.length === 0) {
+    throw new CharacterPreviewLoadError("empty-layer-set", "角色组成没有任何活动图层。");
+  }
+  const pngBytesByPath = new Map<string, Buffer>();
+  await Promise.all([...new Set(resolved.activeLayers.map((layer) => layer.src))].map(async (sourcePath) => {
+    const path = safePackPath(core.root, sourcePath);
+    pngBytesByPath.set(sourcePath, await fileReader(path));
+  }));
+  const previewLayers: ResolvedPreviewLayer[] = resolved.activeLayers.map((layer) => {
+    const path = safePackPath(core.root, layer.src);
+    const png = pngBytesByPath.get(layer.src);
+    if (!png) throw new CharacterPreviewLoadError("missing-png", `未加载活动图层 PNG：${path}`);
+    return { id: layer.id, png, ...pngDimensions(png, path), metadata: layer.metadata };
+  });
+  const stageScale = core.character.renderSpace.stageScale;
+  const characterAnchor = core.character.renderSpace.characterAnchor;
+  return {
+    request,
+    stageScale,
+    characterAnchor,
+    layers: previewLayers,
+    bounds: previewBounds(previewLayers, stageScale, characterAnchor),
+    fingerprint: previewFingerprint(request, [
+      ...core.fingerprintEntries,
+      ...metadataBytesByPath.entries(),
+      ...pngBytesByPath.entries()
+    ]),
+    packRoot: core.root
+  };
+}
+
+function previewBounds(
+  layers: readonly ResolvedPreviewLayer[],
+  stageScale: number,
+  characterAnchor: readonly [number, number]
+) {
+  return unionPreviewBounds(layers.map((layer) => calculateLayerGeometry({
+    width: layer.width,
+    height: layer.height,
+    metadata: layer.metadata,
+    stageScale,
+    characterAnchor
+  }).bounds));
+}
+
+function contributionFingerprint(
+  completeFingerprint: string,
+  baseAppearanceExpression: string,
+  layerIds: readonly string[]
+): string {
+  return createHash("sha256")
+    .update("completion-token-static-svg-v1-320x180")
+    .update("\0")
+    .update(completeFingerprint)
+    .update("\0")
+    .update(baseAppearanceExpression)
+    .update("\0")
+    .update(layerIds.join("\0"))
+    .digest("hex");
 }
 
 export function pngDimensions(buffer: Buffer, path = "PNG"): { width: number; height: number } {
@@ -189,4 +277,16 @@ function parseJson(bytes: Buffer, path: string): unknown {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function normalizePackLoadError(
+  error: unknown,
+  request: CharacterPreviewRequest
+): CharacterPreviewLoadError {
+  if (error instanceof CharacterPreviewLoadError) return error;
+  return new CharacterPreviewLoadError(
+    "pack-load-failed",
+    `无法加载角色 '${request.characterId}'：${errorMessage(error)}`,
+    { cause: error }
+  );
 }

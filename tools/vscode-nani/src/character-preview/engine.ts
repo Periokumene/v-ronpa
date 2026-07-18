@@ -1,14 +1,31 @@
 import type { NaniCharacterPackDescriptor } from "../project-resources";
 import { characterPreviewRequestKey } from "./requestExtractor";
-import { loadResolvedCharacterPreview, type CharacterPreviewFileReader } from "./packLoader";
-import { StaticSvgCharacterPreviewRenderer } from "./svgRenderer";
-import type { CharacterPreviewRequest, PreviewArtifact } from "./types";
+import {
+  loadResolvedCharacterCompletionPreview,
+  loadResolvedCharacterPreview,
+  type CharacterPreviewFileReader
+} from "./packLoader";
+import {
+  CHARACTER_TOKEN_PREVIEW_HEIGHT,
+  CHARACTER_TOKEN_PREVIEW_WIDTH,
+  StaticSvgCharacterPreviewRenderer
+} from "./svgRenderer";
+import type {
+  CharacterCompletionPreviewArtifacts,
+  CharacterPreviewRequest,
+  PreviewArtifact
+} from "./types";
 import { CharacterPreviewArtifactCache } from "./artifactCache";
 
 export class CharacterPreviewEngine {
   private readonly hot = new Map<string, PreviewArtifact>();
   private readonly pending = new Map<string, Promise<PreviewArtifact>>();
+  private readonly completionPending = new Map<string, Promise<CharacterCompletionPreviewArtifacts>>();
   private readonly renderer = new StaticSvgCharacterPreviewRenderer();
+  private readonly tokenRenderer = new StaticSvgCharacterPreviewRenderer({
+    width: CHARACTER_TOKEN_PREVIEW_WIDTH,
+    height: CHARACTER_TOKEN_PREVIEW_HEIGHT
+  });
   private generation = 0;
 
   constructor(
@@ -45,10 +62,44 @@ export class CharacterPreviewEngine {
     return pending;
   }
 
+  generateCompletion(
+    request: CharacterPreviewRequest,
+    baseAppearanceExpression: string,
+    descriptor: NaniCharacterPackDescriptor
+  ): Promise<CharacterCompletionPreviewArtifacts> {
+    const requestKey = characterPreviewRequestKey(request);
+    const key = `${requestKey}\0${baseAppearanceExpression}`;
+    const generation = this.generation;
+    const existing = this.completionPending.get(key);
+    if (existing) return existing;
+    const pending = loadResolvedCharacterCompletionPreview(
+      descriptor,
+      request,
+      baseAppearanceExpression,
+      this.fileReader
+    )
+      .then(async (resolved) => {
+        const [complete, contribution] = await Promise.all([
+          this.artifacts.getOrCreate(resolved.complete, this.renderer),
+          resolved.contribution
+            ? this.artifacts.getOrCreate(resolved.contribution, this.tokenRenderer)
+            : Promise.resolve(undefined)
+        ]);
+        if (generation === this.generation) this.hot.set(requestKey, complete);
+        return { complete, ...(contribution ? { contribution } : {}) };
+      })
+      .finally(() => {
+        if (this.completionPending.get(key) === pending) this.completionPending.delete(key);
+      });
+    this.completionPending.set(key, pending);
+    return pending;
+  }
+
   invalidate(): void {
     this.generation += 1;
     this.hot.clear();
     this.pending.clear();
+    this.completionPending.clear();
     this.artifacts.clearMemory();
   }
 }
