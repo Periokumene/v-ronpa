@@ -1,40 +1,49 @@
-import { describe, expect, it, vi } from "vitest";
-import { gameANaniFullReloadPlugin } from "./vite.config";
+import { describe, expect, it } from "vitest";
+import {
+  GAME_A_CHARACTER_SMOKE_VITE_MODE,
+  GAME_A_SMOKE_VITE_MODE,
+  resolveGameANaniDevtoolsEntry,
+  resolveGameALaunchDefinitionModule,
+  resolveGameAViteCacheDir
+} from "./vite.config";
 
 describe("game-a Vite config", () => {
-  it("forces a full page reload for .nani updates", async () => {
-    const plugin = gameANaniFullReloadPlugin();
-    const handleHotUpdate = plugin.handleHotUpdate;
-    const send = vi.fn();
-
-    expect(typeof handleHotUpdate).toBe("function");
-    const result = await (handleHotUpdate as (ctx: {
-      file: string;
-      server: { ws: { send: (payload: unknown) => void } };
-    }) => unknown)({
-      file: "/workspace/apps/game-a/src/nani/opening.nani",
-      server: { ws: { send } }
-    });
-
-    expect(send).toHaveBeenCalledWith({ type: "full-reload" });
-    expect(result).toEqual([]);
+  it("selects the smoke entry only for the dedicated Playwright server mode", () => {
+    expect(resolveGameALaunchDefinitionModule(GAME_A_SMOKE_VITE_MODE))
+      .toMatch(/\/src\/gameASmokeLaunchDefinition\.ts$/u);
+    expect(resolveGameALaunchDefinitionModule(GAME_A_CHARACTER_SMOKE_VITE_MODE))
+      .toMatch(/\/src\/gameACharacterSmokeLaunchDefinition\.ts$/u);
   });
 
-  it("leaves non-.nani updates to Vite's normal hot update handling", async () => {
-    const plugin = gameANaniFullReloadPlugin();
-    const handleHotUpdate = plugin.handleHotUpdate;
-    const send = vi.fn();
-
-    expect(typeof handleHotUpdate).toBe("function");
-    const result = await (handleHotUpdate as (ctx: {
-      file: string;
-      server: { ws: { send: (payload: unknown) => void } };
-    }) => unknown)({
-      file: "/workspace/apps/game-a/src/App.tsx",
-      server: { ws: { send } }
+  it("configures exactly the active Nani source for the devtools update bridge", () => {
+    expect(resolveGameANaniDevtoolsEntry("development")).toMatchObject({
+      entryId: "vn:game-a-opening",
+      scriptPath: "game-a/opening.nani"
     });
-
-    expect(send).not.toHaveBeenCalled();
-    expect(result).toBeUndefined();
+    expect(resolveGameANaniDevtoolsEntry("development").sourceFile).toMatch(/\/src\/nani\/opening\.nani$/u);
+    expect(resolveGameANaniDevtoolsEntry(GAME_A_SMOKE_VITE_MODE)).toMatchObject({
+      entryId: "vn:game-a-test-smoke",
+      scriptPath: "game-a/test/smoke.nani"
+    });
+    expect(resolveGameANaniDevtoolsEntry(GAME_A_SMOKE_VITE_MODE).sourceFile)
+      .toMatch(/\/src\/test-nani\/smoke\.nani$/u);
+    expect(resolveGameANaniDevtoolsEntry(GAME_A_CHARACTER_SMOKE_VITE_MODE)).toMatchObject({
+      entryId: "vn:game-a-test-character",
+      scriptPath: "game-a/test/character-smoke.nani"
+    });
   });
+
+  it("isolates optimize-deps caches for concurrently running modes", () => {
+    expect(resolveGameAViteCacheDir(GAME_A_SMOKE_VITE_MODE))
+      .not.toBe(resolveGameAViteCacheDir(GAME_A_CHARACTER_SMOKE_VITE_MODE));
+    expect(resolveGameAViteCacheDir("preview/local"))
+      .toBe("node_modules/.vite-game-a-preview-local");
+  });
+
+  it.each(["development", "production", "test", "smoke"])(
+    "keeps the canonical opening entry for the %s mode",
+    (mode) => {
+      expect(resolveGameALaunchDefinitionModule(mode)).toMatch(/\/src\/gameALaunchDefinition\.ts$/u);
+    }
+  );
 });

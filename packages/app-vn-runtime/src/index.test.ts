@@ -541,6 +541,32 @@ describe("app VN runtime helpers", () => {
         state: { ...storyRuntime.state, pendingChoices: [{ text: "Choice", enabled: true }] }
       })
     ).toBe(false);
+    expect(canToggleVnStoryAutomation({ ...storyRuntime, active: false })).toBe(false);
+    expect(
+      canToggleVnStoryAutomation({
+        ...storyRuntime,
+        state: {
+          ...storyRuntime.state,
+          runtimeWait: { kind: "pause", commandId: "wait", commandIndex: 0, mode: "confirm" }
+        }
+      })
+    ).toBe(false);
+    expect(
+      canToggleVnStoryAutomation({
+        ...storyRuntime,
+        state: {
+          ...storyRuntime.state,
+          presentationWait: {
+            channel: "ui",
+            commandId: "hideui",
+            commandIndex: 0,
+            durationMs: 200,
+            targets: ["dialog"],
+            targetVisible: false
+          }
+        }
+      })
+    ).toBe(false);
     expect(shouldAnimateVnStoryPlayPacing("normal")).toBe(true);
     expect(shouldAnimateVnStoryPlayPacing("skip")).toBe(false);
     expect(resolveVnPresentationWaitAdvanceSource("system", { mode: "manual" })).toBe("system");

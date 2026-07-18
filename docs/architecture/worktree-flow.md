@@ -11,9 +11,10 @@ must not add fixed-port exceptions. Do not commit `.env.worktree`, `.local-state
 `test-results`, or `playwright-report`.
 
 Automated Playwright gates do not reuse an existing server even when its port
-responds: launch flags such as `VITE_ENABLE_TEST_ENTRIES=1` are part of the
-test environment and cannot be inferred from HTTP readiness. Stop a manually
-started server before running smoke on the same worktree port.
+responds: the dedicated Game A smoke modes are part of the test environment and
+cannot be inferred from HTTP readiness. Both test modes serve `/` on isolated
+ports; product code does not parse a test-entry URL. Stop a manually started
+server before running smoke on the same worktree ports.
 
 On macOS the smoke configuration selects ANGLE Metal and permits two workers;
 other platforms fall back to one worker. Do not override this with a global

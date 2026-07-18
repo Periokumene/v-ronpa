@@ -3,13 +3,13 @@ import { parseScenario, type Diagnostic as ParserDiagnostic } from "@v-ronpa/nan
 import { compileRuntimeScript, type RuntimeCompilerDiagnostic } from "@v-ronpa/nani-runtime-compiler";
 import {
   createInitialStoryState,
+  stepStoryInstruction,
   storyReducer,
   type StoryStepperDiagnostic,
   type StoryStepperResult
 } from "@v-ronpa/story-engine";
 import {
   advanceStoryPlay,
-  chooseStoryPlayOption,
   createInitialStoryPlayState,
   stopStoryPlayAutomation,
   toggleAutoStoryPlay,
@@ -94,19 +94,40 @@ export function advanceVnSession(session: VnSessionState, source: StoryPlayAdvan
   return toPlayStep(session, playStep);
 }
 
+export function stepVnSessionInstruction(session: VnSessionState): VnSessionStep {
+  return toReducerStep(session, stepStoryInstruction(session.story, session.script));
+}
+
 export function chooseVnSessionOption(session: VnSessionState, index: number): VnSessionPlayStep {
-  return toPlayStep(session, chooseStoryPlayOption(session.play, { state: session.story, script: session.script, index }));
+  const resolved = resolveVnSessionChoice(session, index);
+  const advanced = advanceStoryPlay(stopStoryPlayAutomation(session.play, "choice"), {
+    state: resolved.session.story,
+    script: session.script,
+    source: "choice"
+  });
+  return toPlayStep(resolved.session, {
+    ...advanced,
+    story: combineStorySteps(resolved.storyStep, advanced.story)
+  });
+}
+
+export function resolveVnSessionChoice(session: VnSessionState, index: number): VnSessionStep {
+  return toReducerStep(session, storyReducer(session.story, { type: "CHOOSE", script: session.script, index }));
 }
 
 export function submitVnSessionInput(session: VnSessionState, value: string | number | boolean): VnSessionPlayStep {
-  const submitted = storyReducer(session.story, { type: "SUBMIT_INPUT", script: session.script, value });
-  if (submitted.diagnostics.length > 0) {
-    return toDiagnosticPlayStep(session, submitted);
+  const resolved = resolveVnSessionInput(session, value);
+  if (resolved.storyStep.diagnostics.length > 0) {
+    return toDiagnosticPlayStep(session, resolved.storyStep);
   }
   return toPlayStep(
-    { ...session, story: submitted.state },
-    advanceStoryPlay(session.play, { state: submitted.state, script: session.script, source: "manual" })
+    resolved.session,
+    advanceStoryPlay(session.play, { state: resolved.session.story, script: session.script, source: "manual" })
   );
+}
+
+export function resolveVnSessionInput(session: VnSessionState, value: string | number | boolean): VnSessionStep {
+  return toReducerStep(session, storyReducer(session.story, { type: "SUBMIT_INPUT", script: session.script, value }));
 }
 
 export function completeVnSessionPresentationWait(session: VnSessionState): VnSessionStep {
@@ -168,6 +189,15 @@ function toReducerStep(session: VnSessionState, storyStep: StoryStepperResult): 
     },
     storyStep,
     emittedRuntimeCommands: storyStep.emittedRuntimeCommands
+  };
+}
+
+function combineStorySteps(first: StoryStepperResult, second: StoryStepperResult): StoryStepperResult {
+  return {
+    state: second.state,
+    diagnostics: [...first.diagnostics, ...second.diagnostics],
+    emittedRuntimeCommands: [...first.emittedRuntimeCommands, ...second.emittedRuntimeCommands],
+    ...(second.stopReason ? { stopReason: second.stopReason } : {})
   };
 }
 

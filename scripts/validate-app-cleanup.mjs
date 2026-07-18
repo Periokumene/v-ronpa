@@ -21,7 +21,15 @@ const forbidden = [
   { pattern: /@v-ronpa\/game(?=["'`,}\s])/u, label: "@v-ronpa/game" },
   { pattern: /vertical-slice/u, label: "vertical-slice" },
   { pattern: /VerticalSlice/u, label: "VerticalSlice" },
-  { pattern: /verticalSlice/u, label: "verticalSlice" }
+  { pattern: /verticalSlice/u, label: "verticalSlice" },
+  { pattern: /\bdevVnLaunchTarget\b/u, label: "devVnLaunchTarget" },
+  { pattern: /\bvnStart\b/u, label: "vnStart" },
+  { pattern: /\bstartLabelOverride\b/u, label: "startLabelOverride" },
+  { pattern: /\bgameANaniFullReloadPlugin\b/u, label: "gameANaniFullReloadPlugin" },
+  { pattern: /\bVITE_ENABLE_TEST_ENTRIES\b/u, label: "VITE_ENABLE_TEST_ENTRIES" },
+  { pattern: /\bvnEntry\b/u, label: "vnEntry query" },
+  { pattern: /\bentryOverride\b/u, label: "entryOverride" },
+  { pattern: /\bruntime\.debug\b/u, label: "runtime.debug", path: /^apps\/game-a\//u }
 ];
 
 const allowed = [
@@ -43,6 +51,7 @@ for (const root of roots) {
     if (!isTextFile(file)) continue;
     const text = readFileSync(file, "utf8");
     for (const rule of forbidden) {
+      if (rule.path && !rule.path.test(rel)) continue;
       if (rule.pattern.test(text)) failures.push(`${rel}: forbidden active cleanup reference '${rule.label}'.`);
     }
   }

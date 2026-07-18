@@ -13,13 +13,11 @@
     "@v-ronpa/asset-registry": "workspace:*",
     "@v-ronpa/contracts": "workspace:*",
     "@v-ronpa/media-save": "workspace:*",
+    "@v-ronpa/nani-parser": "workspace:*",
+    "@v-ronpa/nani-runtime-compiler": "workspace:*",
     "@v-ronpa/pixi-stage-model": "workspace:*",
     "@v-ronpa/story-engine": "workspace:*",
     "@v-ronpa/story-play": "workspace:*",
     "react": "^19.0.0"
-  },
-  "devDependencies": {
-    "@v-ronpa/nani-parser": "workspace:*",
-    "@v-ronpa/nani-runtime-compiler": "workspace:*"
   }
 }

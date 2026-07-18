@@ -9,7 +9,15 @@ import {
   type RuntimeScript,
   type RuntimeValue
 } from "@v-ronpa/contracts";
-import type { CommandIR, NaniValue, RichTextDocumentIR, ScenarioIR, StatementIR, TextIR } from "@v-ronpa/nani-parser";
+import type {
+  CommandIR,
+  NaniValue,
+  RichTextDocumentIR,
+  ScenarioIR,
+  SourceLocation,
+  StatementIR,
+  TextIR
+} from "@v-ronpa/nani-parser";
 
 export type RuntimeCompilerDiagnosticCode =
   | "unknown-command"
@@ -21,11 +29,35 @@ export interface RuntimeCompilerDiagnostic {
   code: RuntimeCompilerDiagnosticCode;
   message: string;
   severity?: "info" | "warning" | "error";
+  loc?: SourceLocation;
 }
 
 export interface CompileRuntimeScriptResult {
   script: RuntimeScript;
   diagnostics: RuntimeCompilerDiagnostic[];
+}
+
+/**
+ * Serializes only the executable semantics that identify a runtime script.
+ *
+ * Source locations and raw parser command data are intentionally excluded so
+ * formatting-only edits do not invalidate saves or debug checkpoints. The
+ * output is deterministic and browser-safe; callers own the digest algorithm.
+ */
+export function serializeRuntimeScriptSemantics(script: RuntimeScript): string {
+  return stableJson({
+    scriptPath: script.scriptPath,
+    labels: script.labels,
+    commands: script.commands.map(({ loc: _loc, sourceCommand: _sourceCommand, ...command }) => command)
+  });
+}
+
+/** Creates the browser/runtime revision using the same SHA-256 format as asset generation. */
+export async function digestRuntimeScriptSemantics(script: RuntimeScript): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) throw new Error("Web Crypto is required to digest runtime script semantics.");
+  const digest = await subtle.digest("SHA-256", new TextEncoder().encode(serializeRuntimeScriptSemantics(script)));
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
 interface NormalizedCommandParams {
@@ -115,7 +147,7 @@ function compileCommand(command: CommandIR, diagnostics: RuntimeCompilerDiagnost
   const definition = getNaniCommandDefinition(command.commandId);
   if (!definition) {
     diagnostics.push(
-      createDiagnostic("unknown-command", `Unknown .nani command: @${command.commandId}.`, "error")
+      createDiagnostic("unknown-command", `Unknown .nani command: @${command.commandId}.`, "error", command.loc)
     );
     return undefined;
   }
@@ -126,20 +158,27 @@ function compileCommand(command: CommandIR, diagnostics: RuntimeCompilerDiagnost
       createDiagnostic(
         "declared-only-command",
         `@${definition.canonicalName} is declared for Naninovel compatibility, but this runtime does not implement its execution boundary yet.`,
-        "warning"
+        "warning",
+        command.loc
       )
     );
   }
 
-  const validationDiagnostics = validateCommandAgainstCatalog(shape, definition);
+  const validationDiagnostics = locateCompilerDiagnostics(
+    validateCommandAgainstCatalog(shape, definition),
+    command.loc
+  );
   diagnostics.push(...validationDiagnostics);
   if (validationDiagnostics.some((diagnostic) => diagnostic.severity === "error")) return undefined;
 
   const normalized = normalizeCommandParams(shape, definition);
   const richText = richTextForCommand(command, definition.id);
   if (richText) normalized.params.text = richText.text;
-  diagnostics.push(...diagnoseUnsupportedImplementedParams(shape, definition, normalized.consumesParams));
-  diagnostics.push(...diagnoseExecutionBoundaryParams(shape, definition));
+  diagnostics.push(...locateCompilerDiagnostics(
+    diagnoseUnsupportedImplementedParams(shape, definition, normalized.consumesParams),
+    command.loc
+  ));
+  diagnostics.push(...locateCompilerDiagnostics(diagnoseExecutionBoundaryParams(shape, definition), command.loc));
 
   const sourceCommand = {
     rawCommandId: command.commandId,
@@ -1092,7 +1131,33 @@ function normalizeParamName(name: string): string {
 function createDiagnostic(
   code: RuntimeCompilerDiagnosticCode,
   message: string,
-  severity?: RuntimeCompilerDiagnostic["severity"]
+  severity?: RuntimeCompilerDiagnostic["severity"],
+  loc?: SourceLocation
 ): RuntimeCompilerDiagnostic {
-  return severity ? { code, message, severity } : { code, message };
+  return {
+    code,
+    message,
+    ...(severity ? { severity } : {}),
+    ...(loc ? { loc } : {})
+  };
+}
+
+function locateCompilerDiagnostics(
+  diagnostics: RuntimeCompilerDiagnostic[],
+  loc: SourceLocation
+): RuntimeCompilerDiagnostic[] {
+  return diagnostics.map((diagnostic) => diagnostic.loc ? diagnostic : { ...diagnostic, loc });
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson((value as Record<string, unknown>)[key])}`)
+      .join(",")}}`;
+  }
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) throw new TypeError("Runtime script semantics must contain only JSON-serializable values.");
+  return serialized;
 }

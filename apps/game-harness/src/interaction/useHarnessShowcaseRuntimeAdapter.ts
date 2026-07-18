@@ -1,15 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { AssetResolver } from "@v-ronpa/asset-registry";
+import type { UseVnRuntimeOptions } from "@v-ronpa/app-vn-runtime";
 import {
-  useVnRuntime,
-  type UseVnRuntimeOptions
-} from "@v-ronpa/app-vn-runtime";
-import {
-  canAdvanceVnStoryFromSource,
-  canCompleteVnPauseRuntimeWaitFromSource,
-  canToggleVnStoryAutomation,
   limitVnRuntimeDiagnostics,
-  shouldAnimateVnStoryPlayPacing,
+  useVnRuntimeWithDebug,
   type VnRuntimeDiagnostic
 } from "@v-ronpa/app-vn-runtime/debug";
 import type {
@@ -135,7 +129,7 @@ export function useHarnessShowcaseRuntimeAdapter(
     setLastAction(action);
     setLastOutcome(outcome);
   }, []);
-  const runtime = useVnRuntime({
+  const runtime = useVnRuntimeWithDebug({
     ...(assetResolver ? { assetResolver } : {}),
     ...(options.audioPort ? { audioPort: options.audioPort } : {}),
     ...(options.dialogRevealSettings ? { dialogRevealSettings: options.dialogRevealSettings } : {}),
@@ -382,28 +376,19 @@ export function useHarnessShowcaseRuntimeAdapter(
 
   return {
     activeMap,
-    advanceStory: runtime.shell.advanceStory,
-    attachMovieElement: runtime.shell.attachMovieElement,
-    chooseStory: runtime.shell.chooseStory,
     closeStoryOverlay,
-    completeMoviePlayback: runtime.shell.completeMoviePlayback,
     confirmFocusedInteraction,
-    dialogRevealRuntime: runtime.shell.dialogRevealRuntime,
-    dismissRuntimeToast: runtime.shell.dismissRuntimeToast,
+    debug: runtime.debug,
     diagnostics: runtime.diagnostics,
     firstPersonBridge,
     gameplay,
     hostInteractionFacts,
-    interactionFacts: runtime.shell.interactionFacts,
     interactionView,
     lastAction,
     lastOutcome,
-    lastRuntimeCommandCount: runtime.debug.lastRuntimeCommandCount,
-    mediaRuntime: runtime.debug.mediaRuntime,
+    lifecycle: runtime.lifecycle,
     moveToPreset,
     navi,
-    observeAssetDiagnostic,
-    pixiStageRuntime: runtime.presentation.pixiStageRuntime,
     presentation: runtime.presentation,
     resetShowcase,
     restoreFromSave,
@@ -411,19 +396,7 @@ export function useHarnessShowcaseRuntimeAdapter(
     resolveTrialKeywordWithEvidence,
     resolveTrialTimeout,
     shell: runtime.shell,
-    stopStoryAutomation: runtime.debug.stopStoryAutomation,
-    storyPlay: runtime.debug.storyPlay,
-    storyPlayActiveActions: runtime.shell.storyPlayActiveActions,
-    storyPlaySchedule: runtime.debug.storyPlaySchedule,
-    storyRuntime: runtime.shell.storyRuntime,
-    storySession: runtime.presentation.storySession,
-    submitStoryInput: runtime.shell.submitStoryInput,
-    toggleStoryAuto: runtime.debug.toggleStoryAuto,
-    toggleStorySkip: runtime.debug.toggleStorySkip,
     trialRuntime,
-    uiRuntime: runtime.shell.uiRuntime,
-    updatePixiPresentationTasks: runtime.presentation.updatePixiPresentationTasks,
-    createVnSaveCheckpoint: runtime.lifecycle.createVnSaveCheckpoint,
     exitTrial
   };
 }
@@ -435,13 +408,6 @@ export function createInitialHarnessShowcaseTrialRuntime(): TrialRuntime {
     lastOutcome: "none"
   };
 }
-
-export {
-  canAdvanceVnStoryFromSource as canStoryAdvanceFromSource,
-  canCompleteVnPauseRuntimeWaitFromSource as canCompletePauseRuntimeWaitFromSource,
-  canToggleVnStoryAutomation as canToggleStoryAutomation,
-  shouldAnimateVnStoryPlayPacing as shouldAnimateStoryPlayPacing
-};
 
 function applyGameplayEvents(gameplay: GameplayState, events: GameplayEvent[]): GameplayState {
   return events.reduce((current, event) => {

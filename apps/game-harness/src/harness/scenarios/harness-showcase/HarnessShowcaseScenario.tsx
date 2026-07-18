@@ -51,7 +51,7 @@ export function HarnessShowcaseScenario() {
     onEnterNavi: enterNaviMode,
     ensureVnPresentationReady: pixiStage.waitUntilReady
   });
-  const flow = flowActor.withInteractionFacts(runtime.interactionFacts, runtime.hostInteractionFacts);
+  const flow = flowActor.withInteractionFacts(runtime.shell.interactionFacts, runtime.hostInteractionFacts);
   const save = useHarnessShowcaseSaveAdapter(runtime, {
     canSave: () => flow.capabilities.canSave,
     capturePreview: () => pixiStage.handle?.captureThumbnail(SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS)
@@ -70,7 +70,7 @@ export function HarnessShowcaseScenario() {
       <RichTextFontStyles
         assetResolver={assetRegistry}
         fonts={harnessContentManifest.fonts}
-        onDiagnostic={runtime.observeAssetDiagnostic}
+        onDiagnostic={runtime.diagnostics.observeAssetDiagnostic}
       />
       <section className="playfield" data-testid="playfield">
         <GameInteractionShell
@@ -93,7 +93,7 @@ export function HarnessShowcaseScenario() {
               <ExplorationStage3D {...runtime.firstPersonBridge.explorationStageProps} />
             )}
             <VnPixiPresenterHost
-              active={flow.mode !== "trial" && runtime.storyRuntime.active}
+              active={flow.mode !== "trial" && runtime.shell.storyRuntime.active}
               assetResolver={assetRegistry}
               characterOutlineEnabled={true}
               characterPreloadPlan={harnessShowcaseCharacterPreloadPlan}
@@ -107,7 +107,7 @@ export function HarnessShowcaseScenario() {
           <div className="objective-chip">
             <span data-testid="harness-scenario-id">harness-showcase</span>
             <strong data-testid="harness-scenario-title">Navi To VN Harness Showcase</strong>
-            <small data-testid="harness-status">{flow.mode === "title" ? "标题界面" : flow.mode === "trial" ? "Trial 模式" : runtime.storyRuntime.active ? "视觉小说覆盖层" : "Navi 探索"}</small>
+            <small data-testid="harness-status">{flow.mode === "title" ? "标题界面" : flow.mode === "trial" ? "Trial 模式" : runtime.shell.storyRuntime.active ? "视觉小说覆盖层" : "Navi 探索"}</small>
           </div>
         </div>
       </section>
@@ -153,12 +153,12 @@ export function HarnessShowcaseScenario() {
                 lastOutcome={runtime.lastOutcome}
                 mapId={runtime.navi.activeMapId ?? "none"}
                 mode={flow.mode}
-                pixiBackground={runtime.pixiStageRuntime.snapshot.backgroundsById.MainBackground?.appearance ?? "none"}
-                pixiCharacters={formatPixiStageCharacters(runtime.pixiStageRuntime.snapshot)}
-                pixiRevision={String(runtime.pixiStageRuntime.snapshot.revision)}
-                pixiTasks={formatPixiPresentationTasks(runtime.pixiStageRuntime.presentationTasks)}
+                pixiBackground={runtime.presentation.pixiStageRuntime.snapshot.backgroundsById.MainBackground?.appearance ?? "none"}
+                pixiCharacters={formatPixiStageCharacters(runtime.presentation.pixiStageRuntime.snapshot)}
+                pixiRevision={String(runtime.presentation.pixiStageRuntime.snapshot.revision)}
+                pixiTasks={formatPixiPresentationTasks(runtime.presentation.pixiStageRuntime.presentationTasks)}
                 pointerLockStatus={runtime.firstPersonBridge.pointerLockStatus}
-                route={String(runtime.storyRuntime.state.variables.route ?? "none")}
+                route={String(runtime.shell.storyRuntime.state.variables.route ?? "none")}
                 substate={runtime.navi.substate}
                 trialInputLock={runtime.trialRuntime.state?.inputLock ?? "none"}
                 trialKeywords={formatTrialKeywordStates(runtime.trialRuntime.state?.keywordStates)}
@@ -167,9 +167,9 @@ export function HarnessShowcaseScenario() {
                 trialSegment={runtime.trialRuntime.state?.currentSegmentId ?? "none"}
               />
               <HarnessShowcaseRuntimeControls
-                advanceDisabled={!runtime.storyRuntime.active}
+                advanceDisabled={!runtime.shell.storyRuntime.active}
                 onExitTrial={runtime.exitTrial}
-                onAdvanceStory={runtime.advanceStory}
+                onAdvanceStory={runtime.shell.advanceStory}
                 onMoveToPreset={runtime.moveToPreset}
                 onRequestInteract={runtime.confirmFocusedInteraction}
                 onReset={runtime.resetShowcase}
@@ -199,12 +199,12 @@ export function HarnessShowcaseScenario() {
                 inputLock={flow.mode === "trial" ? runtime.trialRuntime.state?.inputLock ?? "none" : runtime.navi.inputLock}
                 naviSubstate={runtime.navi.substate}
                 {...(runtime.trialRuntime.state?.presentation ? { trialPresentation: runtime.trialRuntime.state.presentation } : {})}
-                scriptPointer={runtime.storyRuntime.state.instructionPointer}
-                variables={runtime.storyRuntime.state.variables}
+                scriptPointer={runtime.shell.storyRuntime.state.instructionPointer}
+                variables={runtime.shell.storyRuntime.state.variables}
                 inventoryItems={runtime.gameplay.inventory.items}
                 evidenceIds={runtime.gameplay.evidence.ownedEvidenceIds}
                 {...(runtime.trialRuntime.state?.currentSegmentId ? { trialSegmentId: runtime.trialRuntime.state.currentSegmentId } : {})}
-                runtimeCommandCount={runtime.lastRuntimeCommandCount}
+                backlogCount={runtime.debug.storyRuntime.state.backlog.length}
                 diagnosticCount={runtime.runtimeDiagnostics.length}
                 latestDiagnostic={formatLatestDiagnostic(runtime.runtimeDiagnostics)}
               />

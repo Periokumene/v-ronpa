@@ -21,7 +21,7 @@ export interface InspectorLiteProps {
   inventoryItems: Record<string, number>;
   evidenceIds: string[];
   trialSegmentId?: string;
-  runtimeCommandCount: number;
+  backlogCount: number;
   diagnosticCount?: number;
   latestDiagnostic?: string;
   onGrantItem?: (itemId: string) => void;

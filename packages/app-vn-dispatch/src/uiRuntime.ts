@@ -58,6 +58,7 @@ export interface RuntimeMovieOverlay {
 export interface UiRuntimeState {
   surfaces: UiSurfaceStateMap;
   toasts: RuntimeToast[];
+  toastSequence: number;
   inputPrompt?: RuntimeInputPrompt;
   movieOverlay?: RuntimeMovieOverlay;
 }
@@ -79,7 +80,6 @@ export interface UiRuntimeCommandOptions {
 }
 
 const SHOW_UI_TARGETS = new Set<string>(RUNTIME_UI_GROUPS);
-let toastSequence = 0;
 
 export function createInitialUiRuntimeState(): UiRuntimeState {
   return {
@@ -88,7 +88,8 @@ export function createInitialUiRuntimeState(): UiRuntimeState {
       commandBar: shownSurface(),
       toastLayer: shownSurface()
     },
-    toasts: []
+    toasts: [],
+    toastSequence: 0
   };
 }
 
@@ -107,7 +108,8 @@ export function createUiRuntimeStateFromCheckpoint(checkpoint: VnUiCheckpoint): 
       commandBar: terminalSurface(checkpoint.commandBar),
       toastLayer: terminalSurface(checkpoint.toastLayer)
     },
-    toasts: []
+    toasts: [],
+    toastSequence: 0
   };
 }
 
@@ -276,13 +278,15 @@ function reduceUiVisibilityCommand(
 function reduceToastCommand(state: UiRuntimeState, command: RuntimeCommand): UiRuntimeResult {
   const text = stringParam(command, "text") ?? "";
   const durationMs = numberParam(command, "durationMs");
+  const toastSequence = state.toastSequence + 1;
   return {
     state: {
       ...state,
+      toastSequence,
       toasts: [
         ...state.toasts,
         {
-          id: `toast:${++toastSequence}`,
+          id: `toast:${toastSequence}`,
           text,
           ...(command.richText ? { richText: cloneRichText(command.richText) } : {}),
           ...(durationMs !== undefined ? { durationMs } : {})

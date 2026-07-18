@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "jsx": "react-jsx"
+  },
+  "references": [
+    { "path": "../app-vn-runtime" },
+    { "path": "../contracts" },
+    { "path": "../nani-parser" },
+    { "path": "../nani-runtime-compiler" }
+  ],
+  "include": ["src"]
+}

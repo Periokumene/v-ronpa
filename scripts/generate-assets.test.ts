@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeCommand, RuntimeScript, RuntimeValue } from "@v-ronpa/contracts";
+import { serializeRuntimeScriptSemantics } from "../packages/nani-runtime-compiler/src/index.ts";
+import { deriveLayeredCharacterPreloadPlan } from "../packages/layered-character/src/index.ts";
 import {
   createScriptRevision,
-  deriveLayeredCharacterPreloadPlan,
   generateGameARuntimeAssetsModule,
   generateGameATestScriptMetadataModule
 } from "./generate-assets.mjs";
@@ -13,6 +14,15 @@ describe("generated script revisions", () => {
     expect(createScriptRevision(base)).toBe(createScriptRevision(runtimeScript("Hello", 99)));
     expect(createScriptRevision(base)).not.toBe(createScriptRevision(runtimeScript("Changed", 1)));
   });
+
+  it("hashes the compiler-owned canonical semantic serialization", () => {
+    const script = runtimeScript("Hello", 1);
+
+    expect(serializeRuntimeScriptSemantics(script)).toBe(
+      '{"commands":[{"canonicalName":"print","category":"text","commandId":"print","params":{"autoNext":false,"text":"Hello"},"source":"v-ronpa","status":"implemented"}],"labels":{"Start":0},"scriptPath":"game/test.nani"}'
+    );
+    expect(createScriptRevision(script)).toBe("sha256:455fbd5b40f88d7cf9f71f0bb6c13979e5f52f3fec3d7f2d6f39aff0837af8a9");
+  });
 });
 
 describe("generated Game A script metadata boundaries", () => {
@@ -22,6 +32,7 @@ describe("generated Game A script metadata boundaries", () => {
 
     expect(productModule).toContain('"game-a/opening.nani"');
     expect(productModule).not.toContain('"game-a/test/');
+    expect(productModule).not.toContain("gameATestScriptMetadataByPath");
     expect(testModule).toContain('"game-a/test/smoke.nani"');
     expect(testModule).toContain('"game-a/test/character-smoke.nani"');
     expect(testModule).not.toContain('"game-a/opening.nani"');

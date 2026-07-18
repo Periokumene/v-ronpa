@@ -6,7 +6,10 @@ import {
   completeVnSessionRuntimeWait,
   createVnSessionRestoreSnapshot,
   createVnSession,
+  resolveVnSessionChoice,
+  resolveVnSessionInput,
   restoreVnSession,
+  stepVnSessionInstruction,
   submitVnSessionInput,
   toggleVnSessionAuto,
   toggleVnSessionSkip
@@ -37,6 +40,33 @@ describe("app VN session", () => {
     expect(first.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["print"]);
   });
 
+  it("steps one instruction without changing play mode and matches batched story state", () => {
+    const boot = createVnSession({
+      scriptPath: "session-step.nani",
+      sourceText: `#Start
+@set route:"intro"
+@back bg:harness
+Narrator: First.`,
+      startLabel: "Start"
+    });
+    const batched = advanceVnSession(boot.session, "start");
+
+    const setStep = stepVnSessionInstruction(boot.session);
+    const backStep = stepVnSessionInstruction(setStep.session);
+    const printStep = stepVnSessionInstruction(backStep.session);
+
+    expect(setStep.session.story.instructionPointer).toBe(1);
+    expect(setStep.session.story.variables.route).toBe("intro");
+    expect(backStep.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back"]);
+    expect(printStep.session.story).toEqual(batched.session.story);
+    expect(printStep.session.play).toEqual(boot.session.play);
+    expect([
+      ...setStep.emittedRuntimeCommands,
+      ...backStep.emittedRuntimeCommands,
+      ...printStep.emittedRuntimeCommands
+    ]).toEqual(batched.emittedRuntimeCommands);
+  });
+
   it("chooses branches and keeps session restore snapshots headless", () => {
     const boot = createVnSession({ scriptPath: "session-choice.nani", sourceText, startLabel: "Start" });
     const first = advanceVnSession(boot.session, "start");
@@ -49,6 +79,22 @@ describe("app VN session", () => {
     expect(chosen.session.story.variables.route).toBe("right");
     expect(snapshot.story.variables.route).toBe("right");
     expect(restored.story.variables.route).toBe("right");
+  });
+
+  it("resolves choices without advancing and reports invalid decisions", () => {
+    const boot = createVnSession({ scriptPath: "session-resolve-choice.nani", sourceText, startLabel: "Start" });
+    const first = advanceVnSession(boot.session, "start");
+    const withChoices = advanceVnSession(first.session, "manual");
+    const resolved = resolveVnSessionChoice(withChoices.session, 1);
+    const invalid = resolveVnSessionChoice(withChoices.session, 9);
+
+    expect(resolved.session.story.pendingChoices).toEqual([]);
+    expect(resolved.session.story.instructionPointer).toBe(resolved.session.script.labels.Right);
+    expect(resolved.session.story.variables.route).toBeUndefined();
+    expect(invalid.session.story).toBe(withChoices.session.story);
+    expect(invalid.storyStep.diagnostics).toEqual([
+      { code: "invalid-choice", message: "Choice index 9 is not available." }
+    ]);
   });
 
   it("toggles AUTO and SKIP in session state without timers", () => {
@@ -80,6 +126,30 @@ Narrator: After input.
     expect(inputWaiting.session.story.runtimeWait).toMatchObject({ kind: "input", variableName: "codename" });
     expect(submitted.session.story.variables.codename).toBe("Mira");
     expect(submitted.session.story.backlog.at(-1)?.text).toBe("After input.");
+  });
+
+  it("resolves input without advancing and preserves invalid input waits", () => {
+    const boot = createVnSession({
+      scriptPath: "session-resolve-input.nani",
+      sourceText: `#Start
+@input score type:number summary:"Score"
+@set accepted:true
+Narrator: Accepted.`,
+      startLabel: "Start"
+    });
+    const waiting = advanceVnSession(boot.session, "start");
+    const resolved = resolveVnSessionInput(waiting.session, "42");
+    const invalid = resolveVnSessionInput(waiting.session, "not-a-number");
+
+    expect(resolved.session.story.variables.score).toBe(42);
+    expect(resolved.session.story.variables.accepted).toBeUndefined();
+    expect(resolved.session.story.instructionPointer).toBe(1);
+    expect(resolved.session.story.runtimeWait).toBeUndefined();
+    expect(invalid.session.story).toBe(waiting.session.story);
+    expect(invalid.session.story.runtimeWait).toEqual(waiting.session.story.runtimeWait);
+    expect(invalid.storyStep.diagnostics).toEqual([
+      { code: "input-validation", message: "Input value not-a-number is not a valid number.", severity: "warning" }
+    ]);
   });
 
   it("completes presentation waits without storing renderer task state", () => {

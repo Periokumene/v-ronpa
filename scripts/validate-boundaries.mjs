@@ -14,6 +14,7 @@ const packageRoots = {
   "app-vn-session": "packages/app-vn-session",
   "app-vn-dispatch": "packages/app-vn-dispatch",
   "app-vn-runtime": "packages/app-vn-runtime",
+  "app-vn-devtools": "packages/app-vn-devtools",
   "app-vn-shell": "packages/app-vn-shell",
   "gameplay": "packages/gameplay",
   "navi-director": "packages/navi-director",
@@ -51,6 +52,7 @@ const allowedWorkspaceDeps = {
     "story-engine",
     "story-play"
   ],
+  "app-vn-devtools": ["app-vn-runtime", "contracts", "nani-parser", "nani-runtime-compiler"],
   "app-vn-shell": ["app-vn-dispatch", "app-vn-runtime", "contracts", "media-save", "pixi-presenter", "pixi-stage-model", "story-engine", "story-play", "ui-kit"],
   "gameplay": ["contracts"],
   "navi-director": ["contracts", "gameplay"],
@@ -63,12 +65,14 @@ const allowedWorkspaceDeps = {
   "media-save": ["contracts"],
   "game-flow-machine": ["contracts"],
   "game-a": [
+    "app-vn-devtools",
     "app-vn-runtime",
     "app-vn-shell",
     "asset-registry",
     "contracts",
     "game-flow-machine",
     "gameplay",
+    "layered-character",
     "media-save",
     "runtime-assets-pixi",
     "ui-kit"
@@ -120,6 +124,7 @@ const forbiddenExternalDeps = {
   "pixi-stage-model": rendererAndBrowserAdapters,
   "runtime-assets-pixi": rendererAndBrowserAdapters,
   "app-vn-runtime": ["@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
+  "app-vn-devtools": ["react-dom", "@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
   "app-vn-shell": ["@react-three/", "three", "dexie", "howler"],
   "gameplay": rendererAndBrowserAdapters,
   "navi-director": rendererAndBrowserAdapters,
@@ -265,6 +270,7 @@ function validateSpecifier({ pkg, specifier, location, source }) {
 }
 
 function validateWorkspaceDep({ pkg, targetPkg, location, source }) {
+  if (targetPkg === pkg) return;
   const allowed = allowedWorkspaceDeps[pkg] ?? [];
   if (!allowed.includes(targetPkg)) {
     violations.push(

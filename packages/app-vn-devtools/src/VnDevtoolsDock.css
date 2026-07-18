@@ -1,0 +1,755 @@
+.vn-devtools-dock,
+.vn-devtools-collapsed-button {
+  --vn-devtools-bg: #0b0d14;
+  --vn-devtools-panel: #121622;
+  --vn-devtools-panel-raised: #181e2d;
+  --vn-devtools-border: #2a3143;
+  --vn-devtools-border-bright: #46516a;
+  --vn-devtools-text: #e9edf7;
+  --vn-devtools-muted: #8f9bb2;
+  --vn-devtools-accent: #58d7c7;
+  --vn-devtools-accent-strong: #8af4e6;
+  --vn-devtools-warning: #f5bf5a;
+  --vn-devtools-error: #ff7185;
+  --vn-devtools-current: #65a8ff;
+  color: var(--vn-devtools-text);
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace;
+  color-scheme: dark;
+}
+
+.vn-devtools-dock {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 min(var(--vn-devtools-width, 420px), 45vw);
+  width: min(var(--vn-devtools-width, 420px), 45vw);
+  min-width: min(var(--vn-devtools-width, 420px), 45vw);
+  max-width: min(var(--vn-devtools-width, 420px), 45vw);
+  height: 100dvh;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 14px 10px;
+  border-left: 1px solid var(--vn-devtools-border-bright);
+  background:
+    radial-gradient(circle at 15% -10%, rgb(88 215 199 / 10%), transparent 32%),
+    var(--vn-devtools-bg);
+  box-shadow: -12px 0 30px rgb(0 0 0 / 28%);
+  z-index: 40;
+}
+
+.vn-devtools-dock *,
+.vn-devtools-collapsed-button * {
+  box-sizing: border-box;
+}
+
+.vn-devtools-dock button,
+.vn-devtools-dock input {
+  font: inherit;
+}
+
+.vn-devtools-dock button {
+  color: inherit;
+}
+
+.vn-devtools-resizer {
+  position: absolute;
+  inset: 0 auto 0 -7px;
+  width: 14px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 3;
+}
+
+.vn-devtools-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 6px;
+  width: 2px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+
+.vn-devtools-resizer:hover::after,
+.vn-devtools-resizer:focus-visible::after {
+  background: var(--vn-devtools-accent);
+}
+
+.vn-devtools-resizer:focus-visible,
+.vn-devtools-dock button:focus-visible,
+.vn-devtools-dock input:focus-visible,
+.vn-devtools-collapsed-button:focus-visible {
+  outline: 2px solid var(--vn-devtools-accent-strong);
+  outline-offset: 2px;
+}
+
+.vn-devtools-header,
+.vn-devtools-panel-heading,
+.vn-devtools-status > div,
+.vn-devtools-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vn-devtools-header {
+  align-items: flex-start;
+}
+
+.vn-devtools-title-block {
+  min-width: 0;
+}
+
+.vn-devtools-kicker,
+.vn-devtools-revision,
+.vn-devtools-panel-heading > span,
+.vn-devtools-outline > span,
+.vn-devtools-footer {
+  color: var(--vn-devtools-muted);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vn-devtools-title-block h1 {
+  margin: 2px 0;
+  font-family: Inter, "Avenir Next", system-ui, sans-serif;
+  font-size: 17px;
+  letter-spacing: 0.01em;
+}
+
+.vn-devtools-script-path {
+  display: block;
+  overflow: hidden;
+  color: var(--vn-devtools-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vn-devtools-icon-button,
+.vn-devtools-toolbar button,
+.vn-devtools-outline button,
+.vn-devtools-decision-actions button {
+  border: 1px solid var(--vn-devtools-border);
+  border-radius: 6px;
+  background: var(--vn-devtools-panel);
+  cursor: pointer;
+}
+
+.vn-devtools-icon-button {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+}
+
+.vn-devtools-status,
+.vn-devtools-decision {
+  padding: 10px;
+  border: 1px solid var(--vn-devtools-border);
+  border-radius: 8px;
+  background: var(--vn-devtools-panel);
+}
+
+.vn-devtools-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vn-devtools-muted);
+  box-shadow: 0 0 0 3px rgb(143 155 178 / 10%);
+}
+
+.vn-devtools-status[data-phase="ready"] .vn-devtools-status-dot {
+  background: var(--vn-devtools-accent);
+  box-shadow: 0 0 0 3px rgb(88 215 199 / 13%);
+}
+
+.vn-devtools-status[data-phase="updating"] .vn-devtools-status-dot,
+.vn-devtools-status[data-phase="materializing"] .vn-devtools-status-dot,
+.vn-devtools-status[data-phase="inspecting"] .vn-devtools-status-dot {
+  background: var(--vn-devtools-current);
+  animation: vn-devtools-pulse 1.2s ease-in-out infinite;
+}
+
+.vn-devtools-status[data-phase="blocked"] .vn-devtools-status-dot,
+.vn-devtools-status[data-phase="decision-required"] .vn-devtools-status-dot {
+  background: var(--vn-devtools-warning);
+}
+
+.vn-devtools-status[data-phase="error"] .vn-devtools-status-dot {
+  background: var(--vn-devtools-error);
+}
+
+.vn-devtools-status p {
+  margin: 7px 0;
+  color: #cbd2e2;
+  font-family: Inter, "Avenir Next", system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.vn-devtools-status strong {
+  margin-right: auto;
+  font-size: 12px;
+}
+
+.vn-devtools-status-tag,
+.vn-devtools-previewability,
+.vn-devtools-command {
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #222a3b;
+  color: var(--vn-devtools-muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.vn-devtools-status-tag,
+.vn-devtools-previewability.is-degraded,
+.vn-devtools-previewability.is-decision-required {
+  color: var(--vn-devtools-warning);
+}
+
+.vn-devtools-previewability.is-blocked,
+.vn-devtools-previewability.is-no-stable-result {
+  color: var(--vn-devtools-error);
+}
+
+.vn-devtools-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vn-devtools-toolbar button,
+.vn-devtools-decision-actions button {
+  min-height: 28px;
+  padding: 4px 8px;
+  color: #cad1df;
+  font-size: 10px;
+}
+
+.vn-devtools-toolbar button:hover:not(:disabled),
+.vn-devtools-outline button:hover,
+.vn-devtools-icon-button:hover,
+.vn-devtools-decision-actions button:hover {
+  border-color: var(--vn-devtools-border-bright);
+  background: var(--vn-devtools-panel-raised);
+}
+
+.vn-devtools-toolbar button:disabled,
+.vn-devtools-dock button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.vn-devtools-search {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--vn-devtools-border);
+  border-radius: 7px;
+  background: #0e121b;
+  color: var(--vn-devtools-muted);
+}
+
+.vn-devtools-search:focus-within {
+  border-color: var(--vn-devtools-accent);
+}
+
+.vn-devtools-search input {
+  min-width: 0;
+  height: 32px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--vn-devtools-text);
+  font-size: 11px;
+}
+
+.vn-devtools-search button {
+  border: 0;
+  background: transparent;
+  color: var(--vn-devtools-muted);
+  cursor: pointer;
+}
+
+.vn-devtools-outline {
+  display: grid;
+  gap: 6px;
+}
+
+.vn-devtools-outline > div {
+  display: flex;
+  gap: 5px;
+  padding-bottom: 2px;
+  overflow-x: auto;
+}
+
+.vn-devtools-outline button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  color: #cbd2e2;
+  font-size: 10px;
+}
+
+.vn-devtools-outline small {
+  color: var(--vn-devtools-muted);
+}
+
+.vn-devtools-source-panel,
+.vn-devtools-diagnostics,
+.vn-devtools-runtime-state {
+  display: grid;
+  gap: 7px;
+}
+
+.vn-devtools-panel-heading h2 {
+  margin: 0;
+  font-family: Inter, "Avenir Next", system-ui, sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.vn-devtools-source-list {
+  display: grid;
+  max-height: min(45dvh, 520px);
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--vn-devtools-border);
+  border-radius: 7px;
+  background: #080b11;
+  list-style: none;
+  scrollbar-color: var(--vn-devtools-border-bright) transparent;
+}
+
+.vn-devtools-source-line {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+  border-bottom: 1px solid rgb(42 49 67 / 58%);
+}
+
+.vn-devtools-source-line:last-child {
+  border-bottom: 0;
+}
+
+.vn-devtools-source-line.is-selected {
+  background: rgb(88 215 199 / 8%);
+  box-shadow: inset 2px 0 var(--vn-devtools-accent);
+}
+
+.vn-devtools-source-line.is-current {
+  background: rgb(101 168 255 / 8%);
+}
+
+.vn-devtools-source-line.is-pinned {
+  box-shadow: inset 2px 0 var(--vn-devtools-warning);
+}
+
+.vn-devtools-source-line.is-current.is-pinned {
+  box-shadow: inset 2px 0 var(--vn-devtools-current), inset 4px 0 var(--vn-devtools-warning);
+}
+
+.vn-devtools-line-select {
+  display: grid;
+  grid-template-columns: 36px 25px minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  padding: 7px 7px 3px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vn-devtools-line-number {
+  color: #596278;
+  font-size: 10px;
+  text-align: right;
+}
+
+.vn-devtools-line-markers {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--vn-devtools-current);
+  font-size: 8px;
+}
+
+.vn-devtools-line-markers span:nth-child(2),
+.vn-devtools-source-line.is-pinned .vn-devtools-line-markers span:last-child {
+  color: var(--vn-devtools-warning);
+}
+
+.vn-devtools-line-select code {
+  overflow-wrap: anywhere;
+  color: #d7dcea;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.vn-devtools-line-meta {
+  display: flex;
+  grid-column: 1;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px 5px 61px;
+}
+
+.vn-devtools-command {
+  color: var(--vn-devtools-accent);
+}
+
+.vn-devtools-line-diagnostic {
+  display: inline-grid;
+  min-width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(255 113 133 / 16%);
+  color: var(--vn-devtools-error);
+  font-size: 9px;
+}
+
+.vn-devtools-preview-button {
+  align-self: center;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  margin: 5px 7px;
+  padding: 4px 7px;
+  border: 1px solid var(--vn-devtools-accent);
+  border-radius: 5px;
+  background: #12302f;
+  color: var(--vn-devtools-accent-strong);
+  font-size: 9px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateX(3px);
+  transition: opacity 100ms ease, transform 100ms ease;
+}
+
+.vn-devtools-source-line:hover .vn-devtools-preview-button,
+.vn-devtools-source-line:focus-within .vn-devtools-preview-button,
+.vn-devtools-preview-button:disabled {
+  opacity: 1;
+  transform: none;
+}
+
+.vn-devtools-preview-button:disabled {
+  border-color: var(--vn-devtools-border);
+  background: var(--vn-devtools-panel);
+}
+
+.vn-devtools-decision {
+  border-color: rgb(245 191 90 / 45%);
+  background: linear-gradient(140deg, rgb(245 191 90 / 9%), transparent 55%), var(--vn-devtools-panel);
+}
+
+.vn-devtools-decision > p,
+.vn-devtools-validation {
+  margin: 8px 0;
+  color: #d7dcea;
+  font-family: Inter, "Avenir Next", system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.vn-devtools-decision fieldset {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vn-devtools-decision legend,
+.vn-devtools-decision-input > span {
+  margin-bottom: 5px;
+  color: var(--vn-devtools-muted);
+  font-size: 10px;
+}
+
+.vn-devtools-decision-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 7px;
+  border: 1px solid var(--vn-devtools-border);
+  border-radius: 6px;
+  background: #0d1018;
+  cursor: pointer;
+}
+
+.vn-devtools-decision-option:has(input:checked) {
+  border-color: var(--vn-devtools-warning);
+}
+
+.vn-devtools-decision-option span,
+.vn-devtools-decision-option small {
+  display: block;
+}
+
+.vn-devtools-decision-option strong {
+  font-size: 11px;
+}
+
+.vn-devtools-decision-option small {
+  margin-top: 2px;
+  color: var(--vn-devtools-muted);
+  font-size: 9px;
+}
+
+.vn-devtools-decision-input {
+  display: grid;
+}
+
+.vn-devtools-decision-input input {
+  min-height: 32px;
+  padding: 5px 7px;
+  border: 1px solid var(--vn-devtools-border);
+  border-radius: 6px;
+  background: #0d1018;
+  color: var(--vn-devtools-text);
+}
+
+.vn-devtools-validation {
+  color: var(--vn-devtools-error);
+  font-size: 10px;
+}
+
+.vn-devtools-decision-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.vn-devtools-decision-actions button.is-primary {
+  border-color: var(--vn-devtools-warning);
+  color: #ffe2a6;
+}
+
+.vn-devtools-diagnostics ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vn-devtools-diagnostics li {
+  border-left: 2px solid var(--vn-devtools-muted);
+  background: var(--vn-devtools-panel);
+}
+
+.vn-devtools-diagnostics li[data-severity="warning"] {
+  border-left-color: var(--vn-devtools-warning);
+}
+
+.vn-devtools-diagnostics li[data-severity="error"] {
+  border-left-color: var(--vn-devtools-error);
+}
+
+.vn-devtools-diagnostics button {
+  display: grid;
+  width: 100%;
+  gap: 3px;
+  padding: 7px 9px;
+  border: 0;
+  background: transparent;
+  color: #d2d8e5;
+  font-family: Inter, "Avenir Next", system-ui, sans-serif;
+  font-size: 11px;
+  text-align: left;
+}
+
+.vn-devtools-diagnostic-code {
+  color: var(--vn-devtools-muted);
+  font-family: ui-monospace, "SFMono-Regular", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.vn-devtools-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.vn-devtools-summary-grid details {
+  overflow: hidden;
+  border: 1px solid var(--vn-devtools-border);
+  border-radius: 6px;
+  background: var(--vn-devtools-panel);
+}
+
+.vn-devtools-summary-grid summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px;
+  color: #dce1ec;
+  font-size: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.vn-devtools-summary-grid summary::-webkit-details-marker {
+  display: none;
+}
+
+.vn-devtools-summary-grid summary span {
+  color: var(--vn-devtools-muted);
+}
+
+.vn-devtools-summary-grid dl {
+  display: grid;
+  margin: 0;
+  padding: 0 7px 7px;
+}
+
+.vn-devtools-summary-grid dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+  padding: 4px 0;
+  border-top: 1px solid rgb(42 49 67 / 70%);
+  font-size: 9px;
+}
+
+.vn-devtools-summary-grid dt {
+  overflow: hidden;
+  color: var(--vn-devtools-muted);
+  text-overflow: ellipsis;
+}
+
+.vn-devtools-summary-grid dd {
+  margin: 0;
+  color: #e4e8f1;
+}
+
+.vn-devtools-summary-grid [data-tone="accent"] dd {
+  color: var(--vn-devtools-accent);
+}
+
+.vn-devtools-summary-grid [data-tone="warning"] dd {
+  color: var(--vn-devtools-warning);
+}
+
+.vn-devtools-summary-grid [data-tone="error"] dd {
+  color: var(--vn-devtools-error);
+}
+
+.vn-devtools-empty {
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed var(--vn-devtools-border);
+  border-radius: 6px;
+  color: var(--vn-devtools-muted);
+  font-family: Inter, "Avenir Next", system-ui, sans-serif;
+  font-size: 11px;
+  text-align: center;
+}
+
+.vn-devtools-empty.is-compact {
+  padding: 8px;
+}
+
+.vn-devtools-footer {
+  align-items: flex-end;
+  margin-top: auto;
+  padding-top: 4px;
+  border-top: 1px solid var(--vn-devtools-border);
+  line-height: 1.5;
+}
+
+.vn-devtools-footer kbd {
+  padding: 1px 3px;
+  border: 1px solid var(--vn-devtools-border);
+  border-radius: 3px;
+  background: var(--vn-devtools-panel);
+  color: #cbd2e2;
+  font-family: inherit;
+}
+
+.vn-devtools-collapsed-button {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--vn-devtools-border-bright);
+  border-radius: 9px;
+  background: var(--vn-devtools-bg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  color: var(--vn-devtools-accent-strong);
+  font-weight: 800;
+  cursor: pointer;
+  z-index: 80;
+}
+
+.vn-devtools-collapsed-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--vn-devtools-bg);
+  border-radius: 50%;
+  background: var(--vn-devtools-warning);
+}
+
+.vn-devtools-collapsed-badge.is-error {
+  background: var(--vn-devtools-error);
+}
+
+.vn-devtools-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+@keyframes vn-devtools-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+@media (max-width: 899px) {
+  .vn-devtools-dock {
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: min(var(--vn-devtools-width, 420px), 92vw);
+    min-width: min(var(--vn-devtools-width, 420px), 92vw);
+    max-width: 92vw;
+    z-index: 80;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vn-devtools-status-dot,
+  .vn-devtools-preview-button,
+  .vn-devtools-resizer::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1,0 +1,160 @@
+export const VN_DEVTOOLS_DEFAULT_WIDTH = 420;
+export const VN_DEVTOOLS_MIN_WIDTH = 320;
+export const VN_DEVTOOLS_MAX_WIDTH = 720;
+
+export type VnDevtoolsDiagnosticSeverity = "info" | "warning" | "error";
+
+export interface VnDevtoolsDiagnostic {
+  id: string;
+  severity: VnDevtoolsDiagnosticSeverity;
+  message: string;
+  code?: string;
+  lineId?: string;
+  lineNumber?: number;
+}
+
+export type VnDevtoolsLinePreviewability =
+  | "previewable"
+  | "decision-required"
+  | "degraded"
+  | "blocked"
+  | "no-stable-result";
+
+export interface VnDevtoolsSourceLine {
+  id: string;
+  lineNumber: number;
+  sourceText: string;
+  label?: string;
+  command?: string;
+  previewability: VnDevtoolsLinePreviewability;
+  current?: boolean;
+  pinned?: boolean;
+  diagnostics?: readonly VnDevtoolsDiagnostic[];
+}
+
+export type VnDevtoolsStatusPhase =
+  | "idle"
+  | "inspecting"
+  | "ready"
+  | "updating"
+  | "materializing"
+  | "decision-required"
+  | "blocked"
+  | "error";
+
+export interface VnDevtoolsStatus {
+  phase: VnDevtoolsStatusPhase;
+  message?: string;
+  updateId?: number;
+  degraded?: boolean;
+}
+
+export type VnDevtoolsSummaryTone = "neutral" | "accent" | "warning" | "error";
+
+export interface VnDevtoolsSummaryItem {
+  label: string;
+  value: string | number | boolean | null;
+  tone?: VnDevtoolsSummaryTone;
+}
+
+export interface VnDevtoolsRuntimeSummaries {
+  story: readonly VnDevtoolsSummaryItem[];
+  pixi: readonly VnDevtoolsSummaryItem[];
+  ui: readonly VnDevtoolsSummaryItem[];
+  media: readonly VnDevtoolsSummaryItem[];
+}
+
+export interface VnDevtoolsChoiceDecisionOption {
+  id: string;
+  label: string;
+  enabled: boolean;
+  detail?: string;
+}
+
+export interface VnDevtoolsChoiceDecision {
+  kind: "choice";
+  id: string;
+  prompt: string;
+  options: readonly VnDevtoolsChoiceDecisionOption[];
+  selectedOptionId?: string;
+}
+
+export interface VnDevtoolsInputDecision {
+  kind: "input";
+  id: string;
+  prompt: string;
+  variableName: string;
+  inputType: "text" | "number" | "boolean";
+  defaultValue?: string;
+  validationMessage?: string;
+}
+
+export type VnDevtoolsDecision = VnDevtoolsChoiceDecision | VnDevtoolsInputDecision;
+
+export type VnDevtoolsDecisionSubmission =
+  | { kind: "choice"; decisionId: string; optionId: string }
+  | { kind: "input"; decisionId: string; value: string | number | boolean };
+
+export interface VnDevtoolsSourceLocation {
+  scriptPath: string;
+  lineNumber: number;
+}
+
+export interface VnDevtoolsActions {
+  selectLine: (lineId: string) => void;
+  previewLine: (lineId: string) => void;
+  pinCurrent: () => void;
+  unpin: () => void;
+  setCollapsed: (collapsed: boolean) => void;
+  resize: (width: number) => void;
+  search: (query: string) => void;
+  submitDecision: (submission: VnDevtoolsDecisionSubmission) => void;
+  cancelDecision: () => void;
+  cancelCandidate: () => void;
+  copyLocation: (location: VnDevtoolsSourceLocation) => void;
+}
+
+export interface VnDevtoolsController {
+  entryId: string;
+  scriptPath: string;
+  scriptRevision?: string;
+  lines: readonly VnDevtoolsSourceLine[];
+  selectedLineId?: string;
+  searchQuery: string;
+  collapsed: boolean;
+  width: number;
+  status: VnDevtoolsStatus;
+  diagnostics: readonly VnDevtoolsDiagnostic[];
+  summaries: VnDevtoolsRuntimeSummaries;
+  decision?: VnDevtoolsDecision;
+  hasUpdateBadge?: boolean;
+  actions: VnDevtoolsActions;
+}
+
+export interface VnDevtoolsDockProps {
+  controller: VnDevtoolsController;
+  className?: string;
+}
+
+export function clampVnDevtoolsWidth(width: number): number {
+  if (!Number.isFinite(width)) return VN_DEVTOOLS_DEFAULT_WIDTH;
+  return Math.min(VN_DEVTOOLS_MAX_WIDTH, Math.max(VN_DEVTOOLS_MIN_WIDTH, Math.round(width)));
+}
+
+export function canPreviewVnDevtoolsLine(line: VnDevtoolsSourceLine): boolean {
+  return line.previewability !== "blocked" && line.previewability !== "no-stable-result";
+}
+
+export function filterVnDevtoolsLines(
+  lines: readonly VnDevtoolsSourceLine[],
+  query: string
+): readonly VnDevtoolsSourceLine[] {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (normalizedQuery.length === 0) return lines;
+  return lines.filter((line) =>
+    [String(line.lineNumber), line.sourceText, line.label ?? "", line.command ?? ""]
+      .join("\n")
+      .toLocaleLowerCase()
+      .includes(normalizedQuery)
+  );
+}

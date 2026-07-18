@@ -5,7 +5,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import gameAAssetConfigInput from "../apps/game-a/asset.config.mjs";
 import harnessAssetConfigInput from "../apps/game-harness/asset.config.mjs";
 import { parseScenario } from "../packages/nani-parser/src/index.ts";
-import { compileRuntimeScript } from "../packages/nani-runtime-compiler/src/index.ts";
+import {
+  compileRuntimeScript,
+  serializeRuntimeScriptSemantics
+} from "../packages/nani-runtime-compiler/src/index.ts";
+import { deriveLayeredCharacterPreloadPlan } from "../packages/layered-character/src/index.ts";
 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const providerModuleById = new Map([
@@ -283,46 +287,6 @@ function collectScriptMetadata(entries, config) {
   );
 }
 
-export function deriveLayeredCharacterPreloadPlan(script) {
-  const characterIds = new Set();
-  for (const command of script.commands) {
-    if (command.commandId !== "char") continue;
-    const target = stringRuntimeParam(command, "target");
-    if (target && target !== "*") characterIds.add(target);
-  }
-
-  const expressionsByCharacter = new Map(
-    [...characterIds].map((characterId) => [characterId, new Set()])
-  );
-  const wildcardExpressions = [];
-  for (const command of script.commands) {
-    if (command.commandId !== "char" && command.commandId !== "slide") continue;
-    const target = stringRuntimeParam(command, "target");
-    const expression = stringRuntimeParam(command, "appearanceExpression");
-    if (!target || expression === undefined) continue;
-    if (target === "*") {
-      wildcardExpressions.push(expression.trim());
-      continue;
-    }
-    expressionsByCharacter.get(target)?.add(expression.trim());
-  }
-  for (const expressions of expressionsByCharacter.values()) {
-    for (const expression of wildcardExpressions) expressions.add(expression);
-  }
-
-  return [...expressionsByCharacter]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([characterId, expressions]) => ({
-      characterId,
-      appearanceExpressions: [...expressions].sort((left, right) => left.localeCompare(right))
-    }));
-}
-
-function stringRuntimeParam(command, key) {
-  const value = command.params[key];
-  return typeof value === "string" ? value : undefined;
-}
-
 function deriveScriptAssetRefs(script, config) {
   const refs = [...script.assets];
   for (const command of script.commands) {
@@ -338,20 +302,7 @@ function deriveScriptAssetRefs(script, config) {
 }
 
 export function createScriptRevision(script) {
-  const semanticScript = {
-    scriptPath: script.scriptPath,
-    labels: script.labels,
-    commands: script.commands.map(({ loc: _loc, sourceCommand: _sourceCommand, ...command }) => command)
-  };
-  return `sha256:${createHash("sha256").update(stableJson(semanticScript)).digest("hex")}`;
-}
-
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
+  return `sha256:${createHash("sha256").update(serializeRuntimeScriptSemantics(script)).digest("hex")}`;
 }
 
 function dedupeAssetRefs(assetRefs) {

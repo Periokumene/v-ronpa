@@ -158,7 +158,7 @@ export function advanceToNextStop(
     };
   }
 
-  if (state.pendingChoices.length > 0) {
+  if (state.pendingChoices.length > 0 && !canContinueChoiceGroup(state, script)) {
     return {
       state,
       emittedRuntimeCommands: [],
@@ -179,7 +179,7 @@ export function advanceToNextStop(
     const command = script.commands[nextState.instructionPointer];
     if (!command) return { state: { ...nextState, ended: true }, diagnostics, emittedRuntimeCommands, stopReason: "ended" };
 
-    const result = executeCommandAtPointer(nextState, script, command);
+    const result = stepStoryInstruction(nextState, script);
     nextState = result.state;
     diagnostics.push(...result.diagnostics);
     emittedRuntimeCommands.push(...result.emittedRuntimeCommands);
@@ -202,8 +202,7 @@ export function advanceToNextStop(
     }
 
     if (nextState.pendingChoices.length > 0) {
-      const nextCommand = script.commands[nextState.instructionPointer];
-      if (nextCommand?.category === "choice" || nextCommand?.commandId === "clearchoice") continue;
+      if (canContinueChoiceGroup(nextState, script)) continue;
       return { state: nextState, diagnostics, emittedRuntimeCommands, stopReason: "choices" };
     }
   }
@@ -217,6 +216,53 @@ export function advanceToNextStop(
     ],
     stopReason: "max-steps"
   };
+}
+
+/** Executes exactly one instruction, or returns the active story boundary unchanged. */
+export function stepStoryInstruction(state: StoryRuntimeState, script: RuntimeScript): StoryStepperResult {
+  if (state.ended) {
+    return {
+      state,
+      emittedRuntimeCommands: [],
+      diagnostics: [createDiagnostic("story-ended-noop", "Story is already ended; advance did not change state.")],
+      stopReason: "ended"
+    };
+  }
+
+  if (state.presentationWait) {
+    return {
+      state,
+      emittedRuntimeCommands: [],
+      diagnostics: [
+        createDiagnostic("presentation-wait", "Story is waiting for a presentation command to complete; advance did not change state.")
+      ],
+      stopReason: "presentation-wait"
+    };
+  }
+
+  if (state.runtimeWait) {
+    return {
+      state,
+      emittedRuntimeCommands: [],
+      diagnostics: [
+        createDiagnostic("runtime-wait", "Story is waiting for a runtime command to complete; advance did not change state.")
+      ],
+      stopReason: "runtime-wait"
+    };
+  }
+
+  const command = script.commands[state.instructionPointer];
+  if (state.pendingChoices.length > 0 && !canContinueChoiceGroup(state, script)) {
+    return {
+      state,
+      emittedRuntimeCommands: [],
+      diagnostics: [createDiagnostic("pending-choices", "Story is waiting for a choice; advance did not change state.")],
+      stopReason: "choices"
+    };
+  }
+
+  if (!command) return { state: { ...state, ended: true }, diagnostics: [], emittedRuntimeCommands: [] };
+  return executeCommandAtPointer(state, script, command);
 }
 
 export function chooseStoryOption(state: StoryRuntimeState, script: RuntimeScript, index: number): StoryStepperResult {
@@ -274,6 +320,8 @@ export function selectCurrentStoryLine(state: StoryRuntimeState): CurrentStoryLi
 }
 
 export function storyReducer(state: StoryRuntimeState, event: StoryEvent): StoryStepperResult {
+  if (event.type === "STEP") return stepStoryInstruction(state, event.script);
+
   if (event.type === "PRESENTATION_COMPLETE") {
     return {
       state: state.presentationWait ? { ...state, presentationWait: undefined } : state,
@@ -350,50 +398,7 @@ export function storyReducer(state: StoryRuntimeState, event: StoryEvent): Story
     return chooseStoryOption(state, event.script, event.index);
   }
 
-  if (state.ended) {
-    return {
-      state,
-      emittedRuntimeCommands: [],
-      diagnostics: [createDiagnostic("story-ended-noop", "Story is already ended; advance did not change state.")],
-      stopReason: "ended"
-    };
-  }
-
-  if (state.presentationWait) {
-    return {
-      state,
-      emittedRuntimeCommands: [],
-      diagnostics: [
-        createDiagnostic("presentation-wait", "Story is waiting for a presentation command to complete; advance did not change state.")
-      ],
-      stopReason: "presentation-wait"
-    };
-  }
-
-  if (state.runtimeWait) {
-    return {
-      state,
-      emittedRuntimeCommands: [],
-      diagnostics: [
-        createDiagnostic("runtime-wait", "Story is waiting for a runtime command to complete; advance did not change state.")
-      ],
-      stopReason: "runtime-wait"
-    };
-  }
-
-  const command = event.script.commands[state.instructionPointer];
-  if (state.pendingChoices.length > 0 && command?.category !== "choice" && command?.commandId !== "clearchoice") {
-    return {
-      state,
-      emittedRuntimeCommands: [],
-      diagnostics: [createDiagnostic("pending-choices", "Story is waiting for a choice; advance did not change state.")],
-      stopReason: "choices"
-    };
-  }
-
-  if (!command) return { state: { ...state, ended: true }, diagnostics: [], emittedRuntimeCommands: [] };
-
-  return executeCommandAtPointer(state, event.script, command);
+  return assertNeverStoryEvent(event);
 }
 
 function executeCommandAtPointer(
@@ -402,6 +407,11 @@ function executeCommandAtPointer(
   command: RuntimeCommand
 ): RuntimeCommandExecutionResult {
   return executeCommand(state, script, command);
+}
+
+function canContinueChoiceGroup(state: StoryRuntimeState, script: RuntimeScript): boolean {
+  const command = script.commands[state.instructionPointer];
+  return command?.category === "choice" || command?.commandId === "clearchoice";
 }
 
 function executeCommand(
@@ -1252,4 +1262,8 @@ function createDiagnostic(
   severity?: StoryStepperDiagnostic["severity"]
 ): StoryStepperDiagnostic {
   return severity ? { code, message, severity } : { code, message };
+}
+
+function assertNeverStoryEvent(event: never): never {
+  throw new Error(`Unhandled story event: ${JSON.stringify(event)}`);
 }

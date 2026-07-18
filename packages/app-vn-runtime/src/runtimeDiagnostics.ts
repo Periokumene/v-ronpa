@@ -28,6 +28,7 @@ export interface VnRuntimeCompilerDiagnosticLike {
   code: string;
   severity?: "info" | "warning" | "error";
   message: string;
+  loc?: { scriptPath: string; line: number; column: number };
 }
 
 export interface CollectVnRuntimeDiagnosticsInput {
@@ -137,7 +138,8 @@ function toVnCompilerDiagnostic(diagnostic: VnRuntimeCompilerDiagnosticLike): Vn
     source: "compiler",
     code: diagnostic.code,
     severity: diagnostic.severity ?? "warning",
-    message: diagnostic.message
+    message: diagnostic.message,
+    ...(diagnostic.loc ? { loc: formatDiagnosticLocation(diagnostic.loc) } : {})
   };
 }
 
@@ -154,7 +156,7 @@ function toVnTransactionDiagnostic(diagnostic: VnRuntimeTransactionDiagnostic): 
   return {
     source: "transaction",
     code: diagnostic.code,
-    severity: "error",
+    severity: diagnostic.code === "normalized-pixi-params" ? "warning" : "error",
     message: diagnostic.message,
     commandId: diagnostic.commandId
   };
@@ -180,6 +182,6 @@ function toVnUiDiagnostic(diagnostic: UiRuntimeDiagnostic): VnRuntimeDiagnostic 
   };
 }
 
-function formatDiagnosticLocation(loc: NonNullable<VnRuntimeParserDiagnosticLike["loc"]>): string {
+function formatDiagnosticLocation(loc: { scriptPath: string; line: number; column: number }): string {
   return `${loc.scriptPath}:${loc.line}:${loc.column}`;
 }

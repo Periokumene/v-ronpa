@@ -35,6 +35,9 @@ importers:
 
   apps/game-a:
     dependencies:
+      '@v-ronpa/app-vn-devtools':
+        specifier: workspace:*
+        version: link:../../packages/app-vn-devtools
       '@v-ronpa/app-vn-runtime':
         specifier: workspace:*
         version: link:../../packages/app-vn-runtime
@@ -53,6 +56,9 @@ importers:
       '@v-ronpa/gameplay':
         specifier: workspace:*
         version: link:../../packages/gameplay
+      '@v-ronpa/layered-character':
+        specifier: workspace:*
+        version: link:../../packages/layered-character
       '@v-ronpa/media-save':
         specifier: workspace:*
         version: link:../../packages/media-save
@@ -157,6 +163,28 @@ importers:
         specifier: ^0.181.0
         version: 0.181.0
 
+  packages/app-vn-devtools:
+    dependencies:
+      '@v-ronpa/app-vn-runtime':
+        specifier: workspace:*
+        version: link:../app-vn-runtime
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@v-ronpa/nani-parser':
+        specifier: workspace:*
+        version: link:../nani-parser
+      '@v-ronpa/nani-runtime-compiler':
+        specifier: workspace:*
+        version: link:../nani-runtime-compiler
+      react:
+        specifier: ^19.0.0
+        version: 19.2.7
+    devDependencies:
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.5(@types/node@24.13.2)
+
   packages/app-vn-dispatch:
     dependencies:
       '@v-ronpa/contracts':
@@ -196,6 +224,12 @@ importers:
       '@v-ronpa/media-save':
         specifier: workspace:*
         version: link:../media-save
+      '@v-ronpa/nani-parser':
+        specifier: workspace:*
+        version: link:../nani-parser
+      '@v-ronpa/nani-runtime-compiler':
+        specifier: workspace:*
+        version: link:../nani-runtime-compiler
       '@v-ronpa/pixi-stage-model':
         specifier: workspace:*
         version: link:../pixi-stage-model
@@ -208,13 +242,6 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.7
-    devDependencies:
-      '@v-ronpa/nani-parser':
-        specifier: workspace:*
-        version: link:../nani-parser
-      '@v-ronpa/nani-runtime-compiler':
-        specifier: workspace:*
-        version: link:../nani-runtime-compiler
 
   packages/app-vn-session:
     dependencies:

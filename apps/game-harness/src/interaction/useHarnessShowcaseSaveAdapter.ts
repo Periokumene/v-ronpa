@@ -79,7 +79,7 @@ export function useHarnessShowcaseSaveAdapter(
   const savePort = useMemo(() => options.port ?? createDexieSavePort(HARNESS_SHOWCASE_DB), [options.port]);
   const collectSaveData = useCallback(
     () => {
-      const checkpoint = runtime.createVnSaveCheckpoint({ allowInactive: true });
+      const checkpoint = runtime.lifecycle.createVnSaveCheckpoint({ allowInactive: true });
       if (!checkpoint.ok) return checkpoint;
       return { ok: true as const, value: createHarnessShowcaseSaveData({
         savedAt: new Date().toISOString(),
@@ -95,7 +95,7 @@ export function useHarnessShowcaseSaveAdapter(
       runtime.gameplay.evidence,
       runtime.gameplay.inventory,
       runtime.navi,
-      runtime.createVnSaveCheckpoint,
+      runtime.lifecycle.createVnSaveCheckpoint,
       runtime.trialRuntime.active,
       runtime.trialRuntime.state
     ]

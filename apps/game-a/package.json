@@ -10,12 +10,14 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@v-ronpa/app-vn-devtools": "workspace:*",
     "@v-ronpa/app-vn-runtime": "workspace:*",
     "@v-ronpa/app-vn-shell": "workspace:*",
     "@v-ronpa/asset-registry": "workspace:*",
     "@v-ronpa/contracts": "workspace:*",
     "@v-ronpa/game-flow-machine": "workspace:*",
     "@v-ronpa/gameplay": "workspace:*",
+    "@v-ronpa/layered-character": "workspace:*",
     "@v-ronpa/media-save": "workspace:*",
     "@v-ronpa/runtime-assets-pixi": "workspace:*",
     "@v-ronpa/ui-kit": "workspace:*",

@@ -3,6 +3,20 @@
 Each app owns a declarative `asset.config.mjs`. Generation scans its public
 assets, compiles configured `.nani` entries, emits stable semantic SHA-256 script
 revisions, derives script asset refs, and records selected runtime providers.
+`nani-runtime-compiler` owns the canonical semantic byte serialization. It
+includes script path, labels, commands, and command semantics while excluding
+source text and source locations. Asset generation hashes those bytes with
+Node SHA-256; browser inspection hashes the same bytes with Web Crypto. Golden
+tests require byte-for-byte and digest parity, so generated metadata, source
+updates, materialization, save identity, and caches cannot invent separate
+revision rules.
+
+Entries listed in an app's separate `testScripts` collection are emitted into an
+explicitly named test metadata export, separate from the product `scripts`
+metadata object. Product manifests import only the product export, while
+dedicated test-mode entry modules import the test export. There is no per-entry
+`testOnly` marker. The production bundle scan rejects test script paths and
+therefore also guards this tree-shaking boundary.
 
 `RuntimeAssetFragment` is the only provider protocol. A `runtime-assets-*`
 package may contribute stable IDs, runtime assets, optional fonts, and source
@@ -52,13 +66,15 @@ Density is not duplicated in `character.json`.
 
 ## Entry-scoped layered-character preparation
 
-`generate-assets.mjs` derives one `LayeredCharacterPreloadPlan` from each compiled RuntimeScript. It collects explicit
+The pure layered-character model derives one `LayeredCharacterPreloadPlan` from each compiled RuntimeScript; asset
+generation and the Game A DEV candidate transaction call this same projection. It collects explicit
 `@char` character IDs, the default expression `""`, expression changes from `@char` and `@slide`, and applies wildcard
 expressions to every explicit character in the entry. IDs and expressions are deduplicated and stably sorted. The plan is
 stored only in generated script metadata beside `scriptRevision` and `assetRefs`; it is not copied into ContentManifest,
 hand-written app configuration, `.nani`, or a character pack.
 
-An app launch definition pairs the runtime entry with that exact generated plan. The canonical Pixi host mounts while the
+An app launch definition pairs the runtime entry with that exact plan. Product launches use generated metadata; a verified
+DEV source candidate derives a replacement plan from the same compiled script and installs both as one app-owned value. The canonical Pixi host mounts while the
 title or Navi surface is still active. Presenter mount loads and validates only referenced layers, deduplicates shared pack,
 metadata, and Texture work, and calls `renderer.prepare.upload()` for every unique successful Texture. Its stage handle
 becomes ready only after those uploads settle. Story-session changes do not remount this presenter or discard its WebGL

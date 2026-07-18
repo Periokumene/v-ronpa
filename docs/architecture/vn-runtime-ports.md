@@ -1,9 +1,18 @@
 # VN Runtime Ports
 
 The VN runtime public boundary is capability-shaped. `VnRuntimeShellPort` owns
-story/UI actions and facts; `VnPresentationPort` owns terminal Pixi presentation;
-`VnLifecyclePort` owns start/reset/checkpoint/restore; `VnDiagnosticsPort` owns
-diagnostic observation; `VnRuntimeDebugPort` is explicit non-product inspection.
+story/UI actions and facts, including Auto/Skip control;
+`VnPresentationPort` owns terminal Pixi presentation; `VnLifecyclePort` owns
+start/reset/checkpoint/restore; and `VnDiagnosticsPort` owns diagnostic
+observation. These four ports are the complete product boundary returned by
+`useVnRuntime()`.
+
+Read-only runtime inspection is deliberately absent from the root entry.
+Harnesses import `useVnRuntimeWithDebug()` and `VnRuntimeDebugSnapshot` from
+`@v-ronpa/app-vn-runtime/debug`. That same explicit entry exposes headless Nani
+inspection and materialization, but no product action is duplicated there.
+The product hook and debug wrapper are separate modules: product composition
+never delegates through the debug hook or pays the snapshot clone/freeze cost.
 
 Media handles, restore plans, wait keys, voice gates, timers, and transaction
 helpers are internal. Canonical BGM/looping-SFX desired state is checkpoint data,
@@ -11,4 +20,5 @@ but live handles, one-shots, voice/bleep gates, movies, cursors, and fades are n
 Lifecycle reset is a hard reset of the runtime-exclusive media ports; there is no
 per-call media-retention option. Root exports are explicit, and no compatibility
 re-export exists. See [VN integration](app-vn-integration.md) and
-[presentation pipeline](presentation-pipeline.md).
+[presentation pipeline](presentation-pipeline.md). The development-only source
+workflow is specified in [Nani devtools](vn-devtools.md).

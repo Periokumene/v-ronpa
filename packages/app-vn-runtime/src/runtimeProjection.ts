@@ -1,0 +1,117 @@
+import {
+  createVnRuntimePresentationTransaction,
+  deriveUiRuntimeLifecycleState,
+  settleUiRuntimeTransitions,
+  type MediaRuntimeEffect,
+  type MediaRuntimeState,
+  type UiRuntimeState,
+  type VnOutputRouteTable,
+  type VnRuntimePresentationTransaction,
+  type VnRuntimeProfile
+} from "@v-ronpa/app-vn-dispatch";
+import type {
+  GameplayEvent,
+  PixiStageSnapshot,
+  RuntimeCommand
+} from "@v-ronpa/contracts";
+import type { VnSessionState } from "@v-ronpa/app-vn-session";
+import type { PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
+
+/**
+ * Stable state produced by one Story instruction plus its presentation fanout.
+ *
+ * This function is deliberately free of React, media ports, timers, storage,
+ * and presenters. The live runtime applies the transient descriptors while the
+ * debug materializer discards them and commits only the stable state.
+ */
+export interface ProjectVnRuntimeStepInput {
+  active: boolean;
+  animatePixi: boolean;
+  nowMs: number;
+  previousMediaState: MediaRuntimeState;
+  previousPixiStage: PixiStageSnapshot;
+  previousUiState: UiRuntimeState;
+  profile: VnRuntimeProfile;
+  routeTable?: VnOutputRouteTable;
+  runtimeCommands: RuntimeCommand[];
+  session: VnSessionState;
+}
+
+export interface ProjectVnRuntimeStepResult {
+  session: VnSessionState;
+  runtime: {
+    uiState: UiRuntimeState;
+  };
+  stable: {
+    mediaState: MediaRuntimeState;
+    pixiStage: PixiStageSnapshot;
+    uiState: UiRuntimeState;
+  };
+  transient: {
+    gameplayEvents: GameplayEvent[];
+    mediaEffects: MediaRuntimeEffect[];
+    pixiHints: PixiStageRenderHint[];
+  };
+  transaction: VnRuntimePresentationTransaction;
+}
+
+export function projectVnRuntimeStep({
+  active,
+  animatePixi,
+  nowMs,
+  previousMediaState,
+  previousPixiStage,
+  previousUiState,
+  profile,
+  routeTable,
+  runtimeCommands,
+  session
+}: ProjectVnRuntimeStepInput): ProjectVnRuntimeStepResult {
+  const transaction = createVnRuntimePresentationTransaction({
+    nowMs,
+    previousMediaState,
+    previousPixiStage,
+    previousUiState,
+    profile,
+    runtimeCommands,
+    ...(routeTable ? { routeTable } : {})
+  });
+  const story = session.story.presentationWait?.channel === "pixi"
+    ? {
+        ...session.story,
+        presentationWait: {
+          ...session.story.presentationWait,
+          stageRevision: transaction.pixiStage.revision,
+          expectedTasks: animatePixi ? transaction.pixiWaitTasks : []
+        }
+      }
+    : session.story;
+  const projectedSession = { ...session, active, story };
+  const projectedUiState = deriveUiRuntimeLifecycleState(
+    animatePixi ? transaction.uiState : settleUiRuntimeTransitions(transaction.uiState),
+    story
+  );
+  const stableUiState: UiRuntimeState = {
+    surfaces: projectedUiState.surfaces,
+    toasts: [],
+    toastSequence: 0
+  };
+
+  return {
+    session: projectedSession,
+    runtime: {
+      uiState: projectedUiState
+    },
+    stable: {
+      mediaState: transaction.mediaState,
+      pixiStage: transaction.pixiStage,
+      uiState: stableUiState
+    },
+    transient: {
+      gameplayEvents: transaction.gameplayEvents,
+      mediaEffects: transaction.mediaEffects,
+      pixiHints: transaction.pixiHints
+    },
+    transaction
+  };
+}

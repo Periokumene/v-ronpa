@@ -58,6 +58,13 @@ targets and `targetVisible`; UI surface transition completion resumes the story.
 Pixi duration is retained as a fallback diagnostic timeout, not as the primary
 release mechanism.
 
+The standalone `wait` command remains `stubbed`. Its authored parameters are
+validated and StoryEngine emits the normal stub diagnostic/no-op, but this does
+not promise timer scheduling, pause accounting, Skip pacing, click feedback, or
+combined wait correctness. The generated matrix below is authoritative; use
+`pnpm generate:command-docs` after catalog changes and
+`pnpm validate:command-docs` in freshness gates.
+
 ## Categories
 
 - `text`: dialogue printer, backlog, and text formatting commands.
@@ -100,87 +107,105 @@ release mechanism.
   lifecycle-owned `inputPrompt` / `movieOverlay` are outside the current
   implementation.
 
-## Official Naninovel Commands
+## Command Matrix (generated)
 
-| Command | Runtime id | Category | Params | Children | Status |
-|---|---|---|---|---|---|
-| `addChoice` | `addchoice` | choice | `choiceSummary:string`, `id:string`, `lock:string`, `button:string`, `pos:decimal list`, `handler:string`, `goto:string`, `gosub:string`, `set:string`, `show:boolean`, `time:decimal` | no | stubbed |
-| `append` | `append` | text | `text:string`, `printer:string`, `author:string` | no | implemented |
-| `arrange` | `arrange` | actor | `characterPositions:named decimal list`, `look:boolean`, `time:decimal`, `wait:boolean` | no | implemented |
-| `async` | `async` | flow | `trackId:string`, `loop:boolean` | yes | stubbed |
-| `await` | `await` | flow | `trackId:string`, `complete:boolean` | no | stubbed |
-| `back` | `back` | scene | `appearanceAndTransition:named string`, `pos:decimal list`, actor transform params | no | implemented |
-| `bgm` | `bgm` | media | `bgmPath:string`, `intro:string`, audio params | no | implemented |
-| `blur` | `blur` | effect | `actorId:string`, `power:decimal`, `time:decimal`, `wait:boolean` | no | implemented |
-| `bokeh` | `bokeh` | effect | `focus:string`, `dist:decimal`, `power:decimal`, `time:decimal`, `wait:boolean` | no | implemented |
-| `camera` | `camera` | scene | `offset:decimal list`, `roll:decimal`, `rotation:decimal list`, `zoom:decimal`, `ortho:boolean`, `toggle:string list`, `set:named boolean list`, `easing:string`, `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
-| `char` | `char` | actor | `idAndAppearance:named string`, `look:string`, `avatar:string`, `pos:decimal list`, actor transform params | no | implemented |
-| `choice` | `choice` | choice | same as `addChoice` | no | implemented |
-| `choiceHandler` | `choicehandler` | choice | `handlerId:string`, `default:boolean`, actor transform params | no | stubbed |
-| `clearBacklog` | `clearbacklog` | text | none | no | implemented |
-| `clearChoice` | `clearchoice` | choice | `handlerId:string`, `id:string`, `hide:boolean` | no | implemented |
-| `despawn` | `despawn` | actor | `path:string`, `params:string list`, `wait:boolean` | no | stubbed |
-| `despawnAll` | `despawnall` | actor | `wait:boolean` | no | stubbed |
-| `else` | `else` | flow | none | yes | stubbed |
-| `endIf` | `endif` | flow | none | no | stubbed |
-| `enterDialogue` | `enterdialogue` | text | none | no | stubbed |
-| `exitDialogue` | `exitdialogue` | text | `destroy:boolean` | no | stubbed |
-| `format` | `format` | text | `templates:named string list`, `printer:string` | no | stubbed |
-| `glitch` | `glitch` | effect | `time:decimal`, `power:decimal`, `wait:boolean` | no | implemented |
-| `gosub` | `gosub` | flow | `path:string` | no | stubbed |
-| `goto` | `goto` | flow | `path:string`, `reset:string list`, `hold:boolean`, `release:boolean` | no | implemented |
-| `group` | `group` | flow | none | yes | stubbed |
-| `hide` | `hide` | actor | `actorIds:string list`, `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
-| `hideAll` | `hideall` | actor | `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
-| `hideChars` | `hidechars` | actor | `time:decimal`, `lazy:boolean`, `wait:boolean` | no | implemented |
-| `hidePrinter` | `hideprinter` | text | `printerId:string`, `time:decimal`, `wait:boolean` | no | stubbed |
-| `hideUI` | `hideui` | ui | `uINames:string list`, `allowToggle:boolean`, `time:decimal`, `wait:boolean`, `target:string` (V-Ronpa) | no | implemented |
-| `if` | `if` | flow | `expression:string` | yes | stubbed |
-| `input` | `input` | ui | `variableName:string`, `type:string`, `summary:string`, `value:string`, `nostop:boolean` | no | implemented |
-| `lipSync` | `lipsync` | actor | `charIdAndAllow:named boolean` | no | stubbed |
-| `loadScene` | `loadscene` | scene | `sceneName:string`, `additive:boolean` | no | stubbed |
-| `lock` | `lock` | state | `id:string` | no | stubbed |
-| `look` | `look` | actor | `enable:boolean`, `zone:decimal list`, `speed:decimal list`, `gravity:boolean` | no | stubbed |
-| `movie` | `movie` | media | `moviePath:string`, `time:decimal`, `block:boolean` | no | implemented |
-| `openURL` | `openurl` | ui | `uRL:string`, `target:string` | no | stubbed |
-| `print` | `print` | text | `text:string`, `printer:string`, `author:string`, `as:string`, `speed:decimal`, `reset:boolean`, `default:boolean`, `waitInput:boolean`, `append:boolean`, `fadeTime:decimal`, `wait:boolean`; dialogue-line compiler output may also carry `textId:string` | no | implemented |
-| `printer` | `printer` | text | `idAndAppearance:named string`, `default:boolean`, `hideOther:boolean`, `anchor:boolean`, `pos:decimal list`, actor transform params | no | stubbed |
-| `processInput` | `processinput` | ui | `inputEnabled:boolean`, `set:named boolean list` | no | stubbed |
-| `purgeRollback` | `purgerollback` | state | none | no | stubbed |
-| `rain` | `rain` | effect | `power:decimal`, `wind:decimal`, `hue:decimal`, `tint:decimal`, `time:decimal`, `easing:string`, `wait:boolean` | no | implemented |
-| `random` | `random` | flow | `weight:decimal list` | yes | stubbed |
-| `remove` | `remove` | actor | `actorIds:string list` | no | stubbed |
-| `resetState` | `resetstate` | state | `exclude:string list`, `only:string list` | no | stubbed |
-| `resetText` | `resettext` | text | `printerId:string` | no | implemented |
-| `return` | `return` | flow | `reset:string list` | no | stubbed |
-| `save` | `save` | ui | `at:string` | no | stubbed |
-| `set` | `set` | state | `expression:string` | no | implemented |
-| `sfx` | `sfx` | media | `sfxPath:string`, audio params | no | implemented |
-| `sfxFast` | `sfxfast` | media | `sfxPath:string`, `volume:decimal`, `restart:boolean`, `additive:boolean`, `group:string`, `wait:boolean` | no | implemented |
-| `shake` | `shake` | effect | `actorId:string`, `count:integer`, `loop:boolean`, `time:decimal`, `deltaTime:decimal`, `power:decimal`, `deltaPower:decimal`, `hor:boolean`, `ver:boolean`, `wait:boolean` | no | implemented |
-| `show` | `show` | actor | `actorIds:string list`, `time:decimal`, `lazy:boolean`, `wait:boolean` | no | stubbed |
-| `showPrinter` | `showprinter` | text | `printerId:string`, `time:decimal`, `wait:boolean` | no | implemented |
-| `showUI` | `showui` | ui | `uINames:string list`, `time:decimal`, `wait:boolean`, `target:string` (V-Ronpa), `visible:boolean` (V-Ronpa) | no | implemented |
-| `skip` | `skip` | ui | `enable:boolean` | no | stubbed |
-| `slide` | `slide` | actor | `idAndAppearance:named string`, `from:decimal list`, `to:decimal list`, `visible:boolean`, `easing:string`, `time:decimal`, `lazy:boolean`, `wait:boolean` | no | implemented |
-| `snow` | `snow` | effect | particle params | no | implemented |
-| `spawn` | `spawn` | actor | `path:string`, `params:string list`, `pos:decimal list`, `position:decimal list`, `rotation:decimal list`, `scale:decimal list`, `wait:boolean` | no | stubbed |
-| `stop` | `stop` | flow | `trackId:string` | no | stubbed |
-| `stopBgm` | `stopbgm` | media | `bgmPath:string`, `fade:decimal`, `wait:boolean`, `group:string` (V-Ronpa) | no | implemented |
-| `stopSfx` | `stopsfx` | media | `sfxPath:string`, `fade:decimal`, `wait:boolean`, `group:string` (V-Ronpa) | no | implemented |
-| `stopVoice` | `stopvoice` | media | none | no | stubbed |
-| `sun` | `sun` | effect | particle params | no | implemented |
-| `sync` | `sync` | flow | `trackId:string` | no | stubbed |
-| `timeline` | `timeline` | media | `name:string`, `stop:boolean`, `pause:boolean`, `resume:boolean`, `wait:boolean` | no | stubbed |
-| `title` | `title` | ui | none | no | stubbed |
-| `toast` | `toast` | ui | `text:string`, `appearance:string`, `time:decimal` | no | implemented |
-| `trans` | `trans` | scene | `transition:string`, `params:decimal list`, `dissolve:string`, `easing:string`, `time:decimal` | no | stubbed |
-| `unless` | `unless` | flow | `expression:string` | yes | stubbed |
-| `unloadScene` | `unloadscene` | scene | `sceneName:string` | no | stubbed |
-| `unlock` | `unlock` | state | `id:string` | no | stubbed |
-| `voice` | `voice` | media | `voicePath:string`, `volume:decimal`, `group:string`, `authorId:string` | no | stubbed |
-| `wait` | `wait` | flow | `waitMode:string` | no | implemented |
-| `while` | `while` | flow | `expression:string` | yes | stubbed |
+<!-- BEGIN GENERATED COMMAND CATALOG -->
+<!-- Generated by scripts/generate-command-catalog-doc.mjs. Do not edit this block by hand. -->
+### Official Naninovel declarations
+
+| Command | Runtime id | Category | Execution | Params | Children | Status |
+|---|---|---|---|---|---|---|
+| `addChoice` | `addchoice` | choice | declared-only | choiceSummary:string, id:string, enabled:boolean (V-Ronpa), lock:string, button:string, pos:decimal list, handler:string, goto:string, gosub:string, set:string, show:boolean, time:decimal | no | stubbed |
+| `append` | `append` | text | story-control | text:string, printer:string, author:string | no | implemented |
+| `arrange` | `arrange` | actor | pixi-presentation | characterPositions:named decimal list, look:boolean, time:decimal, wait:boolean | no | implemented |
+| `async` | `async` | flow | declared-only | trackId:string, loop:boolean | yes | stubbed |
+| `await` | `await` | flow | declared-only | trackId:string, complete:boolean | no | stubbed |
+| `back` | `back` | scene | pixi-presentation | appearanceAndTransition:named string, pos:decimal list, id:string, appearance:string, pose:string, via:string, params:decimal list, dissolve:string, visible:boolean, position:decimal list, rotation:decimal list, scale:decimal list, tint:string, easing:string, time:decimal, lazy:boolean, wait:boolean, effect:string (V-Ronpa) | no | implemented |
+| `bgm` | `bgm` | media | media-output | bgmPath:string, intro:string, volume:decimal, loop:boolean, fade:decimal, group:string, time:decimal, wait:boolean | no | implemented |
+| `blur` | `blur` | effect | pixi-presentation | actorId:string, power:decimal, time:decimal, wait:boolean | no | implemented |
+| `bokeh` | `bokeh` | effect | pixi-presentation | focus:string, dist:decimal, power:decimal, time:decimal, wait:boolean | no | implemented |
+| `camera` | `camera` | scene | declared-only | offset:decimal list, roll:decimal, rotation:decimal list, zoom:decimal, ortho:boolean, toggle:string list, set:named boolean list, easing:string, time:decimal, lazy:boolean, wait:boolean | no | stubbed |
+| `char` | `char` | actor | pixi-presentation | idAndAppearance:named string, look:string, avatar:string, pos:decimal list, id:string, appearance:string, pose:string, via:string, params:decimal list, dissolve:string, visible:boolean, position:decimal list, rotation:decimal list, scale:decimal list, tint:string, easing:string, time:decimal, lazy:boolean, wait:boolean | no | implemented |
+| `choice` | `choice` | choice | story-control | choiceSummary:string, id:string, enabled:boolean (V-Ronpa), lock:string, button:string, pos:decimal list, handler:string, goto:string, gosub:string, set:string, show:boolean, time:decimal | no | implemented |
+| `choiceHandler` | `choicehandler` | choice | declared-only | handlerId:string, default:boolean, id:string, appearance:string, pose:string, via:string, params:decimal list, dissolve:string, visible:boolean, position:decimal list, rotation:decimal list, scale:decimal list, tint:string, easing:string, time:decimal, lazy:boolean, wait:boolean | no | stubbed |
+| `clearBacklog` | `clearbacklog` | text | story-control | none | no | implemented |
+| `clearChoice` | `clearchoice` | choice | story-control | handlerId:string, id:string, hide:boolean | no | implemented |
+| `despawn` | `despawn` | actor | declared-only | path:string, params:string list, wait:boolean | no | stubbed |
+| `despawnAll` | `despawnall` | actor | declared-only | wait:boolean | no | stubbed |
+| `else` | `else` | flow | declared-only | none | yes | stubbed |
+| `endIf` | `endif` | flow | declared-only | none | no | stubbed |
+| `enterDialogue` | `enterdialogue` | text | declared-only | none | no | stubbed |
+| `exitDialogue` | `exitdialogue` | text | declared-only | destroy:boolean | no | stubbed |
+| `format` | `format` | text | declared-only | templates:named string list, printer:string | no | stubbed |
+| `glitch` | `glitch` | effect | pixi-presentation | time:decimal, power:decimal, blockJump:decimal, burstJump:decimal, pixelScatter:decimal, colorNoise:decimal, speed:decimal, seed:decimal, wait:boolean | no | implemented |
+| `glitchFilter` | `glitchfilter` | effect | pixi-presentation | time:decimal, easing:string, power:decimal, blockJump:decimal, burstJump:decimal, pixelScatter:decimal, colorNoise:decimal, speed:decimal, seed:decimal, wait:boolean | no | implemented |
+| `gosub` | `gosub` | flow | declared-only | path:string | no | stubbed |
+| `goto` | `goto` | flow | story-control | path:string, reset:string list, hold:boolean, release:boolean | no | implemented |
+| `group` | `group` | flow | declared-only | none | yes | stubbed |
+| `hide` | `hide` | actor | declared-only | actorIds:string list, time:decimal, lazy:boolean, wait:boolean | no | stubbed |
+| `hideAll` | `hideall` | actor | declared-only | time:decimal, lazy:boolean, wait:boolean | no | stubbed |
+| `hideChars` | `hidechars` | actor | pixi-presentation | time:decimal, lazy:boolean, wait:boolean | no | implemented |
+| `hidePrinter` | `hideprinter` | text | declared-only | printerId:string, time:decimal, wait:boolean | no | stubbed |
+| `hideUI` | `hideui` | ui | ui-output | uINames:string list, allowToggle:boolean, time:decimal, wait:boolean, target:string (V-Ronpa) | no | implemented |
+| `if` | `if` | flow | declared-only | expression:string | yes | stubbed |
+| `input` | `input` | ui | story-control | variableName:string, type:string, summary:string, value:string, nostop:boolean | no | implemented |
+| `lipSync` | `lipsync` | actor | declared-only | charIdAndAllow:named boolean | no | stubbed |
+| `loadScene` | `loadscene` | scene | declared-only | sceneName:string, additive:boolean | no | stubbed |
+| `lock` | `lock` | state | declared-only | id:string | no | stubbed |
+| `look` | `look` | actor | declared-only | enable:boolean, zone:decimal list, speed:decimal list, gravity:boolean | no | stubbed |
+| `movie` | `movie` | media | media-output | moviePath:string, time:decimal, block:boolean | no | implemented |
+| `openURL` | `openurl` | ui | declared-only | uRL:string, target:string | no | stubbed |
+| `print` | `print` | text | story-control | text:string, printer:string, author:string, as:string, speed:decimal, reset:boolean, default:boolean, waitInput:boolean, append:boolean, fadeTime:decimal, wait:boolean | no | implemented |
+| `printer` | `printer` | text | declared-only | idAndAppearance:named string, default:boolean, hideOther:boolean, anchor:boolean, pos:decimal list, id:string, appearance:string, pose:string, via:string, params:decimal list, dissolve:string, visible:boolean, position:decimal list, rotation:decimal list, scale:decimal list, tint:string, easing:string, time:decimal, lazy:boolean, wait:boolean | no | stubbed |
+| `processInput` | `processinput` | ui | declared-only | inputEnabled:boolean, set:named boolean list | no | stubbed |
+| `purgeRollback` | `purgerollback` | state | declared-only | none | no | stubbed |
+| `rain` | `rain` | effect | pixi-presentation | power:decimal, wind:decimal, hue:decimal, tint:decimal, time:decimal, easing:string, wait:boolean | no | implemented |
+| `random` | `random` | flow | declared-only | weight:decimal list | yes | stubbed |
+| `remove` | `remove` | actor | declared-only | actorIds:string list | no | stubbed |
+| `resetState` | `resetstate` | state | declared-only | exclude:string list, only:string list | no | stubbed |
+| `resetText` | `resettext` | text | story-control | printerId:string | no | implemented |
+| `return` | `return` | flow | declared-only | reset:string list | no | stubbed |
+| `save` | `save` | ui | declared-only | at:string | no | stubbed |
+| `set` | `set` | state | story-control | expression:string | no | implemented |
+| `sfx` | `sfx` | media | media-output | sfxPath:string, volume:decimal, loop:boolean, fade:decimal, group:string, time:decimal, wait:boolean | no | implemented |
+| `sfxFast` | `sfxfast` | media | media-output | sfxPath:string, volume:decimal, restart:boolean, additive:boolean, group:string, wait:boolean | no | implemented |
+| `shake` | `shake` | effect | pixi-presentation | actorId:string, count:integer, loop:boolean, time:decimal, deltaTime:decimal, power:decimal, deltaPower:decimal, hor:boolean, ver:boolean, wait:boolean, target:string (V-Ronpa), intensity:decimal (V-Ronpa), duration:decimal (V-Ronpa) | no | implemented |
+| `show` | `show` | actor | declared-only | actorIds:string list, time:decimal, lazy:boolean, wait:boolean | no | stubbed |
+| `showPrinter` | `showprinter` | text | story-control | printerId:string, time:decimal, wait:boolean | no | implemented |
+| `showUI` | `showui` | ui | ui-output | uINames:string list, time:decimal, wait:boolean, target:string (V-Ronpa), visible:boolean (V-Ronpa) | no | implemented |
+| `skip` | `skip` | ui | declared-only | enable:boolean | no | stubbed |
+| `slide` | `slide` | actor | pixi-presentation | idAndAppearance:named string, from:decimal list, to:decimal list, visible:boolean, easing:string, time:decimal, lazy:boolean, wait:boolean | no | implemented |
+| `snow` | `snow` | effect | pixi-presentation | power:decimal, time:decimal, xSpeed:decimal, ySpeed:decimal, density:decimal, flakeScale:decimal, sway:decimal, fog:decimal, noise:decimal, seed:decimal, pos:decimal list, position:decimal list, rotation:decimal list, scale:decimal list, wait:boolean | no | implemented |
+| `spawn` | `spawn` | actor | declared-only | path:string, params:string list, pos:decimal list, position:decimal list, rotation:decimal list, scale:decimal list, wait:boolean | no | stubbed |
+| `stop` | `stop` | flow | declared-only | trackId:string | no | stubbed |
+| `stopBgm` | `stopbgm` | media | media-output | bgmPath:string, fade:decimal, wait:boolean, group:string (V-Ronpa) | no | implemented |
+| `stopSfx` | `stopsfx` | media | media-output | sfxPath:string, fade:decimal, wait:boolean, group:string (V-Ronpa) | no | implemented |
+| `stopVoice` | `stopvoice` | media | declared-only | none | no | stubbed |
+| `sun` | `sun` | effect | pixi-presentation | power:decimal, time:decimal, pos:decimal list, position:decimal list, rotation:decimal list, scale:decimal list, wait:boolean | no | implemented |
+| `sync` | `sync` | flow | declared-only | trackId:string | no | stubbed |
+| `timeline` | `timeline` | media | declared-only | name:string, stop:boolean, pause:boolean, resume:boolean, wait:boolean | no | stubbed |
+| `title` | `title` | ui | declared-only | none | no | stubbed |
+| `toast` | `toast` | ui | ui-output | text:string, appearance:string, time:decimal | no | implemented |
+| `trans` | `trans` | scene | declared-only | transition:string, params:decimal list, dissolve:string, easing:string, time:decimal | no | stubbed |
+| `unless` | `unless` | flow | declared-only | expression:string | yes | stubbed |
+| `unloadScene` | `unloadscene` | scene | declared-only | sceneName:string | no | stubbed |
+| `unlock` | `unlock` | state | declared-only | id:string | no | stubbed |
+| `voice` | `voice` | media | declared-only | voicePath:string, volume:decimal, group:string, authorId:string | no | stubbed |
+| `wait` | `wait` | flow | story-control | waitMode:string | no | stubbed |
+| `while` | `while` | flow | declared-only | expression:string | yes | stubbed |
+
+### V-Ronpa project declarations
+
+| Command | Runtime id | Category | Execution | Params | Children | Status |
+|---|---|---|---|---|---|---|
+| `charenter` | `charenter` | actor | declared-only | character:string, appearanceExpression:string, effect:string | no | stubbed |
+| `end` | `end` | flow | story-control | none | no | implemented |
+| `flash` | `flash` | effect | pixi-presentation | color:string, duration:decimal, wait:boolean | no | implemented |
+| `focus` | `focus` | effect | pixi-presentation | target:string, duration:decimal | no | implemented |
+| `gameplay` | `gameplay` | state | gameplay | type:string, id:string, quantity:integer, item:string, itemId:string, evidence:string, evidenceId:string, character:string, characterId:string, status:string, skill:string, skillId:string, delta:integer, affinityDelta:integer | no | implemented |
+| `inback` | `inback` | scene | pixi-presentation | appearanceAndTransition:named string, appearance:string, via:string, effect:string, visible:boolean, easing:string, time:decimal, wait:boolean | no | implemented |
+| `trialkeyword` | `trialkeyword` | ui | pixi-presentation | id:string, text:string, speaker:string, evidence:string | no | implemented |
+<!-- END GENERATED COMMAND CATALOG -->
 
 Shared shorthand:
 
@@ -224,20 +249,8 @@ Shared shorthand:
 
 ## V-Ronpa Project Commands
 
-These commands remain project-specific declarations in the same catalog so
-handler registration cannot drift:
-
-- `end`
-- `gameplay` alias `gameplay-event`; params `type`, `id`, `quantity`, `item`,
-  `itemId`, `evidence`, `evidenceId`, `character`, `characterId`, `status`,
-  `skill`, `skillId`, `delta`, and `affinityDelta`
-- `charenter` with `.nani` source alias `char-enter`; migration stub only,
-  prefer official `char`
-- `flash`
-- `focus`
-- `inback`; params `appearanceAndTransition`, `appearance`, `via`, `effect`,
-  `visible`, `easing`, `time`, and `wait`
-- `trialkeyword` alias `trial-keyword`
+Project commands and aliases are included in the generated matrix above; their
+status and execution owner come directly from `commandCatalog`.
 
 Compatibility params currently attached to official commands:
 

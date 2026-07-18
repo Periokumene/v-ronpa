@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   INVALID_VN_START_LABEL_DIAGNOSTIC_CODE,
   useVnRuntime,
@@ -16,25 +15,15 @@ export type UseGameAVnRuntimeOptions = Pick<
   | "dialogueBleepSettings"
   | "storyPlayTiming"
   | "voiceSettings"
-> & {
-  startLabelOverride?: string;
-  entry: VnRuntimeEntry;
-};
+>;
 
-export function useGameAVnRuntime({ entry: baseEntry, startLabelOverride, ...options }: UseGameAVnRuntimeOptions) {
-  const entry = useMemo(
-    () => ({
-      ...baseEntry,
-      ...(startLabelOverride ? { startLabel: startLabelOverride } : {})
-    }),
-    [baseEntry, startLabelOverride]
-  );
+export function useGameAVnRuntime({ entry, ...options }: UseGameAVnRuntimeOptions & { entry: VnRuntimeEntry }) {
   const runtime = useVnRuntime({
     ...options,
     entry,
     gameId: "game-a"
   });
-  const startLabelError = runtime.diagnostics.runtimeDiagnostics.find(
+  const invalidStartLabelDiagnostic = runtime.diagnostics.runtimeDiagnostics.find(
     (diagnostic) => diagnostic.code === INVALID_VN_START_LABEL_DIAGNOSTIC_CODE && diagnostic.severity === "error"
   );
 
@@ -43,13 +32,11 @@ export function useGameAVnRuntime({ entry: baseEntry, startLabelOverride, ...opt
     presentation: runtime.presentation,
     lifecycle: runtime.lifecycle,
     diagnostics: runtime.diagnostics,
-    debug: runtime.debug,
-    startLabelError,
     restoreFromSave(save: SaveData) {
       return restoreGameAVnSave(runtime.lifecycle, save);
     },
     startNewGame(): boolean {
-      if (startLabelError) return false;
+      if (invalidStartLabelDiagnostic) return false;
       runtime.lifecycle.startStory();
       return true;
     }
