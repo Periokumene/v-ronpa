@@ -456,6 +456,9 @@ importers:
       '@v-ronpa/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@v-ronpa/layered-character':
+        specifier: workspace:*
+        version: link:../../packages/layered-character
       '@v-ronpa/nani-parser':
         specifier: workspace:*
         version: link:../../packages/nani-parser

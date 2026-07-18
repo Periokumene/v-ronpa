@@ -11,6 +11,7 @@ VS Code language support for V-Ronpa `.nani` scripts.
 - Provides current-file label completion for `@goto #` and `goto:#`.
 - Discovers the nearest `asset.config.mjs` for an opened `.nani` file and completes generated background, BGM, SFX, video, and layered-character resources.
 - Completes layered-character expression tokens from the matching `compositions.json`, including comma-separated `@char` and `@slide` expressions.
+- Renders a native 320x420 hover preview when the pointer is over the static identity value of an `@char` command.
 - Publishes parser and runtime-compiler diagnostics with exact original-source UTF-16 ranges.
 - Preserves shared diagnostic codes and severities under the single VS Code diagnostic source `nani`.
 - Surfaces compiler-owned warnings for invalid `showUI` / `hideUI` runtime UI targets and ignored promoted-primary values.
@@ -36,6 +37,14 @@ The configured generated assets export is the only authority for resource IDs. T
 Layered-character token names are read directly from each generated character pack's sibling `compositions.json`. Those files are watched independently, so token edits become available without regenerating or reinstalling the extension.
 
 Use **V-Ronpa Nani: Refresh Project Assets** from the Command Palette if an external tool changes files without producing a filesystem notification. Missing or malformed project metadata is reported in the **V-Ronpa Nani** output channel and never disables parser, compiler, hover, or catalog completion features. The asset index is completion-only: unknown IDs are not diagnosed because external paths and dynamic IDs remain valid authoring inputs.
+
+## Character Assembly Preview
+
+Hover the identity expression in a command such as `@char alice.EYE1,MOUTH3` to inspect the assembled layered character. The preview uses the generated character-pack mapping and the shared layered-character resolver, then embeds only the active PNG layers into a content-addressed SVG in VS Code extension storage. It reproduces layer order, anchors, pivots, scale, Z rotation, flips, color multiplication, and alpha. It intentionally does not approximate Pixi outlines, filters, animation, transitions, or stage transforms from other command parameters.
+
+Command-name and non-identity parameter hovers continue to show language documentation. Preview failures are reported inside the hover and under `[char-preview]` in the **V-Ronpa Nani** output channel; they are never added to Problems. During a same-line edit, the last valid image remains visible with an explicit updating or invalid warning. Inserting or deleting a newline clears that conservative line cache.
+
+Use **V-Ronpa Nani: Preview Character at Cursor** to move the caret to the current line's character identity and open the native hover. The command has no default keybinding and never edits the script. Dynamic IDs, dynamic appearance expressions, and wildcard targets are not guessed.
 
 The parser source map is the only diagnostic-location authority. The extension converts each half-open offset span with `TextDocument.positionAt`; it does not inspect messages, search source text, or manufacture fallback ranges. Results computed for an older document version are discarded. If a parser/compiler or span invariant fails, the extension records the error in the **V-Ronpa Nani** output channel and clears diagnostics for that unchanged document version rather than publishing a guessed range.
 

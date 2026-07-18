@@ -3,7 +3,7 @@
   "displayName": "V-Ronpa Nani",
   "description": "VS Code language support for V-Ronpa .nani scripts.",
   "publisher": "v-ronpa",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "main": "./dist/extension.cjs",
@@ -16,7 +16,8 @@
   ],
   "activationEvents": [
     "onLanguage:nani",
-    "onCommand:v-ronpa-nani.refreshProjectAssets"
+    "onCommand:v-ronpa-nani.refreshProjectAssets",
+    "onCommand:v-ronpa-nani.previewCharacterAtCursor"
   ],
   "contributes": {
     "languages": [
@@ -45,6 +46,11 @@
         "command": "v-ronpa-nani.refreshProjectAssets",
         "title": "Refresh Project Assets",
         "category": "V-Ronpa Nani"
+      },
+      {
+        "command": "v-ronpa-nani.previewCharacterAtCursor",
+        "title": "Preview Character at Cursor",
+        "category": "V-Ronpa Nani"
       }
     ]
   },
@@ -60,6 +66,7 @@
   },
   "dependencies": {
     "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/layered-character": "workspace:*",
     "@v-ronpa/nani-parser": "workspace:*",
     "@v-ronpa/nani-runtime-compiler": "workspace:*"
   },
