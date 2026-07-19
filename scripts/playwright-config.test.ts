@@ -24,9 +24,11 @@ describe("Playwright smoke isolation", () => {
       ? playwrightConfig.webServer
       : [playwrightConfig.webServer];
 
-    expect(webServers).toHaveLength(2);
+    expect(webServers).toHaveLength(3);
     expect(webServers.every((server) => server?.reuseExistingServer === false)).toBe(true);
-    expect(webServers.some((server) => server?.command.includes("VITE_ENABLE_TEST_ENTRIES=1"))).toBe(true);
+    expect(webServers.some((server) => server?.command.includes("--mode game-a-smoke"))).toBe(true);
+    expect(webServers.some((server) => server?.command.includes("--mode game-a-character-smoke"))).toBe(true);
+    expect(new Set(webServers.map((server) => server?.url)).size).toBe(3);
   });
 
   it("does not collect the deferred AUTO/SKIP browser suite", () => {

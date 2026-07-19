@@ -8,12 +8,12 @@
 }
 
 .game-a-dialog-surface {
-  --game-a-dialog-left: 11.7vw;
-  --game-a-dialog-right: 11.7vw;
+  --game-a-dialog-left: 11.7cqw;
+  --game-a-dialog-right: 11.7cqw;
   --game-a-dialog-bottom: 0px;
-  --game-a-dialog-height: 27.692vh;
-  --game-a-dialog-copy-left: clamp(24px, 3.2vw, 86px);
-  --game-a-dialog-copy-right: clamp(48px, 4vw, 112px);
+  --game-a-dialog-height: 27.692cqh;
+  --game-a-dialog-copy-left: clamp(24px, 3.2cqw, 86px);
+  --game-a-dialog-copy-right: clamp(48px, 4cqw, 112px);
   position: absolute;
   z-index: 9;
   right: var(--game-a-dialog-right);
@@ -21,7 +21,7 @@
   left: var(--game-a-dialog-left);
   height: var(--game-a-dialog-height);
   min-height: 0;
-  padding: clamp(40px, 6vh, 70px) clamp(24px, 6vw, 96px) clamp(58px, 8vh, 86px);
+  padding: clamp(40px, 6cqh, 70px) clamp(24px, 6cqw, 96px) clamp(58px, 8cqh, 86px);
   color: #f1f1f1;
   font-family: var(--game-a-ui-mono-font);
   isolation: isolate;
@@ -53,14 +53,14 @@
 
 .game-a-dialog-speaker {
   position: absolute;
-  top: -5.4vh;
-  left: 3.9vw;
+  top: -5.4cqh;
+  left: 3.9cqw;
   display: grid;
   place-items: center;
-  min-width: clamp(170px, 11.6vw, 300px);
-  max-width: min(38vw, 340px);
-  min-height: 8vh;
-  padding: 0 clamp(18px, 2.2vw, 34px);
+  min-width: clamp(170px, 11.6cqw, 300px);
+  max-width: min(38cqw, 340px);
+  min-height: 8cqh;
+  padding: 0 clamp(18px, 2.2cqw, 34px);
   border: 2px solid var(--game-a-dialog-line);
   background: #000;
   box-shadow:
@@ -68,7 +68,7 @@
     inset 0 0 0 1px var(--game-a-dialog-line-soft);
   overflow: hidden;
   color: #efefef;
-  font-size: clamp(24px, 2.3vw, 44px);
+  font-size: clamp(24px, 2.3cqw, 44px);
   font-weight: 400;
   line-height: 1;
   text-overflow: ellipsis;
@@ -97,15 +97,15 @@
 }
 
 .game-a-dialog-text-small {
-  font-size: clamp(15px, 1.28vw, 22px);
+  font-size: clamp(15px, 1.28cqw, 22px);
 }
 
 .game-a-dialog-text-medium {
-  font-size: clamp(17px, 1.5vw, 27px);
+  font-size: clamp(17px, 1.5cqw, 27px);
 }
 
 .game-a-dialog-text-large {
-  font-size: clamp(20px, 1.78vw, 32px);
+  font-size: clamp(20px, 1.78cqw, 32px);
 }
 
 .game-a-choice-overlay {
@@ -114,14 +114,14 @@
   inset: 0;
   display: grid;
   place-items: center;
-  padding: clamp(24px, 6vw, 80px);
+  padding: clamp(24px, 6cqw, 80px);
   pointer-events: none;
 }
 
 .game-a-choice-list {
   display: grid;
   gap: 12px;
-  width: min(520px, calc(100vw - 48px));
+  width: min(520px, calc(100cqw - 48px));
   pointer-events: auto;
 }
 
@@ -140,7 +140,7 @@
     inset 0 0 0 1px var(--game-a-dialog-line-soft);
   color: rgba(239, 239, 239, 0.9);
   font-family: var(--game-a-ui-rich-font);
-  font-size: clamp(18px, 1.45vw, 26px);
+  font-size: clamp(18px, 1.45cqw, 26px);
   line-height: 1.35;
   text-align: left;
   text-shadow:
@@ -185,13 +185,13 @@
 .game-a-command-bar {
   position: absolute;
   z-index: 11;
-  right: 11.7vw;
-  bottom: clamp(10px, 1.7vh, 22px);
-  left: 11.7vw;
+  right: 11.7cqw;
+  bottom: clamp(10px, 1.7cqh, 22px);
+  left: 11.7cqw;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: clamp(24px, 3vw, 76px);
+  gap: clamp(24px, 3cqw, 76px);
   pointer-events: auto;
 }
 
@@ -204,7 +204,7 @@
   background: transparent;
   color: rgba(239, 239, 239, 0.42);
   font-family: var(--game-a-ui-mono-font);
-  font-size: clamp(12px, 1.05vw, 19px);
+  font-size: clamp(12px, 1.05cqw, 19px);
   line-height: 1;
   text-shadow: 0 0 1px rgba(255, 255, 255, 0.24);
 }
@@ -235,7 +235,7 @@
   inset: 0;
   display: grid;
   align-items: center;
-  padding: clamp(24px, 8vw, 96px);
+  padding: clamp(24px, 8cqw, 96px);
   background: #000;
   pointer-events: auto;
 }
@@ -256,7 +256,7 @@
 .game-a-title-panel h1 {
   margin: 0 0 14px;
   color: #fbfcf6;
-  font-size: clamp(42px, 8vw, 82px);
+  font-size: clamp(42px, 8cqw, 82px);
   line-height: 0.95;
 }
 
@@ -274,7 +274,7 @@
   right: 18px;
   display: grid;
   gap: 8px;
-  width: min(360px, calc(100vw - 36px));
+  width: min(360px, calc(100cqw - 36px));
   pointer-events: auto;
 }
 
@@ -289,12 +289,12 @@
   position: absolute;
   z-index: 34;
   left: 50%;
-  bottom: clamp(240px, 38vh, 390px);
+  bottom: clamp(240px, 38cqh, 390px);
   display: flex;
   flex-wrap: wrap;
   align-items: end;
   gap: 10px;
-  width: min(460px, calc(100vw - 36px));
+  width: min(460px, calc(100cqw - 36px));
   padding: 16px;
   border: 1px solid rgba(199, 223, 207, 0.3);
   border-radius: 6px;
@@ -335,7 +335,7 @@
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: clamp(16px, 2.35vw, 40px);
+  padding: clamp(16px, 2.35cqw, 40px);
   background: #050505;
   color: var(--game-a-pause-ink);
   font-family: var(--game-a-ui-mono-font);
@@ -357,12 +357,12 @@
 
 .game-a-pause-close {
   position: absolute;
-  top: clamp(16px, 2.5vw, 36px);
-  right: clamp(18px, 2.5vw, 36px);
+  top: clamp(16px, 2.5cqw, 36px);
+  right: clamp(18px, 2.5cqw, 36px);
   z-index: 2;
-  width: clamp(36px, 3vw, 48px);
-  min-width: clamp(36px, 3vw, 48px);
-  min-height: clamp(32px, 2.8vw, 42px);
+  width: clamp(36px, 3cqw, 48px);
+  min-width: clamp(36px, 3cqw, 48px);
+  min-height: clamp(32px, 2.8cqw, 42px);
   padding: 0;
   border: 1px solid var(--game-a-pause-muted);
   border-radius: 0;
@@ -375,22 +375,22 @@
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 0;
-  padding: clamp(18px, 2.5vw, 36px);
+  padding: clamp(18px, 2.5cqw, 36px);
   background: rgba(0, 0, 0, 0.35);
 }
 
 .game-a-pause-heading {
   display: flex;
   align-items: baseline;
-  gap: clamp(18px, 2.5vw, 36px);
+  gap: clamp(18px, 2.5cqw, 36px);
   min-width: 0;
   margin-bottom: 10px;
-  padding-right: clamp(52px, 5vw, 80px);
+  padding-right: clamp(52px, 5cqw, 80px);
 }
 
 .game-a-pause-number {
   color: rgba(229, 229, 224, 0.78);
-  font-size: clamp(40px, 4.8vw, 74px);
+  font-size: clamp(40px, 4.8cqw, 74px);
   font-weight: 700;
   line-height: 0.92;
 }
@@ -398,7 +398,7 @@
 .game-a-pause-heading strong {
   min-width: 0;
   color: rgba(229, 229, 224, 0.74);
-  font-size: clamp(22px, 2.45vw, 38px);
+  font-size: clamp(22px, 2.45cqw, 38px);
   letter-spacing: 0;
   line-height: 1;
 }
@@ -406,7 +406,7 @@
 .game-a-pause-nav-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(150px, 230px);
-  gap: clamp(16px, 2vw, 28px);
+  gap: clamp(16px, 2cqw, 28px);
   align-items: center;
   margin-bottom: 8px;
 }
@@ -466,7 +466,7 @@
 }
 
 .game-a-pause-screen .game-a-overlay-empty {
-  padding: clamp(18px, 2vw, 28px);
+  padding: clamp(18px, 2cqw, 28px);
   color: var(--game-a-pause-muted);
 }
 
@@ -474,7 +474,7 @@
   display: grid;
   gap: 0;
   margin: 0;
-  padding: clamp(14px, 1.8vw, 28px);
+  padding: clamp(14px, 1.8cqw, 28px);
   list-style: none;
 }
 
@@ -506,11 +506,11 @@
   display: grid;
   grid-template-columns: minmax(52px, 78px) minmax(118px, 160px) minmax(0, 1fr) minmax(78px, 120px);
   align-items: center;
-  gap: clamp(12px, 1.7vw, 28px);
+  gap: clamp(12px, 1.7cqw, 28px);
   box-sizing: border-box;
-  height: clamp(104px, 12.8vh, 136px);
+  height: clamp(104px, 12.8cqh, 136px);
   min-height: 0;
-  padding: 6px clamp(12px, 1.8vw, 28px);
+  padding: 6px clamp(12px, 1.8cqw, 28px);
   border: 0;
   border-bottom: 1px solid var(--game-a-pause-faint);
   border-radius: 0;
@@ -532,7 +532,7 @@
 
 .game-a-save-row-number {
   color: rgba(229, 229, 224, 0.75);
-  font-size: clamp(24px, 3vw, 46px);
+  font-size: clamp(24px, 3cqw, 46px);
   font-weight: 700;
   line-height: 1;
 }
@@ -595,7 +595,7 @@
   align-items: center;
   justify-content: center;
   width: fit-content;
-  margin: auto clamp(12px, 1.8vw, 28px) clamp(14px, 2vh, 26px) auto;
+  margin: auto clamp(12px, 1.8cqw, 28px) clamp(14px, 2cqh, 26px) auto;
   gap: 14px;
   padding: 0;
   color: var(--game-a-pause-muted);
@@ -700,9 +700,9 @@
   display: grid;
   grid-template-columns: minmax(160px, 0.72fr) minmax(240px, 1fr);
   align-items: center;
-  gap: clamp(18px, 3vw, 52px);
-  min-height: clamp(64px, 7.4vh, 92px);
-  padding: 10px clamp(18px, 3vw, 56px);
+  gap: clamp(18px, 3cqw, 52px);
+  min-height: clamp(64px, 7.4cqh, 92px);
+  padding: 10px clamp(18px, 3cqw, 56px);
   border-bottom: 1px solid var(--game-a-pause-faint);
   color: var(--game-a-pause-ink);
 }
@@ -714,7 +714,7 @@
 .game-a-setting-label {
   min-width: 0;
   color: rgba(229, 229, 224, 0.86);
-  font-size: clamp(16px, 1.65vw, 24px);
+  font-size: clamp(16px, 1.65cqw, 24px);
   font-weight: 700;
   letter-spacing: 0;
 }
@@ -730,7 +730,7 @@
   display: grid;
   grid-template-columns: 42px minmax(142px, 1fr) 42px;
   align-items: center;
-  gap: clamp(10px, 1.5vw, 18px);
+  gap: clamp(10px, 1.5cqw, 18px);
   width: min(100%, 520px);
   color: var(--game-a-pause-ink);
 }
@@ -793,7 +793,7 @@
 
 .game-a-step-block {
   display: block;
-  height: clamp(16px, 1.8vw, 24px);
+  height: clamp(16px, 1.8cqw, 24px);
   border: 1px solid rgba(229, 229, 224, 0.16);
   background: rgba(229, 229, 224, 0.08);
 }
@@ -808,7 +808,7 @@
 .game-a-stepper-value {
   min-width: 0;
   color: rgba(229, 229, 224, 0.9);
-  font-size: clamp(16px, 1.55vw, 22px);
+  font-size: clamp(16px, 1.55cqw, 22px);
   font-weight: 700;
   text-align: center;
   white-space: nowrap;
@@ -820,7 +820,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
-  padding: 14px clamp(18px, 3vw, 56px) clamp(16px, 2.3vw, 28px);
+  padding: 14px clamp(18px, 3cqw, 56px) clamp(16px, 2.3cqw, 28px);
   border-top: 1px solid var(--game-a-pause-faint);
   background:
     linear-gradient(180deg, rgba(5, 5, 5, 0.78), rgba(5, 5, 5, 0.96)),
@@ -847,8 +847,8 @@
 }
 
 .game-a-overlay-panel {
-  width: min(920px, calc(100vw - 32px));
-  max-height: min(740px, calc(100vh - 32px));
+  width: min(920px, calc(100cqw - 32px));
+  max-height: min(740px, calc(100cqh - 32px));
   overflow: auto;
   padding: 20px;
   border: 1px solid rgba(199, 223, 207, 0.28);
@@ -1005,9 +1005,9 @@
   width: min(320px, 100%);
 }
 
-@media (max-width: 720px) {
+@container game-a-playfield (max-width: 720px) {
   .game-a-dialog-surface {
-    --game-a-dialog-height: clamp(248px, 46vh, 360px);
+    --game-a-dialog-height: clamp(248px, 46cqh, 360px);
     right: 12px;
     bottom: -1px;
     left: 12px;
@@ -1020,7 +1020,7 @@
     left: 28px;
     min-width: 128px;
     min-height: 58px;
-    max-width: calc(100vw - 80px);
+    max-width: calc(100cqw - 80px);
     font-size: 24px;
   }
 

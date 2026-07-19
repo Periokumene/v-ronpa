@@ -31,6 +31,10 @@ import {
   runtimeValue
 } from "./values.ts";
 
+export {
+  digestRuntimeScriptSemantics,
+  serializeRuntimeScriptSemantics
+} from "./semantics.ts";
 export type {
   RuntimeCompilerDiagnostic,
   RuntimeCompilerDiagnosticCode

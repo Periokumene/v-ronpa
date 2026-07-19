@@ -12,8 +12,10 @@
     "test:watch": "vitest",
     "test:smoke": "playwright test",
     "generate:assets": "node scripts/generate-assets.mjs",
+    "generate:command-docs": "node scripts/generate-command-catalog-doc.mjs",
     "validate:assets": "node scripts/validate-assets.mjs",
-    "validate:contracts": "vitest run packages/contracts packages/asset-registry packages/layered-character packages/nani-parser packages/nani-runtime-compiler packages/story-engine packages/story-play packages/app-vn-session packages/app-vn-dispatch packages/app-vn-runtime packages/app-vn-shell packages/gameplay packages/navi-director packages/trial-director packages/media-save",
+    "validate:contracts": "vitest run packages/contracts packages/asset-registry packages/layered-character packages/nani-parser packages/nani-runtime-compiler packages/story-engine packages/story-play packages/app-vn-session packages/app-vn-dispatch packages/app-vn-runtime packages/app-vn-devtools packages/app-vn-shell packages/gameplay packages/navi-director packages/trial-director packages/media-save",
+    "validate:command-docs": "node scripts/generate-command-catalog-doc.mjs --check",
     "validate:boundaries": "node scripts/validate-boundaries.mjs",
     "validate:task-boundaries": "node scripts/validate-task-boundaries.mjs",
     "validate:ccr": "node scripts/validate-ccr.mjs",
@@ -23,7 +25,7 @@
     "validate:nani-diagnostics-cleanup": "node scripts/validate-nani-diagnostics-cleanup.mjs",
     "validate:nani-diagnostics-quality": "node scripts/validate-nani-diagnostics-stress.mjs && node scripts/benchmark-nani-diagnostics.mjs",
     "benchmark:nani-diagnostics": "node scripts/benchmark-nani-diagnostics.mjs",
-    "validate:baseline": "pnpm typecheck && pnpm validate:contracts && pnpm test && pnpm test:extension && pnpm validate:assets && pnpm validate:boundaries && pnpm validate:ccr && pnpm validate:app-cleanup && pnpm validate:vn-runtime-cleanup && pnpm validate:nani-diagnostics-cleanup && pnpm validate:nani-diagnostics-quality && pnpm --filter @v-ronpa/game-a build && pnpm --filter @v-ronpa/game-harness build && pnpm test:smoke",
+    "validate:baseline": "pnpm typecheck && pnpm validate:contracts && pnpm validate:command-docs && pnpm test && pnpm test:extension && pnpm validate:assets && pnpm validate:boundaries && pnpm validate:ccr && pnpm validate:app-cleanup && pnpm validate:vn-runtime-cleanup && pnpm validate:nani-diagnostics-cleanup && pnpm validate:nani-diagnostics-quality && pnpm --filter @v-ronpa/game-a build && pnpm --filter @v-ronpa/game-harness build && pnpm test:smoke",
     "setup:worktree-env": "node scripts/setup-worktree-env.mjs"
   },
   "devDependencies": {

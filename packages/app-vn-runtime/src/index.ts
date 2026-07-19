@@ -11,7 +11,6 @@ export type {
   VnLifecyclePort,
   VnPresentationPort,
   VnRestoreResult,
-  VnRuntimeDebugPort,
   VnRuntimeDialogRevealSettings,
   VnRuntimeDialogueBleepSettings,
   VnRuntimeEntry,

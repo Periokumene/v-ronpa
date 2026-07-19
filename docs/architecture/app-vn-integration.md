@@ -6,12 +6,15 @@
 - `presentation: VnPresentationPort`
 - `lifecycle: VnLifecyclePort`
 - `diagnostics: VnDiagnosticsPort`
-- `debug: VnRuntimeDebugPort`
 
 `GameInteractionShell` consumes only `VnRuntimeShellPort`. `VnPixiPresenterHost`
 consumes `VnPresentationPort`, an asset resolver, and optional diagnostics/capture
 callbacks. Navi and Trial facts are host inputs to the flow projection and never
 become VN runtime port fields.
+
+Story advance, choice/input submission, movie completion, Auto/Skip control,
+toast dismissal, and shell-visible runtime facts all belong to the shell port.
+Apps do not reach through an inspection object to perform product actions.
 
 Apps own SaveData composition. They call `createVnSaveCheckpoint()` and pass its
 Result into the shared save controller. The controller requires `canSave` for UI
@@ -31,4 +34,23 @@ database namespaces. Game A must not import session, dispatch, presenter, Pixi,
 Navi, Trial, Dexie, or Howler packages directly.
 
 Harness-only runtime diagnostics helpers are available from the explicit
-`@v-ronpa/app-vn-runtime/debug` entry.
+`@v-ronpa/app-vn-runtime/debug` entry. `useVnRuntimeWithDebug()` adds one
+read-only `VnRuntimeDebugSnapshot` to the four canonical ports. Game A's
+development workbench uses the entry's headless inspector/materializer and
+commits only through `VnLifecyclePort.restoreVnState()`; see
+[Nani devtools](vn-devtools.md).
+
+## Game viewport ownership
+
+The app playfield is the only geometry boundary shared by Game A DOM surfaces
+and Pixi. Product UI dimensions and breakpoints are relative to the playfield
+container, not the browser window. Pixi continues to measure the host supplied
+by `VnPixiPresenterHost`; apps and development tools must not send presenter
+resize commands or mirror its dimensions into runtime state.
+
+Development chrome stays outside this boundary. Game A may provide an
+app-internal wrapper around the playfield for DEV-only scaling or letterboxing,
+but `GameInteractionShell`, runtime ports, checkpoints, and Pixi remain children
+of one logical playfield. The production call omits the wrapper and must not
+mount development DOM or observers. Host preview modes are app tooling state,
+not `app-vn-devtools`, runtime, save, or presentation contracts.

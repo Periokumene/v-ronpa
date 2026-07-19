@@ -8,6 +8,11 @@ part of `ScenarioIR`, RuntimeCommand, RuntimeScript, or saves. Parser/compiler
 API changes require a CCR and must preserve runtime contract snapshots. See
 [Nani Source Diagnostics](nani-source-diagnostics.md).
 
+Nani workbench anchors, decision traces, inspection results, and materializer
+outcomes are debug-only types under `app-vn-runtime/debug`; they are not public
+content contracts and are never serialized into SaveData. The workbench does
+not add syntax, parser/IR shapes, RuntimeCommand variants, or save fields.
+
 ## SaveData v7
 
 SaveData has one accepted version: `7`. It requires top-level `gameId`. A VN

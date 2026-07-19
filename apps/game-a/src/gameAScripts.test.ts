@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { AssetRef, RuntimeCommand } from "@v-ronpa/contracts";
-import { compileRuntimeScript } from "../../../packages/nani-runtime-compiler/src/index";
+import { compileRuntimeScript, digestRuntimeScriptSemantics } from "../../../packages/nani-runtime-compiler/src/index";
 import { parseScenario } from "../../../packages/nani-parser/src/index";
 import { gameAVnEntry } from "./contentManifest";
 import { gameAOpeningLaunchDefinition, gameAOpeningNaniSource } from "./gameAScripts";
 import {
-  gameATestLaunchDefinitions,
-  resolveGameATestLaunchDefinition
+  gameACharacterSmokeLaunchDefinition,
+  gameASmokeLaunchDefinition
 } from "./gameATestEntries";
 
 const openingRuntimeEntry = gameAOpeningLaunchDefinition.runtimeEntry;
-const smokeRuntimeEntry = gameATestLaunchDefinitions.smoke.runtimeEntry;
-const characterRuntimeEntry = gameATestLaunchDefinitions.character.runtimeEntry;
+const smokeRuntimeEntry = gameASmokeLaunchDefinition.runtimeEntry;
+const characterRuntimeEntry = gameACharacterSmokeLaunchDefinition.runtimeEntry;
 
 describe("game-a nani scripts", () => {
   it("exposes the opening .nani source as the app runtime entry", () => {
@@ -84,10 +84,10 @@ describe("game-a nani scripts", () => {
 
     expect(smokeRuntimeEntry.sourceText).toContain("CHECKPOINT SMOKE MOVIE");
     expect(characterRuntimeEntry.sourceText).toContain("CHECKPOINT CHARACTER 04");
-    expect(gameATestLaunchDefinitions.smoke.characterPreloadPlan).toEqual([
+    expect(gameASmokeLaunchDefinition.characterPreloadPlan).toEqual([
       { characterId: "alice", appearanceExpressions: [""] }
     ]);
-    expect(gameATestLaunchDefinitions.character.characterPreloadPlan).toEqual([
+    expect(gameACharacterSmokeLaunchDefinition.characterPreloadPlan).toEqual([
       {
         characterId: "alice",
         appearanceExpressions: [
@@ -115,11 +115,17 @@ describe("game-a nani scripts", () => {
     );
   });
 
-  it("resolves only explicit test entry ids", () => {
-    expect(resolveGameATestLaunchDefinition("smoke")).toBe(gameATestLaunchDefinitions.smoke);
-    expect(resolveGameATestLaunchDefinition("character")).toBe(gameATestLaunchDefinitions.character);
-    expect(resolveGameATestLaunchDefinition("opening")).toBeUndefined();
-    expect(resolveGameATestLaunchDefinition(null)).toBeUndefined();
+  it.each([
+    ["opening", openingRuntimeEntry],
+    ["smoke", smokeRuntimeEntry],
+    ["character", characterRuntimeEntry]
+  ])("matches the generated %s script revision in the browser runtime", async (_name, entry) => {
+    const parsed = parseScenario({ scriptPath: entry.scriptPath, sourceText: entry.sourceText });
+    const compiled = compileRuntimeScript(parsed);
+
+    expect(parsed.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+    expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+    expect(await digestRuntimeScriptSemantics(compiled.script)).toBe(entry.scriptRevision);
   });
 
   it("keeps active script asset references declared on the VN entry", () => {

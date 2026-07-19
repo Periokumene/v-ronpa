@@ -58,6 +58,11 @@ invariant failure is an implementation error: editor adapters log it and
 publish no guessed range.
 Product runtime diagnostics preserve parser/compiler code, severity, coarse
 location, and exact span instead of rebuilding a looser mirror type.
+The DEV Workbench transports that same absolute span through Vite and maps it
+against the exact candidate source only in the browser controller. Find marks
+and diagnostic underlines are separate rendering layers. Non-source runtime,
+asset, media, and bridge diagnostics may omit spans and use line-level
+navigation; this does not weaken the parser/compiler diagnostic contract.
 
 ## Non-Goals
 

@@ -190,6 +190,25 @@ describe("UI runtime", () => {
     expect(dismissToast(result.state, "toast:1").toasts).toEqual([]);
   });
 
+  it("derives toast identity only from input state", () => {
+    const first = reduceUiRuntimeCommand(
+      createInitialUiRuntimeState(),
+      runtimeCommand("toast", "ui", { text: "Ready" })
+    );
+    const replay = reduceUiRuntimeCommand(
+      createInitialUiRuntimeState(),
+      runtimeCommand("toast", "ui", { text: "Ready" })
+    );
+
+    expect(first.state).toEqual(replay.state);
+    expect(first.state.toasts[0]?.id).toBe("toast:1");
+    const afterDismiss = reduceUiRuntimeCommand(
+      dismissToast(first.state, "toast:1"),
+      runtimeCommand("toast", "ui", { text: "Again" })
+    );
+    expect(afterDismiss.state.toasts[0]?.id).toBe("toast:2");
+  });
+
   it("copies toast rich text snapshots from runtime commands", () => {
     const result = reduceUiRuntimeCommand(
       createInitialUiRuntimeState(),

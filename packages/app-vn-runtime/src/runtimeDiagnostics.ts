@@ -6,6 +6,7 @@ import type {
 } from "@v-ronpa/app-vn-dispatch";
 import type { VnSessionDiagnostics } from "@v-ronpa/app-vn-session";
 import type { RuntimeScript } from "@v-ronpa/contracts";
+import type { TextSpan } from "@v-ronpa/nani-parser";
 import type { StoryStepperDiagnostic } from "@v-ronpa/story-engine";
 
 export type VnRuntimeDiagnosticSource = "parser" | "compiler" | "story" | "transaction" | "media" | "ui" | "asset";
@@ -16,7 +17,7 @@ export interface VnRuntimeDiagnostic {
   severity: "info" | "warning" | "error";
   message: string;
   loc?: string;
-  span?: { start: number; end: number };
+  span?: TextSpan;
   commandId?: string;
 }
 
@@ -150,7 +151,7 @@ function toVnTransactionDiagnostic(diagnostic: VnRuntimeTransactionDiagnostic): 
   return {
     source: "transaction",
     code: diagnostic.code,
-    severity: "error",
+    severity: diagnostic.code === "normalized-pixi-params" ? "warning" : "error",
     message: diagnostic.message,
     commandId: diagnostic.commandId
   };

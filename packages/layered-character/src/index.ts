@@ -2,7 +2,9 @@ import type {
   LayeredCharacterCompositions,
   LayeredCharacterDefinition,
   LayeredCharacterLayerMetadata,
-  LayeredCharacterLayers
+  LayeredCharacterLayers,
+  RuntimeCommand,
+  RuntimeScript
 } from "@v-ronpa/contracts";
 
 export type LayeredCharacterDiagnosticCode =
@@ -46,6 +48,53 @@ export interface LayeredCharacterPreloadPlanEntry {
 }
 
 export type LayeredCharacterPreloadPlan = readonly LayeredCharacterPreloadPlanEntry[];
+
+/**
+ * Derives the complete deterministic preload plan for layered-character commands in a runtime script.
+ *
+ * Wildcard expressions apply only to characters explicitly introduced by an `@char` command. Keeping
+ * this projection next to the layered-character model gives asset generation and DEV source updates one
+ * authority for deciding which expression textures must be prepared before presentation.
+ */
+export function deriveLayeredCharacterPreloadPlan(script: RuntimeScript): LayeredCharacterPreloadPlan {
+  const characterIds = new Set<string>();
+  for (const command of script.commands) {
+    if (command.commandId !== "char") continue;
+    const target = stringRuntimeParam(command, "target");
+    if (target && target !== "*") characterIds.add(target);
+  }
+
+  const expressionsByCharacter = new Map(
+    [...characterIds].map((characterId) => [characterId, new Set<string>()] as const)
+  );
+  const wildcardExpressions: string[] = [];
+  for (const command of script.commands) {
+    if (command.commandId !== "char" && command.commandId !== "slide") continue;
+    const target = stringRuntimeParam(command, "target");
+    const expression = stringRuntimeParam(command, "appearanceExpression");
+    if (!target || expression === undefined) continue;
+    if (target === "*") {
+      wildcardExpressions.push(expression.trim());
+      continue;
+    }
+    expressionsByCharacter.get(target)?.add(expression.trim());
+  }
+  for (const expressions of expressionsByCharacter.values()) {
+    for (const expression of wildcardExpressions) expressions.add(expression);
+  }
+
+  return [...expressionsByCharacter]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([characterId, expressions]) => ({
+      characterId,
+      appearanceExpressions: [...expressions].sort((left, right) => left.localeCompare(right))
+    }));
+}
+
+function stringRuntimeParam(command: RuntimeCommand, key: string): string | undefined {
+  const value = command.params[key];
+  return typeof value === "string" ? value : undefined;
+}
 
 export interface ResolvedLayeredCharacterLayerRef {
   id: string;

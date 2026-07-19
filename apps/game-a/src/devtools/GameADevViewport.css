@@ -1,0 +1,94 @@
+.game-a-shell-with-devtools {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.game-a-dev-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(45deg, rgb(18 22 30 / 45%) 25%, transparent 25%) 0 0 / 20px 20px,
+    linear-gradient(-45deg, rgb(18 22 30 / 45%) 25%, transparent 25%) 0 10px / 20px 20px,
+    #05070b;
+  isolation: isolate;
+}
+
+.game-a-dev-viewport-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 1px;
+  min-height: 1px;
+  overflow: hidden;
+  transform-origin: top left;
+  will-change: transform;
+}
+
+.game-a-dev-viewport-toolbar {
+  position: absolute;
+  z-index: 30;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgb(70 81 106 / 82%);
+  border-radius: 7px;
+  background: rgb(11 13 20 / 88%);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 32%);
+  color: #8f9bb2;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", monospace;
+  font-size: 9px;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+}
+
+.game-a-dev-viewport-toolbar button {
+  min-height: 24px;
+  padding: 0 7px;
+  border-color: transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #aab4c7;
+  font-family: inherit;
+  font-size: 9px;
+}
+
+.game-a-dev-viewport-toolbar button[aria-pressed="true"] {
+  border-color: rgb(88 215 199 / 55%);
+  background: rgb(88 215 199 / 13%);
+  color: #8af4e6;
+}
+
+.game-a-dev-viewport-toolbar button:focus-visible {
+  outline: 2px solid #8af4e6;
+  outline-offset: 1px;
+}
+
+.game-a-dev-viewport-toolbar span {
+  min-width: 92px;
+  padding: 0 5px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 899px) {
+  .game-a-dev-viewport-toolbar {
+    right: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-a-dev-viewport-stage {
+    will-change: auto;
+  }
+}

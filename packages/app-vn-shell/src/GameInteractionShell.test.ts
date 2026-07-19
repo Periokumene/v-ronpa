@@ -441,7 +441,10 @@ function createRuntime({
         ended: false
       }
     },
+    stopStoryAutomation: () => undefined,
     submitStoryInput: () => undefined,
+    toggleStoryAuto: () => undefined,
+    toggleStorySkip: () => undefined,
     uiRuntime: {
       state: baseUiRuntimeState
     }

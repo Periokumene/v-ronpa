@@ -14,6 +14,7 @@ import {
   chooseStoryOption,
   createInitialStoryState,
   selectCurrentStoryLine,
+  stepStoryInstruction,
   storyReducer,
   storyRuntimeSnapshot
 } from "./index";
@@ -183,6 +184,48 @@ describe("story engine", () => {
       { text: "Follow the witness into class", goto: "#Classroom", enabled: true }
     ]);
     expect(result.emittedRuntimeCommands).toEqual([]);
+  });
+
+  it("executes one instruction at a time and matches batched stop projection", () => {
+    const runtimeScript = vnStepperRuntimeScript;
+    const initial = createInitialStoryState(runtimeScript);
+    const batchedText = advanceToNextStop(initial, runtimeScript);
+
+    const first = stepStoryInstruction(initial, runtimeScript);
+    const second = stepStoryInstruction(first.state, runtimeScript);
+    const third = stepStoryInstruction(second.state, runtimeScript);
+
+    expect(first.state.instructionPointer).toBe(1);
+    expect(second.state.instructionPointer).toBe(2);
+    expect(third.state).toEqual(batchedText.state);
+    expect([
+      ...first.emittedRuntimeCommands,
+      ...second.emittedRuntimeCommands,
+      ...third.emittedRuntimeCommands
+    ]).toEqual(batchedText.emittedRuntimeCommands);
+
+    const batchedChoices = advanceToNextStop(batchedText.state, runtimeScript);
+    const firstChoice = stepStoryInstruction(third.state, runtimeScript);
+    const secondChoice = stepStoryInstruction(firstChoice.state, runtimeScript);
+    const batchedChoiceRemainder = advanceToNextStop(firstChoice.state, runtimeScript);
+
+    expect(firstChoice.state.pendingChoices).toHaveLength(1);
+    expect(secondChoice.state).toEqual(batchedChoices.state);
+    expect(batchedChoiceRemainder.state).toEqual(secondChoice.state);
+    expect(secondChoice.state.pendingChoices).toHaveLength(2);
+  });
+
+  it("does not step past an active story boundary", () => {
+    const runtimeScript = vnStepperRuntimeScript;
+    const text = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+    const choices = advanceToNextStop(text.state, runtimeScript);
+    const blocked = stepStoryInstruction(choices.state, runtimeScript);
+
+    expect(blocked.state).toBe(choices.state);
+    expect(blocked.stopReason).toBe("choices");
+    expect(blocked.diagnostics).toEqual([
+      { code: "pending-choices", message: "Story is waiting for a choice; advance did not change state." }
+    ]);
   });
 
   it("reports declared but unimplemented official commands as no-op diagnostics", () => {

@@ -53,7 +53,6 @@ const forbiddenPatterns = [
   { pattern: /(?:exec|match|search)\s*\(\s*diagnostic\.message\b/u, label: "diagnostic message regex" },
   { pattern: /\.lineAt\s*\(\s*0\s*\)/u, label: "first-line diagnostic fallback" },
   { pattern: /\bsourceMap\s*\?/u, label: "optional Nani source map" },
-  { pattern: /\bspan\s*\?\s*:\s*TextSpan\b/u, label: "optional Nani diagnostic span" },
   { pattern: /\bParseScenarioInput\b[^}]*\bbaseUrl\b/su, label: "removed parser baseUrl input" },
   { pattern: /most likely command line|approximate command-line ranges|approximate diagnostic range/iu, label: "approximate diagnostic documentation" }
 ];
@@ -87,6 +86,7 @@ checkNoProvenance(
   /\b(NaniSourceMap|NaniSourceRef|TextSpan|sourceMap|sourceSpan|provenance)\b/u
 );
 checkPublicApiShape();
+checkUnifiedAuthorityShape();
 
 if (failures.length > 0) {
   console.error("Nani diagnostics cleanup guard failed:");
@@ -111,11 +111,17 @@ function checkPublicApiShape() {
   const apiPath = "packages/nani-parser/src/types/api.ts";
   const parserIndexPath = "packages/nani-parser/src/index.ts";
   const compilerPath = "packages/nani-runtime-compiler/src/index.ts";
+  const compilerSemanticsPath = "packages/nani-runtime-compiler/src/semantics.ts";
   const runtimeDiagnosticsPath = "packages/app-vn-runtime/src/runtimeDiagnostics.ts";
+  const viteProtocolPath = "packages/app-vn-devtools/src/viteProtocol.ts";
+  const viteBridgePath = "packages/app-vn-devtools/src/vite.ts";
   const api = readRequired(apiPath);
   const parserIndex = readRequired(parserIndexPath);
   const compiler = readRequired(compilerPath);
+  const compilerSemantics = readRequired(compilerSemanticsPath);
   const runtimeDiagnostics = readRequired(runtimeDiagnosticsPath);
+  const viteProtocol = readRequired(viteProtocolPath);
+  const viteBridge = readRequired(viteBridgePath);
 
   requirePattern(apiPath, api, /interface ParsedScenarioDocument\s*\{[^}]*\bscenario\s*:\s*ScenarioIR\s*;[^}]*\bsourceMap\s*:\s*NaniSourceMap\s*;/su, "required scenario/sourceMap document shape");
   requirePattern(apiPath, api, /interface NaniSourceDiagnostic[\s\S]*?\bspan\s*:\s*TextSpan\s*;/u, "required diagnostic span");
@@ -124,7 +130,28 @@ function checkPublicApiShape() {
   rejectPattern(parserIndexPath, parserIndex, /\bparseRichText\b/u, "removed public rich-text parser");
   requirePattern(compilerPath, compiler, /export function compileRuntimeScript\s*\(\s*document\s*:\s*ParsedScenarioDocument\s*\)/u, "parsed-document compiler entry point");
   rejectPattern(compilerPath, compiler, /compileRuntimeScript\s*\([^)]*ScenarioIR/u, "bare ScenarioIR compiler entry point");
+  requirePattern(compilerPath, compiler, /export\s*\{[^}]*digestRuntimeScriptSemantics[^}]*serializeRuntimeScriptSemantics[^}]*\}\s*from\s*["']\.\/semantics\.ts["']/su, "canonical semantic helper exports");
+  requirePattern(compilerSemanticsPath, compilerSemantics, /export function serializeRuntimeScriptSemantics\s*\(/u, "canonical semantic serializer");
+  requirePattern(compilerSemanticsPath, compilerSemantics, /export async function digestRuntimeScriptSemantics\s*\(/u, "WebCrypto semantic digest");
   rejectPattern(runtimeDiagnosticsPath, runtimeDiagnostics, /\b(?:VnRuntimeParserDiagnosticLike|VnRuntimeCompilerDiagnosticLike)\b/u, "loose runtime diagnostic mirror");
+  requirePattern(runtimeDiagnosticsPath, runtimeDiagnostics, /\bspan\?\s*:\s*TextSpan\s*;/u, "optional runtime source span transport");
+  requirePattern(viteProtocolPath, viteProtocol, /\bspan\?\s*:\s*TextSpan\s*;/u, "optional Workbench wire span transport");
+  if ((viteBridge.match(/\bspan\s*:\s*diagnostic\.span\b/gu) ?? []).length < 2) {
+    failures.push(`${viteBridgePath}: parser and compiler diagnostics must both preserve exact spans.`);
+  }
+}
+
+function checkUnifiedAuthorityShape() {
+  const generatorPath = "scripts/generate-assets.mjs";
+  const commandDocPath = "docs/nani/command-catalog.md";
+  const generator = readRequired(generatorPath);
+  const commandDoc = readRequired(commandDocPath);
+
+  requirePattern(generatorPath, generator, /import\s*\{[^}]*serializeRuntimeScriptSemantics[^}]*\}\s*from\s*["'][^"']*nani-runtime-compiler[^"']*["']/su, "compiler-owned semantic serializer import");
+  requirePattern(generatorPath, generator, /import\s*\{\s*deriveLayeredCharacterPreloadPlan\s*\}\s*from\s*["'][^"']*layered-character[^"']*["']/su, "layered-character preload authority import");
+  rejectPattern(generatorPath, generator, /function\s+(?:stableJson|serializeRuntimeScriptSemantics|deriveLayeredCharacterPreloadPlan)\s*\(/u, "duplicated semantic/preload authority");
+  requirePattern(commandDocPath, commandDoc, /<!-- BEGIN GENERATED COMMAND CATALOG -->[\s\S]*<!-- END GENERATED COMMAND CATALOG -->/u, "generated command matrix markers");
+  rejectPattern(commandDocPath, commandDoc, /## Official Naninovel Commands/u, "legacy hand-maintained command matrix");
 }
 
 function readRequired(path) {

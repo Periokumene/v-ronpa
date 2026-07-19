@@ -8,13 +8,10 @@ import type {
   StoryRuntimeSnapshot
 } from "@v-ronpa/contracts";
 import type { MediaRuntimeState, UiRuntimeState, DialogRevealEvent, DialogRevealState } from "@v-ronpa/app-vn-dispatch";
-import type { VnSessionState } from "@v-ronpa/app-vn-session";
 import type { PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
 import type { VnRuntimeDiagnostic } from "./runtimeDiagnostics";
 import type {
   StoryPlayAdvanceSource,
-  StoryPlaySchedule,
-  StoryPlayState,
   StoryPlayStopReason,
   StoryPlayTimingPolicy
 } from "@v-ronpa/story-play";
@@ -75,7 +72,10 @@ export interface VnRuntimeShellPort {
   interactionFacts: VnInteractionFacts;
   storyPlayActiveActions: Partial<Record<GameUiAction, boolean>>;
   storyRuntime: VnStoryRuntime;
+  stopStoryAutomation(reason: StoryPlayStopReason): void;
   submitStoryInput(value: string | number | boolean): void;
+  toggleStoryAuto(): void;
+  toggleStorySkip(): void;
   uiRuntime: VnUiRuntime;
 }
 
@@ -106,24 +106,32 @@ export interface VnDiagnosticsPort {
   runtimeDiagnostics: VnRuntimeDiagnostic[];
 }
 
-/** Explicit debug-only capability; product shells must not depend on it. */
-export interface VnRuntimeDebugPort {
-  lastRuntimeCommandCount: number;
-  mediaRuntime: VnMediaRuntime;
-  storyPlay: StoryPlayState;
-  storyPlaySchedule: StoryPlaySchedule;
-  storySessionState: VnSessionState;
-  stopStoryAutomation(reason: StoryPlayStopReason): void;
-  toggleStoryAuto(): void;
-  toggleStorySkip(): void;
+/** Read-only runtime observations exposed only through the explicit debug entry. */
+export interface VnRuntimeDebugSnapshot {
+  readonly storyRuntime: DeepReadonly<VnStoryRuntime>;
+  readonly pixiStageRuntime: DeepReadonly<VnPixiStageRuntime>;
+  readonly uiRuntime: DeepReadonly<VnUiRuntime>;
+  readonly runtimeDiagnostics: readonly DeepReadonly<VnRuntimeDiagnostic>[];
 }
+
+type DeepReadonly<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends readonly (infer Item)[]
+    ? readonly DeepReadonly<Item>[]
+    : T extends object
+      ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+      : T;
 
 export interface UseVnRuntimeResult {
   shell: VnRuntimeShellPort;
   presentation: VnPresentationPort;
   lifecycle: VnLifecyclePort;
   diagnostics: VnDiagnosticsPort;
-  debug: VnRuntimeDebugPort;
+}
+
+/** Explicit debug hook result; never exposed by the product runtime entry. */
+export interface UseVnRuntimeWithDebugResult extends UseVnRuntimeResult {
+  debug: VnRuntimeDebugSnapshot;
 }
 
 export interface VnRuntimeEntry {

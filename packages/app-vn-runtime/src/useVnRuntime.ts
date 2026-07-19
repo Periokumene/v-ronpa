@@ -13,7 +13,6 @@ import {
   createInitialUiRuntimeState,
   createVnMediaCheckpoint,
   createVnUiCheckpoint,
-  createVnRuntimePresentationTransaction,
   deriveUiRuntimeLifecycleState,
   dismissToast,
   hasActiveUiRuntimeTransitions,
@@ -99,6 +98,7 @@ import {
   type VnRuntimeMediaHandleStore
 } from "./runtimeMedia";
 import { createVnRuntimeRestorePlan } from "./runtimeRestore";
+import { projectVnRuntimeStep } from "./runtimeProjection";
 import { collectVnSaveCheckpoint, validateVnRestoreIdentity } from "./checkpoint";
 import type {
   VnDialogRevealRuntime,
@@ -231,7 +231,6 @@ export function useVnRuntime({
     eventSequence: 0
   }));
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<VnRuntimeDiagnostic[]>(() => initialRuntimeDiagnostics);
-  const [lastRuntimeCommandCount, setLastRuntimeCommandCount] = useState(0);
   const [storySession, setStorySession] = useState(0);
 
   const sessionRef = useRef(session);
@@ -603,7 +602,6 @@ export function useVnRuntime({
       ...createInitialVnPixiStageRuntime(),
       hintSequence: current.hintSequence + 1
     }));
-    setLastRuntimeCommandCount(0);
     setStorySession((current) => current + 1);
   }
 
@@ -845,7 +843,6 @@ export function useVnRuntime({
       hintSequence: current.hintSequence + 1
     }));
     setStorySession((current) => current + 1);
-    setLastRuntimeCommandCount(0);
     if (plan.mediaEffects.length > 0) {
       void applyVnRuntimeMediaEffects({
         audioPort,
@@ -873,33 +870,23 @@ export function useVnRuntime({
     storyDiagnostics = []
   }: CommitVnSessionStepInput) {
     const nowMs = readVnRuntimeNowMs();
-    const transaction = createVnRuntimePresentationTransaction({
+    const animatePixi = shouldAnimateVnStoryPlayPacing(pacing);
+    const projection = projectVnRuntimeStep({
+      active,
+      animatePixi,
       nowMs,
-      runtimeCommands,
       previousMediaState: mediaRuntimeRef.current.state,
       previousPixiStage,
       previousUiState: uiRuntimeRef.current.state,
       profile: runtimeProfile,
+      runtimeCommands,
+      session: nextSession,
       ...(routeTable ? { routeTable } : {})
     });
-    setLastRuntimeCommandCount(runtimeCommands.length);
-    if (transaction.gameplayEvents.length > 0) onGameplayEvents?.(transaction.gameplayEvents);
-    const animatePixi = shouldAnimateVnStoryPlayPacing(pacing);
-    const nextStoryState = nextSession.story.presentationWait?.channel === "pixi"
-      ? {
-          ...nextSession.story,
-          presentationWait: {
-            ...nextSession.story.presentationWait,
-            stageRevision: transaction.pixiStage.revision,
-            expectedTasks: animatePixi ? transaction.pixiWaitTasks : []
-          }
-        }
-      : nextSession.story;
-    const sessionForCommit = {
-      ...nextSession,
-      active,
-      story: nextStoryState
-    };
+    const transaction = projection.transaction;
+    if (projection.transient.gameplayEvents.length > 0) onGameplayEvents?.(projection.transient.gameplayEvents);
+    const sessionForCommit = projection.session;
+    const nextStoryState = sessionForCommit.story;
     const dialogueAudio = commitDialogRevealForStoryStep({
       active,
       dialogVisible: transaction.uiState.surfaces.dialog.targetVisible,
@@ -926,7 +913,7 @@ export function useVnRuntime({
         ...(resolved.uri ? { uri: resolved.uri } : {}),
         blocking: effect.block
       });
-    }, transaction.uiState);
+    }, projection.runtime.uiState);
     if (sawMovieEffect) pendingMoviePlaybackRef.current = pendingMoviePlayback;
     appendRuntimeDiagnostics(
       collectVnRuntimeDiagnostics({
@@ -936,7 +923,7 @@ export function useVnRuntime({
         uiDiagnostics: transaction.uiDiagnostics
       }).concat(movieDiagnostics, dialogueAudio.diagnostics)
     );
-    setMediaRuntimeNow({ state: transaction.mediaState });
+    setMediaRuntimeNow({ state: projection.stable.mediaState });
     setUiRuntimeNow({ state: deriveUiRuntimeLifecycleState(nextUiStateFromCommands, nextStoryState) });
     const audioMediaEffects = transaction.mediaEffects.filter((effect) => effect.type !== "play-movie");
     const voiceBoundaryToken = dialogueAudio.hasVoiceBoundary ? beginVoiceBoundary() : undefined;
@@ -959,10 +946,10 @@ export function useVnRuntime({
         }
       });
     }
-    if (forcePixiCommit || transaction.pixiStage !== previousPixiStage || transaction.pixiHints.length > 0) {
+    if (forcePixiCommit || projection.stable.pixiStage !== previousPixiStage || projection.transient.pixiHints.length > 0) {
       setPixiStageRuntimeNow((current) => ({
-        snapshot: transaction.pixiStage,
-        hints: transaction.pixiHints,
+        snapshot: projection.stable.pixiStage,
+        hints: projection.transient.pixiHints,
         hintSequence: current.hintSequence + 1,
         animate: animatePixi,
         presentationTasks: animatePixi ? current.presentationTasks : []
@@ -1206,7 +1193,6 @@ export function useVnRuntime({
       session.story.runtimeWait
     ]
   );
-
   return {
     shell: {
       advanceStory,
@@ -1218,7 +1204,10 @@ export function useVnRuntime({
       interactionFacts,
       storyPlayActiveActions,
       storyRuntime,
+      stopStoryAutomation,
       submitStoryInput,
+      toggleStoryAuto,
+      toggleStorySkip,
       uiRuntime
     },
     presentation: {
@@ -1235,16 +1224,6 @@ export function useVnRuntime({
     diagnostics: {
       observeAssetDiagnostic,
       runtimeDiagnostics
-    },
-    debug: {
-      lastRuntimeCommandCount,
-      mediaRuntime,
-      stopStoryAutomation,
-      storyPlay,
-      storyPlaySchedule,
-      storySessionState: session,
-      toggleStoryAuto,
-      toggleStorySkip
     }
   };
 }

@@ -4,6 +4,7 @@ import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
 import {
   INVALID_VN_START_LABEL_DIAGNOSTIC_CODE,
   createInitialVnRuntimeDiagnostics,
+  collectVnRuntimeDiagnostics,
   createVnRuntimeStartLabelDiagnostics
 } from "./runtimeDiagnostics";
 
@@ -63,6 +64,18 @@ describe("VN runtime diagnostics", () => {
         severity: "error",
         message: 'VN start label "DBG_RAIN" was not found in opening.nani.'
       }
+    ]);
+  });
+
+  it("treats deterministic Pixi normalization as degraded warning while unresolved projection stays fatal", () => {
+    expect(collectVnRuntimeDiagnostics({
+      transactionDiagnostics: [
+        { code: "normalized-pixi-params", commandId: "rain", message: "clamped" },
+        { code: "unresolved-runtime-expression", commandId: "rain", message: "unresolved" }
+      ]
+    })).toMatchObject([
+      { code: "normalized-pixi-params", severity: "warning" },
+      { code: "unresolved-runtime-expression", severity: "error" }
     ]);
   });
 });

@@ -21,6 +21,9 @@ describe("Nani semantic golden from integration baseline", () => {
     expect(golden.baseline).toBe("a7bb0091234f7796df3db93a7bfe3f0ae948e300");
     expect(golden.canonicalization).toBe("stable-json-v1");
     expect(diagnosticGolden.baseline).toBe(golden.baseline);
+    expect(golden.intentionalOverrides).toEqual({
+      "game-a-smoke": "Editor Tools moves the visual/audio setup before the first stable Workbench target and records its route/text identity."
+    });
   });
 
   for (const fixture of diagnosticGolden.cases) {
@@ -159,6 +162,7 @@ interface GeneratedMetadataGolden {
 interface SemanticGolden {
   baseline: string;
   canonicalization: string;
+  intentionalOverrides: Record<string, string>;
   corpora: Record<string, CorpusGolden>;
   generatedMetadata: Record<string, GeneratedMetadataGolden>;
 }

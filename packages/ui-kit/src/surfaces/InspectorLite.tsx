@@ -11,7 +11,7 @@ export function InspectorLite({
   inventoryItems,
   evidenceIds,
   trialSegmentId,
-  runtimeCommandCount,
+  backlogCount,
   diagnosticCount = 0,
   latestDiagnostic,
   onGrantItem,
@@ -51,8 +51,8 @@ export function InspectorLite({
           <dd>{evidenceIds.length}</dd>
         </div>
         <div>
-          <dt>Commands</dt>
-          <dd>{runtimeCommandCount}</dd>
+          <dt>Backlog</dt>
+          <dd>{backlogCount}</dd>
         </div>
         <div>
           <dt>Diagnostics</dt>

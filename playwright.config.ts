@@ -6,6 +6,8 @@ const harnessPort = resolveWorktreeAppRuntimeEnv("game-harness").port;
 const gameAPort = resolveWorktreeAppRuntimeEnv("game-a").port;
 const harnessURL = `http://127.0.0.1:${harnessPort}`;
 const gameAURL = `http://127.0.0.1:${gameAPort}`;
+const gameACharacterPort = gameAPort + 1;
+const gameACharacterURL = `http://127.0.0.1:${gameACharacterPort}`;
 const useMacHardwareWebGl = process.platform === "darwin";
 const webGlWorkers = useMacHardwareWebGl ? 2 : 1;
 const chromiumLaunchOptions = useMacHardwareWebGl ? { args: ["--use-angle=metal"] } : undefined;
@@ -27,8 +29,14 @@ export default defineConfig({
       timeout: 120000
     },
     {
-      command: `VITE_DEV_PORT=${runtimeEnv.port} VITE_ENABLE_TEST_ENTRIES=1 pnpm --filter @v-ronpa/game-a dev --host 127.0.0.1`,
+      command: `VITE_DEV_PORT=${runtimeEnv.port} pnpm --filter @v-ronpa/game-a dev --mode game-a-smoke --host 127.0.0.1`,
       url: gameAURL,
+      reuseExistingServer: false,
+      timeout: 120000
+    },
+    {
+      command: `VITE_DEV_PORT=${runtimeEnv.port + 1} pnpm --filter @v-ronpa/game-a dev --mode game-a-character-smoke --host 127.0.0.1`,
+      url: gameACharacterURL,
       reuseExistingServer: false,
       timeout: 120000
     }
@@ -41,8 +49,13 @@ export default defineConfig({
     },
     {
       name: "game-a",
-      testMatch: /game-a-.*\.spec\.ts/u,
+      testMatch: /game-a-vn\.spec\.ts/u,
       use: { ...devices["Desktop Chrome"], baseURL: gameAURL, launchOptions: chromiumLaunchOptions }
+    },
+    {
+      name: "game-a-character",
+      testMatch: /game-a-alice\.spec\.ts/u,
+      use: { ...devices["Desktop Chrome"], baseURL: gameACharacterURL, launchOptions: chromiumLaunchOptions }
     }
   ]
 });

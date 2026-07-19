@@ -33,12 +33,12 @@ export function useOverlayPageAdapters({
 }) {
   function dispatchUiAction(action: GameUiAction) {
     if (action === "toggle-auto") {
-      runtime.toggleStoryAuto();
+      runtime.shell.toggleStoryAuto();
       return;
     }
 
     if (action === "toggle-skip") {
-      runtime.toggleStorySkip();
+      runtime.shell.toggleStorySkip();
       return;
     }
 
@@ -71,7 +71,7 @@ export function useOverlayPageAdapters({
         ? target.section ?? selectDefaultPauseSection(flow.capabilities, createCommandAvailability())
         : undefined;
       if (save.busy && target.kind === "overlay" && target.overlay === "title-load") return;
-      if (shouldStopVnShellAutomationForAction(action, flow.mode)) runtime.stopStoryAutomation("overlay");
+      if (shouldStopVnShellAutomationForAction(action, flow.mode)) runtime.shell.stopStoryAutomation("overlay");
       if (target.kind === "pause") {
         flow.openPauseSection(section ?? selectDefaultPauseSection(flow.capabilities, createCommandAvailability()));
       }

@@ -8,6 +8,8 @@ export function createEscapeCaptureRef(onEscape: (() => void) | undefined): RefC
     if (!view) return;
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      const target = event.target as { closest?: (selector: string) => Element | null } | null;
+      if (target?.closest?.("[data-game-input-boundary~='escape']")) return;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();

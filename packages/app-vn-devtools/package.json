@@ -1,0 +1,23 @@
+{
+  "name": "@v-ronpa/app-vn-devtools",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite": "./src/vite.ts",
+    "./vite-protocol": "./src/viteProtocol.ts",
+    "./styles.css": "./src/VnDevtoolsDock.css"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
+    "@v-ronpa/app-vn-runtime": "workspace:*",
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/nani-parser": "workspace:*",
+    "@v-ronpa/nani-runtime-compiler": "workspace:*",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}

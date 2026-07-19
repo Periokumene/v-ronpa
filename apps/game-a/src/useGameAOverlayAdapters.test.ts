@@ -41,6 +41,17 @@ describe("game-a overlay adapters", () => {
     expect(adapters.flowSend).toHaveBeenCalledWith({ type: "RETURN_TITLE" });
   });
 
+  it("routes product automation actions through the shell port", () => {
+    const adapters = createAdapters({ mode: "vn", startNewGame: () => true });
+    adapters.dispatchUiAction("toggle-auto");
+    adapters.dispatchUiAction("toggle-skip");
+    adapters.dispatchUiAction("open-pause");
+
+    expect(adapters.toggleStoryAuto).toHaveBeenCalledOnce();
+    expect(adapters.toggleStorySkip).toHaveBeenCalledOnce();
+    expect(adapters.stopStoryAutomation).toHaveBeenCalledWith("overlay");
+  });
+
   it("routes quick save/load without opening pause pages", async () => {
     const adapters = createAdapters({
       mode: "vn",
@@ -104,6 +115,9 @@ function createAdapters({
   const quickLoadSlot = vi.fn(async () => quickLoadResult);
   const quickSaveSlot = vi.fn(async () => undefined);
   const resetRuntime = vi.fn();
+  const stopStoryAutomation = vi.fn();
+  const toggleStoryAuto = vi.fn();
+  const toggleStorySkip = vi.fn();
   const beginNewGame = vi.fn(async () => startNewGame());
   const ensureVnPresentationReady = vi.fn(async () => presentationReady);
   const adapters = useGameAOverlayAdapters({
@@ -128,7 +142,7 @@ function createAdapters({
     runtime: {
       startNewGame,
       lifecycle: { resetRuntime },
-      debug: { toggleStoryAuto: vi.fn(), toggleStorySkip: vi.fn(), stopStoryAutomation: vi.fn() }
+      shell: { stopStoryAutomation, toggleStoryAuto, toggleStorySkip }
     },
     save: {
       cancelLoadSlot: vi.fn(),
@@ -150,5 +164,18 @@ function createAdapters({
     settings: { settings: {}, patchSettings: vi.fn(), resetSettings: vi.fn() }
   } as unknown as Parameters<typeof useGameAOverlayAdapters>[0]);
 
-  return { ...adapters, beginNewGame, ensureVnPresentationReady, flowSend, openOverlay, openPauseSection, quickLoadSlot, quickSaveSlot, resetRuntime };
+  return {
+    ...adapters,
+    beginNewGame,
+    ensureVnPresentationReady,
+    flowSend,
+    openOverlay,
+    openPauseSection,
+    quickLoadSlot,
+    quickSaveSlot,
+    resetRuntime,
+    stopStoryAutomation,
+    toggleStoryAuto,
+    toggleStorySkip
+  };
 }

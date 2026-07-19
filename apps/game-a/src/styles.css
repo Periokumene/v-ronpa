@@ -34,6 +34,8 @@ button:hover {
 }
 
 .game-a-shell {
+  width: 100%;
+  height: 100%;
   min-height: 100%;
   background: #000;
 }
@@ -41,9 +43,11 @@ button:hover {
 .game-a-playfield {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
+  container-type: size;
+  container-name: game-a-playfield;
 }
 
 .game-a-scene,
@@ -103,20 +107,4 @@ button:hover {
   color: #b7c7ce;
   font-size: 12px;
   text-transform: uppercase;
-}
-
-.game-a-dev-launch-error {
-  position: absolute;
-  z-index: 20;
-  inset: 18px 18px auto auto;
-  max-width: min(520px, calc(100vw - 36px));
-  padding: 12px 14px;
-  border: 1px solid rgba(255, 109, 109, 0.58);
-  border-radius: 8px;
-  background: rgba(40, 12, 18, 0.88);
-  color: #ffe8e8;
-  font-size: 13px;
-  line-height: 1.45;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
-  pointer-events: none;
 }

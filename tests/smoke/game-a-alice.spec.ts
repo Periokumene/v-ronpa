@@ -1,4 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+
+const characterSourceFile = fileURLToPath(
+  new URL("../../apps/game-a/src/test-nani/character-smoke.nani", import.meta.url)
+);
 
 test.setTimeout(120_000);
 
@@ -10,7 +16,7 @@ test("game-a test character entry stays on title until planned textures are uplo
     await route.continue();
   });
 
-  await page.goto("/?vnEntry=character", { waitUntil: "domcontentloaded" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("title-surface")).toBeVisible();
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-preparation", "preparing");
   await page.getByTestId("title-new-game").click();
@@ -33,7 +39,9 @@ test("game-a character smoke renders the imported Alice layered states", async (
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await page.goto("/?vnEntry=character&vnStart=Start");
+  await page.goto("/");
+  await expect(page.getByTestId("title-surface")).toBeVisible();
+  await page.getByTestId("title-new-game").click();
   await expect(page.getByTestId("game-a-mode")).toHaveText("视觉小说");
 
   await advanceUntilText(page, "CHECKPOINT CHARACTER 00", 8);
@@ -88,6 +96,72 @@ test("game-a character smoke renders the imported Alice layered states", async (
   expect(consoleErrors).toEqual([]);
 });
 
+test("a Nani HMR candidate prepares a newly authored Alice expression before preview commit", async ({ page }) => {
+  const originalSource = await readFile(characterSourceFile, "utf8");
+  const expression = "EYE3,MOUTH6,ArmL3,ArmR1,EFFECT1";
+  const hmrText = "CHECKPOINT CHARACTER HMR - candidate expression prepared.";
+  const updatedSource = originalSource.replace(
+    '@choice "完成角色测试" goto:#Complete',
+    [
+      `@char alice.${expression} pos:50 wait!`,
+      `Narrator: ${hmrText}|#character_hmr|`,
+      '@choice "完成角色测试" goto:#Complete'
+    ].join("\n")
+  );
+  expect(updatedSource).not.toBe(originalSource);
+
+  const candidateLayerRequests: string[] = [];
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (/\/alice\/assets\/layers\/MAIN\/(?:EYE\/3|MOUTH\/6|ArmL\/3|ArmR\/1|EFFECT\/1)\.png$/u.test(pathname)) {
+      candidateLayerRequests.push(pathname);
+    }
+  });
+
+  try {
+    await page.goto("/");
+    await page.getByTestId("title-new-game").click();
+    await expect(page.getByTestId("game-a-mode")).toHaveText("视觉小说");
+    await advanceUntilText(page, "CHECKPOINT CHARACTER 00", 8);
+
+    const initialTarget = page.locator('[data-testid^="vn-devtools-line-"]')
+      .filter({ hasText: "CHECKPOINT CHARACTER 00" })
+      .first();
+    await initialTarget.hover();
+    await initialTarget.locator(".vn-devtools-preview-button").click();
+    await expect(page.getByTestId("vn-devtools-dock")).toContainText("Stable checkpoint installed");
+    const initialRevision = await readWorkbenchRevision(page);
+
+    await writeFile(characterSourceFile, updatedSource, "utf8");
+    await expect.poll(() => readWorkbenchRevision(page), { timeout: 15_000 }).not.toBe(initialRevision);
+    await expect.poll(() => new Set(candidateLayerRequests).size, { timeout: 15_000 }).toBe(5);
+    await expect(page.getByTestId("pixi-layer")).toHaveAttribute(
+      "data-pixi-character-preparation",
+      "ready",
+      { timeout: 15_000 }
+    );
+
+    const hmrTarget = page.locator('[data-testid^="vn-devtools-line-"]')
+      .filter({ hasText: hmrText })
+      .first();
+    await hmrTarget.hover();
+    await hmrTarget.locator(".vn-devtools-preview-button").click();
+    await expect(page.getByTestId("vn-dialog-text")).toContainText(hmrText);
+    await expectAliceState(page, expression);
+    await expect(page.locator("main.game-a-shell")).toHaveAttribute("data-game-a-asset-diagnostics-count", "0");
+  } finally {
+    await writeFile(characterSourceFile, originalSource, "utf8");
+  }
+});
+
+async function readWorkbenchRevision(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const render = (window as Window & { render_game_to_text?: () => string }).render_game_to_text;
+    if (!render) return null;
+    return (JSON.parse(render()) as { workbench: { revision: string | null } }).workbench.revision;
+  });
+}
+
 async function expectAliceState(page: Page, expression: string) {
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute(
     "data-pixi-characters",
@@ -131,17 +205,23 @@ async function advanceVn(page: Page) {
   await page.mouse.click(viewport.width / 2, viewport.height / 2);
 }
 
-const characterInteriorPoints = [
-  [640, 200],
-  [620, 250],
-  [640, 280],
-  [610, 300],
-  [660, 300]
+const characterInteriorOffsets = [
+  [0, 200],
+  [-20, 250],
+  [0, 280],
+  [-30, 300],
+  [20, 300]
 ] as const;
 
 type CharacterInteriorSample = readonly [red: number, green: number, blue: number, alpha: number];
 
 async function captureCharacterInterior(page: Page, path: string): Promise<CharacterInteriorSample[]> {
+  const playfield = await page.getByTestId("game-a-playfield").boundingBox();
+  expect(playfield).not.toBeNull();
+  const points = characterInteriorOffsets.map(([offsetX, offsetY]) => [
+    Math.round((playfield?.x ?? 0) + (playfield?.width ?? 0) / 2 + offsetX),
+    Math.round((playfield?.y ?? 0) + offsetY)
+  ] as const);
   const screenshot = await page.screenshot({ path });
   const samples = await page.evaluate(async ({ base64, points }) => {
     const image = new Image();
@@ -154,7 +234,7 @@ async function captureCharacterInterior(page: Page, path: string): Promise<Chara
     if (!context) throw new Error("2D screenshot sampling context is unavailable");
     context.drawImage(image, 0, 0);
     return points.map(([x, y]) => [...context.getImageData(x, y, 1, 1).data]);
-  }, { base64: screenshot.toString("base64"), points: characterInteriorPoints });
+  }, { base64: screenshot.toString("base64"), points });
 
   const [skin] = samples;
   expect(skin).toBeDefined();

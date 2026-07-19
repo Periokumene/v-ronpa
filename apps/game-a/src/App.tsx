@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
@@ -8,12 +8,14 @@ import {
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings,
   useGameSettingsAdapter,
-  usePixiStageReadiness
+  usePixiStageReadiness,
+  type LayeredCharacterPreloadPlan
 } from "@v-ronpa/app-vn-shell";
 import { SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS } from "@v-ronpa/media-save";
+import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
 import { RichTextFontStyles } from "@v-ronpa/ui-kit";
 import { gameAContentManifest } from "./contentManifest";
-import { resolveGameAVnLaunchTarget, shouldAutoStartGameAVnLaunchTarget } from "./devVnLaunchTarget";
+import { gameALaunchDefinition } from "./gameALaunchDefinition";
 import { useGameAFlowActor } from "./useGameAFlowActor";
 import { useGameAOverlayAdapters } from "./useGameAOverlayAdapters";
 import { useGameASaveAdapter } from "./useGameASaveAdapter";
@@ -22,18 +24,49 @@ import { createGameASurfaces, type GameASurfaceNavigation } from "./ui/GameASurf
 import { gameAUiConfig } from "./ui/gameAUiConfig";
 import { resolveGameAUiAssets } from "./ui/resolveGameAUiAssets";
 import { useGameAUiAudio } from "./ui/useGameAUiAudio";
-import { gameAOpeningLaunchDefinition, type GameAVnLaunchDefinition } from "./gameAScripts";
 
-export function App({ launchDefinition = gameAOpeningLaunchDefinition }: { launchDefinition?: GameAVnLaunchDefinition } = {}) {
-  const devVnLaunchTarget = useMemo(
-    () =>
-      resolveGameAVnLaunchTarget({
-        devMode: import.meta.env.DEV,
-        search: typeof window === "undefined" ? "" : window.location.search
-      }),
-    []
+const GameADevApp = import.meta.env.DEV
+  ? lazy(() => import("./devtools/GameADevApp").then((module) => ({ default: module.GameADevApp })))
+  : undefined;
+
+export interface GameAAppContext {
+  runtime: ReturnType<typeof useGameAVnRuntime>;
+  flow: ReturnType<typeof useGameAFlowActor>;
+}
+
+export function App() {
+  if (!GameADevApp) {
+    return (
+      <GameAAppCore
+        activeEntry={gameALaunchDefinition.runtimeEntry}
+        characterPreloadPlan={gameALaunchDefinition.characterPreloadPlan}
+      />
+    );
+  }
+  return (
+    <Suspense fallback={null}>
+      <GameADevApp
+        initialLaunchDefinition={gameALaunchDefinition}
+      />
+    </Suspense>
   );
-  const didAutoStartDevLaunch = useRef(false);
+}
+
+interface GameAAppCoreProps {
+  activeEntry: VnRuntimeEntry;
+  characterPreloadPlan: LayeredCharacterPreloadPlan;
+  className?: string;
+  renderAfterPlayfield?: (context: GameAAppContext) => ReactNode;
+  wrapPlayfield?: (playfield: ReactNode) => ReactNode;
+}
+
+export function GameAAppCore({
+  activeEntry,
+  characterPreloadPlan,
+  className,
+  renderAfterPlayfield,
+  wrapPlayfield
+}: GameAAppCoreProps) {
   const settings = useGameSettingsAdapter({ storageKey: "v-ronpa:game-a:settings:v2" });
   const assetRegistry = useMemo(() => createAssetRegistry(gameAContentManifest), []);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
@@ -44,13 +77,12 @@ export function App({ launchDefinition = gameAOpeningLaunchDefinition }: { launc
   const startPromiseRef = useRef<Promise<boolean> | undefined>(undefined);
   const pixiStage = usePixiStageReadiness();
   const runtime = useGameAVnRuntime({
+    entry: activeEntry,
     assetResolver: assetRegistry,
     ...(gameAContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: gameAContentManifest.audio.dialogueBleep } : {}),
     dialogueBleepSettings,
     dialogRevealSettings,
-    entry: launchDefinition.runtimeEntry,
     storyPlayTiming,
-    ...(devVnLaunchTarget.startLabelOverride ? { startLabelOverride: devVnLaunchTarget.startLabelOverride } : {}),
     voiceSettings
   });
   const flow = useGameAFlowActor(runtime.shell.interactionFacts);
@@ -110,38 +142,51 @@ export function App({ launchDefinition = gameAOpeningLaunchDefinition }: { launc
       }),
     [gameAUiAssets, gameASurfaceNavigation, pixiStage.pending]
   );
-  const startLabelError = runtime.startLabelError;
 
   useEffect(() => {
     gameAUiAssets.diagnostics.forEach(runtime.diagnostics.observeAssetDiagnostic);
   }, [gameAUiAssets.diagnostics, runtime.diagnostics.observeAssetDiagnostic]);
 
-  useEffect(() => {
-    if (didAutoStartDevLaunch.current) return;
-    if (
-      !shouldAutoStartGameAVnLaunchTarget({
-        target: devVnLaunchTarget,
-        hasInvalidStartLabel: Boolean(startLabelError)
-      })
-    ) {
-      return;
-    }
-
-    if (!pixiStage.handle) return;
-    didAutoStartDevLaunch.current = true;
-    void beginNewGame();
-  }, [beginNewGame, devVnLaunchTarget, pixiStage.handle, startLabelError]);
-
-  const devVnLaunchError = devVnLaunchTarget.requested
-    ? devVnLaunchTarget.error?.message ?? startLabelError?.message
-    : undefined;
   const assetDiagnosticCount = runtime.diagnostics.runtimeDiagnostics.filter(
     (diagnostic) => diagnostic.source === "asset"
   ).length;
 
+  const playfield = (
+    <section className="game-a-playfield" data-testid="game-a-playfield">
+      <GameInteractionShell
+        dialogAppearance={gameAUiConfig.dialog.appearance}
+        dialogDisplay={dialogDisplay}
+        flow={flow}
+        formatStorySpeaker={displaySpeaker}
+        overlayPages={overlayPages}
+        runtime={runtime.shell}
+        surfaces={gameASurfaces}
+      >
+        <div className="game-a-scene" data-testid="game-a-vn-shell">
+          <VnPixiPresenterHost
+            active={flow.mode === "vn" && runtime.shell.storyRuntime.active}
+            assetResolver={assetRegistry}
+            characterOutlineEnabled={true}
+            characterPreloadPlan={characterPreloadPlan}
+            diagnostics={runtime.diagnostics}
+            presentation={runtime.presentation}
+            onStageHandleChanged={pixiStage.onStageHandleChanged}
+          />
+        </div>
+      </GameInteractionShell>
+      <div className="game-a-hud">
+        <div className="game-a-status">
+          <span data-testid="game-a-app-id">game-a</span>
+          <strong>视觉小说框架</strong>
+          <small data-testid="game-a-mode">{formatGameAMode(flow.mode)}</small>
+        </div>
+      </div>
+    </section>
+  );
+
   return (
     <main
-      className="game-a-shell"
+      className={className ? `game-a-shell ${className}` : "game-a-shell"}
       data-game-a-asset-diagnostics-count={String(assetDiagnosticCount)}
       {...gameAUiAudioBindings}
     >
@@ -150,41 +195,8 @@ export function App({ launchDefinition = gameAOpeningLaunchDefinition }: { launc
         fonts={gameAContentManifest.fonts}
         onDiagnostic={runtime.diagnostics.observeAssetDiagnostic}
       />
-      <section className="game-a-playfield" data-testid="game-a-playfield">
-        <GameInteractionShell
-          dialogAppearance={gameAUiConfig.dialog.appearance}
-          dialogDisplay={dialogDisplay}
-          flow={flow}
-          formatStorySpeaker={displaySpeaker}
-          overlayPages={overlayPages}
-          runtime={runtime.shell}
-          surfaces={gameASurfaces}
-        >
-          <div className="game-a-scene" data-testid="game-a-vn-shell">
-            <VnPixiPresenterHost
-              active={flow.mode === "vn" && runtime.shell.storyRuntime.active}
-              assetResolver={assetRegistry}
-              characterOutlineEnabled={true}
-              characterPreloadPlan={launchDefinition.characterPreloadPlan}
-              diagnostics={runtime.diagnostics}
-              presentation={runtime.presentation}
-              onStageHandleChanged={pixiStage.onStageHandleChanged}
-            />
-          </div>
-        </GameInteractionShell>
-        <div className="game-a-hud">
-          <div className="game-a-status">
-            <span data-testid="game-a-app-id">game-a</span>
-            <strong>视觉小说框架</strong>
-            <small data-testid="game-a-mode">{formatGameAMode(flow.mode)}</small>
-          </div>
-        </div>
-        {devVnLaunchError ? (
-          <div className="game-a-dev-launch-error" data-testid="game-a-dev-launch-error" role="alert">
-            {devVnLaunchError}
-          </div>
-        ) : null}
-      </section>
+      {wrapPlayfield ? wrapPlayfield(playfield) : playfield}
+      {renderAfterPlayfield?.({ runtime, flow })}
     </main>
   );
 }

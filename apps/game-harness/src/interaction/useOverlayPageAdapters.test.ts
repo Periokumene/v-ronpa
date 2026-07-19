@@ -49,6 +49,17 @@ describe("harness overlay page adapters", () => {
     expect(adapters.flowSend).toHaveBeenCalledWith({ type: "RETURN_TITLE" });
   });
 
+  it("routes VN automation through the canonical shell port", () => {
+    const adapters = createAdapters();
+    adapters.dispatchUiAction("toggle-auto");
+    adapters.dispatchUiAction("toggle-skip");
+    adapters.dispatchUiAction("open-pause");
+
+    expect(adapters.toggleStoryAuto).toHaveBeenCalledOnce();
+    expect(adapters.toggleStorySkip).toHaveBeenCalledOnce();
+    expect(adapters.stopStoryAutomation).toHaveBeenCalledWith("overlay");
+  });
+
   it("does not restore or change mode when the VN stage is not ready", async () => {
     const adapters = createAdapters({ presentationReady: false, quickLoadResult: true, withQuickSlot: true });
 
@@ -68,6 +79,9 @@ function createAdapters({ presentationReady = true, quickLoadResult = false, wit
   const quickLoadSlot = vi.fn(async () => quickLoadResult);
   const quickSaveSlot = vi.fn(async () => undefined);
   const resetShowcase = vi.fn();
+  const stopStoryAutomation = vi.fn();
+  const toggleStoryAuto = vi.fn();
+  const toggleStorySkip = vi.fn();
   const ensureVnPresentationReady = vi.fn(async () => presentationReady);
   const adapters = useOverlayPageAdapters({
     flow: {
@@ -85,9 +99,7 @@ function createAdapters({ presentationReady = true, quickLoadResult = false, wit
     ensureVnPresentationReady,
     runtime: {
       resetShowcase,
-      stopStoryAutomation: vi.fn(),
-      toggleStoryAuto: vi.fn(),
-      toggleStorySkip: vi.fn()
+      shell: { stopStoryAutomation, toggleStoryAuto, toggleStorySkip }
     },
     save: {
       activeOperation: undefined,
@@ -108,5 +120,17 @@ function createAdapters({ presentationReady = true, quickLoadResult = false, wit
     },
     settings: { settings: {}, patchSettings: vi.fn(), resetSettings: vi.fn() }
   } as unknown as Parameters<typeof useOverlayPageAdapters>[0]);
-  return { ...adapters, ensureVnPresentationReady, flowSend, openOverlay, openPauseSection, quickLoadSlot, quickSaveSlot, resetShowcase };
+  return {
+    ...adapters,
+    ensureVnPresentationReady,
+    flowSend,
+    openOverlay,
+    openPauseSection,
+    quickLoadSlot,
+    quickSaveSlot,
+    resetShowcase,
+    stopStoryAutomation,
+    toggleStoryAuto,
+    toggleStorySkip
+  };
 }

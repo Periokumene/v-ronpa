@@ -2,7 +2,9 @@
 
 The Harness is an app composition surface for VN/Navi/Trial integration and
 debug visibility. It may use the explicit runtime debug entry, but production
-shells consume canonical ports.
+shells consume canonical ports. Its adapter exposes the four ports, one
+read-only debug snapshot, and Harness-owned state; it must not recreate flat
+aliases for story, Pixi, or automation actions.
 
 Required gates:
 
@@ -15,12 +17,20 @@ Required gates:
   BGM/looping-SFX save-load plus title cleanup, and Harness VN/Navi/Trial pause
   evidence.
 
+The Nani workbench is a Game A development surface in its first version. Harness
+does not mount or depend on `app-vn-devtools`; future host-state materialization
+must compose through an app-owned atomic commit boundary rather than expanding
+the VN debug core.
+
 Game A product Nani lives only under `apps/game-a/src/nani/**`. Test-only Nani
-lives under `apps/game-a/src/test-nani/**`, has a separate generated metadata
-module, and is enabled only with `VITE_ENABLE_TEST_ENTRIES=1` plus an explicit
-`?vnEntry=<test-id>`. Browser tests must not navigate product labels or literal
-product dialogue as test checkpoints. Production build validation rejects the
-complete test path/id/checkpoint namespace.
+lives under `apps/game-a/src/test-nani/**` and has a separate generated metadata
+module. Vite selects the general smoke and Alice visual entries only in the
+dedicated `game-a-smoke` and `game-a-character-smoke` modes. Each Playwright
+project visits `/` on its own server; product runtime code does not parse
+test-entry URLs or expose an entry override. Browser tests must not navigate
+product labels or literal product dialogue as test checkpoints. Production
+build validation rejects the complete test path/id/checkpoint namespace as well
+as workbench text, test IDs, source-update event names, and tab-session keys.
 
 Playwright gates always start fresh, correctly configured app servers. On
 macOS, Chromium is launched through ANGLE's Metal backend and the independent

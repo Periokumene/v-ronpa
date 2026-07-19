@@ -1,7 +1,17 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { PIXI_INNER_BACKGROUND_ID, PIXI_MAIN_BACKGROUND_ID } from "@v-ronpa/contracts";
+import {
+  PIXI_INNER_BACKGROUND_ID,
+  PIXI_MAIN_BACKGROUND_ID,
+  type RuntimeCommand,
+  type RuntimeScript
+} from "@v-ronpa/contracts";
 import { parseScenario } from "@v-ronpa/nani-parser";
-import { compileRuntimeScript } from "./index";
+import {
+  compileRuntimeScript,
+  digestRuntimeScriptSemantics,
+  serializeRuntimeScriptSemantics
+} from "./index";
 import { assertCommandNormalizerRegistry } from "./normalizers";
 import { createArgumentDiagnostic } from "./validation";
 
@@ -112,11 +122,88 @@ describe("nani runtime compiler", () => {
     });
   });
 
+  it("canonically serializes executable script semantics without source metadata", () => {
+    const first = runtimeScriptForSerialization({
+      line: 1,
+      raw: "Narrator: Hello.",
+      sourceCommand: { rawCommandId: "text", rawParams: {} }
+    });
+    const reformatted = runtimeScriptForSerialization({
+      line: 99,
+      raw: "  Narrator: Hello.  ",
+      sourceCommand: { rawCommandId: "print", rawParams: { author: "Narrator" } }
+    });
+    const changed = runtimeScriptForSerialization({
+      line: 1,
+      raw: "Narrator: Changed.",
+      sourceCommand: { rawCommandId: "text", rawParams: {} },
+      text: "Changed."
+    });
+
+    expect(serializeRuntimeScriptSemantics(first)).toBe(
+      '{"commands":[{"canonicalName":"print","category":"text","commandId":"print","params":{"autoNext":false,"speaker":"Narrator","text":"Hello."},"source":"v-ronpa","status":"implemented"}],"labels":{"Start":0},"scriptPath":"game/test.nani"}'
+    );
+    expect(serializeRuntimeScriptSemantics(reformatted)).toBe(serializeRuntimeScriptSemantics(first));
+    expect(serializeRuntimeScriptSemantics(changed)).not.toBe(serializeRuntimeScriptSemantics(first));
+  });
+
+  it("matches Node and Web Crypto SHA-256 revisions for canonical semantics", async () => {
+    const script = runtimeScriptForSerialization({
+      line: 1,
+      raw: "Narrator: Hello.",
+      sourceCommand: { rawCommandId: "text", rawParams: {} }
+    });
+    const canonical = serializeRuntimeScriptSemantics(script);
+    const nodeRevision = `sha256:${createHash("sha256").update(canonical).digest("hex")}`;
+
+    expect(await digestRuntimeScriptSemantics(script)).toBe(nodeRevision);
+    expect(nodeRevision).toBe("sha256:447dbdb9f9550e57713843f7248801583cc668b5bc6a6d77661659d71ed8e9c4");
+  });
+
+  it("ignores source comments and locations but changes revisions for semantic edits", async () => {
+    const base = compileScriptForRevision([
+      "; original comment",
+      "#Start",
+      '@print "Hello" author:Narrator if:{canSpeak}',
+      '@set route:"left"'
+    ]);
+    const relocated = compileScriptForRevision([
+      "; rewritten comment",
+      "; added source-only line",
+      "",
+      "#Start",
+      '@print "Hello" author:Narrator if:{canSpeak}',
+      '@set route:"left"'
+    ]);
+    const firstCommand = base.commands[0];
+    if (!firstCommand) throw new Error("Expected the revision fixture to compile a command.");
+
+    expect(relocated.commands[0]?.loc.line).not.toBe(firstCommand.loc.line);
+    expect(serializeRuntimeScriptSemantics(relocated)).toBe(serializeRuntimeScriptSemantics(base));
+    expect(await digestRuntimeScriptSemantics(relocated)).toBe(await digestRuntimeScriptSemantics(base));
+
+    const semanticChanges = {
+      label: { ...base, labels: { Renamed: 0 } },
+      commandIdentity: withFirstCommand(base, { commandId: "append", canonicalName: "append" }),
+      commandStatus: withFirstCommand(base, { status: "stubbed" }),
+      condition: withFirstCommand(base, { condition: { type: "expression", source: "canContinue" } }),
+      params: withFirstCommand(base, { params: { ...firstCommand.params, text: "Changed" } }),
+      state: compileScriptForRevision(["; original comment", "#Start", '@print "Hello" author:Narrator if:{canSpeak}', '@set route:"right"'])
+    } satisfies Record<string, RuntimeScript>;
+    const canonical = serializeRuntimeScriptSemantics(base);
+    const revision = await digestRuntimeScriptSemantics(base);
+
+    for (const [semantic, changed] of Object.entries(semanticChanges)) {
+      expect(serializeRuntimeScriptSemantics(changed), semantic).not.toBe(canonical);
+      expect(await digestRuntimeScriptSemantics(changed), semantic).not.toBe(revision);
+    }
+  });
+
   it("compiles text statements into print runtime commands", () => {
     const parsed = parseScenario({ sourceText: "Felix: Hello.|#voice_validation_0001|[>]\nMira: No voice.[>]", scriptPath: "text.nani" });
     const result = compileRuntimeScript(parsed);
 
-    expect(result.diagnostics).toEqual([]);
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
     expect(result.script.commands).toEqual([
       expect.objectContaining({
         commandId: "print",
@@ -141,7 +228,7 @@ describe("nani runtime compiler", () => {
     });
     const result = compileRuntimeScript(parsed);
 
-    expect(result.diagnostics).toEqual([]);
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
     expect(result.script.commands[0]).toEqual(
       expect.objectContaining({
         commandId: "print",
@@ -165,7 +252,7 @@ describe("nani runtime compiler", () => {
     });
     const result = compileRuntimeScript(parsed);
 
-    expect(result.diagnostics).toEqual([]);
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
     expect(result.script.commands[0]).toMatchObject({
       commandId: "print",
       params: { text: "Stop there", speaker: "Felix", autoNext: true },
@@ -195,7 +282,7 @@ describe("nani runtime compiler", () => {
     });
     const result = compileRuntimeScript(parsed);
 
-    expect(result.diagnostics).toEqual([]);
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
     expect(result.script.commands).toEqual([
       expect.objectContaining({
         commandId: "back",
@@ -340,7 +427,7 @@ describe("nani runtime compiler", () => {
     });
     const result = compileRuntimeScript(parsed);
 
-    expect(result.diagnostics).toEqual([]);
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
     expect(result.script.commands.map((command) => command.commandId)).toEqual([
       "rain",
       "rain",
@@ -517,7 +604,7 @@ describe("nani runtime compiler", () => {
     });
     const result = compileRuntimeScript(parsed);
 
-    expect(result.diagnostics).toEqual([]);
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
     expect(result.script.commands.slice(0, 4).map((command) => command.params.durationMs)).toEqual([
       120,
       0,
@@ -866,6 +953,11 @@ describe("nani runtime compiler", () => {
         severity: "error"
       }
     ]);
+    expect(result.diagnostics[0]?.loc).toMatchObject({
+      scriptPath: "diagnostics.nani",
+      line: 1,
+      column: 1
+    });
   });
 
   it("reports unknown commands as errors because skipped commands must be error-level", () => {
@@ -1058,7 +1150,7 @@ describe("nani runtime compiler", () => {
     });
     const result = compileRuntimeScript(parsed);
 
-    expect(result.diagnostics).toEqual([]);
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
     expect(result.script.commands.map((command) => command.commandId)).toEqual([
       "append",
       "resettext",
@@ -1111,7 +1203,7 @@ describe("nani runtime compiler", () => {
     });
     const result = compileRuntimeScript(parsed);
 
-    expect(result.diagnostics).toEqual([]);
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
     expect(result.script.commands.map((command) => command.commandId)).toEqual(["hideui", "showui"]);
     expect(result.script.commands[0]?.params).toEqual({ visible: false, wait: false });
     expect(result.script.commands[1]?.params).toEqual({ visible: true, wait: false });
@@ -1130,7 +1222,7 @@ describe("nani runtime compiler", () => {
     const result = compileRuntimeScript(parsed);
 
     expect(result.script.commands.map((command) => command.commandId)).toEqual(["bgm", "input", "hideui", "sfxfast"]);
-    expect(result.diagnostics).toEqual(
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           code: "unsupported-command-param",
@@ -1161,5 +1253,50 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands[0]?.params).not.toHaveProperty("loop");
     expect(result.script.commands[2]?.params).toMatchObject({ target: "commandBar", visible: false, wait: true });
   });
-
 });
+
+function runtimeScriptForSerialization({
+  line,
+  raw,
+  sourceCommand,
+  text = "Hello."
+}: {
+  line: number;
+  raw: string;
+  sourceCommand: NonNullable<RuntimeScript["commands"][number]["sourceCommand"]>;
+  text?: string;
+}): RuntimeScript {
+  return {
+    scriptPath: "game/test.nani",
+    labels: { Start: 0 },
+    assets: [{ id: "bg:ignored", kind: "background", tags: [] }],
+    dependencies: [{ endpoint: "ignored.nani" }],
+    commands: [
+      {
+        commandId: "print",
+        canonicalName: "print",
+        category: "text",
+        source: "v-ronpa",
+        status: "implemented",
+        params: { text, speaker: "Narrator", autoNext: false },
+        loc: { scriptPath: "game/test.nani", line, column: 1, raw },
+        sourceCommand
+      }
+    ]
+  };
+}
+
+function compileScriptForRevision(lines: string[]): RuntimeScript {
+  const parsed = parseScenario({ sourceText: lines.join("\n"), scriptPath: "game/revision.nani" });
+  return compileRuntimeScript(parsed).script;
+}
+
+function withFirstCommand(script: RuntimeScript, overrides: Partial<RuntimeCommand>): RuntimeScript {
+  const command = script.commands[0];
+  if (!command) throw new Error("Expected the revision fixture to compile a command.");
+  return { ...script, commands: [{ ...command, ...overrides }, ...script.commands.slice(1)] };
+}
+
+function withoutDiagnosticLocations(diagnostics: ReturnType<typeof compileRuntimeScript>["diagnostics"]) {
+  return diagnosticSummaries(diagnostics);
+}
