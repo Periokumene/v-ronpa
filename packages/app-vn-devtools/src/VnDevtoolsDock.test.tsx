@@ -49,6 +49,7 @@ describe("VnDevtoolsDock", () => {
     );
     (runToLine?.props as { onClick: () => void }).onClick();
     expect(actions.previewLine).toHaveBeenCalledWith("line:dialog");
+    expect(collectText(runToLine).join("")).toBe("");
     expect(findButtonByAriaLabel(element, "Run to line 3")?.props.disabled).toBe(true);
   });
 

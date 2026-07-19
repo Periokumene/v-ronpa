@@ -98,6 +98,7 @@ describe("VN devtools view-model helpers", () => {
   it("highlights syntax without changing a single source character", () => {
     for (const source of [
       "#StoryBegin",
+      "; explain the next beat",
       "@char id:alice expression:\"calm\"",
       "nar: Hello, 'world'",
       ""
@@ -109,6 +110,9 @@ describe("VN devtools view-model helpers", () => {
       "command",
       "plain",
       "string"
+    ]);
+    expect(highlightVnDevtoolsSource("  ; explain the next beat")).toEqual([
+      { kind: "comment", text: "  ; explain the next beat" }
     ]);
   });
 

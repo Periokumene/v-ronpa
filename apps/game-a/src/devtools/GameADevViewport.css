@@ -50,6 +50,13 @@
   font-size: 9px;
   line-height: 1;
   backdrop-filter: blur(8px);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.game-a-dev-viewport-toolbar:hover,
+.game-a-dev-viewport-toolbar:focus-within {
+  opacity: 1;
 }
 
 .game-a-dev-viewport-toolbar button {
@@ -87,8 +94,41 @@
   }
 }
 
+.game-a-shell-with-devtools:has(> .vn-devtools-collapsed-button) .game-a-dev-viewport-toolbar {
+  right: 43px;
+  border-radius: 7px 0 0 7px;
+}
+
+.game-a-shell-with-devtools > .vn-devtools-collapsed-button {
+  top: 10px;
+  right: 10px;
+  border-color: rgb(70 81 106 / 82%);
+  border-left-color: transparent;
+  border-radius: 0 7px 7px 0;
+  background: rgb(11 13 20 / 88%);
+  backdrop-filter: blur(8px);
+}
+
+.game-a-shell-with-devtools > .vn-devtools-collapsed-button:hover,
+.game-a-shell-with-devtools > .vn-devtools-collapsed-button:focus-visible {
+  border-color: rgb(70 81 106 / 82%);
+  border-left-color: transparent;
+  background: rgb(18 24 35 / 94%);
+}
+
+.game-a-shell-with-devtools:has(> .vn-devtools-collapsed-button:hover) .game-a-dev-viewport-toolbar,
+.game-a-shell-with-devtools:has(> .vn-devtools-collapsed-button:focus-visible) .game-a-dev-viewport-toolbar,
+.game-a-shell-with-devtools:has(.game-a-dev-viewport-toolbar:hover) > .vn-devtools-collapsed-button,
+.game-a-shell-with-devtools:has(.game-a-dev-viewport-toolbar:focus-within) > .vn-devtools-collapsed-button {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .game-a-dev-viewport-stage {
     will-change: auto;
+  }
+
+  .game-a-dev-viewport-toolbar {
+    transition: none;
   }
 }

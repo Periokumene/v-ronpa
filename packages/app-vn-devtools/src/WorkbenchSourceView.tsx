@@ -122,7 +122,6 @@ function SourceLine({ line, match, currentFindMatch, selected, onSelect, onPrevi
         onClick={() => onPreview(line.id)}
       >
         <Play size={13} weight="fill" aria-hidden="true" />
-        <span>Run to line</span>
       </button>
       {previewDescription && line.previewability !== "previewable" && (
         <span className="vn-devtools-line-explanation" role="note">

@@ -26,6 +26,22 @@ describe("Nani Workbench IDE styling contract", () => {
     expect(css).toContain("@media (max-width: 899px)");
   });
 
+  it("reserves contextual line space and reveals low-frequency controls without layout shift", () => {
+    expect(css).toMatch(/\.vn-devtools-line-explanation \{[\s\S]*min-height: 19px;[\s\S]*visibility: hidden;/u);
+    expect(css).toMatch(/\.vn-devtools-source-line\.is-selected \.vn-devtools-line-explanation,[\s\S]*visibility: visible;/u);
+    expect(css).toMatch(/\.vn-devtools-collapsed-button \{[\s\S]*opacity: 0;/u);
+    expect(css).toMatch(/\.vn-devtools-collapsed-button:hover,[\s\S]*opacity: 1;/u);
+  });
+
+  it("gives labels their own syntax color and keeps line execution icon-only at every width", () => {
+    expect(css).toMatch(/\.vn-devtools-line-select \.syntax-label \{[\s\S]*var\(--vn-devtools-label\);/u);
+    expect(css).toMatch(/\.vn-devtools-line-select \.syntax-comment \{[\s\S]*var\(--vn-devtools-comment\);/u);
+    expect(css).toMatch(/\.vn-devtools-dock \.vn-devtools-preview-button \{[\s\S]*min-height: 24px;[\s\S]*max-height: 24px;/u);
+    expect(css).toMatch(/\.vn-devtools-dock \.vn-devtools-find-trigger \{[\s\S]*min-height: 28px;[\s\S]*max-height: 28px;/u);
+    expect(componentSources).not.toContain("<span>Run to line</span>");
+    expect(componentSources).not.toContain('className="vn-devtools-tool-label">Find</span>');
+  });
+
   it("removes the old decorative/card vocabulary and uses library icons instead of glyph controls", () => {
     expect(css).not.toContain("radial-gradient");
     expect(css).not.toContain("linear-gradient");

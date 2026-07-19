@@ -145,7 +145,6 @@ function FindControl({
         }}
       >
         <MagnifyingGlass size={15} weight="bold" aria-hidden="true" />
-        <span className="vn-devtools-tool-label">Find</span>
       </button>
       <div className="vn-devtools-find-input-row">
         <MagnifyingGlass size={14} aria-hidden="true" />

@@ -15,6 +15,8 @@
   --vn-devtools-warning: #e8b85b;
   --vn-devtools-error: #ff7185;
   --vn-devtools-current: #63a9ff;
+  --vn-devtools-label: #9eb4ff;
+  --vn-devtools-comment: #7f9f8b;
   color: var(--vn-devtools-text);
   color-scheme: dark;
   font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace;
@@ -240,6 +242,16 @@
   color: var(--vn-devtools-muted);
   font-size: 10px;
   white-space: nowrap;
+}
+
+.vn-devtools-dock .vn-devtools-find-trigger {
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  padding: 0;
 }
 
 .vn-devtools-command-strip .vn-devtools-primary-action {
@@ -519,10 +531,19 @@
   white-space: pre-wrap;
 }
 
-.vn-devtools-line-select .syntax-label,
+.vn-devtools-line-select .syntax-label {
+  color: var(--vn-devtools-label);
+  font-weight: 700;
+}
+
 .vn-devtools-line-select .syntax-command {
   color: var(--vn-devtools-accent);
   font-weight: 650;
+}
+
+.vn-devtools-line-select .syntax-comment {
+  color: var(--vn-devtools-comment);
+  font-style: italic;
 }
 
 .vn-devtools-line-select .syntax-speaker {
@@ -559,26 +580,28 @@
   text-decoration-color: var(--vn-devtools-current);
 }
 
-.vn-devtools-preview-button {
+.vn-devtools-dock .vn-devtools-preview-button {
   position: absolute;
-  top: 4px;
-  right: 5px;
+  top: 3px;
+  right: 6px;
   display: inline-flex;
-  min-width: 25px;
-  height: 23px;
+  width: 24px;
+  min-width: 24px;
+  max-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  max-height: 24px;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 0 5px;
-  border: 1px solid rgb(88 215 199 / 42%);
-  border-radius: 3px;
-  background: #102421;
-  color: var(--vn-devtools-accent-strong);
-  font-size: 9px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vn-devtools-muted);
   cursor: pointer;
   opacity: 0;
-  transform: translateX(2px);
-  transition: opacity 100ms ease, transform 100ms ease;
+  transform: translateX(3px);
+  transition: color 100ms ease, background 100ms ease, border-color 100ms ease, opacity 100ms ease, transform 100ms ease;
 }
 
 .vn-devtools-source-line:hover .vn-devtools-preview-button,
@@ -588,23 +611,36 @@
   transform: none;
 }
 
+.vn-devtools-preview-button:not(:disabled):hover,
+.vn-devtools-preview-button:not(:disabled):focus-visible {
+  border-color: rgb(88 215 199 / 38%);
+  background: rgb(88 215 199 / 10%);
+  color: var(--vn-devtools-accent-strong);
+}
+
 .vn-devtools-preview-button:disabled {
   border-color: var(--vn-devtools-border);
-  background: var(--vn-devtools-surface);
+  background: rgb(13 18 27 / 72%);
+  color: var(--vn-devtools-faint);
+  cursor: not-allowed;
 }
 
 .vn-devtools-line-explanation {
-  display: none;
+  display: block;
+  min-height: 19px;
   padding: 0 38px 5px 62px;
   color: var(--vn-devtools-warning);
   font-family: Inter, "Avenir Next", system-ui, sans-serif;
   font-size: 10px;
   line-height: 1.4;
+  opacity: 0;
+  visibility: hidden;
 }
 
 .vn-devtools-source-line.is-selected .vn-devtools-line-explanation,
 .vn-devtools-source-line:focus-within .vn-devtools-line-explanation {
-  display: block;
+  opacity: 1;
+  visibility: visible;
 }
 
 .vn-devtools-bottom-panel {
@@ -1015,13 +1051,23 @@
   width: 34px;
   height: 34px;
   place-items: center;
-  border: 1px solid var(--vn-devtools-border-strong);
-  border-radius: 5px;
-  background: var(--vn-devtools-bg);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
-  color: var(--vn-devtools-accent-strong);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: rgb(9 13 19 / 92%);
+  box-shadow: none;
+  color: var(--vn-devtools-muted);
   cursor: pointer;
+  opacity: 0;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease, opacity 120ms ease;
   z-index: 80;
+}
+
+.vn-devtools-collapsed-button:hover,
+.vn-devtools-collapsed-button:focus-visible {
+  border-color: var(--vn-devtools-border-strong);
+  background: var(--vn-devtools-surface);
+  color: var(--vn-devtools-accent-strong);
+  opacity: 1;
 }
 
 .vn-devtools-collapsed-badge {
@@ -1063,10 +1109,6 @@
   .vn-devtools-command-strip > button,
   .vn-devtools-find-trigger {
     padding: 0 6px;
-  }
-
-  .vn-devtools-preview-button > span {
-    display: none;
   }
 
   .vn-devtools-file-status > span:first-of-type,
@@ -1118,6 +1160,7 @@
 @media (prefers-reduced-motion: reduce) {
   .vn-devtools-busy-icon,
   .vn-devtools-preview-button,
+  .vn-devtools-collapsed-button,
   .vn-devtools-resizer::after {
     animation: none !important;
     transition: none !important;

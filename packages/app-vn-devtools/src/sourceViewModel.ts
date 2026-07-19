@@ -56,6 +56,7 @@ export type VnDevtoolsSyntaxTokenKind =
   | "plain"
   | "label"
   | "command"
+  | "comment"
   | "speaker"
   | "string";
 
@@ -114,6 +115,11 @@ export function stepVnDevtoolsFindMatch(
 export function highlightVnDevtoolsSource(sourceText: string): readonly VnDevtoolsSyntaxToken[] {
   if (sourceText.length === 0) return [{ kind: "plain", text: sourceText }];
   const spans: Array<{ start: number; end: number; kind: Exclude<VnDevtoolsSyntaxTokenKind, "plain"> }> = [];
+
+  const comment = sourceText.match(/^\s*;.*$/u);
+  if (comment?.index !== undefined) {
+    return [{ kind: "comment", text: sourceText }];
+  }
 
   const label = sourceText.match(/^\s*#[^\s]+/u);
   if (label?.index !== undefined) spans.push({ start: label.index, end: label.index + label[0].length, kind: "label" });
