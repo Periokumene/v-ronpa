@@ -1,0 +1,8 @@
+{
+  "baseline": "a7bb0091234f7796df3db93a7bfe3f0ae948e300",
+  "runs": 50,
+  "openingCorpusMedianMs": 0.516,
+  "synthetic10000MedianMs": 69.404,
+  "relativeRegressionLimit": 0.2,
+  "absoluteRegressionLimitMs": 5
+}

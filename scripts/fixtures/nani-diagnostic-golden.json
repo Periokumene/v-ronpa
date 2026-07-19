@@ -1,0 +1,189 @@
+{
+  "baseline": "a7bb0091234f7796df3db93a7bfe3f0ae948e300",
+  "cases": [
+    {
+      "id": "labels",
+      "scriptPath": "diagnostics-labels.nani",
+      "sourceText": "#Dup\n#Dup",
+      "parser": [
+        {
+          "code": "duplicate-label",
+          "severity": "error",
+          "message": "Duplicate label: Dup",
+          "loc": { "scriptPath": "diagnostics-labels.nani", "line": 2, "column": 1, "raw": "#Dup" },
+          "span": { "start": 6, "end": 9 },
+          "lexeme": "Dup"
+        }
+      ],
+      "compiler": []
+    },
+    {
+      "id": "text-ids",
+      "scriptPath": "diagnostics-text.nani",
+      "sourceText": "A: Bad|#bad id|\nB: Many|#one| and |#two|\nC: First|#dup|\nD: Second|#dup|",
+      "parser": [
+        {
+          "code": "invalid-text-id",
+          "severity": "error",
+          "message": "Invalid textId marker: bad id",
+          "loc": { "scriptPath": "diagnostics-text.nani", "line": 1, "column": 1, "raw": "A: Bad|#bad id|" },
+          "span": { "start": 8, "end": 14 },
+          "lexeme": "bad id"
+        },
+        {
+          "code": "multiple-text-ids",
+          "severity": "error",
+          "message": "Text line may contain only one textId marker.",
+          "loc": { "scriptPath": "diagnostics-text.nani", "line": 2, "column": 1, "raw": "B: Many|#one| and |#two|" },
+          "span": { "start": 34, "end": 40 },
+          "lexeme": "|#two|"
+        },
+        {
+          "code": "duplicate-text-id",
+          "severity": "error",
+          "message": "Duplicate textId: dup",
+          "loc": { "scriptPath": "diagnostics-text.nani", "line": 4, "column": 1, "raw": "D: Second|#dup|" },
+          "span": { "start": 67, "end": 70 },
+          "lexeme": "dup"
+        }
+      ],
+      "compiler": []
+    },
+    {
+      "id": "inline-and-rich-text",
+      "scriptPath": "diagnostics-inline.nani",
+      "sourceText": "A: <font color=not-a-color>x</font> [bogus] [> extra] [< speed:fast]",
+      "parser": [
+        {
+          "code": "unsupported-inline-command",
+          "severity": "error",
+          "message": "Unsupported inline .nani command: [bogus]. Inline commands currently support [>] and [< speed:<decimal>].",
+          "loc": { "scriptPath": "diagnostics-inline.nani", "line": 1, "column": 37, "raw": "A: <font color=not-a-color>x</font> [bogus] [> extra] [< speed:fast]" },
+          "span": { "start": 37, "end": 42 },
+          "lexeme": "bogus"
+        },
+        {
+          "code": "invalid-inline-command-argument",
+          "severity": "error",
+          "message": "Inline auto-next command [>] does not accept parameters.",
+          "loc": { "scriptPath": "diagnostics-inline.nani", "line": 1, "column": 45, "raw": "A: <font color=not-a-color>x</font> [bogus] [> extra] [< speed:fast]" },
+          "span": { "start": 47, "end": 52 },
+          "lexeme": "extra"
+        },
+        {
+          "code": "invalid-inline-command-value",
+          "severity": "error",
+          "message": "Inline print parameter speed expected decimal.",
+          "loc": { "scriptPath": "diagnostics-inline.nani", "line": 1, "column": 55, "raw": "A: <font color=not-a-color>x</font> [bogus] [> extra] [< speed:fast]" },
+          "span": { "start": 63, "end": 67 },
+          "lexeme": "fast"
+        },
+        {
+          "code": "invalid-rich-text",
+          "severity": "warning",
+          "message": "Invalid rich text font color: not-a-color.",
+          "loc": { "scriptPath": "diagnostics-inline.nani", "line": 1, "column": 1, "raw": "A: <font color=not-a-color>x</font> [bogus] [> extra] [< speed:fast]" },
+          "span": { "start": 15, "end": 26 },
+          "lexeme": "not-a-color"
+        }
+      ],
+      "compiler": []
+    },
+    {
+      "id": "scanner-and-local-label",
+      "scriptPath": "diagnostics-scanner.nani",
+      "sourceText": "@print \"oops\n@print Hi if:{ready\n@bgm Piano volume :0.5\n@goto #Missing",
+      "parser": [
+        {
+          "code": "unclosed-command-quote",
+          "severity": "error",
+          "message": "Unclosed quoted command argument.",
+          "loc": { "scriptPath": "diagnostics-scanner.nani", "line": 1, "column": 1, "raw": "@print \"oops" },
+          "span": { "start": 7, "end": 12 },
+          "lexeme": "\"oops"
+        },
+        {
+          "code": "unclosed-command-expression",
+          "severity": "error",
+          "message": "Unclosed command expression brace.",
+          "loc": { "scriptPath": "diagnostics-scanner.nani", "line": 2, "column": 1, "raw": "@print Hi if:{ready" },
+          "span": { "start": 26, "end": 32 },
+          "lexeme": "{ready"
+        },
+        {
+          "code": "invalid-command-param-spacing",
+          "severity": "warning",
+          "message": "Parameter volume has whitespace before \":\"; use volume:<value> so it is parsed as a parameter.",
+          "loc": { "scriptPath": "diagnostics-scanner.nani", "line": 3, "column": 1, "raw": "@bgm Piano volume :0.5" },
+          "span": { "start": 50, "end": 51 },
+          "lexeme": " "
+        },
+        {
+          "code": "missing-local-label",
+          "severity": "error",
+          "message": "Missing local label reference: #Missing",
+          "loc": { "scriptPath": "diagnostics-scanner.nani", "line": 4, "column": 1, "raw": "@goto #Missing" },
+          "span": { "start": 62, "end": 70 },
+          "lexeme": "#Missing"
+        }
+      ],
+      "compiler": []
+    },
+    {
+      "id": "compiler-validation",
+      "scriptPath": "diagnostics-compiler.nani",
+      "sourceText": "@notInCatalog value\n@bgm Piano volume:fast\n@bgm Piano loop:true\n@format template\n@flash time:0.05\n@showUI uINames:dialog,hud",
+      "parser": [],
+      "compiler": [
+        {
+          "code": "unknown-command",
+          "severity": "error",
+          "message": "Unknown .nani command: @notincatalog.",
+          "loc": { "scriptPath": "diagnostics-compiler.nani", "line": 1, "column": 1, "raw": "@notInCatalog value" },
+          "span": { "start": 1, "end": 13 },
+          "lexeme": "notInCatalog"
+        },
+        {
+          "code": "invalid-command-param",
+          "severity": "error",
+          "message": "@bgm parameter volume expected decimal.",
+          "loc": { "scriptPath": "diagnostics-compiler.nani", "line": 2, "column": 1, "raw": "@bgm Piano volume:fast" },
+          "span": { "start": 38, "end": 42 },
+          "lexeme": "fast"
+        },
+        {
+          "code": "unsupported-command-param",
+          "severity": "warning",
+          "message": "@bgm accepts loop:boolean, but the current runtime compiler does not consume it yet.",
+          "loc": { "scriptPath": "diagnostics-compiler.nani", "line": 3, "column": 1, "raw": "@bgm Piano loop:true" },
+          "span": { "start": 54, "end": 63 },
+          "lexeme": "loop:true"
+        },
+        {
+          "code": "declared-only-command",
+          "severity": "warning",
+          "message": "@format is declared for Naninovel compatibility, but this runtime does not implement its execution boundary yet.",
+          "loc": { "scriptPath": "diagnostics-compiler.nani", "line": 4, "column": 1, "raw": "@format template" },
+          "span": { "start": 65, "end": 71 },
+          "lexeme": "format"
+        },
+        {
+          "code": "ignored-promoted-primary",
+          "severity": "warning",
+          "message": "@flash does not declare parameter time, and its runtime compiler does not consume a primary value; time:0.05 would be ignored.",
+          "loc": { "scriptPath": "diagnostics-compiler.nani", "line": 5, "column": 1, "raw": "@flash time:0.05" },
+          "span": { "start": 88, "end": 97 },
+          "lexeme": "time:0.05"
+        },
+        {
+          "code": "unsupported-ui-target",
+          "severity": "warning",
+          "message": "@showUI target hud is not a v1 runtime UI surface.",
+          "loc": { "scriptPath": "diagnostics-compiler.nani", "line": 6, "column": 1, "raw": "@showUI uINames:dialog,hud" },
+          "span": { "start": 121, "end": 124 },
+          "lexeme": "hud"
+        }
+      ]
+    }
+  ]
+}

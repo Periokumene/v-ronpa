@@ -5,12 +5,6 @@ export interface SourceLocation {
   raw: string;
 }
 
-export interface Diagnostic {
-  severity: "info" | "warning" | "error";
-  message: string;
-  loc?: SourceLocation;
-}
-
 export type NaniValue =
   | { type: "string"; value: string }
   | { type: "number"; value: number }
@@ -134,19 +128,4 @@ export interface ScenarioIR {
   labels: Record<string, number>;
   assets: AssetRef[];
   dependencies: ScriptDependency[];
-}
-
-export interface ParseScenarioInput {
-  sourceText: string;
-  scriptPath: string;
-  baseUrl?: string;
-}
-
-export interface ParseScenarioResult {
-  scenario: ScenarioIR;
-  diagnostics: Diagnostic[];
-}
-
-export interface ParserPort {
-  parseScenario(input: ParseScenarioInput): ParseScenarioResult;
 }

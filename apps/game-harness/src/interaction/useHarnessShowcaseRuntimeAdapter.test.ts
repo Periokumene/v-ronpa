@@ -10,7 +10,7 @@ import {
 describe("harness showcase runtime adapter glue", () => {
   it("keeps the harness-showcase script as a Pixi, media, and rich text command showcase", () => {
     const parsed = parseScenario({ sourceText: harnessShowcaseScript, scriptPath: "harness/harness-showcase.nani" });
-    const compiled = compileRuntimeScript(parsed.scenario);
+    const compiled = compileRuntimeScript(parsed);
 
     expect(parsed.diagnostics).toEqual([]);
     expect(parsed.scenario.assets).toEqual(
@@ -180,7 +180,7 @@ describe("harness showcase runtime adapter glue", () => {
     }
 
     const parsed = parseScenario({ sourceText: harnessShowcaseScript, scriptPath: "harness/harness-showcase.nani" });
-    const compiled = compileRuntimeScript(parsed.scenario);
+    const compiled = compileRuntimeScript(parsed);
     const richCommands = compiled.script.commands.filter((command) => command.richText);
     const styles = richCommands.flatMap((command) => command.richText?.runs.map((run) => run.style) ?? []);
 

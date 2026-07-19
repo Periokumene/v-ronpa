@@ -8,7 +8,9 @@ ensureGitRef(base);
 const changed = changedFilesSince(base);
 const contractTouched = changed.some((path) =>
   path.startsWith("packages/contracts/") ||
-  path.startsWith("packages/nani-parser/src/types")
+  path.startsWith("packages/nani-parser/src/types") ||
+  path === "packages/nani-parser/src/index.ts" ||
+  path === "packages/nani-parser/src/sourceMap.ts"
 );
 
 const hasCcr = changed.some((path) => path.startsWith("docs/ccr/") && path !== "docs/ccr/template.md");

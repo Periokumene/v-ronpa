@@ -2,6 +2,7 @@ import { collectLabels, getCompletionContext, type NaniPosition, type NaniRange 
 import { allowedValueCompletionFacts, commandCompletionFacts, paramCompletionFacts } from "./languageFacts";
 import { emptyProjectAssetIndex, type NaniProjectAssetIndex } from "./projectAssets";
 import { getNaniResourceCompletions } from "./resourceCompletions";
+import type { NaniDeferredCompletionDocumentation } from "./resourceCompletions";
 
 export type NaniCompletionKind = "command" | "param" | "value" | "label" | "snippet" | "resource";
 
@@ -12,6 +13,7 @@ export interface NaniCompletion {
   range: NaniRange;
   detail?: string;
   documentation?: string;
+  deferredDocumentation?: NaniDeferredCompletionDocumentation;
   isSnippet: boolean;
   sortText?: string;
 }

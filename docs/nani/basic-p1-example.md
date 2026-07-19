@@ -2,20 +2,22 @@
 
 ## Purpose
 
-This document internalizes the previously external Naninovel-style sample notes
-into a V-Ronpa P1 parser baseline. It is intentionally narrower than the source
-material: these scripts are parser fixtures first, not production story content
-or a complete runtime demo.
+This document records the original narrow Naninovel-style fixture examples.
+They remain parser fixtures rather than production story content or a complete
+runtime demo. The active source-location and diagnostic contract is documented
+in [Nani Source Diagnostics](../architecture/nani-source-diagnostics.md).
 
 The examples are verified against the current V-Ronpa architecture:
 
-- `packages/nani-parser` preserves `.nani` source as generic AST/IR.
-- StoryEngine may later consume the same fixtures, but this task does not add
-  StoryEngine behavior.
+- `packages/nani-parser` preserves `.nani` semantics as generic `ScenarioIR`
+  and returns a required exact-source sidecar. Ordered command `args` are the
+  compiler binding authority; derived command projections are read-only views.
+- StoryEngine consumes compiled runtime commands; these examples do not define
+  new StoryEngine behavior.
 - Parser fixtures must not define Trial rules. Trial keyword, evidence-submit,
   timeout, and segment routing rules belong to `TrialDefinition` and
   `trial-director`.
-- Commands outside the current P1 parser/contract boundary are omitted instead
+- Commands outside this fixture's intentionally narrow examples are omitted instead
   of kept as placeholders.
 
 ## P1 Fixture Boundaries
@@ -122,7 +124,7 @@ Felix.Serious: Waiting changes the rhythm of the room.[>]
 
 ## Downstream Use
 
-The parser task should add fixture files matching these examples under
-`packages/nani-parser/fixtures/` and snapshot their IR. A later StoryEngine task
-may reuse these scripts to verify command execution, but that is a separate
-worktree boundary.
+The matching files under `packages/nani-parser/fixtures/` are canonical parser
+fixtures. Tests snapshot their IR and required source map, slice original text
+to validate exact UTF-16 spans, and keep runtime behavior covered in the
+compiler/StoryEngine packages.

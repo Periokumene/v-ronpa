@@ -73,11 +73,25 @@ describe("project resource completions", () => {
       start: { line: 0, character: "@char alice.Default,".length },
       end: { line: 0, character: tokenSource.length }
     });
+    expect(completions[0]?.deferredDocumentation).toEqual({
+      kind: "character-appearance-token",
+      characterId: "alice",
+      baseAppearanceExpression: "Default",
+      candidateToken: "EYE0"
+    });
   });
 
   it("does not invent resource diagnostics or completions without a matching slot", () => {
     const source = "@flash color:#fff ";
     const completions = getNaniCompletions(source, { line: 0, character: source.length }, projectAssets);
     expect(completions.some((completion) => completion.kind === "resource")).toBe(false);
+  });
+
+  it("keeps deferred character previews scoped to @char rather than @slide", () => {
+    const source = "@slide alice.Default,E";
+    const completions = getNaniCompletions(source, { line: 0, character: source.length }, projectAssets);
+
+    expect(completions.map((completion) => completion.label)).toEqual(["EYE0", "EYE1"]);
+    expect(completions.every((completion) => completion.deferredDocumentation === undefined)).toBe(true);
   });
 });

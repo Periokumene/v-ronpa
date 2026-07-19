@@ -2,9 +2,13 @@ node_modules
 .gitignore
 src
 scripts
+test
+.vscode-test.mjs
+.vscode-test
 dist-types
 *.tsbuildinfo
 tsconfig.json
+tsconfig.test.json
 vitest.config.*
 **/*.test.*
 **/*.map

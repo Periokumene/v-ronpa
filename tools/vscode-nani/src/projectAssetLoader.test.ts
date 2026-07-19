@@ -1,5 +1,5 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -43,8 +43,19 @@ describe("project asset loading", () => {
 
     expect(loaded.index.assets.map((asset) => asset.id)).toEqual(["alice", "bgm:main"]);
     expect(loaded.index.characterTokens.alice).toEqual(["Default", "EYE0"]);
+    expect(loaded.characterPacks.alice).toEqual({
+      id: "alice",
+      rootPath: dirname(fixture.compositionsPath),
+      characterPath: join(dirname(fixture.compositionsPath), "character.json")
+    });
     expect(loaded.watchedPaths).toEqual(
-      expect.arrayContaining([fixture.configPath, fixture.outputPath, fixture.compositionsPath])
+      expect.arrayContaining([
+        fixture.configPath,
+        fixture.outputPath,
+        fixture.compositionsPath,
+        join(dirname(fixture.compositionsPath), "character.json"),
+        join(dirname(fixture.compositionsPath), "layers.json")
+      ])
     );
     expect(loaded.warnings).toEqual([]);
   });
@@ -74,7 +85,7 @@ describe("project asset loading", () => {
     let loads = 0;
     const loader = async () => {
       loads += 1;
-      return { index: { assets: [], characterTokens: {} }, watchedPaths: [], warnings: [] };
+      return { index: { assets: [], characterTokens: {} }, characterPacks: {}, watchedPaths: [], warnings: [] };
     };
 
     await cache.get("config", loader);

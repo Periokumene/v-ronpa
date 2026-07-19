@@ -1,5 +1,7 @@
 # VS Code Nani Alignment Audit — 2026-07-17
 
+> **Status: Historical / Superseded.** This file records the July 2026 catalog and asset-alignment audit. Its former editor-diagnostic implementation notes are superseded by the repository's exact-source diagnostic architecture; the VS Code adapter now consumes parser/compiler spans without local semantic probes or range inference.
+
 ## Baseline and method
 
 - Baseline tag: `vscode-nani-adapter-baseline-2026-07-03` (annotated tag object `1cb35cd`, peeled commit `294f799`).
@@ -88,5 +90,5 @@ These are asset-pack data, not language keywords. Other apps and character packs
 - Handwritten compatibility content remains parseable and retains shared hover/compiler diagnostics.
 - Resource IDs come only from the nearest asset config's generated module; character tokens come only from `compositions.json`.
 - Unknown project resources are not diagnosed because external paths and dynamic IDs are valid.
-- A compiler-derived primary-consumption probe detects ignored promoted params such as flash `time:` without treating colon-form asset IDs as parameter typos.
+- The runtime compiler owns ignored promoted-primary diagnostics such as flash `time:`; the VS Code adapter only publishes the compiler's structured result.
 - Existing content is corrected to remove `@sfx wait!` and use `@flash duration:50`.

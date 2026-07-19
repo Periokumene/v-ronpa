@@ -12,8 +12,15 @@ export interface NaniAssetConfig {
 
 export interface LoadedProjectAssets {
   index: NaniProjectAssetIndex;
+  characterPacks: Readonly<Record<string, NaniCharacterPackDescriptor>>;
   watchedPaths: string[];
   warnings: string[];
+}
+
+export interface NaniCharacterPackDescriptor {
+  id: string;
+  rootPath: string;
+  characterPath: string;
 }
 
 export class ProjectAssetLoadError extends Error {
@@ -74,6 +81,7 @@ export async function loadProjectAssets(
     );
   }
   const characterTokens: Record<string, readonly string[]> = {};
+  const characterPacks: Record<string, NaniCharacterPackDescriptor> = {};
   const watchedPaths = new Set([configPath, outputPath]);
   const warnings: string[] = [];
 
@@ -84,7 +92,14 @@ export async function loadProjectAssets(
       warnings.push(`Could not map character asset '${asset.id}' URI '${asset.optimizedUri}' into publicRoot.`);
       continue;
     }
-    const compositionsPath = join(dirname(characterJson), "compositions.json");
+    const packRoot = dirname(characterJson);
+    const descriptor = { id: asset.id, rootPath: packRoot, characterPath: characterJson };
+    characterPacks[asset.id] = descriptor;
+    characterPacks[asset.id.toLowerCase()] = descriptor;
+    const layersPath = join(packRoot, "layers.json");
+    const compositionsPath = join(packRoot, "compositions.json");
+    watchedPaths.add(characterJson);
+    watchedPaths.add(layersPath);
     watchedPaths.add(compositionsPath);
     if (!existsSync(compositionsPath)) {
       warnings.push(`Character asset '${asset.id}' has no compositions.json at ${compositionsPath}.`);
@@ -101,6 +116,7 @@ export async function loadProjectAssets(
 
   return {
     index: { assets, characterTokens },
+    characterPacks,
     watchedPaths: [...watchedPaths],
     warnings
   };
@@ -127,7 +143,7 @@ export class ProjectAssetCache {
 }
 
 export function disabledProjectAssets(): LoadedProjectAssets {
-  return { index: emptyProjectAssetIndex, watchedPaths: [], warnings: [] };
+  return { index: emptyProjectAssetIndex, characterPacks: {}, watchedPaths: [], warnings: [] };
 }
 
 async function importAssetConfig(configPath: string): Promise<unknown> {

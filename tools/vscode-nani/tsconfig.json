@@ -16,6 +16,9 @@
       "path": "../../packages/contracts"
     },
     {
+      "path": "../../packages/layered-character"
+    },
+    {
       "path": "../../packages/nani-parser"
     },
     {
