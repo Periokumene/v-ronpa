@@ -12,7 +12,12 @@ import {
   createVnUiCheckpoint,
   settleUiRuntimePresentationWait
 } from "@v-ronpa/app-vn-dispatch";
-import { PIXI_MAIN_BACKGROUND_ID, type SaveableVnState } from "@v-ronpa/contracts";
+import {
+  PIXI_MAIN_BACKGROUND_ID,
+  type SaveableVnState,
+  type VnEntryDef,
+  type VnRuntimeScriptSource
+} from "@v-ronpa/contracts";
 import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import { projectVnRuntimeStep } from "./runtimeProjection";
 import { collectVnSaveCheckpoint } from "./checkpoint";
@@ -21,15 +26,14 @@ import {
   materializeVnDebugTarget,
   type VnDebugEntryInspection
 } from "./debugMaterializer";
-import type { VnRuntimeEntry } from "./runtimeTypes";
 
 function projectLiveCheckpointThroughCommand(
   inspection: VnDebugEntryInspection,
   stopCommandIndex: number
 ): SaveableVnState {
   const boot = createVnSession({
-    scriptPath: inspection.entry.scriptPath,
-    sourceText: inspection.entry.sourceText,
+    scriptPath: inspection.source.scriptPath,
+    sourceText: inspection.source.sourceText,
     ...(inspection.entry.startLabel ? { startLabel: inspection.entry.startLabel } : {})
   });
   let session = boot.session;
@@ -67,7 +71,11 @@ function projectLiveCheckpointThroughCommand(
 
   const checkpoint = collectVnSaveCheckpoint({
     active: true,
-    entry: inspection.entry,
+    entryId: inspection.entry.id,
+    script: {
+      scriptPath: inspection.source.scriptPath,
+      scriptRevision: inspection.source.scriptRevision
+    },
     story: session.story,
     pixiStage,
     media: createVnMediaCheckpoint(mediaState),
@@ -224,16 +232,13 @@ describe("projectVnRuntimeStep", () => {
       "@hideUI commandBar",
       "Narrator: Parity.|#parity_line|"
     ].join("\n");
-    const declaredEntry: VnRuntimeEntry = {
+    const { entry: declaredEntry, source } = debugFixture({
       id: "vn:projection-parity",
       scriptPath: "projection-parity.nani",
-      scriptRevision: "sha256:placeholder",
       sourceText,
-      startLabel: "Start",
-      profile: "vn2d"
-    };
-    const inspection = await inspectVnDebugEntry(declaredEntry);
-    const boot = createVnSession({ scriptPath: declaredEntry.scriptPath, sourceText, startLabel: "Start" });
+    });
+    const inspection = await inspectVnDebugEntry(declaredEntry, source);
+    const boot = createVnSession({ scriptPath: source.scriptPath, sourceText, startLabel: "Start" });
     const advanced = advanceVnSession(boot.session);
     const projected = projectVnRuntimeStep({
       active: true,
@@ -248,14 +253,23 @@ describe("projectVnRuntimeStep", () => {
     });
     const live = collectVnSaveCheckpoint({
       active: true,
-      entry: inspection.entry,
+      entryId: inspection.entry.id,
+      script: {
+        scriptPath: inspection.source.scriptPath,
+        scriptRevision: inspection.source.scriptRevision
+      },
       story: projected.session.story,
       pixiStage: projected.stable.pixiStage,
       media: createVnMediaCheckpoint(projected.stable.mediaState),
       ui: createVnUiCheckpoint(projected.stable.uiState)
     });
     const target = inspection.commands.find((command) => command.anchor.stableId === "print:parity_line")!.anchor;
-    const materialized = await materializeVnDebugTarget({ entry: inspection.entry, inspection, target });
+    const materialized = await materializeVnDebugTarget({
+      entry: inspection.entry,
+      catalog: [inspection.source],
+      inspection,
+      target
+    });
 
     expect(live.ok).toBe(true);
     expect(materialized.status).toBe("ready");
@@ -277,14 +291,12 @@ describe("projectVnRuntimeStep", () => {
         "@sfx sfx:rain group:rain loop:true volume:0.25",
         "Narrator: Stable target parity.|#stable_target_parity|"
       ].join("\n");
-      const inspection = await inspectVnDebugEntry({
+      const fixture = debugFixture({
         id: "vn:projection-stable-target-parity",
         scriptPath: "projection-stable-target-parity.nani",
-        scriptRevision: "sha256:placeholder",
-        sourceText,
-        startLabel: "Start",
-        profile: "vn2d"
+        sourceText
       });
+      const inspection = await inspectVnDebugEntry(fixture.entry, fixture.source);
       const stopCommand = inspection.commands.find(
         ({ command }) => command.canonicalName === stopCanonicalName
       );
@@ -299,6 +311,7 @@ describe("projectVnRuntimeStep", () => {
       const live = projectLiveCheckpointThroughCommand(inspection, stopCommand.anchor.commandIndex);
       const materialized = await materializeVnDebugTarget({
         entry: inspection.entry,
+        catalog: [inspection.source],
         inspection,
         target
       });
@@ -310,3 +323,25 @@ describe("projectVnRuntimeStep", () => {
     }
   );
 });
+
+function debugFixture({
+  id,
+  scriptPath,
+  sourceText
+}: {
+  id: string;
+  scriptPath: string;
+  sourceText: string;
+}): { entry: VnEntryDef; source: VnRuntimeScriptSource } {
+  return {
+    entry: {
+      id,
+      title: id,
+      initialScriptPath: scriptPath,
+      startLabel: "Start",
+      profile: "vn2d",
+      assetRefs: []
+    },
+    source: { scriptPath, sourceText, scriptRevision: "sha256:placeholder" }
+  };
+}

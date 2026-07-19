@@ -8,6 +8,10 @@ Review changes for these drift risks:
 - dispatch/runtime importing presenter, or presenter interpreting RuntimeCommand;
 - save code stripping waits instead of returning checkpoint rejection;
 - restore ignoring game, entry, or script revision identity;
+- entry-level source/revision fields, single-file runtime definitions, or a
+  second endpoint parser reappearing beside the catalog linker;
+- cross-script preparation mutating Story/Pixi/UI/media before its atomic commit;
+- Pixi presenter remounting when a per-script preload plan or catalog record changes;
 - persistent-media desired state drifting from command volume/stop semantics;
 - lifecycle reset, accepted restore, or unmount bypassing runtime-exclusive
   port-wide media disposal;
@@ -16,7 +20,7 @@ Review changes for these drift risks:
 - app-specific pause behavior, fixed ports, or active docs describing superseded paths.
 
 Canonical current-state references are under `docs/architecture/`. Relevant
-change records are `interaction-vn-runtime-presentation-authority.md`,
+change records are `game-a-multi-nani-runtime-hard-cut.md`, `interaction-vn-runtime-presentation-authority.md`,
 `unified-media-save-slots-and-thumbnails.md` (except its superseded database
 names), and `save-data-v7-vn-persistent-media.md`.
 

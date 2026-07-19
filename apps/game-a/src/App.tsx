@@ -8,14 +8,13 @@ import {
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings,
   useGameSettingsAdapter,
-  usePixiStageReadiness,
-  type LayeredCharacterPreloadPlan
+  usePixiStageReadiness
 } from "@v-ronpa/app-vn-shell";
 import { SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS } from "@v-ronpa/media-save";
-import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
+import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import { RichTextFontStyles } from "@v-ronpa/ui-kit";
 import { gameAContentManifest } from "./contentManifest";
-import { gameALaunchDefinition } from "./gameALaunchDefinition";
+import { gameAStoryDefinition, type GameAStoryDefinition } from "./gameAScripts";
 import { useGameAFlowActor } from "./useGameAFlowActor";
 import { useGameAOverlayAdapters } from "./useGameAOverlayAdapters";
 import { useGameASaveAdapter } from "./useGameASaveAdapter";
@@ -38,31 +37,28 @@ export function App() {
   if (!GameADevApp) {
     return (
       <GameAAppCore
-        activeEntry={gameALaunchDefinition.runtimeEntry}
-        characterPreloadPlan={gameALaunchDefinition.characterPreloadPlan}
+        storyDefinition={gameAStoryDefinition}
       />
     );
   }
   return (
     <Suspense fallback={null}>
       <GameADevApp
-        initialLaunchDefinition={gameALaunchDefinition}
+        initialStoryDefinition={gameAStoryDefinition}
       />
     </Suspense>
   );
 }
 
 interface GameAAppCoreProps {
-  activeEntry: VnRuntimeEntry;
-  characterPreloadPlan: LayeredCharacterPreloadPlan;
+  storyDefinition: GameAStoryDefinition;
   className?: string;
   renderAfterPlayfield?: (context: GameAAppContext) => ReactNode;
   wrapPlayfield?: (playfield: ReactNode) => ReactNode;
 }
 
 export function GameAAppCore({
-  activeEntry,
-  characterPreloadPlan,
+  storyDefinition,
   className,
   renderAfterPlayfield,
   wrapPlayfield
@@ -76,8 +72,36 @@ export function GameAAppCore({
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
   const startPromiseRef = useRef<Promise<boolean> | undefined>(undefined);
   const pixiStage = usePixiStageReadiness();
+  const initialCharacterPreloadPlan = storyDefinition.characterPreloadPlanByScriptPath[
+    storyDefinition.entry.initialScriptPath
+  ] ?? [];
+  const prepareScriptPresentation = useCallback(
+    async ({ scriptPath, pixiStage: savedPixiStage, signal }: { scriptPath: string; pixiStage?: PixiStageSnapshot; signal: AbortSignal }) => {
+      if (!(await pixiStage.waitUntilReady()) || signal.aborted || !pixiStage.handle) {
+        return { ok: false as const, code: "pixi-stage-unavailable", message: "The Pixi stage is not ready." };
+      }
+      const basePlan = storyDefinition.characterPreloadPlanByScriptPath[scriptPath] ?? [];
+      const visiblePlan = savedPixiStage
+        ? Object.values(savedPixiStage.charactersById).map((character) => ({
+            characterId: character.id,
+            appearanceExpressions: [character.appearanceExpression]
+          }))
+        : [];
+      const result = await pixiStage.handle.prepareCharacters([...basePlan, ...visiblePlan]);
+      return result.ok
+        ? result
+        : {
+            ok: false as const,
+            code: "character-prepare-failed",
+            message: `Failed to prepare ${result.failures.map((failure) => `${failure.characterId}.${failure.expression || "default"}`).join(", ")}.`
+          };
+    },
+    [pixiStage.handle, pixiStage.waitUntilReady, storyDefinition.characterPreloadPlanByScriptPath]
+  );
   const runtime = useGameAVnRuntime({
-    entry: activeEntry,
+    entry: storyDefinition.entry,
+    catalog: storyDefinition.catalog,
+    prepareScriptPresentation,
     assetResolver: assetRegistry,
     ...(gameAContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: gameAContentManifest.audio.dialogueBleep } : {}),
     dialogueBleepSettings,
@@ -97,7 +121,7 @@ export function GameAAppCore({
     const promise = (async () => {
       try {
         if (!(await pixiStage.waitUntilReady())) return false;
-        if (!runtime.startNewGame()) return false;
+        if (!(await runtime.startNewGame())) return false;
         flow.send({ type: "START_NEW_GAME", mode: "vn" });
         return true;
       } finally {
@@ -147,6 +171,12 @@ export function GameAAppCore({
     gameAUiAssets.diagnostics.forEach(runtime.diagnostics.observeAssetDiagnostic);
   }, [gameAUiAssets.diagnostics, runtime.diagnostics.observeAssetDiagnostic]);
 
+  useEffect(() => {
+    if (flow.mode !== "vn" || !runtime.shell.interactionFacts.storyEnded) return;
+    runtime.lifecycle.resetRuntime();
+    flow.send({ type: "RETURN_TITLE" });
+  }, [flow.mode, flow.send, runtime.lifecycle, runtime.shell.interactionFacts.storyEnded]);
+
   const assetDiagnosticCount = runtime.diagnostics.runtimeDiagnostics.filter(
     (diagnostic) => diagnostic.source === "asset"
   ).length;
@@ -167,7 +197,7 @@ export function GameAAppCore({
             active={flow.mode === "vn" && runtime.shell.storyRuntime.active}
             assetResolver={assetRegistry}
             characterOutlineEnabled={true}
-            characterPreloadPlan={characterPreloadPlan}
+            characterPreloadPlan={initialCharacterPreloadPlan}
             diagnostics={runtime.diagnostics}
             presentation={runtime.presentation}
             onStageHandleChanged={pixiStage.onStageHandleChanged}

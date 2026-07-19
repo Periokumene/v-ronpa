@@ -3,7 +3,8 @@ import type { StoryRuntimeSnapshot } from "@v-ronpa/contracts";
 import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import { collectVnSaveCheckpoint, validateVnRestoreIdentity } from "./checkpoint";
 
-const entry = { id: "vn:test", scriptRevision: "sha256:test" };
+const entryId = "vn:test";
+const script = { scriptPath: "test.nani", scriptRevision: "sha256:test" };
 const stableStory: StoryRuntimeSnapshot = {
   currentScriptPath: "test.nani",
   instructionPointer: 1,
@@ -19,7 +20,7 @@ describe("VN checkpoint authority", () => {
       ok: true,
       value: {
         entryId: "vn:test",
-        scriptRevision: "sha256:test",
+        script,
         media: { bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } } },
         ui: { dialog: true }
       }
@@ -37,15 +38,15 @@ describe("VN checkpoint authority", () => {
   });
 
   it.each([
-    ["game-mismatch", { savedGameId: "other", savedEntryId: "vn:test", savedScriptRevision: "sha256:test" }],
-    ["entry-mismatch", { savedGameId: "game:test", savedEntryId: "vn:other", savedScriptRevision: "sha256:test" }],
-    ["script-revision-mismatch", { savedGameId: "game:test", savedEntryId: "vn:test", savedScriptRevision: "sha256:other" }]
+    ["game-mismatch", { savedGameId: "other", savedEntryId: "vn:test", savedScript: script }],
+    ["entry-mismatch", { savedGameId: "game:test", savedEntryId: "vn:other", savedScript: script }],
+    ["script-revision-mismatch", { savedGameId: "game:test", savedEntryId: "vn:test", savedScript: { ...script, scriptRevision: "sha256:other" } }]
   ] as const)("rejects %s identity", (code, saved) => {
     expect(
       validateVnRestoreIdentity({
         expectedGameId: "game:test",
         expectedEntryId: "vn:test",
-        expectedScriptRevision: "sha256:test",
+        expectedScript: script,
         ...saved
       })
     ).toMatchObject({ ok: false, code });
@@ -55,7 +56,8 @@ describe("VN checkpoint authority", () => {
 function checkpoint(story: StoryRuntimeSnapshot) {
   return collectVnSaveCheckpoint({
     active: true,
-    entry,
+    entryId,
+    script,
     story,
     pixiStage: createInitialPixiStageSnapshot(),
     media: {

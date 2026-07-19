@@ -60,6 +60,7 @@ export interface PixiThumbnailCaptureResult<Mime extends PixiThumbnailMime = Pix
 
 export interface PixiPresenterPort {
   mount(): Promise<void>;
+  prepareCharacters(plan: LayeredCharacterPreloadPlan): Promise<PixiCharacterPreparationResult>;
   setActive(active: boolean): void;
   reconcile(snapshot: PixiStageSnapshot, options?: PixiStageReconcileOptions): void;
   captureThumbnail<Mime extends PixiThumbnailMime = "image/webp">(
@@ -68,6 +69,15 @@ export interface PixiPresenterPort {
   clear(): void;
   destroy(): void;
 }
+
+export interface PixiCharacterPreparationFailure {
+  characterId: string;
+  expression: string;
+}
+
+export type PixiCharacterPreparationResult =
+  | { ok: true }
+  | { ok: false; failures: PixiCharacterPreparationFailure[] };
 
 interface PendingReconcile {
   snapshot: PixiStageSnapshot;
@@ -94,6 +104,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
   let listeningForWindowResize = false;
   let resizeFrame: number | undefined;
   let renderingActive = options.active;
+  let mountPromise: Promise<void> | undefined;
 
   const size = {
     width: () => Math.max(1, options.host.clientWidth || (initialized ? app.renderer.width : 0) || options.width || 960),
@@ -109,7 +120,12 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     weather?.tick(ticker);
   };
 
-  async function mount() {
+  function mount(): Promise<void> {
+    if (!mountPromise) mountPromise = mountPresenter();
+    return mountPromise;
+  }
+
+  async function mountPresenter() {
     if (mountStarted || destroyed) return;
     mountStarted = true;
     const initOptions = {
@@ -165,6 +181,19 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
       pendingReconcile = undefined;
       renderSnapshot(pending.snapshot, pending.options);
     }
+  }
+
+  async function prepareCharacters(plan: LayeredCharacterPreloadPlan): Promise<PixiCharacterPreparationResult> {
+    await mount();
+    if (destroyed || !actors) {
+      return {
+        ok: false,
+        failures: plan.flatMap(({ characterId, appearanceExpressions }) =>
+          appearanceExpressions.map((expression) => ({ characterId, expression }))
+        )
+      };
+    }
+    return actors.preloadCharacters(plan);
   }
 
   function setActive(active: boolean) {
@@ -330,7 +359,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     mounted = false;
   }
 
-  return { mount, setActive, reconcile, captureThumbnail, clear, destroy };
+  return { mount, prepareCharacters, setActive, reconcile, captureThumbnail, clear, destroy };
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, mime: PixiThumbnailMime, quality: number): Promise<Blob | undefined> {

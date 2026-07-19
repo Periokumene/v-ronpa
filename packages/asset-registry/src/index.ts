@@ -82,7 +82,7 @@ const rawUriPattern = /^(\/|\.\/|\.\.\/|https?:\/\/|data:|blob:)/u;
 export function createAssetRegistry(manifestInput: unknown): AssetRegistry {
   const diagnostics: AssetRegistryDiagnostic[] = [];
   const inputVersion = manifestVersion(manifestInput);
-  if (inputVersion !== 3) {
+  if (inputVersion !== 4) {
     diagnostics.push({
       code: "manifest-version-unsupported",
       severity: "error",
@@ -230,7 +230,7 @@ function manifestVersion(input: unknown): unknown {
 
 function createEmptyManifest(): ContentManifest {
   return {
-    version: 3,
+    version: 4,
     assets: [],
     fonts: [],
     runtimeAssets: [],

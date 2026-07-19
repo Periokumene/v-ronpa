@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
+import type { VnDevtoolsScriptCandidate } from "@v-ronpa/app-vn-devtools";
 import type { SaveableVnState } from "@v-ronpa/contracts";
 import { GameAAppCore, type GameAAppContext } from "../App";
-import type { GameAVnLaunchDefinition } from "../gameAScripts";
+import type { GameAStoryDefinition } from "../gameAScripts";
 import { GameANaniDevtools } from "./GameANaniDevtools";
 import { GameADevViewport } from "./GameADevViewport";
-import { prepareGameACandidateLaunch, stabilizeGameACandidateLaunch } from "./gameACandidateLaunch";
+import { prepareGameACandidateStory } from "./gameACandidateStory";
 import {
   canRollbackGameADevtoolsCommit,
   createGameADevtoolsCommitSettlement,
@@ -20,50 +20,49 @@ import {
 interface PendingDevtoolsCommit {
   token: number;
   phase: "install" | "await-session";
-  candidate: GameAVnLaunchDefinition;
-  previous: GameAVnLaunchDefinition;
+  candidate: GameAStoryDefinition;
+  previous: GameAStoryDefinition;
   checkpoint: SaveableVnState;
   settlement: GameADevtoolsCommitSettlement;
   storySessionBefore?: number;
 }
 
 interface GameADevtoolsTransactionOwner {
-  activeLaunchDefinitionRef: { current: GameAVnLaunchDefinition };
+  activeStoryDefinitionRef: { current: GameAStoryDefinition };
   commitSequenceRef: { current: number };
   pendingCommitRef: { current: PendingDevtoolsCommit | undefined };
-  pendingRollbackRef: { current: GameADevtoolsDeferredEntryRollback<GameAVnLaunchDefinition> | undefined };
+  pendingRollbackRef: { current: GameADevtoolsDeferredEntryRollback<GameAStoryDefinition> | undefined };
 }
 
 export function GameADevApp({
-  initialLaunchDefinition
+  initialStoryDefinition
 }: {
-  initialLaunchDefinition: GameAVnLaunchDefinition;
+  initialStoryDefinition: GameAStoryDefinition;
 }) {
-  const [activeLaunchDefinition, setActiveLaunchDefinition] = useState(initialLaunchDefinition);
-  const activeLaunchDefinitionRef = useRef(initialLaunchDefinition);
+  const [activeStoryDefinition, setActiveStoryDefinition] = useState(initialStoryDefinition);
+  const activeStoryDefinitionRef = useRef(initialStoryDefinition);
   const commitSequenceRef = useRef(0);
   const pendingCommitRef = useRef<PendingDevtoolsCommit | undefined>(undefined);
-  const pendingRollbackRef = useRef<GameADevtoolsDeferredEntryRollback<GameAVnLaunchDefinition> | undefined>(undefined);
+  const pendingRollbackRef = useRef<GameADevtoolsDeferredEntryRollback<GameAStoryDefinition> | undefined>(undefined);
   const transactionOwner = useRef<GameADevtoolsTransactionOwner>({
-    activeLaunchDefinitionRef,
+    activeStoryDefinitionRef,
     commitSequenceRef,
     pendingCommitRef,
     pendingRollbackRef
   }).current;
-  if (!pendingRollbackRef.current) activeLaunchDefinitionRef.current = activeLaunchDefinition;
+  if (!pendingRollbackRef.current) activeStoryDefinitionRef.current = activeStoryDefinition;
 
   return (
     <GameAAppCore
-      activeEntry={activeLaunchDefinition.runtimeEntry}
-      characterPreloadPlan={activeLaunchDefinition.characterPreloadPlan}
+      storyDefinition={activeStoryDefinition}
       className="game-a-shell-with-devtools"
       wrapPlayfield={wrapGameADevPlayfield}
       renderAfterPlayfield={({ runtime, flow }) => (
         <GameADevtoolsHost
-          activeLaunchDefinition={activeLaunchDefinition}
+          activeStoryDefinition={activeStoryDefinition}
           flow={flow}
           runtime={runtime}
-          setActiveLaunchDefinition={setActiveLaunchDefinition}
+          setActiveStoryDefinition={setActiveStoryDefinition}
           transactionOwner={transactionOwner}
         />
       )}
@@ -76,24 +75,24 @@ function wrapGameADevPlayfield(playfield: ReactNode): ReactNode {
 }
 
 interface GameADevtoolsHostProps extends GameAAppContext {
-  activeLaunchDefinition: GameAVnLaunchDefinition;
-  setActiveLaunchDefinition: (definition: GameAVnLaunchDefinition) => void;
+  activeStoryDefinition: GameAStoryDefinition;
+  setActiveStoryDefinition: (definition: GameAStoryDefinition) => void;
   transactionOwner: GameADevtoolsTransactionOwner;
 }
 
 function GameADevtoolsHost({
-  activeLaunchDefinition,
+  activeStoryDefinition,
   flow,
   runtime,
-  setActiveLaunchDefinition,
+  setActiveStoryDefinition,
   transactionOwner
 }: GameADevtoolsHostProps) {
-  const { activeLaunchDefinitionRef, commitSequenceRef, pendingCommitRef, pendingRollbackRef } = transactionOwner;
+  const { activeStoryDefinitionRef, commitSequenceRef, pendingCommitRef, pendingRollbackRef } = transactionOwner;
   const [pendingCommit, setPendingCommit] = useState<PendingDevtoolsCommit | undefined>(
     () => pendingCommitRef.current
   );
-  const setActiveLaunchDefinitionRef = useRef(setActiveLaunchDefinition);
-  setActiveLaunchDefinitionRef.current = setActiveLaunchDefinition;
+  const setActiveStoryDefinitionRef = useRef(setActiveStoryDefinition);
+  setActiveStoryDefinitionRef.current = setActiveStoryDefinition;
   const mountedRef = useRef(false);
   const installedCommitTokenRef = useRef<number | undefined>(undefined);
 
@@ -111,11 +110,11 @@ function GameADevtoolsHost({
       mounted: mountedRef.current,
       settlement: pending.settlement,
       rollbackEntryRef: () => {
-        activeLaunchDefinitionRef.current = pending.previous;
+        activeStoryDefinitionRef.current = pending.previous;
         pendingRollbackRef.current = { entry: pending.previous, token: pending.token };
       },
       rollbackMountedEntry: () => {
-        setActiveLaunchDefinitionRef.current(pending.previous);
+        setActiveStoryDefinitionRef.current(pending.previous);
         setPendingCommit(undefined);
       }
     });
@@ -143,18 +142,18 @@ function GameADevtoolsHost({
 
   useLayoutEffect(() => {
     const rollback = pendingRollbackRef.current;
-    if (rollback) activeLaunchDefinitionRef.current = rollback.entry;
+    if (rollback) activeStoryDefinitionRef.current = rollback.entry;
     reconcileGameADevtoolsEntryRollback({
-      activeEntry: activeLaunchDefinition,
+      activeEntry: activeStoryDefinition,
       pendingRollback: pendingRollbackRef,
-      setActiveEntry: setActiveLaunchDefinitionRef.current,
+      setActiveEntry: setActiveStoryDefinitionRef.current,
       clearPendingState: () => setPendingCommit(undefined)
     });
-  }, [activeLaunchDefinition, pendingRollbackRef]);
+  }, [activeStoryDefinition, pendingRollbackRef]);
 
   const commitCandidate = useCallback(
     async (
-      candidateEntry: VnRuntimeEntry,
+      candidateEntry: VnDevtoolsScriptCandidate,
       checkpoint: SaveableVnState,
       signal: AbortSignal,
       onAccepted: () => void
@@ -167,7 +166,7 @@ function GameADevtoolsHost({
       ) {
         return false;
       }
-      const prepared = await prepareGameACandidateLaunch(candidateEntry, signal);
+      const prepared = await prepareGameACandidateStory(activeStoryDefinitionRef.current, candidateEntry, signal);
       if (
         prepared.status !== "ready"
         || !mountedRef.current
@@ -176,16 +175,13 @@ function GameADevtoolsHost({
         || signal.aborted
       ) return false;
 
-      const candidate = stabilizeGameACandidateLaunch(
-        activeLaunchDefinitionRef.current,
-        prepared.launchDefinition
-      );
+      const candidate = prepared.storyDefinition;
       const settlement = createGameADevtoolsCommitSettlement();
       const pending: PendingDevtoolsCommit = {
         token: ++commitSequenceRef.current,
         phase: "install",
         candidate,
-        previous: activeLaunchDefinitionRef.current,
+        previous: activeStoryDefinitionRef.current,
         checkpoint,
         settlement
       };
@@ -193,21 +189,21 @@ function GameADevtoolsHost({
         signal,
         install() {
           pendingCommitRef.current = pending;
-          activeLaunchDefinitionRef.current = candidate;
+          activeStoryDefinitionRef.current = candidate;
         },
         onAccepted
       });
       if (!accepted) return false;
       setPendingCommit(pending);
-      setActiveLaunchDefinitionRef.current(candidate);
+      setActiveStoryDefinitionRef.current(candidate);
       return settlement.promise;
     },
     []
   );
 
-  const adoptCandidate = useCallback(async (candidateEntry: VnRuntimeEntry, signal: AbortSignal) => {
+  const adoptCandidate = useCallback(async (candidateEntry: VnDevtoolsScriptCandidate, signal: AbortSignal) => {
     if (!mountedRef.current || pendingCommitRef.current || pendingRollbackRef.current || signal.aborted) return false;
-    const prepared = await prepareGameACandidateLaunch(candidateEntry, signal);
+    const prepared = await prepareGameACandidateStory(activeStoryDefinitionRef.current, candidateEntry, signal);
     if (
       prepared.status !== "ready"
       || !mountedRef.current
@@ -215,12 +211,9 @@ function GameADevtoolsHost({
       || pendingRollbackRef.current
       || signal.aborted
     ) return false;
-    const candidate = stabilizeGameACandidateLaunch(
-      activeLaunchDefinitionRef.current,
-      prepared.launchDefinition
-    );
-    activeLaunchDefinitionRef.current = candidate;
-    setActiveLaunchDefinitionRef.current(candidate);
+    const candidate = prepared.storyDefinition;
+    activeStoryDefinitionRef.current = candidate;
+    setActiveStoryDefinitionRef.current(candidate);
     return true;
   }, []);
 
@@ -234,36 +227,38 @@ function GameADevtoolsHost({
       return;
     }
 
-    if (pending.phase !== "install" || activeLaunchDefinition !== pending.candidate) return;
+    if (pending.phase !== "install" || activeStoryDefinition !== pending.candidate) return;
     if (installedCommitTokenRef.current === pending.token) return;
     installedCommitTokenRef.current = pending.token;
 
-    const installResult = installGameADevtoolsCommit({
+    void installGameADevtoolsCommit({
       storySessionBefore: runtime.presentation.storySession,
       restore: () => runtime.lifecycle.restoreVnState({ gameId: "game-a", state: pending.checkpoint }),
       enterVn: () => flow.send({ type: "ENTER_VN" })
-    });
-    if (installResult.status === "failed") {
-      failPendingCommit(pending);
-      return;
-    }
-    if (installResult.flowDispatchError) {
+    }).then((installResult) => {
+      if (pendingCommitRef.current?.token !== pending.token) return;
+      if (installResult.status === "failed") {
+        failPendingCommit(pending);
+        return;
+      }
+      if (installResult.flowDispatchError) {
       runtime.diagnostics.observeAssetDiagnostic({
         code: "vn-devtools-flow-dispatch-failed",
         severity: "error",
         kind: "vn-devtools",
         message: `The Nani workbench restored the candidate runtime, but ENTER_VN dispatch failed: ${installResult.flowDispatchError}`
       });
-    }
+      }
 
     const waiting = {
       ...pending,
       phase: "await-session" as const,
       storySessionBefore: installResult.storySessionBefore
     };
-    pendingCommitRef.current = waiting;
-    if (mountedRef.current) setPendingCommit(waiting);
-  }, [activeLaunchDefinition, failPendingCommit, flow.send, pendingCommit, runtime.diagnostics, runtime.lifecycle, runtime.presentation.storySession]);
+      pendingCommitRef.current = waiting;
+      if (mountedRef.current) setPendingCommit(waiting);
+    });
+  }, [activeStoryDefinition, failPendingCommit, flow.send, pendingCommit, runtime.diagnostics, runtime.lifecycle, runtime.presentation.storySession]);
 
   useEffect(() => {
     const pending = pendingCommit;
@@ -279,7 +274,7 @@ function GameADevtoolsHost({
 
   return (
     <GameANaniDevtools
-      entry={activeLaunchDefinition.runtimeEntry}
+      storyDefinition={activeStoryDefinition}
       runtime={runtime}
       vnActive={runtime.shell.storyRuntime.active}
       adoptCandidate={adoptCandidate}

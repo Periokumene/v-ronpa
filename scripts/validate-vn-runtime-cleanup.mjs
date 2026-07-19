@@ -21,7 +21,13 @@ const legacySymbols = [
   "canStoryAdvanceFromSource",
   "canCompletePauseRuntimeWaitFromSource",
   "canToggleStoryAutomation",
-  "shouldAnimateStoryPlayPacing"
+  "shouldAnimateStoryPlayPacing",
+  "VnRuntimeEntry",
+  "GameAVnLaunchDefinition",
+  "gameALaunchDefinition",
+  "activeLaunchDefinition",
+  "gameAOpeningLaunchDefinition",
+  "resolveGameALaunchDefinitionModule"
 ];
 
 for (const sourceRoot of activeRoots) {
@@ -123,6 +129,40 @@ for (const secondEntryModule of [
   if (moduleSpecifierPattern(secondEntryModule).test(stripComments(gameADevHost))) {
     failures.push(`${gameADevHostPath}: the DEV host must receive the Vite-selected entry from App instead of importing '${secondEntryModule}'.`);
   }
+}
+
+const contractsPath = "packages/contracts/src/index.ts";
+const contracts = readFileSync(join(root, contractsPath), "utf8");
+const vnEntrySchemaBody = contracts.match(/export const VnEntryDefSchema\s*=\s*z[\s\S]*?\.strict\(\);/u)?.[0];
+if (!vnEntrySchemaBody) {
+  failures.push(`${contractsPath}: missing canonical VnEntryDefSchema.`);
+} else {
+  for (const entryLevelField of ["scriptPath", "scriptRevision", "sourceText", "characterPreloadPlan"]) {
+    if (new RegExp(`\\b${entryLevelField}\\s*:`, "u").test(vnEntrySchemaBody)) {
+      failures.push(`${contractsPath}: entry-level '${entryLevelField}' is forbidden; script identity belongs to the catalog record.`);
+    }
+  }
+  if (!/\binitialScriptPath\s*:/u.test(vnEntrySchemaBody)) {
+    failures.push(`${contractsPath}: VnEntryDefSchema must expose the catalog-owned initialScriptPath.`);
+  }
+}
+
+const gameAViteConfigPath = "apps/game-a/vite.config.ts";
+const gameAViteConfig = stripComments(readFileSync(join(root, gameAViteConfigPath), "utf8"));
+if (!/gameAAssetConfig\.scripts/u.test(gameAViteConfig)) {
+  failures.push(`${gameAViteConfigPath}: production Nani Devtools membership must come from gameAAssetConfig.scripts.`);
+}
+if (/gameAAssetConfig\.scripts\s*\[\s*0\s*\]/u.test(gameAViteConfig)) {
+  failures.push(`${gameAViteConfigPath}: production Nani Devtools must not collapse the catalog to its first script.`);
+}
+
+const pixiLayerPath = "packages/app-vn-shell/src/PixiLayer.tsx";
+const pixiLayer = stripComments(readFileSync(join(root, pixiLayerPath), "utf8"));
+if (!/initialCharacterPreloadPlanRef\s*=\s*useRef\(characterPreloadPlan\)/u.test(pixiLayer)) {
+  failures.push(`${pixiLayerPath}: the initial character plan must be captured once for presenter mount.`);
+}
+if (/\},\s*\[[^\]]*characterPreloadPlan[^\]]*\]\);/u.test(pixiLayer)) {
+  failures.push(`${pixiLayerPath}: character plan changes must use prepareCharacters and must not remount the presenter.`);
 }
 
 if (failures.length > 0) {

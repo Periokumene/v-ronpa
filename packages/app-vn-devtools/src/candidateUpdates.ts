@@ -1,4 +1,3 @@
-import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
 import {
   EMPTY_VN_DEBUG_DECISION_TRACE,
   inspectVnDebugEntry,
@@ -11,12 +10,18 @@ import {
 } from "@v-ronpa/app-vn-runtime/debug";
 import { planVnDevtoolsCandidate } from "./sourceUpdates";
 import type { NaniDevtoolsViteUpdate } from "./viteProtocol";
+import {
+  replaceVnDevtoolsCandidateSource,
+  validateVnDevtoolsCandidateCatalog,
+  type VnDevtoolsScriptCandidate
+} from "./scriptCandidate";
 
 export type PreparedVnDevtoolsCandidateUpdate =
   | {
-    kind: "retain-last-known-good";
-    inspection: VnDebugEntryInspection;
-    reason: "invalid-source" | "revision-mismatch";
+      kind: "retain-last-known-good";
+      inspection: VnDebugEntryInspection;
+      reason: "invalid-source" | "revision-mismatch" | "catalog-link-error";
+      message?: string;
   }
   | {
     kind: "refresh-source-mapping";
@@ -34,12 +39,32 @@ export type PreparedVnDevtoolsCandidateUpdate =
   | { kind: "require-preview-target"; inspection: VnDebugEntryInspection; expectedRevision: string };
 
 export interface PrepareVnDevtoolsCandidateUpdateInput {
-  activeEntry: VnRuntimeEntry;
+  activeCandidate: VnDevtoolsScriptCandidate;
   update: NaniDevtoolsViteUpdate;
   pinnedTarget?: VnDebugTargetAnchor;
   decisions?: VnDebugDecisionTrace;
   vnActive: boolean;
   signal?: AbortSignal;
+}
+
+export function isVnDevtoolsUpdateRuntimeActive({
+  hasFixedPoint,
+  runtimeScriptPath,
+  runtimeVisitedScriptPaths = [],
+  updatedScriptPath,
+  vnActive
+}: {
+  hasFixedPoint: boolean;
+  runtimeScriptPath: string;
+  runtimeVisitedScriptPaths?: Iterable<string>;
+  updatedScriptPath: string;
+  vnActive: boolean;
+}): boolean {
+  return vnActive && (
+    updatedScriptPath === runtimeScriptPath
+    || hasFixedPoint
+    || new Set(runtimeVisitedScriptPaths).has(updatedScriptPath)
+  );
 }
 
 /**
@@ -48,7 +73,7 @@ export interface PrepareVnDevtoolsCandidateUpdateInput {
  * result is an inspection/status update that preserves last-known-good state.
  */
 export async function prepareVnDevtoolsCandidateUpdate({
-  activeEntry,
+  activeCandidate,
   decisions = EMPTY_VN_DEBUG_DECISION_TRACE,
   pinnedTarget,
   signal,
@@ -56,17 +81,18 @@ export async function prepareVnDevtoolsCandidateUpdate({
   vnActive
 }: PrepareVnDevtoolsCandidateUpdateInput): Promise<PreparedVnDevtoolsCandidateUpdate> {
   throwIfAborted(signal);
-  const candidateEntry: VnRuntimeEntry = {
-    ...activeEntry,
+  const candidateSource = {
+    ...activeCandidate.source,
     sourceText: update.sourceText,
-    scriptRevision: update.serverRevision ?? activeEntry.scriptRevision
+    scriptRevision: update.serverRevision ?? activeCandidate.source.scriptRevision
   };
-  const inspection = await inspectVnDebugEntry(candidateEntry);
+  const candidateCatalog = replaceVnDevtoolsCandidateSource(activeCandidate, candidateSource);
+  const inspection = await inspectVnDebugEntry(activeCandidate.entry, candidateSource);
   throwIfAborted(signal);
   const plan = planVnDevtoolsCandidate({
     serverRevision: update.serverRevision,
     browserRevision: inspection.revision,
-    activeRevision: activeEntry.scriptRevision,
+    activeRevision: activeCandidate.source.scriptRevision,
     canMaterialize: inspection.canMaterialize,
     hasPinnedTarget: Boolean(pinnedTarget),
     vnActive
@@ -82,8 +108,22 @@ export async function prepareVnDevtoolsCandidateUpdate({
   if (!expectedRevision) {
     return { kind: "retain-last-known-good", inspection, reason: "invalid-source" };
   }
+  const catalogValidation = await validateVnDevtoolsCandidateCatalog(candidateCatalog);
+  throwIfAborted(signal);
+  if (!catalogValidation.ok) {
+    return {
+      kind: "retain-last-known-good",
+      inspection,
+      reason: catalogValidation.code,
+      message: catalogValidation.message
+    };
+  }
   if (plan.kind === "refresh-source-mapping") {
-    const remappedTarget = pinnedTarget ? resolveVnDebugAnchor(inspection, pinnedTarget) : undefined;
+    const remappedTarget = pinnedTarget
+      ? pinnedTarget.scriptPath === inspection.source.scriptPath
+        ? resolveVnDebugAnchor(inspection, pinnedTarget)
+        : pinnedTarget
+      : undefined;
     return {
       kind: plan.kind,
       inspection,
@@ -97,6 +137,7 @@ export async function prepareVnDevtoolsCandidateUpdate({
     }
     const result = await materializeVnDebugTarget({
       entry: inspection.entry,
+      catalog: candidateCatalog.catalog,
       inspection,
       target: pinnedTarget,
       decisions,

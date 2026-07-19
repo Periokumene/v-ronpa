@@ -88,3 +88,8 @@ export type {
   NaniDevtoolsViteInitialCandidate,
   NaniDevtoolsViteUpdate
 } from "./viteProtocol";
+export { validateVnDevtoolsCandidateCatalog } from "./scriptCandidate";
+export type {
+  VnDevtoolsCandidateCatalogValidation,
+  VnDevtoolsScriptCandidate
+} from "./scriptCandidate";

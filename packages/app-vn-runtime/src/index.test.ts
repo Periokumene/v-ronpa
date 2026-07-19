@@ -623,7 +623,7 @@ describe("app VN runtime helpers", () => {
 
 function manifestWithAssets(runtimeAssets: RuntimeAsset[]): ContentManifest {
   return {
-    version: 3 as const,
+    version: 4 as const,
     assets: [],
     fonts: [],
     runtimeAssets,

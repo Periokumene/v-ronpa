@@ -47,74 +47,74 @@ describe("Game A devtools atomic commit", () => {
     expect(accepted).not.toHaveBeenCalled();
   });
 
-  it("enters VN once and waits for the captured story session after a successful restore", () => {
+  it("enters VN once and waits for the captured story session after a successful restore", async () => {
     const enterVn = vi.fn();
-    const restore = vi.fn(() => ({ ok: true }));
+    const restore = vi.fn(async () => ({ ok: true }));
 
-    expect(
+    await expect(
       installGameADevtoolsCommit({
         enterVn,
         restore,
         storySessionBefore: 3
       })
-    ).toEqual({ status: "await-session", storySessionBefore: 3 });
+    ).resolves.toEqual({ status: "await-session", storySessionBefore: 3 });
     expect(restore).toHaveBeenCalledOnce();
     expect(enterVn).toHaveBeenCalledOnce();
   });
 
-  it("rejects a failed restore without entering VN", () => {
+  it("rejects a failed restore without entering VN", async () => {
     const enterVn = vi.fn();
 
-    expect(
+    await expect(
       installGameADevtoolsCommit({
         enterVn,
-        restore: () => ({ ok: false }),
+        restore: async () => ({ ok: false }),
         storySessionBefore: 4
       })
-    ).toEqual({ status: "failed", reason: "restore-rejected" });
+    ).resolves.toEqual({ status: "failed", reason: "restore-rejected" });
     expect(enterVn).not.toHaveBeenCalled();
   });
 
-  it("turns a restore exception into a failed pre-install transaction", () => {
-    expect(
+  it("turns a restore exception into a failed pre-install transaction", async () => {
+    await expect(
       installGameADevtoolsCommit({
         enterVn: vi.fn(),
-        restore: () => {
+        restore: async () => {
           throw new Error("restore failed");
         },
         storySessionBefore: 7
       })
-    ).toEqual({ status: "failed", reason: "restore-exception" });
+    ).resolves.toEqual({ status: "failed", reason: "restore-exception" });
   });
 
-  it("makes a successful restore irrevocable even when its originating task is superseded", () => {
+  it("makes a successful restore irrevocable even when its originating task is superseded", async () => {
     const abort = new AbortController();
     const enterVn = vi.fn();
 
-    expect(
+    await expect(
       installGameADevtoolsCommit({
         enterVn,
-        restore: () => {
+        restore: async () => {
           abort.abort();
           return { ok: true };
         },
         storySessionBefore: 2
       })
-    ).toEqual({ status: "await-session", storySessionBefore: 2 });
+    ).resolves.toEqual({ status: "await-session", storySessionBefore: 2 });
     expect(abort.signal.aborted).toBe(true);
     expect(enterVn).toHaveBeenCalledOnce();
   });
 
-  it("keeps the restored candidate installed when ENTER_VN dispatch throws", () => {
-    expect(
+  it("keeps the restored candidate installed when ENTER_VN dispatch throws", async () => {
+    await expect(
       installGameADevtoolsCommit({
         enterVn: () => {
           throw new Error("flow failed");
         },
-        restore: () => ({ ok: true }),
+        restore: async () => ({ ok: true }),
         storySessionBefore: 7
       })
-    ).toEqual({
+    ).resolves.toEqual({
       status: "await-session",
       storySessionBefore: 7,
       flowDispatchError: "flow failed"

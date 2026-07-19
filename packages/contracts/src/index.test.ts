@@ -48,7 +48,7 @@ import {
 describe("contracts", () => {
   it("validates the baseline content manifest", () => {
     const manifest = ContentManifestSchema.parse({
-      version: 3,
+      version: 4,
       assets: [
         { id: "Ema", kind: "character-pack", tags: ["placeholder"] },
         { id: "texture:evidence:keycard-icon", kind: "texture", tags: ["placeholder", "evidence"] }
@@ -972,7 +972,7 @@ describe("contracts", () => {
 
     expect(() =>
       ContentManifestSchema.parse({
-        version: 3,
+        version: 4,
         assets: [],
         runtimeAssets: [],
         maps: [
@@ -1309,13 +1309,13 @@ describe("contracts", () => {
     };
 
     const save = SaveDataSchema.parse({
-      version: 7,
+      version: 8,
       gameId: "game:test",
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "navi",
       vn: {
         entryId: "vn:opening",
-        scriptRevision: "sha256:test",
+        script: { scriptPath: "opening.nani", scriptRevision: "sha256:test" },
         story,
         pixiStage,
         media: {
@@ -1337,7 +1337,7 @@ describe("contracts", () => {
       characters: {}
     });
 
-    expect(save.version).toBe(7);
+    expect(save.version).toBe(8);
     expect(save.vn?.media).toEqual({
       bgmByGroup: {
         music: { sourceRef: "bgm:main", volume: 0.4 },
@@ -1366,13 +1366,13 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 7,
+        version: 8,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "vn",
         vn: {
           entryId: "vn:opening",
-          scriptRevision: "sha256:test",
+          script: { scriptPath: "opening.nani", scriptRevision: "sha256:test" },
           story,
           pixiStage,
           media: { bgmByGroup: {}, loopingSfxByKey: {} },
@@ -1388,13 +1388,13 @@ describe("contracts", () => {
 
     expect(() =>
       SaveDataSchema.parse({
-        version: 7,
+        version: 8,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "vn",
         vn: {
           entryId: "vn:opening",
-          scriptRevision: "sha256:test",
+          script: { scriptPath: "opening.nani", scriptRevision: "sha256:test" },
           story,
           pixiStage,
           ui: { dialog: true, commandBar: true, toastLayer: true }
@@ -1409,7 +1409,7 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 7,
+        version: 8,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "navi",
@@ -1426,7 +1426,7 @@ describe("contracts", () => {
         "slot:contracts:navi",
         "Contracts Navi",
         SaveDataSchema.parse({
-          version: 7,
+          version: 8,
           gameId: "game:test",
           savedAt: "2026-06-14T00:00:00.000Z",
           mode: "navi",
@@ -1447,13 +1447,13 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 7,
+        version: 8,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "trial",
         vn: {
           entryId: "vn:opening",
-          scriptRevision: "sha256:test",
+          script: { scriptPath: "opening.nani", scriptRevision: "sha256:test" },
           story,
           pixiStage,
           media: { bgmByGroup: {}, loopingSfxByKey: {} },
@@ -1596,13 +1596,13 @@ describe("contracts", () => {
 
   it("does not persist runtime command streams in save data", () => {
     const save = SaveDataSchema.parse({
-      version: 7,
+      version: 8,
       gameId: "game:test",
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "vn",
       vn: {
         entryId: "vn:opening",
-        scriptRevision: "sha256:test",
+        script: { scriptPath: "opening.nani", scriptRevision: "sha256:test" },
         story: {
           currentScriptPath: "opening.nani",
           instructionPointer: 2,

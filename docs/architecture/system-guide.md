@@ -12,14 +12,14 @@ interaction state back into the machine.
 
 ## Package ownership
 
-- `contracts`: public schemas, SaveData v7, `.nani` runtime IR.
+- `contracts`: public schemas, ContentManifest v4, SaveData v8, and `.nani` runtime IR.
 - `nani-parser`: generic `.nani` ScenarioIR plus a required UTF-16 source-map
   sidecar; owns syntax diagnostics and cooked-to-source projection.
-- `nani-runtime-compiler`: catalog binding, validation, normalization, and
+- `nani-runtime-compiler`: command binding, static endpoint/catalog linking, validation, normalization, and
   runtime-boundary diagnostics; consumes parser IR and source map together,
   binding only from ordered `CommandIR.args`; owns the one semantic serializer
   used by Node asset revisions and browser WebCrypto revisions.
-- `app-vn-session`: story session orchestration.
+- `app-vn-session`: story session orchestration and pure cross-script switching.
 - `app-vn-dispatch`: headless command fanout and pure UI/media transactions.
 - `pixi-stage-model`: pure Pixi snapshot reducer, hints, waits, diagnostics.
 - `app-vn-runtime`: React runtime hook, canonical capability ports, shared pure

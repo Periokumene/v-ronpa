@@ -1,8 +1,11 @@
 # Runtime Asset Pipeline
 
-Each app owns a declarative `asset.config.mjs`. Generation scans its public
-assets, compiles configured `.nani` entries, emits stable semantic SHA-256 script
-revisions, derives script asset refs, and records selected runtime providers.
+Each app owns a declarative `asset.config.mjs`. Its ordered `scripts` list is the
+only production catalog-membership authority. Generation scans public assets,
+compiles and links every configured `.nani`, emits `sourcesByPath`, stable
+semantic SHA-256 revisions, per-script asset refs and character plans, and
+records selected runtime providers. Unknown endpoints, labels, duplicate paths,
+and unsupported endpoint forms fail generation.
 `nani-runtime-compiler` owns the canonical semantic byte serialization. It
 includes script path, labels, commands, and command semantics while excluding
 source text and source locations. Asset generation hashes those bytes with
@@ -64,28 +67,34 @@ layer it derives `unitsPerPixel = abs(localTransform.scale.x) / pixelsPerUnit`, 
 requires one pack-wide value within relative error `1e-6`. Alice currently resolves to `1`; Ema resolves to `0.006`.
 Density is not duplicated in `character.json`.
 
-## Entry-scoped layered-character preparation
+## Catalog-scoped layered-character preparation
 
 The pure layered-character model derives one `LayeredCharacterPreloadPlan` from each compiled RuntimeScript; asset
-generation and the Game A DEV candidate transaction call this same projection. It collects explicit
+generation and the Game A DEV catalog-record transaction call this same projection. It collects explicit
 `@char` character IDs, the default expression `""`, expression changes from `@char` and `@slide`, and applies wildcard
-expressions to every explicit character in the entry. IDs and expressions are deduplicated and stably sorted. The plan is
+expressions to every explicit character in the script. IDs and expressions are deduplicated and stably sorted. The plan is
 stored only in generated script metadata beside `scriptRevision` and `assetRefs`; it is not copied into ContentManifest,
 hand-written app configuration, `.nani`, or a character pack.
 
-An app launch definition pairs the runtime entry with that exact plan. Product launches use generated metadata; a verified
-DEV source candidate derives a replacement plan from the same compiled script and installs both as one app-owned value. The canonical Pixi host mounts while the
+One app-owned story definition pairs the entry, runtime catalog, and plans by
+script path. A verified DEV source candidate replaces one catalog record and its
+derived plan as one value. The canonical Pixi host mounts while the
 title or Navi surface is still active. Presenter mount loads and validates only referenced layers, deduplicates shared pack,
 metadata, and Texture work, and calls `renderer.prepare.upload()` for every unique successful Texture. Its stage handle
 becomes ready only after those uploads settle. Story-session changes do not remount this presenter or discard its WebGL
-context.
+context. Later scripts call the same presenter's idempotent
+`prepareCharacters(plan)`; changing a catalog record or plan never remounts the
+canvas. Prepared and in-flight expressions, textures, and GPU uploads are
+deduplicated.
 
 Game A opening currently prepares 16 layers (about 0.09 MiB compressed and 1.18 MiB decoded). Harness showcase prepares 15
 layers (about 2.51 MiB compressed and 29.37 MiB decoded). Preparing the full Ema pack would decode about 111.79 MiB and is
 forbidden as a shared policy.
 
-New-game, VN interaction entry, and restore wait on the app-owned stage handle while remaining on the title or Navi surface.
-Planned failures emit the existing asset diagnostic, cache a strict empty result, and still resolve readiness. Runtime
+New-game, cross-script navigation, Devtools preview, and restore wait on the
+app-owned stage handle. Restore adds expressions still visible in the saved Pixi
+snapshot. Preparation returns a Result; failure leaves Story/Pixi/UI/media and
+the instruction pointer unchanged, while harmless resource-cache work may remain. Runtime
 requests outside the plan emit `asset-unprepared-character-expression`, switch synchronously to empty, and never initiate a
 background load, retry, compatibility lookup, or best-effort unoutlined fallback.
 

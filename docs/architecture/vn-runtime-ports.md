@@ -7,6 +7,12 @@ start/reset/checkpoint/restore; and `VnDiagnosticsPort` owns diagnostic
 observation. These four ports are the complete product boundary returned by
 `useVnRuntime()`.
 
+The lifecycle port is asynchronous at transactional boundaries. `startStory()`
+and `restoreVnState()` return `Promise<Result>` after catalog validation and
+target presentation preparation. A cross-script navigation holds the existing
+runtime state under the `cutscene` input lock, follows at most 32 consecutive
+static endpoints, and commits once. Checkpoints are rejected during that window.
+
 Read-only runtime inspection is deliberately absent from the root entry.
 Harnesses import `useVnRuntimeWithDebug()` and `VnRuntimeDebugSnapshot` from
 `@v-ronpa/app-vn-runtime/debug`. That same explicit entry exposes headless Nani

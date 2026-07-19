@@ -21,7 +21,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
 
   await page.addInitScript(() => {
     localStorage.removeItem("v-ronpa:game-a:settings:v2");
-    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v9");
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v10");
   });
   await page.goto("/");
 
@@ -256,7 +256,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await exerciseNaniSourceSaveFlow(page, workbench);
   await exerciseWorkbenchDecisionFlow(page, workbench, firstStableLine);
   const persistedWorkbenchSession = await page.evaluate(() => {
-    const raw = sessionStorage.getItem("v-ronpa:game-a:nani-devtools:v1");
+    const raw = sessionStorage.getItem("v-ronpa:game-a:nani-devtools:v3");
     return raw ? JSON.parse(raw) as {
       version?: number;
       layout?: { bottomPanelOpen?: boolean; activePanel?: string; bottomPanelHeight?: number };
@@ -264,7 +264,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
     } : undefined;
   });
   expect(persistedWorkbenchSession).toMatchObject({
-    version: 2,
+    version: 3,
     layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 360 }
   });
   expect(persistedWorkbenchSession?.decisions).toHaveLength(2);

@@ -26,7 +26,11 @@ import type { LayeredCharacterPreloadPlan } from "@v-ronpa/layered-character";
 import { getBuiltInPixiFxTexture } from "./fxAssets";
 import type { PixiPresentationTaskHandle, PixiPresentationTaskKind, PresentationTaskController } from "./presentationTasks";
 import { pixiAssetLoadFailed, resolvePixiAsset, type PixiAssetResolver, type PixiPresenterDiagnostic } from "./assetResolver";
-import { CharacterSystem, type CharacterPresentation } from "./characters";
+import {
+  CharacterSystem,
+  type CharacterPreparationResult,
+  type CharacterPresentation
+} from "./characters";
 import { RainShaderRenderer } from "./rain/RainShaderRenderer";
 import { resolveRainSettingsFromCommandParams } from "./rain/settings";
 
@@ -738,7 +742,7 @@ export class ActorSystem {
     this.characterLayer.sortableChildren = true;
   }
 
-  preloadCharacters(plan: LayeredCharacterPreloadPlan): Promise<void> {
+  preloadCharacters(plan: LayeredCharacterPreloadPlan): Promise<CharacterPreparationResult> {
     return this.characters.preload(plan);
   }
 

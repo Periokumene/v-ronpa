@@ -66,12 +66,24 @@ export function installGameADevtoolsCommit({
   storySessionBefore
 }: {
   enterVn(): void;
-  restore(): { ok: boolean };
+  restore(): Promise<{ ok: boolean }>;
   storySessionBefore: number;
-}): GameADevtoolsCommitInstallResult {
+}): Promise<GameADevtoolsCommitInstallResult> {
+  return installGameADevtoolsCommitAsync({ enterVn, restore, storySessionBefore });
+}
+
+async function installGameADevtoolsCommitAsync({
+  enterVn,
+  restore,
+  storySessionBefore
+}: {
+  enterVn(): void;
+  restore(): Promise<{ ok: boolean }>;
+  storySessionBefore: number;
+}): Promise<GameADevtoolsCommitInstallResult> {
   let restored: { ok: boolean };
   try {
-    restored = restore();
+    restored = await restore();
   } catch {
     return { status: "failed", reason: "restore-exception" };
   }

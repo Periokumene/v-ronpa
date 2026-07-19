@@ -32,6 +32,24 @@ Narrator: You chose right.
 @end`;
 
 describe("nani parser", () => {
+  it("collects the same static cross-script dependencies from goto and choice", () => {
+    const result = parseScenario({
+      scriptPath: "game-a/opening.nani",
+      sourceText: [
+        "#Start",
+        "@goto game-a/chapter-02.nani",
+        '@choice "Continue" goto:game-a/chapter-02.nani#Start',
+        "@goto #Start",
+        '@choice "Again" goto:#Start'
+      ].join("\n")
+    });
+
+    expect(result.scenario.dependencies).toEqual([
+      { endpoint: "game-a/chapter-02.nani" },
+      { endpoint: "game-a/chapter-02.nani#Start" }
+    ]);
+  });
+
   it("parses baseline script into stable IR", () => {
     const result = parseScenario({ sourceText: baselineScript, scriptPath: "opening.nani" });
 

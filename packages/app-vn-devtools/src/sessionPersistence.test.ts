@@ -219,7 +219,7 @@ describe("VN devtools session persistence", () => {
     const storage = memoryStorage();
     storage.setItem("key", "value");
     expect(createDefaultVnDevtoolsSessionState()).toEqual({
-      version: 2,
+      version: 3,
       collapsed: false,
       width: 420,
       layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 }

@@ -7,6 +7,9 @@ export default {
   fontFacesExportName: "harnessFontFaces",
   fragmentsExportName: "harnessRuntimeAssetFragments",
   scriptMetadataExportName: "harnessScriptMetadataByPath",
+  scriptSourcesExportName: "harnessScriptSourcesByPath",
+  entryInitialScriptPath: "harness/harness-showcase.nani",
+  entryStartLabel: "Start",
   providers: ["pixi"],
   voiceLocales: ["zh"],
   scripts: [

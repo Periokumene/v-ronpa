@@ -1,8 +1,9 @@
 # CCR: SaveData v6 Stable VN Checkpoint
 
 > SaveData v6 and its media-exclusion rule are superseded by
-> `save-data-v7-vn-persistent-media.md`. Stable checkpoint rejection and restore
-> identity rules are retained by v7.
+> `save-data-v7-vn-persistent-media.md`. Stable checkpoint rejection remains;
+> current catalog identity and SaveData v8 are defined by
+> `game-a-multi-nani-runtime-hard-cut.md`.
 
 ## Requested Change
 

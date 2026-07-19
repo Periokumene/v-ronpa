@@ -1,27 +1,24 @@
-import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
+import type { VnEntryDef, VnRuntimeScriptCatalog } from "@v-ronpa/contracts";
 import type { LayeredCharacterPreloadPlan } from "@v-ronpa/app-vn-shell";
-import { gameAVnEntry, gameAVnScriptPath } from "./contentManifest";
-import { gameAScriptMetadataByPath } from "./generatedAssets";
-import openingNaniSource from "./nani/opening.nani?raw";
+import { gameAVnEntry } from "./contentManifest";
+import {
+  gameAScriptMetadataByPath,
+  gameAScriptSourcesByPath
+} from "./generatedAssets";
 
-export const gameAOpeningNaniSource = openingNaniSource;
-
-export interface GameAVnLaunchDefinition {
-  runtimeEntry: VnRuntimeEntry;
-  characterPreloadPlan: LayeredCharacterPreloadPlan;
+export interface GameAStoryDefinition {
+  entry: VnEntryDef;
+  catalog: VnRuntimeScriptCatalog;
+  characterPreloadPlanByScriptPath: Readonly<Record<string, LayeredCharacterPreloadPlan>>;
 }
 
-const openingMetadata = gameAScriptMetadataByPath[gameAVnScriptPath];
-if (!openingMetadata) throw new Error(`Missing generated metadata for '${gameAVnEntry.scriptPath}'.`);
-
-export const gameAOpeningLaunchDefinition = {
-  runtimeEntry: {
-    id: gameAVnEntry.id,
-    scriptRevision: gameAVnEntry.scriptRevision,
-    profile: gameAVnEntry.profile,
-    scriptPath: gameAVnEntry.scriptPath,
-    sourceText: gameAOpeningNaniSource,
-    ...(gameAVnEntry.startLabel ? { startLabel: gameAVnEntry.startLabel } : {})
-  },
-  characterPreloadPlan: openingMetadata.characterPreloadPlan
-} satisfies GameAVnLaunchDefinition;
+export const gameAStoryDefinition: GameAStoryDefinition = {
+  entry: gameAVnEntry,
+  catalog: Object.values(gameAScriptSourcesByPath),
+  characterPreloadPlanByScriptPath: Object.fromEntries(
+    Object.entries(gameAScriptMetadataByPath).map(([scriptPath, metadata]) => [
+      scriptPath,
+      metadata.characterPreloadPlan
+    ])
+  )
+};

@@ -10,18 +10,16 @@ import {
 export const gameAVnScriptPath = "game-a/opening.nani";
 const GAME_A_MAIN_BACKGROUND_ID = "bg:game-a-academy-hall-fullscreen";
 const GAME_A_INNER_BACKGROUND_ID = "bg:game-a-snow-outskirts-frame";
-const gameAOpeningScriptMetadata = gameAScriptMetadataByPath[gameAVnScriptPath];
-if (!gameAOpeningScriptMetadata) throw new Error(`Missing generated metadata for '${gameAVnScriptPath}'.`);
+const gameAScriptAssetRefs = Object.values(gameAScriptMetadataByPath).flatMap((metadata) => metadata.assetRefs);
 
 export const gameAVnEntry = {
-  id: "vn:game-a-opening",
-  title: "Game A Opening",
-  scriptPath: gameAVnScriptPath,
-  scriptRevision: gameAOpeningScriptMetadata.scriptRevision,
+  id: "vn:game-a-main",
+  title: "Game A",
+  initialScriptPath: gameAVnScriptPath,
   startLabel: "Start",
   profile: "vn2d" as const,
   assetRefs: [
-    ...gameAOpeningScriptMetadata.assetRefs,
+    ...dedupeAssetRefs(gameAScriptAssetRefs),
     { id: "bleep:game-a-dialogue", kind: "bleep" as const, tags: ["game-a", "vn"] },
     { id: "texture:ui:game-a-dialog-frame", kind: "texture" as const, tags: ["game-a", "ui", "vn"] },
     { id: GAME_A_MAIN_BACKGROUND_ID, kind: "background" as const, tags: ["game-a", "preload", "vn"] },
@@ -30,7 +28,7 @@ export const gameAVnEntry = {
 };
 
 const gameAContentManifestInput = {
-  version: 3,
+  version: 4,
   assets: [
     { id: "sfx:ui-hover-default", kind: "sfx" as const, tags: ["game-a", "ui"] },
     { id: "sfx:ui-click-default", kind: "sfx" as const, tags: ["game-a", "ui"] }
@@ -53,3 +51,7 @@ const gameAContentManifestInput = {
 } satisfies ContentManifestInput;
 
 export const gameAContentManifest = composeContentManifest(gameAContentManifestInput, gameARuntimeAssetFragments);
+
+function dedupeAssetRefs<T extends { id: string; kind: string }>(refs: readonly T[]): T[] {
+  return [...new Map(refs.map((ref) => [`${ref.kind}:${ref.id}`, ref])).values()];
+}

@@ -18,15 +18,14 @@ export const harnessShowcaseCharacterPreloadPlan = harnessShowcaseScriptMetadata
 export const harnessShowcaseVnEntry = {
   id: "vn:harness-showcase",
   title: "Harness Showcase",
-  scriptPath: harnessShowcaseScriptPath,
-  scriptRevision: harnessShowcaseScriptMetadata.scriptRevision,
+  initialScriptPath: harnessShowcaseScriptPath,
   startLabel: "Start",
   profile: "vn2d" as const,
   assetRefs: harnessShowcaseScriptMetadata.assetRefs
 };
 
 const harnessContentManifestInput = {
-  version: 3,
+  version: 4,
   audio: {
     dialogueBleep: {
       defaultSound: { sourceRef: "bleep:dialogue-default", gain: 0.45 },

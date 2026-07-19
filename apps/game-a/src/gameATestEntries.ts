@@ -1,42 +1,43 @@
-import { gameATestScriptMetadataByPath } from "./generatedTestScripts";
-import type { GameAVnLaunchDefinition } from "./gameAScripts";
-import characterSmokeNaniSource from "./test-nani/character-smoke.nani?raw";
-import smokeNaniSource from "./test-nani/smoke.nani?raw";
+import type { VnEntryDef } from "@v-ronpa/contracts";
+import {
+  gameATestScriptMetadataByPath,
+  gameATestScriptSourcesByPath
+} from "./generatedTestScripts";
+import type { GameAStoryDefinition } from "./gameAScripts";
 
 type GameATestScriptPath = keyof typeof gameATestScriptMetadataByPath;
 
-export const gameASmokeLaunchDefinition = createTestLaunchDefinition({
+export const gameASmokeStoryDefinition = createTestStoryDefinition({
   id: "vn:game-a-test-smoke",
-  scriptPath: "game-a/test/smoke.nani",
-  sourceText: smokeNaniSource
+  scriptPath: "game-a/test/smoke.nani"
 });
 
-export const gameACharacterSmokeLaunchDefinition = createTestLaunchDefinition({
+export const gameACharacterSmokeStoryDefinition = createTestStoryDefinition({
   id: "vn:game-a-test-character",
-  scriptPath: "game-a/test/character-smoke.nani",
-  sourceText: characterSmokeNaniSource
+  scriptPath: "game-a/test/character-smoke.nani"
 });
 
-function createTestLaunchDefinition({
+function createTestStoryDefinition({
   id,
-  scriptPath,
-  sourceText
+  scriptPath
 }: {
   id: string;
   scriptPath: GameATestScriptPath;
-  sourceText: string;
-}): GameAVnLaunchDefinition {
+}): GameAStoryDefinition {
   const metadata = gameATestScriptMetadataByPath[scriptPath];
-  if (!metadata) throw new Error(`Missing generated test metadata for '${scriptPath}'.`);
+  const source = gameATestScriptSourcesByPath[scriptPath];
+  if (!metadata || !source) throw new Error(`Missing generated test script '${scriptPath}'.`);
+  const entry: VnEntryDef = {
+    id,
+    title: id,
+    initialScriptPath: scriptPath,
+    startLabel: "Start",
+    profile: "vn2d",
+    assetRefs: metadata.assetRefs
+  };
   return {
-    runtimeEntry: {
-      id,
-      scriptRevision: metadata.scriptRevision,
-      profile: "vn2d",
-      scriptPath,
-      sourceText,
-      startLabel: "Start"
-    },
-    characterPreloadPlan: metadata.characterPreloadPlan
+    entry,
+    catalog: [source],
+    characterPreloadPlanByScriptPath: { [scriptPath]: metadata.characterPreloadPlan }
   };
 }

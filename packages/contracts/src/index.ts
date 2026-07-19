@@ -1970,6 +1970,7 @@ export type StoryRuntimeSnapshot = z.infer<typeof StoryRuntimeSnapshotSchema>;
 export const SAVE_BACKLOG_LIMIT = 20;
 
 export const SaveableStorySnapshotSchema = StoryRuntimeSnapshotSchema.omit({
+  currentScriptPath: true,
   presentationWait: true,
   runtimeWait: true
 });
@@ -1979,7 +1980,13 @@ export function createSaveableStorySnapshot(story: StoryRuntimeSnapshot): Saveab
   if (story.runtimeWait || story.presentationWait) {
     throw new Error("VN story checkpoints may only be created at a stable stop.");
   }
-  const { presentationWait: _presentationWait, runtimeWait: _runtimeWait, ...stableStory } = story;
+  const {
+    currentScriptPath: _currentScriptPath,
+    presentationWait: _presentationWait,
+    runtimeWait: _runtimeWait,
+    ...stableStory
+  } = story;
+  void _currentScriptPath;
   void _presentationWait;
   void _runtimeWait;
   return SaveableStorySnapshotSchema.parse({
@@ -2150,14 +2157,23 @@ export const VnEntryDefSchema = z
   .object({
     id: IdSchema,
     title: z.string().min(1),
-    scriptPath: z.string().min(1),
-    scriptRevision: IdSchema,
+    initialScriptPath: z.string().min(1),
     startLabel: z.string().min(1).optional(),
     profile: VnPresentationProfileSchema.default("vn2d"),
     assetRefs: z.array(AssetRefSchema).default([])
   })
   .strict();
 export type VnEntryDef = z.infer<typeof VnEntryDefSchema>;
+
+export const VnRuntimeScriptSourceSchema = z
+  .object({
+    scriptPath: z.string().min(1),
+    sourceText: z.string(),
+    scriptRevision: IdSchema
+  })
+  .strict();
+export type VnRuntimeScriptSource = z.infer<typeof VnRuntimeScriptSourceSchema>;
+export type VnRuntimeScriptCatalog = readonly VnRuntimeScriptSource[];
 
 export const VnUiCheckpointSchema = z
   .object({
@@ -2196,7 +2212,12 @@ export type VnMediaCheckpoint = z.infer<typeof VnMediaCheckpointSchema>;
 export const SaveableVnStateSchema = z
   .object({
     entryId: IdSchema,
-    scriptRevision: IdSchema,
+    script: z
+      .object({
+        scriptPath: z.string().min(1),
+        scriptRevision: IdSchema
+      })
+      .strict(),
     story: SaveableStorySnapshotSchema,
     pixiStage: PixiStageSnapshotSchema,
     ui: VnUiCheckpointSchema,
@@ -2207,7 +2228,7 @@ export type SaveableVnState = z.infer<typeof SaveableVnStateSchema>;
 
 export const SaveDataSchema = z
   .object({
-    version: z.literal(7),
+    version: z.literal(8),
     gameId: IdSchema,
     savedAt: z.string(),
     mode: SaveModeSchema,
@@ -2257,7 +2278,7 @@ export function createSaveSlotSummaryFromSaveData(id: string, label: string, dat
 }
 
 export const ContentManifestSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
   assets: z.array(AssetRefSchema).default([]),
   audio: ContentAudioConfigSchema.optional(),
   fonts: z.array(FontFaceDefinitionSchema).default([]),

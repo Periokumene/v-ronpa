@@ -43,7 +43,7 @@ describe("asset registry", () => {
   });
 
   it("diagnoses unsupported manifest versions", () => {
-    const registry = createAssetRegistry({ ...baseManifest([]), version: 2 as 3 });
+    const registry = createAssetRegistry({ ...baseManifest([]), version: 2 as 4 });
 
     expect(registry.diagnostics).toEqual(
       expect.arrayContaining([
@@ -55,7 +55,7 @@ describe("asset registry", () => {
 
   it("diagnoses malformed manifests without resolving partially declared assets", () => {
     const registry = createAssetRegistry({
-      version: 3,
+      version: 4,
       runtimeAssets: [{ id: "bg:harness", kind: "background" }],
       maps: [],
       items: [],
@@ -103,8 +103,7 @@ describe("asset registry", () => {
         {
           id: "vn:opening",
           title: "Opening",
-          scriptPath: "opening.nani",
-          scriptRevision: "sha256:test",
+          initialScriptPath: "opening.nani",
           profile: "vn2d",
           assetRefs: [{ id: "texture:missing-vn", kind: "texture", tags: [] }]
         }
@@ -159,7 +158,7 @@ function manifestWithKinds(kinds: RuntimeAssetKind[]): ContentManifest {
 
 function baseManifest(runtimeAssets: RuntimeAsset[]): ContentManifest {
   return {
-    version: 3,
+    version: 4,
     assets: [],
     fonts: [],
     runtimeAssets,

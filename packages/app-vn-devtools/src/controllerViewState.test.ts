@@ -15,7 +15,18 @@ const rematchedAnchor: VnDebugTargetAnchor = {
 };
 
 const inspection = {
-  entry: { id: "opening", scriptPath: "game-a/opening.nani" },
+  entry: {
+    id: "opening",
+    title: "Opening",
+    initialScriptPath: "game-a/opening.nani",
+    profile: "vn2d",
+    assetRefs: []
+  },
+  source: {
+    scriptPath: "game-a/opening.nani",
+    scriptRevision: "sha256:new",
+    sourceText: "Narrator: moved"
+  },
   revision: "sha256:new",
   commands: [{ anchor: rematchedAnchor }],
   labels: []

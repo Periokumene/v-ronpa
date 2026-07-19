@@ -6,7 +6,7 @@ describe("runtime-assets-pixi", () => {
   it("participates in the one final AssetRegistry through the shared fragment protocol", () => {
     const manifest = composeContentManifest(
       {
-        version: 3,
+        version: 4,
         assets: [],
         runtimeAssets: [],
         collisionProxies: [],

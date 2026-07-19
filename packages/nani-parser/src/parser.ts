@@ -5,6 +5,7 @@ import {
   type NaniDiagnosticSink
 } from "./diagnostics.ts";
 import { parseSourcedRichText, shouldAttachRichText } from "./richText.ts";
+import { staticNaniEndpointText } from "./endpoint.ts";
 import { scanSourceLines, sourceLocation, textSpan, type NaniSourceLine } from "./sourceText.ts";
 import {
   appendSourcedText,
@@ -726,9 +727,13 @@ function collectCommandMetadata(
     if (characterId) assets.push({ id: characterId, kind: "character-pack" });
   }
 
-  if ((command.commandId === "goto" || command.commandId === "call") && firstArgValue?.type === "raw") {
-    const endpoint = firstArgValue.value;
-    if (!endpoint.startsWith("#")) dependencies.push({ endpoint });
+  const endpointValues = [
+    ...(command.commandId === "goto" || command.commandId === "call" ? [firstArgValue] : []),
+    ...(command.commandId === "choice" ? [command.params.goto] : [])
+  ];
+  for (const value of endpointValues) {
+    const endpoint = staticNaniEndpointText(value);
+    if (endpoint && !endpoint.startsWith("#")) dependencies.push({ endpoint });
   }
 }
 

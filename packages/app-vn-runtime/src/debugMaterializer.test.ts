@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { PIXI_MAIN_BACKGROUND_ID } from "@v-ronpa/contracts";
-import type { VnRuntimeEntry } from "./runtimeTypes";
 import {
-  inspectVnDebugEntry,
-  materializeVnDebugTarget,
+  PIXI_MAIN_BACKGROUND_ID,
+  type VnEntryDef,
+  type VnRuntimeScriptSource
+} from "@v-ronpa/contracts";
+import {
+  inspectVnDebugEntry as inspectDebugEntry,
+  materializeVnDebugTarget as materializeDebugTarget,
   type VnDebugChoiceRequest,
-  type VnDebugInputRequest
+  type VnDebugInputRequest,
+  type MaterializeVnDebugTargetInput
 } from "./debugMaterializer";
 
 describe("VN debug inspection and materialization", () => {
@@ -443,15 +447,152 @@ describe("VN debug inspection and materialization", () => {
     expect(result.checkpoint.story.pendingChoices).toEqual([]);
     expect(result.checkpoint.story.variables.enabled).toBe(false);
   });
+
+  it("replays from the entry start through a cross-script choice into the target anchor", async () => {
+    const runtimeEntry: VnEntryDef = {
+      id: "vn:debug-multi",
+      title: "Multi-script debug",
+      initialScriptPath: "game-a/chapter-01.nani",
+      startLabel: "Start",
+      profile: "vn2d",
+      assetRefs: []
+    };
+    const firstDraft: VnRuntimeScriptSource = {
+      scriptPath: "game-a/chapter-01.nani",
+      scriptRevision: "pending",
+      sourceText: [
+        "#Start",
+        '@set route:"from-first"',
+        "@back bg:harness",
+        '@choice "Continue" goto:game-a/chapter-02.nani#Start id:continue',
+        '@choice "Stay" goto:#Stay id:stay',
+        "#Stay",
+        "Narrator: Stayed.|#stayed|"
+      ].join("\n")
+    };
+    const secondDraft: VnRuntimeScriptSource = {
+      scriptPath: "game-a/chapter-02.nani",
+      scriptRevision: "pending",
+      sourceText: "#Start\nNarrator: Arrived.|#arrived|\n@end"
+    };
+    const first = await inspectDebugEntry(runtimeEntry, firstDraft);
+    const second = await inspectDebugEntry(runtimeEntry, secondDraft);
+    const catalog = [first.source, second.source];
+    const target = second.commands.find((command) => command.anchor.stableId === "print:arrived")!.anchor;
+
+    const requested = await materializeDebugTarget({
+      entry: runtimeEntry,
+      catalog,
+      inspection: second,
+      target
+    });
+    expect(requested.status).toBe("decision-required");
+    if (requested.status !== "decision-required" || requested.decision.kind !== "choice") return;
+
+    const result = await materializeDebugTarget({
+      entry: runtimeEntry,
+      catalog,
+      inspection: second,
+      target,
+      decisions: {
+        inputs: [],
+        choices: [{
+          anchor: requested.decision.anchor,
+          choiceId: "continue",
+          text: "Continue",
+          goto: "game-a/chapter-02.nani#Start"
+        }]
+      }
+    });
+
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.checkpoint.script).toEqual({
+      scriptPath: second.source.scriptPath,
+      scriptRevision: second.source.scriptRevision
+    });
+    expect(result.checkpoint.story.variables).toEqual({ route: "from-first" });
+    expect(result.checkpoint.story.text?.current?.text).toBe("Arrived.");
+    expect(result.checkpoint.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
+  });
+
+  it("authenticates the updated catalog record instead of the cross-script fixed-point target", async () => {
+    const runtimeEntry: VnEntryDef = {
+      id: "vn:debug-cross-revision",
+      title: "Cross-script revision",
+      initialScriptPath: "game-a/opening.nani",
+      startLabel: "Start",
+      profile: "vn2d",
+      assetRefs: []
+    };
+    const opening = await inspectDebugEntry(runtimeEntry, {
+      scriptPath: "game-a/opening.nani",
+      scriptRevision: "pending",
+      sourceText: [
+        "#Start",
+        '@set route:"updated-opening"',
+        "@goto game-a/chapter-02.nani#Start"
+      ].join("\n")
+    });
+    const chapter = await inspectDebugEntry(runtimeEntry, {
+      scriptPath: "game-a/chapter-02.nani",
+      scriptRevision: "pending",
+      sourceText: "#Start\nNarrator: Cross-script target.|#target|\n@end"
+    });
+    const target = chapter.commands.find((command) => command.anchor.stableId === "print:target")!.anchor;
+
+    const result = await materializeDebugTarget({
+      entry: runtimeEntry,
+      catalog: [opening.source, chapter.source],
+      inspection: opening,
+      target,
+      expectedRevision: opening.revision
+    });
+
+    expect(result).toMatchObject({
+      status: "ready",
+      checkpoint: {
+        script: { scriptPath: "game-a/chapter-02.nani" },
+        story: { variables: { route: "updated-opening" } }
+      }
+    });
+  });
 });
 
-function entry(sourceText: string): VnRuntimeEntry {
+interface DebugTestEntry {
+  entry: VnEntryDef;
+  source: VnRuntimeScriptSource;
+}
+
+function entry(sourceText: string): DebugTestEntry {
   return {
-    id: "vn:debug-test",
-    scriptPath: "game-a/debug-test.nani",
-    scriptRevision: "sha256:generated-placeholder",
-    sourceText,
-    startLabel: "Start",
-    profile: "vn2d"
+    entry: {
+      id: "vn:debug-test",
+      title: "Debug test",
+      initialScriptPath: "game-a/debug-test.nani",
+      startLabel: "Start",
+      profile: "vn2d",
+      assetRefs: []
+    },
+    source: {
+      scriptPath: "game-a/debug-test.nani",
+      scriptRevision: "sha256:generated-placeholder",
+      sourceText
+    }
   };
+}
+
+function inspectVnDebugEntry(value: DebugTestEntry) {
+  return inspectDebugEntry(value.entry, value.source);
+}
+
+function materializeVnDebugTarget(
+  input: Omit<MaterializeVnDebugTargetInput, "catalog" | "entry"> & {
+    entry: VnEntryDef | DebugTestEntry;
+  }
+) {
+  const testEntry = "source" in input.entry ? input.entry : undefined;
+  const runtimeEntry: VnEntryDef = testEntry?.entry ?? input.entry as VnEntryDef;
+  const catalog = testEntry ? [testEntry.source] : [input.inspection!.source];
+  return materializeDebugTarget({ ...input, entry: runtimeEntry, catalog });
 }

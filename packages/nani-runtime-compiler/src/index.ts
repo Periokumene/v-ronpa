@@ -35,6 +35,7 @@ export {
   digestRuntimeScriptSemantics,
   serializeRuntimeScriptSemantics
 } from "./semantics.ts";
+export * from "./catalog.ts";
 export type {
   RuntimeCompilerDiagnostic,
   RuntimeCompilerDiagnosticCode

@@ -51,7 +51,7 @@ describe("harness showcase save adapter", () => {
     });
 
     expect(save).toMatchObject({
-      version: 7,
+      version: 8,
       gameId: "game-harness",
       mode: "navi",
       vn: {
@@ -134,7 +134,7 @@ describe("harness showcase save adapter", () => {
   });
 
   it("keeps forty manual slots plus an independent hidden quick slot through the shared media-save policy", () => {
-    expect(HARNESS_SHOWCASE_DB).toBe("v-ronpa-harness-showcase-v9");
+    expect(HARNESS_SHOWCASE_DB).toBe("v-ronpa-harness-showcase-v10");
     expect(harnessShowcaseSaveSlotPolicy.namespace).toBe("harness");
     expect(harnessShowcaseSaveSlotIds).toHaveLength(harnessShowcaseManualSaveSlotCount);
     expect(harnessShowcaseSaveSlotIds.slice(0, 4)).toEqual([
@@ -193,7 +193,7 @@ function createVnCheckpoint(
 ): SaveableVnState {
   return {
     entryId: "vn:harness-showcase",
-    scriptRevision: "sha256:test",
+    script: { scriptPath: "harness/showcase.nani", scriptRevision: "sha256:test" },
     story: createSaveableStorySnapshot(story),
     pixiStage,
     media: {

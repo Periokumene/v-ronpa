@@ -2,8 +2,7 @@ import {
   INVALID_VN_START_LABEL_DIAGNOSTIC_CODE,
   useVnRuntime,
   type UseVnRuntimeOptions,
-  type VnLifecyclePort,
-  type VnRuntimeEntry
+  type VnLifecyclePort
 } from "@v-ronpa/app-vn-runtime";
 import type { SaveData } from "@v-ronpa/contracts";
 
@@ -13,11 +12,14 @@ export type UseGameAVnRuntimeOptions = Pick<
   | "dialogRevealSettings"
   | "dialogueBleepConfig"
   | "dialogueBleepSettings"
+  | "prepareScriptPresentation"
   | "storyPlayTiming"
   | "voiceSettings"
+  | "catalog"
+  | "entry"
 >;
 
-export function useGameAVnRuntime({ entry, ...options }: UseGameAVnRuntimeOptions & { entry: VnRuntimeEntry }) {
+export function useGameAVnRuntime({ entry, ...options }: UseGameAVnRuntimeOptions) {
   const runtime = useVnRuntime({
     ...options,
     entry,
@@ -35,10 +37,9 @@ export function useGameAVnRuntime({ entry, ...options }: UseGameAVnRuntimeOption
     restoreFromSave(save: SaveData) {
       return restoreGameAVnSave(runtime.lifecycle, save);
     },
-    startNewGame(): boolean {
+    async startNewGame(): Promise<boolean> {
       if (invalidStartLabelDiagnostic) return false;
-      runtime.lifecycle.startStory();
-      return true;
+      return (await runtime.lifecycle.startStory()).ok;
     }
   };
 }

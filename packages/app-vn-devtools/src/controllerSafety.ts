@@ -1,4 +1,3 @@
-import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
 import {
   type VnDebugDecisionTrace,
   type VnDebugEntryInspection,
@@ -6,6 +5,7 @@ import {
   type VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
 import type { VnDevtoolsDecisionSubmission, VnDevtoolsStatus } from "./types";
+import type { VnDevtoolsScriptCandidate } from "./scriptCandidate";
 
 /**
  * The Dock always displays the newest saved source, including a rejected
@@ -68,20 +68,20 @@ export function canMaterializeVnDevtoolsInspection(
 
 export function canPinCurrentVnDevtoolsInspection(
   display: VnDevtoolsInspectionDisplay | undefined,
-  installedEntry: VnRuntimeEntry
+  installedEntry: VnDevtoolsScriptCandidate
 ): boolean {
   return canMaterializeVnDevtoolsInspection(display)
-    && vnDebugEntryIdentity(display.inspection.entry) === vnDebugEntryIdentity(installedEntry);
+    && vnDebugEntryIdentity(display.inspection) === vnDebugEntryIdentity(installedEntry);
 }
 
 /** A cancelled candidate may restore preview access only to the installed source. */
 export function canReauthorizeVnDevtoolsInspection(
   display: VnDevtoolsInspectionDisplay | undefined,
-  installedEntry: VnRuntimeEntry
+  installedEntry: VnDevtoolsScriptCandidate
 ): boolean {
   return Boolean(
     display?.inspection.canMaterialize
-    && vnDebugEntryIdentity(display.inspection.entry) === vnDebugEntryIdentity(installedEntry)
+    && vnDebugEntryIdentity(display.inspection) === vnDebugEntryIdentity(installedEntry)
   );
 }
 
@@ -150,12 +150,14 @@ export function vnDebugAnchorIdentity(anchor: VnDebugTargetAnchor): string {
     ?? `${anchor.revision}:${anchor.kind}:${anchor.commandIndex}:${anchor.label ?? anchor.commandId ?? ""}`;
 }
 
-export function vnDebugEntryIdentity(entry: VnRuntimeEntry): string {
+export function vnDebugEntryIdentity(value: VnDevtoolsScriptCandidate | VnDebugEntryInspection): string {
+  const entry = value.entry;
+  const source = value.source;
   return [
     entry.id,
-    entry.scriptPath,
-    entry.scriptRevision,
-    entry.sourceText,
+    source.scriptPath,
+    source.scriptRevision,
+    source.sourceText,
     entry.startLabel ?? "",
     entry.profile ?? ""
   ].join("\u0000");

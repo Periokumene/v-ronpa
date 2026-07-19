@@ -1,8 +1,10 @@
 export { INVALID_VN_START_LABEL_DIAGNOSTIC_CODE } from "./runtimeDiagnostics";
 export { useVnRuntime } from "./useVnRuntime";
+export { compileVnRuntimeCatalog } from "./runtimeCatalog";
 export type { UseVnRuntimeOptions } from "./useVnRuntime";
 export type {
   PresentationTaskObservation,
+  PrepareVnScriptPresentation,
   RestoreVnRuntimeStateInput,
   StartVnStoryOptions,
   UseVnRuntimeResult,
@@ -11,11 +13,14 @@ export type {
   VnLifecyclePort,
   VnPresentationPort,
   VnRestoreResult,
+  VnRuntimeDefinition,
   VnRuntimeDialogRevealSettings,
   VnRuntimeDialogueBleepSettings,
-  VnRuntimeEntry,
   VnRuntimeShellPort,
   VnRuntimeVoiceSettings,
+  VnScriptPresentationPreparationInput,
+  VnScriptPresentationPreparationResult,
+  VnStartResult,
   VnSaveCheckpointRejectionCode,
   VnSaveCheckpointResult
 } from "./runtimeTypes";

@@ -38,10 +38,10 @@ import {
 import {
   harnessShowcaseEvidence,
   harnessShowcaseMaps,
-  harnessShowcaseScript,
   harnessShowcaseTrial
 } from "../harness/showcase";
-import { harnessShowcaseVnEntry } from "../harness/contentManifest";
+import { harnessShowcaseScriptPath, harnessShowcaseVnEntry } from "../harness/contentManifest";
+import { harnessScriptSourcesByPath } from "../harness/generatedAssets";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../harness/inputActions";
 import { useFirstPersonExplorationBridge } from "../harness/useFirstPersonExplorationBridge";
 import type { AudioPort, VideoPort } from "@v-ronpa/media-save";
@@ -129,20 +129,22 @@ export function useHarnessShowcaseRuntimeAdapter(
     setLastAction(action);
     setLastOutcome(outcome);
   }, []);
+  const runtimeEntry = useMemo(
+    () => ({ ...harnessShowcaseVnEntry, profile: options.profile ?? "vn2d" }),
+    [options.profile]
+  );
+  const runtimeCatalog = useMemo(
+    () => [harnessScriptSourcesByPath[harnessShowcaseScriptPath]!],
+    []
+  );
   const runtime = useVnRuntimeWithDebug({
     ...(assetResolver ? { assetResolver } : {}),
     ...(options.audioPort ? { audioPort: options.audioPort } : {}),
     ...(options.dialogRevealSettings ? { dialogRevealSettings: options.dialogRevealSettings } : {}),
     ...(options.dialogueBleepConfig ? { dialogueBleepConfig: options.dialogueBleepConfig } : {}),
     ...(options.dialogueBleepSettings ? { dialogueBleepSettings: options.dialogueBleepSettings } : {}),
-    entry: {
-      id: harnessShowcaseVnEntry.id,
-      scriptRevision: harnessShowcaseVnEntry.scriptRevision,
-      profile: options.profile ?? "vn2d",
-      scriptPath: harnessShowcaseVnEntry.scriptPath,
-      sourceText: harnessShowcaseScript,
-      startLabel: "Start"
-    },
+    entry: runtimeEntry,
+    catalog: runtimeCatalog,
     gameId: "game-harness",
     onGameplayEvents: applyRuntimeGameplayEvents,
     onRuntimeStatus: recordRuntimeStatus,
@@ -250,7 +252,7 @@ export function useHarnessShowcaseRuntimeAdapter(
         setLastOutcome("preparing");
         if (!(await options.ensureVnPresentationReady())) return;
         setTrialRuntime(createInitialHarnessShowcaseTrialRuntime());
-        runtime.lifecycle.startStory();
+        await runtime.lifecycle.startStory();
       } finally {
         startStoryPromiseRef.current = undefined;
       }
@@ -330,9 +332,9 @@ export function useHarnessShowcaseRuntimeAdapter(
     setLastOutcome("overlay-closed");
   }
 
-  function restoreFromSave(save: SaveData) {
+  async function restoreFromSave(save: SaveData) {
     if (save.vn) {
-      const restored = runtime.lifecycle.restoreVnState({ gameId: save.gameId, state: save.vn });
+      const restored = await runtime.lifecycle.restoreVnState({ gameId: save.gameId, state: save.vn });
       if (!restored.ok) return restored;
     }
     if (save.navi) setNavi(save.navi);
