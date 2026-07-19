@@ -96,7 +96,7 @@ describe("VnDevtoolsDock", () => {
     expect(actions.previewLine).toHaveBeenCalledWith("line:dialog");
   });
 
-  it("renders Problems and transient Branch panels with native decision inputs", () => {
+  it("renders Problems and transient Branch panels with skinned semantic decision inputs", () => {
     const actions = createActions();
     const problems = VnDevtoolsDock({
       controller: createController(actions, {

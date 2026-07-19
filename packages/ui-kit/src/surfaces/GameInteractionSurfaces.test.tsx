@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { createDefaultSettingsSnapshot } from "@v-ronpa/contracts";
 import { paginateSaveLoadSlotIds, SettingsOverlay, VnCommandBar } from "./GameInteractionSurfaces";
+
+const interactionSurfaceSource = readFileSync(new URL("./GameInteractionSurfaces.tsx", import.meta.url), "utf8");
 
 describe("VnCommandBar", () => {
   it("renders VM-provided commands without deriving state from broader capabilities", () => {
@@ -88,6 +91,76 @@ describe("SettingsOverlay", () => {
     expect(bleepControl).toBeDefined();
     (bleepControl?.props as { onChange: (value: number) => void }).onChange(0.35);
     expect(onPatchSettings).toHaveBeenCalledWith({ sound: { bleepVolume: 0.35 } });
+
+    const languageControl = findElementByProp(element, "testId", "settings-system-language");
+    (languageControl?.props as { onChange: (value: string) => void }).onChange("en");
+    expect(onPatchSettings).toHaveBeenCalledWith({ system: { language: "en" } });
+
+    const fullscreenControl = findElementByProp(element, "testId", "settings-system-fullscreen");
+    (fullscreenControl?.props as { onChange: (value: boolean) => void }).onChange(true);
+    expect(onPatchSettings).toHaveBeenCalledWith({ system: { preferFullscreen: true } });
+  });
+
+  it("uses explicit settings controls instead of native select, checkbox, or range appearance", () => {
+    expect(interactionSurfaceSource).not.toMatch(/<select\b/u);
+    expect(interactionSurfaceSource).not.toMatch(/type="checkbox"/u);
+    expect(interactionSurfaceSource).not.toMatch(/type="range"/u);
+    expect(interactionSurfaceSource).toContain("<Slider.Root");
+    expect(interactionSurfaceSource).toContain("<Switch.Root");
+    expect(interactionSurfaceSource).toContain("function SettingsOptionStepper");
+  });
+
+  it("drives Slider and Switch through stable value semantics", () => {
+    const onPatchSettings = vi.fn();
+    const element = SettingsOverlay({
+      onClose: vi.fn(),
+      onPatchSettings,
+      onResetSettings: vi.fn(),
+      settings: createDefaultSettingsSnapshot()
+    });
+
+    const slider = renderFunctionElement(findElementByProp(element, "testId", "settings-display-text-speed"));
+    const sliderRoot = findElementByProp(slider, "data-control-id", "settings-display-text-speed");
+    expect(sliderRoot?.props).toMatchObject({ max: 100, min: 0, step: 1, value: [50] });
+    (sliderRoot?.props as { onValueChange: (values: number[]) => void }).onValueChange([100]);
+    expect(onPatchSettings).toHaveBeenCalledWith({ display: { textSpeed: 1 } });
+    (sliderRoot?.props as { onValueChange: (values: number[]) => void }).onValueChange([0]);
+    expect(onPatchSettings).toHaveBeenCalledWith({ display: { textSpeed: 0 } });
+
+    const toggle = renderFunctionElement(findElementByProp(element, "testId", "settings-system-fullscreen"));
+    const switchRoot = findElementByProp(toggle, "data-testid", "settings-system-fullscreen");
+    expect(switchRoot?.props).toMatchObject({ checked: false, "data-value": "off" });
+    (switchRoot?.props as { onCheckedChange: (checked: boolean) => void }).onCheckedChange(true);
+    expect(onPatchSettings).toHaveBeenCalledWith({ system: { preferFullscreen: true } });
+  });
+
+  it("moves enum steppers normally and disables their boundary buttons", () => {
+    const onPatchSettings = vi.fn();
+    const model = createDefaultSettingsSnapshot();
+    const element = SettingsOverlay({ onClose: vi.fn(), onPatchSettings, onResetSettings: vi.fn(), settings: model });
+    const textSize = renderFunctionElement(findElementByProp(element, "testId", "settings-display-text-size"));
+    const current = findElementByProp(textSize, "data-testid", "settings-display-text-size");
+    expect(current?.props).toMatchObject({ "data-value": "medium", role: "group" });
+    (findElementByProp(textSize, "data-testid", "settings-display-text-size-next")?.props as { onClick: () => void }).onClick();
+    expect(onPatchSettings).toHaveBeenCalledWith({ display: { textSize: "large" } });
+    (findElementByProp(textSize, "data-testid", "settings-display-text-size-previous")?.props as { onClick: () => void }).onClick();
+    expect(onPatchSettings).toHaveBeenCalledWith({ display: { textSize: "small" } });
+
+    model.display.textSize = "small";
+    const minimum = renderFunctionElement(findElementByProp(
+      SettingsOverlay({ onClose: vi.fn(), onPatchSettings, onResetSettings: vi.fn(), settings: model }),
+      "testId",
+      "settings-display-text-size"
+    ));
+    expect((findElementByProp(minimum, "data-testid", "settings-display-text-size-previous")?.props as Record<string, unknown>).disabled).toBe(true);
+
+    model.display.textSize = "large";
+    const maximum = renderFunctionElement(findElementByProp(
+      SettingsOverlay({ onClose: vi.fn(), onPatchSettings, onResetSettings: vi.fn(), settings: model }),
+      "testId",
+      "settings-display-text-size"
+    ));
+    expect((findElementByProp(maximum, "data-testid", "settings-display-text-size-next")?.props as Record<string, unknown>).disabled).toBe(true);
   });
 
   it("renders embedded pause content without a second overlay close header", () => {
@@ -112,6 +185,12 @@ function findElementByProp(node: ReactNode, propName: string, propValue: string)
     if (props[propName] === propValue) match = current;
   });
   return match;
+}
+
+function renderFunctionElement(element: ReactElement | undefined): ReactElement {
+  if (!element || typeof element.type !== "function") throw new Error("Expected a function component element.");
+  const render = element.type as unknown as (props: unknown) => ReactElement;
+  return render(element.props);
 }
 
 function collectPropValues(node: ReactNode, ...propNames: string[]): string[] {

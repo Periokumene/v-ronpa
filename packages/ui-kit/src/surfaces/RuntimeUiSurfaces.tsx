@@ -61,8 +61,14 @@ export function RuntimeInputPromptSurface({
       <label style={promptLabelStyle}>
         <span>{summary ?? variableName}</span>
         <input
+          autoCapitalize="none"
+          autoComplete="off"
+          autoCorrect="off"
           data-testid="runtime-input-field"
+          enterKeyHint="done"
+          inputMode={valueType === "number" ? "decimal" : "text"}
           onChange={(event) => setValue(event.currentTarget.value)}
+          spellCheck={false}
           style={promptInputStyle}
           type={valueType === "number" ? "number" : "text"}
           value={value}
@@ -97,8 +103,11 @@ export function RuntimeMovieOverlaySurface({
       {uri ? (
         <video
           data-testid="runtime-movie-video"
+          disablePictureInPicture
+          disableRemotePlayback
           key={uri}
           onEnded={onEnded}
+          playsInline
           ref={onVideoElement}
           style={movieVideoStyle}
         />
@@ -170,8 +179,11 @@ const promptInputStyle: CSSProperties = {
   padding: "9px 10px",
   border: "1px solid rgba(255,255,255,0.2)",
   borderRadius: 6,
+  appearance: "none",
   background: "rgba(255,255,255,0.08)",
-  color: "#fff"
+  color: "#fff",
+  caretColor: "#ffd166",
+  font: "inherit"
 };
 
 const promptButtonStyle: CSSProperties = {

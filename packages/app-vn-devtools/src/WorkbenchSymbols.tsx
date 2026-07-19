@@ -24,11 +24,16 @@ export function WorkbenchSymbols({ controller }: { controller: VnDevtoolsControl
             <MagnifyingGlass size={14} aria-hidden="true" />
             <span className="vn-devtools-visually-hidden">Filter source symbols</span>
             <input
+              autoCapitalize="none"
+              autoComplete="off"
+              autoCorrect="off"
               type="search"
               placeholder="Filter symbols…"
               data-testid="vn-devtools-symbol-search"
+              enterKeyHint="search"
               onChange={filterSymbols}
               onKeyDown={handleSymbolKeyboard}
+              spellCheck={false}
             />
           </label>
           <div className="vn-devtools-symbol-list" role="listbox" aria-label="Nani labels">

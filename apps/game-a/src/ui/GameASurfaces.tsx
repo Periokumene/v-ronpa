@@ -246,9 +246,15 @@ function GameAInputPrompt({ actions, model }: SurfaceSlotProps<RuntimeInputPromp
       <label>
         <span>{model.prompt.summary ?? model.prompt.variableName}</span>
         <input
+          autoCapitalize="none"
+          autoComplete="off"
+          autoCorrect="off"
           data-testid="runtime-input-field"
           defaultValue={model.prompt.defaultValue === undefined ? "" : String(model.prompt.defaultValue)}
+          enterKeyHint="done"
+          inputMode={model.prompt.valueType === "number" ? "decimal" : "text"}
           name="runtime-input"
+          spellCheck={false}
           type={model.prompt.valueType === "number" ? "number" : "text"}
         />
       </label>
@@ -335,6 +341,7 @@ function GameASaveLoadOverlay({
                   alt=""
                   className="game-a-save-thumbnail"
                   data-testid={`save-slot-${absoluteIndex + 1}-thumbnail`}
+                  draggable={false}
                   src={preview.uri}
                   width={preview.width}
                   height={preview.height}

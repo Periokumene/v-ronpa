@@ -22,6 +22,12 @@ names), and `save-data-v7-vn-persistent-media.md`.
 
 ## Open Review TODOs
 
+- [ ] Resolve the Settings v2 `preferFullscreen` placeholder. It currently has
+  no browser effect by design. A future task must choose exactly one path:
+  connect it to an explicit user-gesture-driven Fullscreen API flow, or remove
+  it from the public Settings contract through the contract change process. Do
+  not add opportunistic fullscreen behavior to the document browser policy.
+
 - [ ] Reintroduce AUTO/SKIP browser coverage as an independent test-only Nani
   entry. The former `vn-auto-skip.spec.ts`, Harness showcase branch, and
   `voiceSmoke` timing hook were removed on 2026-07-17 because real-time waits

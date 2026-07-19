@@ -10,6 +10,7 @@ import {
   expectNoDocumentScroll,
   expectNoRuntimeAssetDiagnostics,
   movementPulse,
+  setSettingsOption,
   startNavi,
   startStoryOverlay,
   watchUnexpectedConsoleErrors
@@ -66,7 +67,7 @@ test("harness VN shell, save/load, and main interaction branch", async ({ page }
   await page.getByTestId("vn-command-settings").click();
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
   await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
-  await page.getByTestId("settings-display-text-size").selectOption("small");
+  await setSettingsOption(page, "settings-display-text-size", "small", ["small", "medium", "large"]);
   await expect(page.getByTestId("settings-display-textbox-opacity")).toHaveCount(0);
   await page.getByTestId("pause-surface-close").click();
   await expect(page.getByTestId("settings-overlay")).toBeHidden();
@@ -92,6 +93,7 @@ test("harness VN shell, save/load, and main interaction branch", async ({ page }
   await page.getByTestId("save-slot-1").click();
   await expect(page.getByTestId("save-slot-1")).toContainText(savedDialogExcerpt);
   await expect(page.getByTestId("save-slot-1-thumbnail")).toHaveAttribute("src", /^blob:/);
+  await expect(page.getByTestId("save-slot-1-thumbnail")).toHaveJSProperty("draggable", false);
   await page.getByTestId("pause-surface-close").click();
   await expect(page.getByTestId("save-load-overlay")).toBeHidden();
   await page.getByTestId("vn-command-load").click();

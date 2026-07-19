@@ -46,6 +46,7 @@ import {
   type VnDialogViewModel
 } from "./GameInteractionViewModels";
 import { VN_PAUSE_SECTIONS } from "./vnShellActions";
+import { useWebGameDocumentPolicy } from "./webGameDocumentPolicy";
 
 export type GameInteractionPage = GameOverlayKind | GamePauseSection;
 
@@ -113,6 +114,8 @@ export function GameInteractionShell({
   runtime: VnRuntimeShellPort;
   surfaces?: Partial<GameInteractionShellSurfaces>;
 }) {
+  useWebGameDocumentPolicy();
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;

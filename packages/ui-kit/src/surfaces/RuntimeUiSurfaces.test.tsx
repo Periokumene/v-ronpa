@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
 import { Children, isValidElement, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { RuntimeMovieOverlaySurface } from "./RuntimeUiSurfaces";
+
+const source = readFileSync(new URL("./RuntimeUiSurfaces.tsx", import.meta.url), "utf8");
 
 describe("RuntimeMovieOverlaySurface", () => {
   it("renders movie playback as a full playfield cutscene without native browser controls", () => {
@@ -23,6 +26,11 @@ describe("RuntimeMovieOverlaySurface", () => {
     });
     expect(video).toBeDefined();
     expect((video?.props as { controls?: boolean }).controls).toBeUndefined();
+    expect(video?.props).toMatchObject({
+      disablePictureInPicture: true,
+      disableRemotePlayback: true,
+      playsInline: true
+    });
     expect(styleOf(video)).toMatchObject({
       display: "block",
       width: "100%",
@@ -31,6 +39,21 @@ describe("RuntimeMovieOverlaySurface", () => {
       objectFit: "contain"
     });
     expect(skip).toBeDefined();
+  });
+});
+
+describe("RuntimeInputPromptSurface", () => {
+  it("keeps text editing semantics while disabling browser-managed writing affordances", () => {
+    const inputMarkup = source.match(/<input[\s\S]*?data-testid="runtime-input-field"[\s\S]*?\/>/u)?.[0];
+
+    expect(inputMarkup).toBeDefined();
+    expect(inputMarkup).toContain('autoCapitalize="none"');
+    expect(inputMarkup).toContain('autoComplete="off"');
+    expect(inputMarkup).toContain('autoCorrect="off"');
+    expect(inputMarkup).toContain('enterKeyHint="done"');
+    expect(inputMarkup).toContain('inputMode={valueType === "number" ? "decimal" : "text"}');
+    expect(inputMarkup).toContain("spellCheck={false}");
+    expect(inputMarkup).toContain('type={valueType === "number" ? "number" : "text"}');
   });
 });
 

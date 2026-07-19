@@ -263,7 +263,7 @@ function BranchPanel({
           <span>{decision.prompt}</span>
         </div>
       </header>
-      <form onSubmit={(event) => submitDecisionForm(event, decision, onSubmit)}>
+      <form autoComplete="off" onSubmit={(event) => submitDecisionForm(event, decision, onSubmit)}>
         {decision.kind === "choice" ? (
           <fieldset>
             <legend>Choose a branch</legend>
@@ -308,7 +308,12 @@ function BranchPanel({
           <label className="vn-devtools-decision-input">
             <span>{decision.variableName}</span>
             <input
+              autoCapitalize="none"
+              autoComplete="off"
+              autoCorrect="off"
               name="value"
+              inputMode={decision.inputType === "number" ? "decimal" : "text"}
+              spellCheck={false}
               type={decision.inputType === "number" ? "number" : "text"}
               defaultValue={decision.defaultValue}
               required

@@ -51,4 +51,12 @@ describe("Nani Workbench IDE styling contract", () => {
       expect(componentSources).not.toContain(legacyGlyph);
     }
   });
+
+  it("fully skins semantic radio and text controls without system motion branches", () => {
+    expect(css).toMatch(/\.vn-devtools-quick-pick input \{[\s\S]*border-radius: 50%;[\s\S]*appearance: none;/u);
+    expect(css).toMatch(/\.vn-devtools-quick-pick input:checked \{[\s\S]*box-shadow:/u);
+    expect(css).toMatch(/\.vn-devtools-find-input-row input \{[\s\S]*appearance: none;/u);
+    expect(css).toMatch(/\.vn-devtools-decision-input input \{[\s\S]*appearance: none;/u);
+    expect(css).not.toContain("prefers-reduced-motion");
+  });
 });

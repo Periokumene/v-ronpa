@@ -32,6 +32,7 @@ export async function bootHarness(page: Page) {
   await expectNoRuntimeAssetDiagnostics(page);
   await expect(page.getByTestId("title-surface")).toBeVisible();
   await expect(page.getByTestId("title-new-game")).toBeEnabled();
+  await expect(page.locator("html")).toHaveAttribute("data-v-ronpa-web-game-document", "active");
 }
 
 export async function configureTitleDisplay(
@@ -40,10 +41,47 @@ export async function configureTitleDisplay(
 ) {
   await page.getByTestId("title-settings").click();
   await expect(page.getByTestId("settings-overlay")).toBeVisible();
-  if (options.textSpeed) await page.getByTestId("settings-display-text-speed").fill(options.textSpeed);
-  if (options.textSize) await page.getByTestId("settings-display-text-size").selectOption(options.textSize);
+  if (options.textSpeed) await setSettingsSlider(page, "settings-display-text-speed", Number(options.textSpeed));
+  if (options.textSize) {
+    await setSettingsOption(page, "settings-display-text-size", options.textSize, ["small", "medium", "large"]);
+  }
   await page.getByTestId("settings-overlay-close").click();
   await expect(page.getByTestId("settings-overlay")).toBeHidden();
+}
+
+export async function setSettingsSlider(page: Page, testId: string, value: number) {
+  const thumb = page.getByTestId(testId);
+  const percent = Math.round(Math.min(1, Math.max(0, value)) * 100);
+  await thumb.focus();
+  if (percent === 100) {
+    await thumb.press("End");
+  } else {
+    await thumb.press("Home");
+    for (let step = 0; step < percent; step += 1) await thumb.press("ArrowRight");
+  }
+  await expect(thumb).toHaveAttribute("aria-valuenow", String(percent));
+}
+
+export async function setSettingsOption(
+  page: Page,
+  testId: string,
+  value: string,
+  orderedValues: readonly string[]
+) {
+  const control = page.getByTestId(testId);
+  const targetIndex = orderedValues.indexOf(value);
+  if (targetIndex < 0) throw new Error(`Unknown ${testId} option: ${value}`);
+
+  for (let attempt = 0; attempt < orderedValues.length; attempt += 1) {
+    const currentValue = await control.getAttribute("data-value");
+    if (currentValue === value) return;
+    const currentIndex = orderedValues.indexOf(currentValue ?? "");
+    if (currentIndex < 0) throw new Error(`Unknown current ${testId} option: ${currentValue ?? "missing"}`);
+    const direction = currentIndex < targetIndex ? "next" : "previous";
+    await page.getByTestId(`${testId}-${direction}`).click();
+  }
+
+  await expect(control).toHaveAttribute("data-value", value);
 }
 
 export async function startNavi(page: Page) {
@@ -113,7 +151,30 @@ export async function advanceMainInteractionShowcase(page: Page) {
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("pause-surface")).toHaveCount(0);
   const dialogTextBeforeInputPromptSubmit = await currentDialogText(page);
-  await page.getByTestId("runtime-input-field").fill("Smoke");
+  const runtimeInput = page.getByTestId("runtime-input-field");
+  const editableContextMenuPrevented = await runtimeInput.evaluate((target) => {
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    target.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(editableContextMenuPrevented).toBe(false);
+  const editableDropPolicy = await runtimeInput.evaluate((target) => {
+    const plainText = new DataTransfer();
+    plainText.setData("text/plain", "Smoke");
+    const textDrop = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: plainText });
+    target.dispatchEvent(textDrop);
+
+    const url = new DataTransfer();
+    url.setData("text/plain", "https://example.com/");
+    url.setData("text/uri-list", "https://example.com/");
+    const urlDrop = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: url });
+    target.dispatchEvent(urlDrop);
+    return { text: textDrop.defaultPrevented, url: urlDrop.defaultPrevented };
+  });
+  expect(editableDropPolicy).toEqual({ text: false, url: true });
+  await runtimeInput.fill("Smoke");
+  await runtimeInput.selectText();
+  await expect.poll(() => runtimeInput.evaluate((input) => [input.selectionStart, input.selectionEnd])).toEqual([0, 5]);
   await expect(page.getByTestId("vn-dialog-text")).toHaveText(dialogTextBeforeInputPromptSubmit);
   await page.getByTestId("runtime-input-submit").click();
   await advanceUntilText(page, "CHECKPOINT MAIN 02");
@@ -123,6 +184,9 @@ export async function advanceMainInteractionShowcase(page: Page) {
   await advanceUntilText(page, "CHECKPOINT MAIN 04");
   await advanceVn(page);
   await expect(page.getByTestId("runtime-movie-overlay")).toBeVisible();
+  await expect(page.getByTestId("runtime-movie-video")).toHaveJSProperty("playsInline", true);
+  await expect(page.getByTestId("runtime-movie-video")).toHaveJSProperty("disablePictureInPicture", true);
+  await expect(page.getByTestId("runtime-movie-video")).toHaveJSProperty("disableRemotePlayback", true);
   await expect(page.getByTestId("vn-advance-hit-plane")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("pause-surface")).toHaveCount(0);

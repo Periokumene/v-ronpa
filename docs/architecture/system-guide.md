@@ -28,8 +28,9 @@ interaction state back into the machine.
   coordination, read-only React Dock, tab-session helpers, and a Vite-only Nani
   source bridge.
 - `app-vn-shell`: DOM shell, canonical modal pause-surface ownership, shared
-  pause/save/load/settings behavior, and Pixi host. Paused section slots provide
-  content only; playable dialog, choices, and commands are omitted until resume.
+  pause/save/load/settings behavior, the internal document-level web-game
+  browser policy, and Pixi host. Paused section slots provide content only;
+  playable dialog, choices, and commands are omitted until resume.
 - `pixi-presenter`: Pixi renderer adapter only; it does not interpret runtime commands.
 - `runtime-assets-pixi`: Pixi-owned AssetRegistry fragment only.
 - `navi-director` / `trial-director`: mode-specific state and flow.
@@ -44,7 +45,8 @@ packages cannot depend on any renderer, browser storage, or audio implementation
 See [VN integration](app-vn-integration.md), [presentation](presentation-pipeline.md),
 [assets](asset-pipeline.md), [contracts](contracts.md), and
 [Nani source diagnostics](nani-source-diagnostics.md), and
-[Nani devtools](vn-devtools.md).
+[Nani devtools](vn-devtools.md). Browser-native interaction hardening is defined
+only in [Web game browser policy](web-game-browser-policy.md).
 
 The exact-source boundary is continuously checked by
 `pnpm validate:nani-diagnostics-cleanup` and the deterministic stress/performance

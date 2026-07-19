@@ -284,6 +284,7 @@ describe("game-a interaction surfaces", () => {
     ]);
     expect(saveMarkup).toContain('data-testid="save-page-indicator"');
     expect(saveMarkup).toContain("1 / 8");
+    expect(saveMarkup).toContain('draggable="false"');
 
     const loadSurfaces = createGameASurfaces({
       assets,
@@ -553,7 +554,15 @@ function createSaveLoadModel(
     mode,
     slotIds: Array.from({ length: 40 }, (_, index) => `slot:game-a:${index + 1}`),
     slots: [filledSlot],
-    slotPreviewsById: {},
+    slotPreviewsById: {
+      "slot:game-a:1": {
+        height: 180,
+        kind: "image",
+        mime: "image/webp",
+        uri: "blob:game-a-save-preview",
+        width: 320
+      }
+    },
     canSave: true,
     pendingLoadSlot: pendingLoad ? filledSlot : undefined,
     busy: false,

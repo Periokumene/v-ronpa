@@ -1,0 +1,56 @@
+html[data-v-ronpa-web-game-document="active"] {
+  color-scheme: only dark;
+  forced-color-adjust: none;
+  overscroll-behavior: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html[data-v-ronpa-web-game-document="active"] body {
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html[data-v-ronpa-web-game-document="active"] body * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html[data-v-ronpa-web-game-document="active"] :is(
+  input:not([type]),
+  input[type="email"],
+  input[type="number"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="text"],
+  input[type="url"],
+  textarea,
+  [contenteditable]:not([contenteditable="false"])
+) {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+html[data-v-ronpa-web-game-document="active"] button {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+html[data-v-ronpa-web-game-document="active"] input[type="number"],
+html[data-v-ronpa-web-game-document="active"] input[type="search"] {
+  appearance: textfield;
+  -webkit-appearance: textfield;
+}
+
+html[data-v-ronpa-web-game-document="active"] input[type="number"]::-webkit-inner-spin-button,
+html[data-v-ronpa-web-game-document="active"] input[type="number"]::-webkit-outer-spin-button,
+html[data-v-ronpa-web-game-document="active"] input[type="search"]::-webkit-search-cancel-button,
+html[data-v-ronpa-web-game-document="active"] input[type="search"]::-webkit-search-decoration {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}

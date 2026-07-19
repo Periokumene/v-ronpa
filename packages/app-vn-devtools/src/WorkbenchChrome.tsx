@@ -149,12 +149,17 @@ function FindControl({
       <div className="vn-devtools-find-input-row">
         <MagnifyingGlass size={14} aria-hidden="true" />
         <input
+          autoCapitalize="none"
+          autoComplete="off"
+          autoCorrect="off"
           type="search"
           value={controller.searchQuery}
           placeholder="Find"
           aria-label="Find in Nani source"
           data-testid="vn-devtools-search"
+          enterKeyHint="search"
           onChange={(event) => controller.actions.search(event.currentTarget.value)}
+          spellCheck={false}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();

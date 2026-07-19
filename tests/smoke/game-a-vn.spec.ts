@@ -28,11 +28,20 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("game-a-playfield")).toBeVisible();
   await expect(page.getByTestId("game-a-app-id")).toHaveText("game-a");
   await expect(page.getByTestId("title-surface")).toHaveClass(/game-a-title-surface/);
+  await expect(page.locator("html")).toHaveAttribute("data-v-ronpa-web-game-document", "active");
   const workbench = page.getByTestId("vn-devtools-dock");
   await expect(workbench).toBeVisible();
   await expect(workbench).toHaveAttribute("aria-label", "Nani Workbench");
   await expect(workbench).toContainText("test / smoke.nani");
   await expect(page.getByTestId("vn-devtools-source-editor")).toBeVisible();
+  const workbenchStaticPolicy = await page.getByTestId("vn-devtools-source-editor").evaluate((target) => {
+    const contextMenu = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    const selectStart = new Event("selectstart", { bubbles: true, cancelable: true });
+    target.dispatchEvent(contextMenu);
+    target.dispatchEvent(selectStart);
+    return { contextMenu: contextMenu.defaultPrevented, selectStart: selectStart.defaultPrevented };
+  });
+  expect(workbenchStaticPolicy).toEqual({ contextMenu: true, selectStart: true });
   await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "state");
   await expect(workbench.getByLabel("Current runtime position")).toHaveCount(0);
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute(
@@ -64,6 +73,11 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await page.keyboard.press("Control+f");
   const sourceFind = page.getByTestId("vn-devtools-search");
   await expect(sourceFind).toBeFocused();
+  expect(await sourceFind.evaluate((target) => {
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    target.dispatchEvent(event);
+    return event.defaultPrevented;
+  })).toBe(false);
   await sourceFind.fill("CHECKPOINT SMOKE");
   await expect(page.locator('[data-testid^="vn-devtools-line-"]')).toHaveCount(sourceLineCount);
   await expect(page.getByTestId("vn-devtools-find-count")).not.toHaveText("0 / 0");
@@ -301,6 +315,8 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("save-slot-1")).toBeEnabled();
   await clickByTestId(page, "save-slot-1");
   await expect(page.getByTestId("save-slot-1")).toContainText("CHECKPOINT SMOKE UI");
+  await expect(page.getByTestId("save-slot-1-thumbnail")).toHaveAttribute("src", /^blob:/);
+  await expect(page.getByTestId("save-slot-1-thumbnail")).toHaveJSProperty("draggable", false);
   await page.screenshot({ path: "test-results/game-a-save.png", fullPage: true });
   await clickByTestId(page, "pause-surface-close");
   await clickByTestId(page, "vn-command-load");
@@ -327,7 +343,13 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
 
   await advanceUntilInputPrompt(page);
   await expect(page.getByTestId("runtime-input-prompt")).toBeVisible();
-  await page.getByTestId("runtime-input-field").fill("Codex");
+  const runtimeInput = page.getByTestId("runtime-input-field");
+  await expect(runtimeInput).toHaveAttribute("autocomplete", "off");
+  await expect(runtimeInput).toHaveAttribute("spellcheck", "false");
+  await page.screenshot({ path: "test-results/game-a-runtime-input.png", fullPage: true });
+  await runtimeInput.fill("Codex");
+  await runtimeInput.selectText();
+  await expect.poll(() => runtimeInput.evaluate((input) => [input.selectionStart, input.selectionEnd])).toEqual([0, 5]);
   await clickByTestId(page, "runtime-input-submit");
   await advanceUntilText(page, "CHECKPOINT SMOKE INPUT", 4);
   await advanceUntilText(page, "CHECKPOINT SMOKE PAUSE", 6);
@@ -341,6 +363,9 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await clickByTestId(page, "vn-choice-0");
   await advanceUntilText(page, "CHECKPOINT SMOKE VOICE", 4);
   await advanceUntilMovie(page, 5);
+  await expect(page.getByTestId("runtime-movie-video")).toHaveJSProperty("playsInline", true);
+  await expect(page.getByTestId("runtime-movie-video")).toHaveJSProperty("disablePictureInPicture", true);
+  await expect(page.getByTestId("runtime-movie-video")).toHaveJSProperty("disableRemotePlayback", true);
   await page.waitForTimeout(300);
   await page.screenshot({ path: "test-results/game-a-movie.png", fullPage: true });
   await clickByTestId(page, "runtime-movie-skip");
@@ -711,6 +736,7 @@ async function exerciseWorkbenchDecisionFlow(
   await expect(page.getByTestId("vn-devtools-primary-action")).toContainText("Resolve decision");
   await expect(decision).toContainText("Choose a branch");
   await decision.getByLabel("交互与存档").check();
+  await page.screenshot({ path: "test-results/game-a-workbench-decision-controls.png", fullPage: true });
   await decision.getByRole("button", { name: "Continue preview" }).click();
   await expect(decision).toContainText("playerName");
   await decision.locator('input[name="value"]').fill("Workbench");

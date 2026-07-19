@@ -1,5 +1,7 @@
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
+import * as Slider from "@radix-ui/react-slider";
+import * as Switch from "@radix-ui/react-switch";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type {
   GameOverlayKind,
@@ -249,6 +251,7 @@ export function SaveLoadOverlay({
                 <img
                   alt=""
                   data-testid={`save-slot-${absoluteIndex + 1}-thumbnail`}
+                  draggable={false}
                   src={preview.uri}
                   width={preview.width}
                   height={preview.height}
@@ -338,7 +341,7 @@ export function SettingsOverlay({ embedded = false, onClose, onPatchSettings, on
       <div data-testid="settings-groups" style={settingsGroupsStyle}>
         <section aria-label="System settings" data-testid="settings-group-system" style={settingsGroupStyle}>
           <h3 style={settingsGroupTitleStyle}>System</h3>
-          <SettingsSelect
+          <SettingsOptionStepper
             label="Language"
             testId="settings-system-language"
             value={settings.system.language}
@@ -367,7 +370,7 @@ export function SettingsOverlay({ embedded = false, onClose, onPatchSettings, on
 
         <section aria-label="Display settings" data-testid="settings-group-display" style={settingsGroupStyle}>
           <h3 style={settingsGroupTitleStyle}>Display</h3>
-          <SettingsSelect
+          <SettingsOptionStepper
             label="Text size"
             testId="settings-display-text-size"
             value={settings.display.textSize}
@@ -384,7 +387,7 @@ export function SettingsOverlay({ embedded = false, onClose, onPatchSettings, on
             testId="settings-display-text-speed"
             value={settings.display.textSpeed}
           />
-          <SettingsSelect
+          <SettingsOptionStepper
             label="Textbox font"
             testId="settings-display-font"
             value={settings.display.fontFamilyId}
@@ -479,20 +482,29 @@ function SettingsSlider({
 }) {
   const percent = Math.round(value * 100);
   return (
-    <label style={settingsControlStyle}>
+    <div style={settingsControlStyle}>
       <span>{label}</span>
-      <input
-        aria-label={label}
-        data-testid={testId}
+      <Slider.Root
+        data-control-id={testId}
         max={100}
         min={0}
-        onChange={(event) => onChange(Number(event.currentTarget.value) / 100)}
-        style={settingsRangeStyle}
-        type="range"
-        value={percent}
-      />
+        onValueChange={(values) => onChange((values[0] ?? 0) / 100)}
+        step={1}
+        style={settingsSliderRootStyle}
+        value={[percent]}
+      >
+        <Slider.Track style={settingsSliderTrackStyle}>
+          <Slider.Range style={settingsSliderRangeStyle} />
+        </Slider.Track>
+        <Slider.Thumb
+          aria-label={label}
+          data-testid={testId}
+          data-value={String(percent / 100)}
+          style={settingsSliderThumbStyle}
+        />
+      </Slider.Root>
       <output data-testid={`${testId}-value`} style={settingsValueStyle}>{percent}%</output>
-    </label>
+    </div>
   );
 }
 
@@ -508,20 +520,24 @@ function SettingsToggle({
   testId: string;
 }) {
   return (
-    <label style={settingsControlStyle}>
+    <div style={settingsControlStyle}>
       <span>{label}</span>
-      <input
+      <Switch.Root
         aria-label={label}
         checked={checked}
         data-testid={testId}
-        onChange={(event) => onChange(event.currentTarget.checked)}
-        type="checkbox"
-      />
-    </label>
+        data-value={checked ? "on" : "off"}
+        onCheckedChange={onChange}
+        style={checked ? settingsSwitchRootCheckedStyle : settingsSwitchRootStyle}
+      >
+        <Switch.Thumb style={checked ? settingsSwitchThumbCheckedStyle : settingsSwitchThumbStyle} />
+      </Switch.Root>
+      <output data-testid={`${testId}-value`} style={settingsValueStyle}>{checked ? "On" : "Off"}</output>
+    </div>
   );
 }
 
-function SettingsSelect({
+function SettingsOptionStepper({
   label,
   onChange,
   options,
@@ -534,23 +550,51 @@ function SettingsSelect({
   testId: string;
   value: string;
 }) {
+  const currentIndex = Math.max(0, options.findIndex(([optionValue]) => optionValue === value));
+  const current = options[currentIndex] ?? options[0];
+  if (!current) return null;
+  const previous = options[currentIndex - 1];
+  const next = options[currentIndex + 1];
   return (
-    <label style={settingsControlStyle}>
+    <div style={settingsControlStyle}>
       <span>{label}</span>
-      <select
+      <div
         aria-label={label}
         data-testid={testId}
-        onChange={(event) => onChange(event.currentTarget.value)}
-        style={settingsSelectStyle}
-        value={value}
+        data-value={current[0]}
+        role="group"
+        style={settingsOptionStepperStyle}
       >
-        {options.map(([optionValue, text]) => (
-          <option key={optionValue} value={optionValue}>
-            {text}
-          </option>
-        ))}
-      </select>
-    </label>
+        <button
+          aria-label={`Previous ${label}`}
+          data-testid={`${testId}-previous`}
+          disabled={!previous}
+          onClick={() => {
+            if (previous) onChange(previous[0]);
+          }}
+          style={settingsOptionButtonStyle}
+          type="button"
+        >
+          &lt;
+        </button>
+        <output aria-live="polite" data-testid={`${testId}-value`} style={settingsOptionValueStyle}>
+          {current[1]}
+        </output>
+        <button
+          aria-label={`Next ${label}`}
+          data-testid={`${testId}-next`}
+          disabled={!next}
+          onClick={() => {
+            if (next) onChange(next[0]);
+          }}
+          style={settingsOptionButtonStyle}
+          type="button"
+        >
+          &gt;
+        </button>
+      </div>
+      <span aria-hidden="true" />
+    </div>
   );
 }
 
@@ -705,6 +749,7 @@ const embeddedSectionStyle: CSSProperties = {
   width: "min(920px, calc(100vw - 40px))",
   maxHeight: "min(650px, calc(100vh - 110px))",
   overflow: "auto",
+  overscrollBehavior: "contain",
   display: "grid",
   gap: 14,
   padding: 18,
@@ -734,7 +779,8 @@ const scrollRootStyle: CSSProperties = {
 
 const scrollViewportStyle: CSSProperties = {
   width: "100%",
-  height: "100%"
+  height: "100%",
+  overscrollBehavior: "contain"
 };
 
 const scrollbarStyle: CSSProperties = {
@@ -779,6 +825,7 @@ const settingsGroupsStyle: CSSProperties = {
   gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
   gap: 12,
   overflow: "auto",
+  overscrollBehavior: "contain",
   paddingRight: 4
 };
 
@@ -808,17 +855,94 @@ const settingsControlStyle: CSSProperties = {
   fontSize: 13
 };
 
-const settingsRangeStyle: CSSProperties = {
+const settingsSliderRootStyle: CSSProperties = {
+  position: "relative",
+  display: "flex",
+  alignItems: "center",
   width: "100%",
-  minWidth: 92
+  minWidth: 92,
+  height: 24,
+  touchAction: "none"
 };
 
-const settingsSelectStyle: CSSProperties = {
-  minWidth: 120,
-  border: "1px solid rgba(255,255,255,0.24)",
-  borderRadius: 5,
-  background: "#101821",
-  color: "#f8fbff"
+const settingsSliderTrackStyle: CSSProperties = {
+  position: "relative",
+  flex: 1,
+  height: 5,
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.16)"
+};
+
+const settingsSliderRangeStyle: CSSProperties = {
+  position: "absolute",
+  height: "100%",
+  borderRadius: 999,
+  background: "#6ee7d8"
+};
+
+const settingsSliderThumbStyle: CSSProperties = {
+  display: "block",
+  width: 18,
+  height: 18,
+  border: "2px solid #101821",
+  borderRadius: 999,
+  background: "#ffd166",
+  boxShadow: "0 0 0 1px rgba(255,255,255,0.42)"
+};
+
+const settingsSwitchRootStyle: CSSProperties = {
+  position: "relative",
+  width: 42,
+  height: 24,
+  padding: 2,
+  border: "1px solid rgba(255,255,255,0.28)",
+  borderRadius: 999,
+  background: "#101821"
+};
+
+const settingsSwitchRootCheckedStyle: CSSProperties = {
+  ...settingsSwitchRootStyle,
+  borderColor: "rgba(110,231,216,0.64)",
+  background: "rgba(110,231,216,0.3)"
+};
+
+const settingsSwitchThumbStyle: CSSProperties = {
+  display: "block",
+  width: 18,
+  height: 18,
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.72)",
+  transform: "translateX(0)"
+};
+
+const settingsSwitchThumbCheckedStyle: CSSProperties = {
+  ...settingsSwitchThumbStyle,
+  background: "#ffd166",
+  transform: "translateX(18px)"
+};
+
+const settingsOptionStepperStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "32px minmax(90px, 1fr) 32px",
+  alignItems: "center",
+  gap: 6,
+  minWidth: 160
+};
+
+const settingsOptionButtonStyle: CSSProperties = {
+  ...secondaryButtonStyle,
+  width: 32,
+  minWidth: 32,
+  minHeight: 30,
+  padding: 0
+};
+
+const settingsOptionValueStyle: CSSProperties = {
+  overflow: "hidden",
+  color: "#f8fbff",
+  textAlign: "center",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap"
 };
 
 const settingsValueStyle: CSSProperties = {

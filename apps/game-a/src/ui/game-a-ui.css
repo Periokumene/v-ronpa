@@ -309,15 +309,23 @@
   gap: 6px;
 }
 
-.game-a-input-prompt input,
-.game-a-overlay-panel input,
-.game-a-overlay-panel select {
+.game-a-input-prompt input {
   min-height: 36px;
+  padding: 0 10px;
   border: 1px solid rgba(205, 218, 214, 0.24);
   border-radius: 4px;
+  appearance: none;
+  -webkit-appearance: none;
   background: rgba(5, 9, 12, 0.75);
   color: #f8fbf4;
+  caret-color: #c9b56b;
   font: inherit;
+}
+
+.game-a-input-prompt input:focus-visible {
+  border-color: #c9b56b;
+  outline: 2px solid rgba(201, 181, 107, 0.56);
+  outline-offset: 2px;
 }
 
 .game-a-pause-screen {
@@ -453,6 +461,7 @@
   position: relative;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--game-a-pause-muted);
 }
 
@@ -688,6 +697,7 @@
 .game-a-settings-rows {
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .game-a-settings-panel {
@@ -850,6 +860,7 @@
   width: min(920px, calc(100cqw - 32px));
   max-height: min(740px, calc(100cqh - 32px));
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 20px;
   border: 1px solid rgba(199, 223, 207, 0.28);
   border-radius: 8px;

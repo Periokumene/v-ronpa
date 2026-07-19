@@ -122,13 +122,3 @@
 .game-a-shell-with-devtools:has(.game-a-dev-viewport-toolbar:focus-within) > .vn-devtools-collapsed-button {
   opacity: 1;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .game-a-dev-viewport-stage {
-    will-change: auto;
-  }
-
-  .game-a-dev-viewport-toolbar {
-    transition: none;
-  }
-}

@@ -54,3 +54,13 @@ but `GameInteractionShell`, runtime ports, checkpoints, and Pixi remain children
 of one logical playfield. The production call omits the wrapper and must not
 mount development DOM or observers. Host preview modes are app tooling state,
 not `app-vn-devtools`, runtime, save, or presentation contracts.
+
+## Browser document ownership
+
+Mounting `GameInteractionShell` automatically installs the internal
+document-level browser policy for the whole app, including development chrome
+outside the playfield. Apps and Workbench must not duplicate document event
+listeners or root resets. The policy remains outside runtime ports, gameplay,
+save/checkpoint state, and Pixi/R3F presentation; see
+[Web game browser policy](web-game-browser-policy.md) for the interaction,
+visual, accessibility, and non-goal matrix.
