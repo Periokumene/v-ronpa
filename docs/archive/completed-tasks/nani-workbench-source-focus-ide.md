@@ -20,8 +20,9 @@ still validates the complete branch.
 - State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-18`
-- Updated: `2026-07-18`
+- Updated: `2026-07-19`
 - Completed Commit: `eb351b6`
+- Integrated Commit: `d543d2820aca1c83f604ed789488beccfa48fdda`
 - Archive Target: `docs/archive/completed-tasks/nani-workbench-source-focus-ide.md`
 
 ## Goal
@@ -33,10 +34,10 @@ checkpoint, atomic restore, Pixi identity, and Game A viewport boundaries.
 ## Context
 
 - `docs/architecture/vn-devtools.md`
-- `docs/tasks/nani-debug-workbench-hard-upgrade.md`
-- `docs/tasks/game-a-devtools-viewport-isolation.md`
-- Visual reference:
-  `/Users/periokumene/.codex/generated_images/019f7438-91b6-7d30-b2d8-e69a55c9ed84/exec-7a71f61f-22b8-4551-883a-69e58a5ac5b3.png`
+- `docs/archive/completed-tasks/nani-debug-workbench-hard-upgrade.md`
+- `docs/archive/completed-tasks/game-a-devtools-viewport-isolation.md`
+- Visual reference: accepted source-first IDE direction recorded in the task
+  history and summarized by the archived Design QA report.
 - `AGENTS.md`
 
 ## Constraints
@@ -69,8 +70,8 @@ checkpoint, atomic restore, Pixi identity, and Game A viewport boundaries.
 - `tests/smoke/game-a-alice.spec.ts`
 - `scripts/validate-game-a-production.mjs`
 - `docs/architecture/vn-devtools.md`
-- `docs/tasks/nani-workbench-source-focus-ide.md`
-- `design-qa.md`
+- `docs/archive/completed-tasks/nani-workbench-source-focus-ide.md`
+- `docs/archive/completed-tasks/nani-workbench-source-focus-ide-design-qa.md`
 - `pnpm-lock.yaml`
 - `progress.md`
 
@@ -158,7 +159,7 @@ Test placement:
 - App/E2E: `tests/smoke/game-a-vn.spec.ts` and
   `tests/smoke/game-a-alice.spec.ts` only.
 - Visual evidence: ignored `test-results/**` screenshots and root
-  `design-qa.md` comparison report.
+  `docs/archive/completed-tasks/nani-workbench-source-focus-ide-design-qa.md` comparison report.
 
 ## Dependency Changes
 
@@ -191,8 +192,8 @@ pnpm validate:vn-runtime-cleanup
 pnpm --filter @v-ronpa/game-a build
 pnpm --filter @v-ronpa/game-harness build
 pnpm test:smoke
-BASE_REF=d2aca91d480276cca71c33f4d2329f41d4132f4b pnpm validate:task-boundaries -- --task docs/tasks/nani-workbench-source-focus-ide.md
-BASE_REF=d2aca91d480276cca71c33f4d2329f41d4132f4b pnpm validate:subsystem -- --task docs/tasks/nani-workbench-source-focus-ide.md
+BASE_REF=d2aca91d480276cca71c33f4d2329f41d4132f4b pnpm validate:task-boundaries -- --task docs/archive/completed-tasks/nani-workbench-source-focus-ide.md
+BASE_REF=d2aca91d480276cca71c33f4d2329f41d4132f4b pnpm validate:subsystem -- --task docs/archive/completed-tasks/nani-workbench-source-focus-ide.md
 pnpm validate:baseline
 ```
 
@@ -218,7 +219,7 @@ pnpm validate:baseline
 - Verify font hierarchy, spacing rhythm, palette, Phosphor icons, source density,
   panel proportions, copy, focus rings, and independent scrolling.
 - Compare source and implementation in the same visual input. Record each
-  P0/P1/P2 iteration in `design-qa.md`; final result must be exactly `passed`.
+  P0/P1/P2 iteration in `docs/archive/completed-tasks/nani-workbench-source-focus-ide-design-qa.md`; final result must be exactly `passed`.
 
 ## Review Packet
 
@@ -235,7 +236,7 @@ pnpm validate:baseline
   exact Dock resize, panel routing, decision input, persisted reload, HMR,
   last-known-good, Alice expression preparation, and the complete Harness VN /
   Navi / Trial / Pixi suite.
-- `design-qa.md` records the exact visual source, same-input 1672x941
+- `docs/archive/completed-tasks/nani-workbench-source-focus-ide-design-qa.md` records the exact visual source, same-input 1672x941
   comparison, 720/default/320/overlay evidence, compiler-error and Branch
   states, three resolved P2 iterations, and `final result: passed`.
 - Game A's production guard passed after adding Workbench panel, Find,
@@ -267,5 +268,5 @@ checkpoint, runtime, Pixi, or product DOM migration.
   width without changing the game viewport or runtime semantics.
 - Tests, production guard, builds, screenshots, Design QA, task gates, and full
   baseline validation pass.
-- `design-qa.md` says `final result: passed` and the task card contains final
+- `docs/archive/completed-tasks/nani-workbench-source-focus-ide-design-qa.md` says `final result: passed` and the task card contains final
   evidence and completed commit lineage.

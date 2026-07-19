@@ -11,11 +11,12 @@
 
 ## Status
 
-- State: `Review`
+- State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-18`
-- Updated: `2026-07-18`
-- Completed Commit: annotated by `vscode-nani-adapter-baseline-2026-07-18`
+- Updated: `2026-07-19`
+- Completed Commit: `d71f05bf2ca8eb50289ea76da369345158beff54`
+- Integrated Commit: `d543d2820aca1c83f604ed789488beccfa48fdda`
 - Archive Target: `docs/archive/completed-tasks/vscode-nani-char-hover-preview.md`
 
 ## Goal
@@ -39,7 +40,7 @@ Add a native VS Code hover that statically assembles the layered character selec
 ## Allowed Paths
 
 - `tools/vscode-nani/**`
-- `docs/tasks/vscode-nani-char-hover-preview.md`
+- `docs/archive/completed-tasks/vscode-nani-char-hover-preview.md`
 - `pnpm-lock.yaml`
 
 ## Forbidden Paths
@@ -112,8 +113,8 @@ pnpm validate:boundaries
 pnpm validate:ccr
 pnpm validate:app-cleanup
 pnpm validate:vn-runtime-cleanup
-BASE_REF=codex/nani-exact-source-diagnostics pnpm validate:task-boundaries -- --task docs/tasks/vscode-nani-char-hover-preview.md
-BASE_REF=codex/nani-exact-source-diagnostics pnpm validate:subsystem -- --task docs/tasks/vscode-nani-char-hover-preview.md
+BASE_REF=codex/nani-exact-source-diagnostics pnpm validate:task-boundaries -- --task docs/archive/completed-tasks/vscode-nani-char-hover-preview.md
+BASE_REF=codex/nani-exact-source-diagnostics pnpm validate:subsystem -- --task docs/archive/completed-tasks/vscode-nani-char-hover-preview.md
 pnpm validate:baseline
 ```
 

@@ -10,11 +10,12 @@
 
 ## Status
 
-- State: `Review`
+- State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-18`
-- Updated: `2026-07-18`
-- Completed Commit: `TBD`
+- Updated: `2026-07-19`
+- Completed Commit: `42190582c8f2e83f6e4b3717c3c295730d868826`
+- Integrated Commit: `d543d2820aca1c83f604ed789488beccfa48fdda`
 - Archive Target: `docs/archive/completed-tasks/nani-exact-source-diagnostics.md`
 
 ## Goal
@@ -154,8 +155,8 @@ pnpm --filter @v-ronpa/game-a build
 pnpm --filter @v-ronpa/game-harness build
 pnpm test:smoke
 pnpm validate:baseline
-BASE_REF=integration/v-ronpa-baseline pnpm validate:task-boundaries -- --task docs/tasks/nani-exact-source-diagnostics.md
-BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/nani-exact-source-diagnostics.md
+BASE_REF=integration/v-ronpa-baseline pnpm validate:task-boundaries -- --task docs/archive/completed-tasks/nani-exact-source-diagnostics.md
+BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/archive/completed-tasks/nani-exact-source-diagnostics.md
 ```
 
 ## Programmatic Acceptance

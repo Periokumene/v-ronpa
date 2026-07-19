@@ -19,8 +19,9 @@ diff; the final baseline gate still validates the complete branch.
 - State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-18`
-- Updated: `2026-07-18`
+- Updated: `2026-07-19`
 - Completed Commit: `3ec19471e452086e0bca869276fe583ac441135b`
+- Integrated Commit: `d543d2820aca1c83f604ed789488beccfa48fdda`
 - Archive Target: `docs/archive/completed-tasks/game-a-devtools-viewport-isolation.md`
 
 ## Goal
@@ -34,7 +35,7 @@ explicitly requested.
 
 - `docs/architecture/vn-devtools.md`
 - `docs/architecture/app-vn-integration.md`
-- `docs/tasks/nani-debug-workbench-hard-upgrade.md`
+- `docs/archive/completed-tasks/nani-debug-workbench-hard-upgrade.md`
 - `AGENTS.md`
 
 The current DEV grid shrinks the Game A column while Game A DOM surfaces still
@@ -74,7 +75,7 @@ authorities and a distorted composite scene.
 - `scripts/validate-game-a-production.mjs`
 - `docs/architecture/vn-devtools.md`
 - `docs/architecture/app-vn-integration.md`
-- `docs/tasks/game-a-devtools-viewport-isolation.md`
+- `docs/archive/completed-tasks/game-a-devtools-viewport-isolation.md`
 - `progress.md`
 
 ## Forbidden Paths
@@ -146,7 +147,7 @@ pnpm validate:boundaries
 pnpm validate:app-cleanup
 pnpm --filter @v-ronpa/game-a build
 pnpm test:smoke
-BASE_REF=4c49a69e2798d31e3129ab63c162ddaa69f252b6 pnpm validate:subsystem -- --task docs/tasks/game-a-devtools-viewport-isolation.md
+BASE_REF=4c49a69e2798d31e3129ab63c162ddaa69f252b6 pnpm validate:subsystem -- --task docs/archive/completed-tasks/game-a-devtools-viewport-isolation.md
 pnpm validate:baseline
 ```
 

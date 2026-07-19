@@ -9,17 +9,14 @@
 
 - `codex/vscode-nani-char-completion-preview`
 
-## Worktree Path
-
-- `/Users/periokumene/Dev/v-ronpa`
-
 ## Status
 
-- State: `Review`
+- State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-18`
 - Updated: `2026-07-19`
-- Completed Commit: `This task's final implementation commit`
+- Completed Commit: `c493dc127d3c2e347a0f1c1d3cad25e84ed37c0a`
+- Integrated Commit: `d543d2820aca1c83f604ed789488beccfa48fdda`
 - Archive Target: `docs/archive/completed-tasks/vscode-nani-char-completion-preview.md`
 
 ## Goal
@@ -28,7 +25,7 @@ Add lazy native completion-item previews for static `@char` appearance token can
 
 ## Context
 
-- Builds on the static character assembly loader, SVG renderer, cache, and project resource service delivered by `docs/tasks/vscode-nani-char-hover-preview.md`.
+- Builds on the static character assembly loader, SVG renderer, cache, and project resource service delivered by `docs/archive/completed-tasks/vscode-nani-char-hover-preview.md`.
 - Existing character completion candidates are produced by `tools/vscode-nani/src/resourceCompletions.ts`.
 - The user explicitly does not want a persistent view, Webview, editor-background injection, or token-expansion/provenance text.
 
@@ -46,7 +43,7 @@ Add lazy native completion-item previews for static `@char` appearance token can
 ## Allowed Paths
 
 - `tools/vscode-nani/**`
-- `docs/tasks/vscode-nani-char-completion-preview.md`
+- `docs/archive/completed-tasks/vscode-nani-char-completion-preview.md`
 
 ## Forbidden Paths
 
@@ -127,8 +124,8 @@ pnpm validate:boundaries
 pnpm validate:ccr
 pnpm validate:app-cleanup
 pnpm validate:vn-runtime-cleanup
-BASE_REF=codex/vscode-nani-char-hover-preview pnpm validate:task-boundaries -- --task docs/tasks/vscode-nani-char-completion-preview.md
-BASE_REF=codex/vscode-nani-char-hover-preview pnpm validate:subsystem -- --task docs/tasks/vscode-nani-char-completion-preview.md
+BASE_REF=codex/vscode-nani-char-hover-preview pnpm validate:task-boundaries -- --task docs/archive/completed-tasks/vscode-nani-char-completion-preview.md
+BASE_REF=codex/vscode-nani-char-hover-preview pnpm validate:subsystem -- --task docs/archive/completed-tasks/vscode-nani-char-completion-preview.md
 pnpm validate:baseline
 ```
 
@@ -166,7 +163,7 @@ Evidence is stored only in ignored `output/vscode-nani-char-completion-preview/`
   - Assets, boundaries, CCR, app cleanup, VN runtime cleanup, diagnostics cleanup, task boundaries, and subsystem validation passed; subsystem smoke is 7 tests.
   - `validate:nani-diagnostics-quality` functional stress passed. The performance benchmark remained red under current host load (`69.404 ms` stored baseline versus `94.822–98.362 ms` observed) and therefore stopped `validate:baseline`; concurrent Playwright work made some attempts worse, but isolated retries also exceeded the gate. This task changes no benchmark input under `packages/**`, `apps/**`, or `scripts/**`; the failure is retained as an explicit environmental baseline exception rather than changing the benchmark or widening task scope.
 - VSIX:
-  - `/Users/periokumene/Dev/v-ronpa/tools/vscode-nani/v-ronpa-nani-0.5.0.vsix`
+  - `tools/vscode-nani/v-ronpa-nani-0.5.0.vsix`
   - SHA-256: `7a943d8f8f7bc7cdbad91ede167ef2a612008156cd2cbe1d5819d47dafb15a4e`
   - 8 files, about 120.33 KB; no Webview, Pixi runtime, panel, or editor background surface.
   - Installed version: `v-ronpa.v-ronpa-nani@0.5.0`.
@@ -189,7 +186,7 @@ Evidence is stored only in ignored `output/vscode-nani-char-completion-preview/`
   - `pnpm --filter v-ronpa-nani check-types`, `build:prod`, and `package:vsix`: passed.
   - Reloaded the installed extension and exercised completion previews at the real 64-artifact cache limit. `EYE1`, `MOUTH0`, and `MOUTH6` each displayed both candidate and complete-character images; the new extension-host output log contained no preview error or `ENOENT`.
 - VSIX:
-  - `/Users/periokumene/Dev/v-ronpa/tools/vscode-nani/v-ronpa-nani-0.5.1.vsix`
+  - `tools/vscode-nani/v-ronpa-nani-0.5.1.vsix`
   - SHA-256: `045ef63a61bb62f13df2478a2b51206cb8b5a40011ab62fcc2de16ca5339b296`
   - Installed version: `v-ronpa.v-ronpa-nani@0.5.1`.
   - Installed and built bundle SHA-256 both equal `c8faccdb6bebcc5204c4f8af966ca6287e72ef1262e1bc0b0e16d7ec4898e1f3`.

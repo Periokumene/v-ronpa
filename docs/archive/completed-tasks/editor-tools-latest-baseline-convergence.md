@@ -18,8 +18,9 @@
 - State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-18`
-- Updated: `2026-07-18`
+- Updated: `2026-07-19`
 - Completed Commit: `5ac9e3d392e6b3b41014cf077a514f3132b5bc3a`
+- Integrated Commit: `d543d2820aca1c83f604ed789488beccfa48fdda`
 - Archive Target: `docs/archive/completed-tasks/editor-tools-latest-baseline-convergence.md`
 
 ## Goal
@@ -31,7 +32,7 @@ documentation, generated outputs, and cleanup guards.
 
 ## Context
 
-- `docs/tasks/nani-debug-workbench-hard-upgrade.md`
+- `docs/archive/completed-tasks/nani-debug-workbench-hard-upgrade.md`
 - `docs/ccr/vn-runtime-debug-boundary-hard-cut.md`
 - `docs/architecture/vn-devtools.md`
 - `docs/architecture/worktree-flow.md`
@@ -98,8 +99,8 @@ resolution.
 - `tests/smoke/**`
 - `docs/architecture/**`
 - `docs/ccr/vn-runtime-debug-boundary-hard-cut.md`
-- `docs/tasks/nani-debug-workbench-hard-upgrade.md`
-- `docs/tasks/editor-tools-latest-baseline-convergence.md`
+- `docs/archive/completed-tasks/nani-debug-workbench-hard-upgrade.md`
+- `docs/archive/completed-tasks/editor-tools-latest-baseline-convergence.md`
 - `docs/nani/**`
 - `README.md`
 - `package.json`
@@ -196,8 +197,8 @@ pnpm validate:vn-runtime-cleanup
 pnpm --filter @v-ronpa/game-a build
 pnpm --filter @v-ronpa/game-harness build
 pnpm test:smoke
-BASE_REF=integration/v-ronpa-baseline pnpm validate:task-boundaries -- --task docs/tasks/editor-tools-latest-baseline-convergence.md
-BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/editor-tools-latest-baseline-convergence.md
+BASE_REF=integration/v-ronpa-baseline pnpm validate:task-boundaries -- --task docs/archive/completed-tasks/editor-tools-latest-baseline-convergence.md
+BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/archive/completed-tasks/editor-tools-latest-baseline-convergence.md
 pnpm validate:baseline
 ```
 

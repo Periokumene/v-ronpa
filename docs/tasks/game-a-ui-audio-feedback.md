@@ -8,10 +8,6 @@
 
 - `codex/game-a-ui-audio-feedback`
 
-## Worktree Path
-
-- Current Codex workspace: `/Users/periokumene/Dev/v-ronpa`
-
 ## Worktree Environment
 
 Run `pnpm setup:worktree-env`; do not commit generated environment or Playwright output.
@@ -38,9 +34,10 @@ Give every enabled native Game A button default mouse-hover and activation audio
 - Game A owns its product UI composition and one AssetRegistry.
 - `AudioPort` and the Howler adapter already live in `packages/media-save`.
 - The VN runtime exclusively owns its own AudioPort; UI feedback needs a separate app-owned instance.
-- Source files:
-  - `/Users/periokumene/Documents/Codex/2026-07-11/w/outputs/hover.ogg`
-  - `/Users/periokumene/Documents/Codex/2026-07-11/w/outputs/click.ogg`
+- Original external authoring inputs (identified by name and digest; they are
+  not repository-relative build inputs):
+  - `hover.ogg`
+  - `click.ogg`
 - Input SHA-256:
   - `hover.ogg`: `4b32026acfb3b0d777232225209bf256e1515f524278dc14555dbb87eb16e10f`
   - `click.ogg`: `6060f9e0415035e7ab75330157eaa8453ac4549f38f4a67cb63a5352bb49e1b2`

@@ -13,11 +13,11 @@
 
 ## Status
 
-- State: `In Progress`
+- State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-19`
 - Updated: `2026-07-19`
-- Completed Commit: `TBD`
+- Completed Commit: `d543d2820aca1c83f604ed789488beccfa48fdda`
 - Archive Target: `docs/archive/completed-tasks/vscode-nani-editor-tools-convergence.md`
 
 ## Goal
@@ -70,7 +70,7 @@ generated command documentation each retain exactly one authority.
 - `tests/smoke/**`
 - `docs/**`
 - `README.md`
-- `design-qa.md`
+- `docs/archive/completed-tasks/nani-workbench-source-focus-ide-design-qa.md`
 - `package.json`
 - `pnpm-lock.yaml`
 - `playwright.config.ts`
@@ -165,8 +165,8 @@ pnpm validate:ccr
 pnpm --filter @v-ronpa/game-a build
 pnpm --filter @v-ronpa/game-harness build
 pnpm test:smoke
-BASE_REF=integration/v-ronpa-baseline pnpm validate:task-boundaries -- --task docs/tasks/vscode-nani-editor-tools-convergence.md
-BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/vscode-nani-editor-tools-convergence.md
+BASE_REF=integration/v-ronpa-baseline pnpm validate:task-boundaries -- --task docs/archive/completed-tasks/vscode-nani-editor-tools-convergence.md
+BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/archive/completed-tasks/vscode-nani-editor-tools-convergence.md
 pnpm validate:baseline
 ```
 
@@ -190,11 +190,38 @@ pnpm validate:baseline
 
 ## Review Packet
 
-- Merge topology and resolved-conflict matrix.
-- Changed files and deleted legacy symbols.
-- Focused/full gate output and ignored screenshot evidence paths.
-- Public API and generated-output invariants.
-- Residual risks and explicit non-goals.
+- Merge topology is auditable and preserves both source branches: first merge
+  `5ce0cc4` integrates `c493dc1`; second merge `d543d28` has parents `952f58a`
+  and `9bc1434`. Neither source branch was rewritten.
+- Seven conflicted files / 25 conflict blocks were rebuilt by authority rather
+  than resolved wholesale. The compiler accepts only `ParsedScenarioDocument`;
+  its separate semantic module owns serialization and WebCrypto digesting;
+  Node generation hashes the same bytes.
+- Parser/compiler code, severity, location, and exact UTF-16 spans now survive
+  runtime and Vite transport. Browser deduplication includes spans, absolute
+  spans map to line-local source ranges, and Find marks can overlap severity-
+  prioritized diagnostic waves.
+- Hard deletions remain enforced: no bare-IR compiler overload, diagnostic
+  heuristics, `devVnLaunchTarget`, product-root debug surface, flattened Harness
+  aliases, generator preload/semantic copy, or hand-maintained command matrix.
+- Layered-character owns the preload projection; the command catalog generator
+  owns its matrix; product runtime still exposes only the four canonical ports;
+  the Workbench registry remains internal and DEV-only.
+- The combined lockfile was regenerated from 26 workspace manifests and passed
+  frozen install. Asset and command-doc freshness passed. The sole reviewed
+  semantic-golden delta is Game A smoke setup moved before its first stable
+  Workbench target; the fixture records that intentional override and all other
+  corpus projections remain unchanged.
+- Final validation passed: 51 contract files / 465 tests, 88 full test files /
+  694 tests, 10 Extension Host tests, 50,000 catalog and 20,000 invalid stress
+  cases, task-boundary, subsystem, both production builds, and 8 Playwright
+  smoke tests.
+- Exact Problems screenshots are stored under ignored `test-results/` for
+  720px, 420px, 320px, and narrow overlay states; the archived Design QA records
+  the visual review and `final result: passed`.
+- Residual non-blocking observations are the existing Vite large-chunk warnings
+  and normal host-sensitive benchmark variance. Production leakage checks and
+  the documented diagnostic performance thresholds pass.
 
 ## Merge Target
 
@@ -212,3 +239,5 @@ manifest, or session migration is required.
   boundaries, and command documentation each have one authority.
 - Completed task cards and Design QA evidence are archived, and the local target
   branch is fast-forwarded without pushing.
+- Existing runtime/compiler snapshots and generated outputs are unchanged
+  except for the reviewed Game A smoke preview semantics described above.

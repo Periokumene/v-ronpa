@@ -8,10 +8,6 @@
 
 - `ai/inner-background-command`
 
-## Worktree Path
-
-- Current Codex workspace: `/Users/periokumene/Dev/v-ronpa`
-
 ## Status
 
 - State: `In Progress`

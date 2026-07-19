@@ -13,8 +13,9 @@
 - State: `Done`
 - Owner: `Codex`
 - Created: `2026-07-18`
-- Updated: `2026-07-18`
+- Updated: `2026-07-19`
 - Completed Commit: `59aea0c7c4a7740f83f0b0c47c8bb035e9b9989c`
+- Integrated Commit: `d543d2820aca1c83f604ed789488beccfa48fdda`
 - Archive Target: `docs/archive/completed-tasks/nani-debug-workbench-hard-upgrade.md`
 
 ## Goal
@@ -64,7 +65,7 @@ interfaces.
 - `scripts/**`
 - `tests/smoke/**`
 - `docs/ccr/vn-runtime-debug-boundary-hard-cut.md`
-- `docs/tasks/nani-debug-workbench-hard-upgrade.md`
+- `docs/archive/completed-tasks/nani-debug-workbench-hard-upgrade.md`
 - `docs/architecture/**`
 - `docs/nani/command-catalog.md`
 - `README.md`
@@ -153,7 +154,7 @@ pnpm validate:vn-runtime-cleanup
 pnpm --filter @v-ronpa/game-a build
 pnpm --filter @v-ronpa/game-harness build
 pnpm test:smoke
-BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/nani-debug-workbench-hard-upgrade.md
+BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/archive/completed-tasks/nani-debug-workbench-hard-upgrade.md
 ```
 
 ## Programmatic Acceptance
