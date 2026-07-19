@@ -1,10 +1,22 @@
 import type { StoryPresentationWaitTask, StoryRuntimeSnapshot } from "@v-ronpa/contracts";
-import { dismissToast, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
+import { dismissToast, type DialogRevealState, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
 import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import type { StoryPlayAdvanceSource, StoryPlayPacing, StoryPlayState } from "@v-ronpa/story-play";
 import type { PresentationTaskObservation, VnPixiStageRuntime, VnStoryRuntime } from "./runtimeTypes";
 
 export const DEFAULT_VN_TOAST_DURATION_MS = 2500;
+
+/** Restarts the visual driver when one completed wait installs another transition in the same React batch. */
+export function vnVisualRuntimeDriverKey(
+  reveal: DialogRevealState | undefined,
+  ui: UiRuntimeState
+): string {
+  const revealKey = reveal ? `${reveal.lineKey}:${reveal.status}` : "none";
+  const transitionKey = Object.entries(ui.surfaces).flatMap(([group, surface]) => surface.transition
+    ? [`${group}:${surface.transition.startedAtMs}:${surface.transition.durationMs}:${String(surface.transition.targetVisible)}`]
+    : []).join("|");
+  return `${revealKey}|${transitionKey}`;
+}
 
 export interface SyncVnRuntimeToastDismissalTimersInput {
   state: UiRuntimeState;
@@ -53,7 +65,7 @@ export function dismissVnRuntimeToast(state: UiRuntimeState, toastId: string): U
   return dismissToast(state, toastId);
 }
 
-export function canToggleVnStoryAutomation(storyRuntime: VnStoryRuntime): boolean {
+export function canToggleVnStoryAutomation(storyRuntime: Pick<VnStoryRuntime, "active" | "state">): boolean {
   return (
     storyRuntime.active &&
     !storyRuntime.state.ended &&
@@ -63,7 +75,10 @@ export function canToggleVnStoryAutomation(storyRuntime: VnStoryRuntime): boolea
   );
 }
 
-export function canAdvanceVnStoryFromSource(storyRuntime: VnStoryRuntime, source: StoryPlayAdvanceSource): boolean {
+export function canAdvanceVnStoryFromSource(
+  storyRuntime: Pick<VnStoryRuntime, "active" | "state">,
+  source: StoryPlayAdvanceSource
+): boolean {
   if (!storyRuntime.active || storyRuntime.state.ended || storyRuntime.state.pendingChoices.length > 0) return false;
   if (storyRuntime.state.presentationWait) return true;
   const wait = storyRuntime.state.runtimeWait;

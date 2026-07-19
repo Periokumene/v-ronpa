@@ -4,6 +4,9 @@
 > This CCR supersedes current-architecture claims that VN entries own one source
 > file or that cross-script `@goto` is unsupported. Historical schema records
 > remain historical and are not migration requirements.
+>
+> The app/Devtools host ownership and generated entry-locator details are
+> superseded by `game-a-multi-nani-boundary-convergence-hard-cut.md`.
 
 ## Decision
 

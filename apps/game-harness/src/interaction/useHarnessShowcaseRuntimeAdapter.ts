@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { AssetResolver } from "@v-ronpa/asset-registry";
-import type { UseVnRuntimeOptions } from "@v-ronpa/app-vn-runtime";
+import type { UseVnRuntimeOptions, VnRuntimeDefinition } from "@v-ronpa/app-vn-runtime";
 import {
   limitVnRuntimeDiagnostics,
   useVnRuntimeWithDebug,
@@ -40,8 +40,8 @@ import {
   harnessShowcaseMaps,
   harnessShowcaseTrial
 } from "../harness/showcase";
-import { harnessShowcaseScriptPath, harnessShowcaseVnEntry } from "../harness/contentManifest";
-import { harnessScriptSourcesByPath } from "../harness/generatedAssets";
+import { harnessShowcaseVnEntry } from "../harness/contentManifest";
+import { harnessScriptCatalog } from "../harness/generatedAssets";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../harness/inputActions";
 import { useFirstPersonExplorationBridge } from "../harness/useFirstPersonExplorationBridge";
 import type { AudioPort, VideoPort } from "@v-ronpa/media-save";
@@ -129,13 +129,12 @@ export function useHarnessShowcaseRuntimeAdapter(
     setLastAction(action);
     setLastOutcome(outcome);
   }, []);
-  const runtimeEntry = useMemo(
-    () => ({ ...harnessShowcaseVnEntry, profile: options.profile ?? "vn2d" }),
+  const runtimeDefinition = useMemo<VnRuntimeDefinition>(
+    () => ({
+      entry: { ...harnessShowcaseVnEntry, profile: options.profile ?? "vn2d" },
+      catalog: harnessScriptCatalog
+    }),
     [options.profile]
-  );
-  const runtimeCatalog = useMemo(
-    () => [harnessScriptSourcesByPath[harnessShowcaseScriptPath]!],
-    []
   );
   const runtime = useVnRuntimeWithDebug({
     ...(assetResolver ? { assetResolver } : {}),
@@ -143,8 +142,8 @@ export function useHarnessShowcaseRuntimeAdapter(
     ...(options.dialogRevealSettings ? { dialogRevealSettings: options.dialogRevealSettings } : {}),
     ...(options.dialogueBleepConfig ? { dialogueBleepConfig: options.dialogueBleepConfig } : {}),
     ...(options.dialogueBleepSettings ? { dialogueBleepSettings: options.dialogueBleepSettings } : {}),
-    entry: runtimeEntry,
-    catalog: runtimeCatalog,
+    entry: runtimeDefinition.entry,
+    catalog: runtimeDefinition.catalog,
     gameId: "game-harness",
     onGameplayEvents: applyRuntimeGameplayEvents,
     onRuntimeStatus: recordRuntimeStatus,

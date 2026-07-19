@@ -9,8 +9,20 @@ import {
   calculateLayeredCharacterBounds,
   resolveLayeredCharacter,
   resolveLayeredCharacterLayerRefs,
-  resolveLayeredCharacterSourcePixelScale
+  resolveLayeredCharacterSourcePixelScale,
+  stabilizeLayeredCharacterPreloadPlan
 } from "./index";
+
+describe("layered character preload-plan identity", () => {
+  it("reuses equal plans and replaces changed plans", () => {
+    const installed = [{ characterId: "alice", appearanceExpressions: ["Smile"] }];
+    const equal = [{ characterId: "alice", appearanceExpressions: ["Smile"] }];
+    const changed = [{ characterId: "alice", appearanceExpressions: ["Angry"] }];
+
+    expect(stabilizeLayeredCharacterPreloadPlan(installed, equal)).toBe(installed);
+    expect(stabilizeLayeredCharacterPreloadPlan(installed, changed)).toBe(changed);
+  });
+});
 
 describe("layered character resolver", () => {
   it("resolves default composition and layered expression tokens", () => {

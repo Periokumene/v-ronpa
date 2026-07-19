@@ -6,20 +6,19 @@ import {
   harnessFontFaces,
   harnessRuntimeAssetFragments,
   harnessRuntimeAssets,
+  harnessVnEntryLocator,
   harnessScriptMetadataByPath
 } from "./generatedAssets";
 
-export const harnessShowcaseScriptPath = "harness/harness-showcase.nani";
+export const harnessShowcaseScriptPath = harnessVnEntryLocator.initialScriptPath;
 const harnessShowcaseScriptMetadata = harnessScriptMetadataByPath[harnessShowcaseScriptPath];
 if (!harnessShowcaseScriptMetadata) throw new Error(`Missing generated metadata for '${harnessShowcaseScriptPath}'.`);
 
 export const harnessShowcaseCharacterPreloadPlan = harnessShowcaseScriptMetadata.characterPreloadPlan;
 
 export const harnessShowcaseVnEntry = {
-  id: "vn:harness-showcase",
+  ...harnessVnEntryLocator,
   title: "Harness Showcase",
-  initialScriptPath: harnessShowcaseScriptPath,
-  startLabel: "Start",
   profile: "vn2d" as const,
   assetRefs: harnessShowcaseScriptMetadata.assetRefs
 };

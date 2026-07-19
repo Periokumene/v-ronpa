@@ -86,7 +86,7 @@ export interface VnDebugLabelOutlineItem {
   anchor: VnDebugTargetAnchor;
 }
 
-export interface VnDebugEntryInspection {
+export interface VnDebugScriptInspection {
   entry: VnEntryDef;
   source: VnRuntimeScriptSource;
   declaredRevisionMatches: boolean;
@@ -120,9 +120,10 @@ export interface VnDebugDecisionTrace {
 export const EMPTY_VN_DEBUG_DECISION_TRACE: VnDebugDecisionTrace = { choices: [], inputs: [] };
 
 interface VnDebugMaterializationBase {
-  inspection: VnDebugEntryInspection;
+  inspection: VnDebugScriptInspection;
   diagnostics: VnRuntimeDiagnostic[];
   executedInstructions: number;
+  executedScriptPaths: string[];
   degraded: boolean;
   target: VnDebugTargetAnchor;
   lastStableAnchor?: VnDebugTargetAnchor;
@@ -187,7 +188,7 @@ export interface MaterializeVnDebugTargetInput {
   target: VnDebugTargetAnchor;
   decisions?: VnDebugDecisionTrace;
   expectedRevision?: string;
-  inspection?: VnDebugEntryInspection;
+  inspection?: VnDebugScriptInspection;
   maxInstructions?: number;
   nowMs?: number;
   profile?: VnRuntimeProfile;
@@ -195,10 +196,10 @@ export interface MaterializeVnDebugTargetInput {
   signal?: AbortSignal;
 }
 
-export async function inspectVnDebugEntry(
+export async function inspectVnDebugScript(
   entry: VnEntryDef,
   source: VnRuntimeScriptSource
-): Promise<VnDebugEntryInspection> {
+): Promise<VnDebugScriptInspection> {
   const parsed = parseScenario({ sourceText: source.sourceText, scriptPath: source.scriptPath });
   const compiled = compileRuntimeScript(parsed);
   const revision = await digestRuntimeScriptSemantics(compiled.script);
@@ -277,7 +278,7 @@ export async function materializeVnDebugTarget({
   signal,
   target
 }: MaterializeVnDebugTargetInput): Promise<VnDebugMaterializationResult> {
-  const inspections = await Promise.all(catalog.map((source) => inspectVnDebugEntry(entry, source)));
+  const inspections = await Promise.all(catalog.map((source) => inspectVnDebugScript(entry, source)));
   const inspectionsByPath = new Map(inspections.map((candidate) => [candidate.source.scriptPath, candidate]));
   if (providedInspection) inspectionsByPath.set(providedInspection.source.scriptPath, providedInspection);
   const inspection = inspectionsByPath.get(target.scriptPath) ?? providedInspection ?? inspections[0];
@@ -286,12 +287,14 @@ export async function materializeVnDebugTarget({
     inspection,
     diagnostics,
     executedInstructions,
+    executedScriptPaths: [...new Set(executedScriptPaths)],
     degraded,
     target,
     ...(lastStableAnchor ? { lastStableAnchor } : {})
   });
   let diagnostics = [...inspection.diagnostics];
   let executedInstructions = 0;
+  let executedScriptPaths: string[] = [];
   let degraded = inspection.diagnostics.some(
     (diagnostic) => diagnostic.severity === "warning" && diagnostic.code !== "declared-only-command"
   );
@@ -353,6 +356,7 @@ export async function materializeVnDebugTarget({
   });
   let session = boot.session;
   let currentInspection = initialInspection;
+  executedScriptPaths = [initialInspection.source.scriptPath];
   let pixiStage = createInitialPixiStageSnapshot();
   let mediaState = createInitialMediaRuntimeState();
   let uiState = createInitialUiRuntimeState();
@@ -465,6 +469,7 @@ export async function materializeVnDebugTarget({
         if (!navigation.ok) return blocked(base(), "catalog-link-error", navigation.message);
         session = navigation.session;
         currentInspection = navigation.inspection;
+        executedScriptPaths.push(navigation.inspection.source.scriptPath);
       } else {
         session = resolved.session;
       }
@@ -519,7 +524,7 @@ export async function materializeVnDebugTarget({
       return blocked(base(), "expression-error", `@${command.canonicalName} could not be projected deterministically.`);
     }
     if (projected.transient.gameplayEvents.length > 0) {
-      return blocked(base(), "gameplay-event", "A gameplay event was encountered before the target; Game A cannot restore host state atomically.");
+      return blocked(base(), "gameplay-event", "A gameplay event was encountered before the target; the debug materializer cannot restore host-owned gameplay state atomically.");
     }
     if (commandInspection.previewability === "degraded" || stepDiagnostics.length > 0) degraded = true;
     session = projected.session;
@@ -542,6 +547,7 @@ export async function materializeVnDebugTarget({
       if (!navigation.ok) return blocked(base(), "catalog-link-error", navigation.message);
       session = navigation.session;
       currentInspection = navigation.inspection;
+      executedScriptPaths.push(navigation.inspection.source.scriptPath);
       choiceGroupAnchor = undefined;
       continue;
     }
@@ -589,7 +595,7 @@ export async function materializeVnDebugTarget({
 }
 
 export function resolveVnDebugAnchor(
-  inspection: VnDebugEntryInspection,
+  inspection: VnDebugScriptInspection,
   anchor: VnDebugTargetAnchor
 ): VnDebugTargetAnchor | undefined {
   if (anchor.scriptPath !== inspection.source.scriptPath) return undefined;
@@ -670,7 +676,7 @@ function stableCommandId(command: RuntimeCommand): string | undefined {
 }
 
 function createChoiceGroupDecisionAnchor(
-  inspection: VnDebugEntryInspection,
+  inspection: VnDebugScriptInspection,
   commandIndex: number
 ): VnDebugTargetAnchor {
   const commandAnchor = inspection.commands[commandIndex]!.anchor;
@@ -713,7 +719,7 @@ function createChoiceGroupDecisionAnchor(
 
 function classifyVnDebugCommand(command: RuntimeCommand): { previewability: VnDebugPreviewability; reason?: string } {
   if (command.commandId === "gameplay") {
-    return { previewability: "blocked", reason: "Game A cannot atomically restore gameplay host state in this version." };
+    return { previewability: "blocked", reason: "The debug materializer cannot atomically restore host-owned gameplay state." };
   }
   if (command.status !== "implemented") {
     return { previewability: "degraded", reason: `@${command.canonicalName} is stubbed and is materialized as the formal runtime no-op.` };
@@ -782,9 +788,9 @@ function selectChoiceDecisionIndex(
 function switchDebugNavigation(
   session: VnSessionState,
   endpoint: string,
-  inspectionsByPath: ReadonlyMap<string, VnDebugEntryInspection>
+  inspectionsByPath: ReadonlyMap<string, VnDebugScriptInspection>
 ):
-  | { ok: true; session: VnSessionState; inspection: VnDebugEntryInspection }
+  | { ok: true; session: VnSessionState; inspection: VnDebugScriptInspection }
   | { ok: false; message: string } {
   const parsed = parseStaticNaniEndpoint(endpoint, session.script.scriptPath);
   if (!parsed.ok) return { ok: false, message: parsed.message };

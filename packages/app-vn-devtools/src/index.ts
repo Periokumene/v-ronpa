@@ -93,3 +93,35 @@ export type {
   VnDevtoolsCandidateCatalogValidation,
   VnDevtoolsScriptCandidate
 } from "./scriptCandidate";
+export {
+  canRollbackVnDevtoolsHostCommit,
+  createVnDevtoolsHostCommitSettlement,
+  installVnDevtoolsHostCommit,
+  linearizeVnDevtoolsHostCommitAcceptance,
+  reconcileVnDevtoolsDefinitionRollback
+} from "./hostTransaction";
+export type {
+  VnDevtoolsDeferredDefinitionRollback,
+  VnDevtoolsDefinitionRollbackReconciliation,
+  VnDevtoolsHostCommitInstallResult,
+  VnDevtoolsHostCommitSettlement
+} from "./hostTransaction";
+export { useVnDevtoolsDefinitionState } from "./useVnDevtoolsDefinitionState";
+export type {
+  VnDevtoolsDefinitionState,
+  VnDevtoolsPendingHostCommit
+} from "./useVnDevtoolsDefinitionState";
+export {
+  stabilizeVnDevtoolsScriptCatalog,
+  useVnDevtoolsHostTransaction
+} from "./useVnDevtoolsHostTransaction";
+export type {
+  PrepareVnDevtoolsDefinitionInput,
+  UseVnDevtoolsHostTransactionOptions,
+  VnDevtoolsHostMutationCallbacks
+} from "./useVnDevtoolsHostTransaction";
+export {
+  classifyVnDevtoolsScriptUpdateImpact,
+  prepareVnDevtoolsCandidateUpdate
+} from "./candidateUpdates";
+export type { VnDevtoolsScriptUpdateImpact } from "./candidateUpdates";

@@ -7,11 +7,11 @@ import type {
 } from "@v-ronpa/app-vn-runtime";
 import {
   EMPTY_VN_DEBUG_DECISION_TRACE,
-  inspectVnDebugEntry,
+  inspectVnDebugScript,
   materializeVnDebugTarget,
   type VnDebugDecisionTrace,
   type VnDebugChoiceDecision,
-  type VnDebugEntryInspection,
+  type VnDebugScriptInspection,
   type VnDebugInputDecision,
   type VnDebugMaterializationResult,
   type VnDebugMaterializationDecisionRequired,
@@ -32,7 +32,7 @@ import {
   shouldAdoptCanonicalInitialEntry
 } from "./sourceUpdates";
 import {
-  isVnDevtoolsUpdateRuntimeActive,
+  classifyVnDevtoolsScriptUpdateImpact,
   prepareVnDevtoolsCandidateUpdate
 } from "./candidateUpdates";
 import { prepareVnDevtoolsInitialCandidate } from "./initialCandidate";
@@ -50,11 +50,10 @@ import {
   canReauthorizeVnDevtoolsInspection,
   createInstallableVnDevtoolsInspectionDisplay,
   createReadOnlyVnDevtoolsInspectionDisplay,
-  createVnDevtoolsPreviewAuthorization,
   resolveCurrentVnDevtoolsAnchor,
   vnDebugAnchorIdentity,
   vnDebugAnchorsEqual,
-  vnDebugEntryIdentity,
+  vnDebugScriptIdentity,
   type VnDevtoolsInspectionDisplay
 } from "./controllerSafety";
 import type {
@@ -80,6 +79,7 @@ import {
   createVnDevtoolsScriptCandidate,
   type VnDevtoolsScriptCandidate
 } from "./scriptCandidate";
+import { createVnDevtoolsScriptAuthorityCoordinator } from "./scriptAuthorityCoordinator";
 
 export interface VnDevtoolsRuntimeObservation {
   shell: Pick<VnRuntimeShellPort, "interactionFacts" | "storyRuntime" | "uiRuntime">;
@@ -113,16 +113,16 @@ export interface UseVnDevtoolsControllerOptions {
 
 interface PendingDecisionContext {
   result: VnDebugMaterializationDecisionRequired;
-  inspection: VnDebugEntryInspection;
+  inspection: VnDebugScriptInspection;
   target: VnDebugTargetAnchor;
   expectedRevision?: string;
 }
 
 type VnDevtoolsHostMutation =
-  | { kind: "adopt"; entry: VnDevtoolsScriptCandidate }
+  | { kind: "adopt"; candidate: VnDevtoolsScriptCandidate }
   | {
       kind: "commit";
-      entry: VnDevtoolsScriptCandidate;
+      candidate: VnDevtoolsScriptCandidate;
       checkpoint: SaveableVnState;
       onAccepted: () => void;
     };
@@ -136,16 +136,10 @@ interface VnDevtoolsSessionSnapshot {
   viewedScriptPath: string;
 }
 
-interface CachedVnDevtoolsScriptDisplay {
-  display: VnDevtoolsInspectionDisplay;
-  diagnostics: VnDevtoolsDiagnostic[];
-  status: VnDevtoolsStatus;
-}
-
 /**
  * Reusable controller for source inspection, latest-wins updates, decisions,
- * stable materialization, and tab-local workbench state. Apps retain only the
- * atomic entry/checkpoint commit and flow transition.
+ * stable materialization, shared host transactions, and tab-local workbench
+ * state. Apps retain only definition decoration, restore identity, and Flow.
  */
 export function useVnDevtoolsController({
   adoptCandidate,
@@ -202,27 +196,21 @@ export function useVnDevtoolsController({
   const [lastCheckpoint, setLastCheckpoint] = useState<SaveableVnState | undefined>(undefined);
   const lastCheckpointRef = useRef<SaveableVnState | undefined>(undefined);
   const [hasUpdateBadge, setHasUpdateBadge] = useState(false);
-  const [updatedScriptPaths, setUpdatedScriptPaths] = useState<ReadonlySet<string>>(() => new Set());
+  const [, setScriptAuthorityRevision] = useState(0);
   const [bridgeDiagnostics, setBridgeDiagnostics] = useState<VnDevtoolsDiagnostic[]>([]);
-  const cachedScriptDisplaysRef = useRef(new Map<string, CachedVnDevtoolsScriptDisplay>());
-  const viewedScriptPathRef = useRef(viewedScriptPath);
-  viewedScriptPathRef.current = viewedScriptPath;
-  const runtimeScriptHistoryRef = useRef({
-    storySession: runtime.presentation.storySession,
-    paths: new Set<string>()
-  });
-  if (runtimeScriptHistoryRef.current.storySession !== runtime.presentation.storySession) {
-    runtimeScriptHistoryRef.current = {
-      storySession: runtime.presentation.storySession,
-      paths: new Set<string>()
-    };
+  const scriptAuthorityRef = useRef<ReturnType<typeof createVnDevtoolsScriptAuthorityCoordinator> | undefined>(undefined);
+  if (!scriptAuthorityRef.current) {
+    scriptAuthorityRef.current = createVnDevtoolsScriptAuthorityCoordinator(viewedScriptPath);
   }
-  if (vnActive) {
-    runtimeScriptHistoryRef.current.paths.add(runtime.shell.storyRuntime.state.currentScriptPath);
-  } else {
-    runtimeScriptHistoryRef.current.paths.clear();
-  }
-  const previewAuthorizationRef = useRef(createVnDevtoolsPreviewAuthorization());
+  const scriptAuthority = scriptAuthorityRef.current;
+  scriptAuthority.view(viewedScriptPath);
+  const updatedScriptPaths = scriptAuthority.updatedScriptPaths();
+  const storySessionRef = useRef(runtime.presentation.storySession);
+  storySessionRef.current = runtime.presentation.storySession;
+  const installedMaterializationProvenanceRef = useRef<{
+    storySession: number;
+    executedScriptPaths: readonly string[];
+  } | undefined>(undefined);
   const latestTasksRef = useRef(createVnDevtoolsLatestTaskController());
   const updateGateRef = useRef(createVnDevtoolsMonotonicUpdateGate());
   const adoptCandidateRef = useRef(adoptCandidate);
@@ -231,15 +219,13 @@ export function useVnDevtoolsController({
   commitCandidateRef.current = commitCandidate;
   const hostMutationQueueRef = useRef(createVnDevtoolsSerialCommitQueue<VnDevtoolsHostMutation>(
     (value, signal) => {
-      if (value.kind === "adopt") return Promise.resolve(adoptCandidateRef.current(value.entry, signal));
-      return commitCandidateRef.current(value.entry, value.checkpoint, signal, value.onAccepted);
+      if (value.kind === "adopt") return Promise.resolve(adoptCandidateRef.current(value.candidate, signal));
+      return commitCandidateRef.current(value.candidate, value.checkpoint, signal, value.onAccepted);
     }
   ));
-  const initializedEntriesRef = useRef(new Map<string, string>());
-  const expectedHostEntryIdentitiesRef = useRef(new Set<string>());
   const hostCommitInFlightRef = useRef<number | undefined>(undefined);
   const selectedTargetRef = useRef<VnDebugTargetAnchor | undefined>(undefined);
-  const selectionInspectionRef = useRef<VnDebugEntryInspection | undefined>(undefined);
+  const selectionInspectionRef = useRef<VnDebugScriptInspection | undefined>(undefined);
   const sessionSnapshotRef = useRef<VnDevtoolsSessionSnapshot>({
     collapsed: initialSession.collapsed,
     width: initialSession.width,
@@ -328,7 +314,7 @@ export function useVnDevtoolsController({
     message,
     expectedRevision
   }: {
-    candidateInspection: VnDebugEntryInspection;
+    candidateInspection: VnDebugScriptInspection;
     result: Extract<Awaited<ReturnType<typeof materializeVnDebugTarget>>, { status: "ready" }>;
     task: ReturnType<ReturnType<typeof createVnDevtoolsLatestTaskController>["begin"]>;
     updateId?: number;
@@ -337,20 +323,20 @@ export function useVnDevtoolsController({
   }) => {
     if (!task.isCurrent()) return;
     const candidatePath = candidateInspection.source.scriptPath;
-    const previousInitializedIdentity = initializedEntriesRef.current.get(candidatePath);
+    const previousInitializedIdentity = scriptAuthority.installedIdentity(candidatePath);
     const candidate = candidateFromVnDebugInspection(entry, candidateInspection);
-    const candidateIdentity = entryIdentity(candidate);
+    const candidateIdentity = scriptCandidateIdentity(candidate);
     let acceptedFixedPoint: VnDevtoolsAcceptedFixedPoint<VnDebugTargetAnchor, SaveableVnState> | undefined;
     let hostError: unknown;
-    // Mark the candidate before the host renders it so the entry-observation
+    // Mark the candidate before the host renders it so the definition-observation
     // effect cannot start a duplicate restore during the atomic commit window.
-    initializedEntriesRef.current.set(candidatePath, candidateIdentity);
-    expectedHostEntryIdentitiesRef.current.add(candidateIdentity);
+    scriptAuthority.install(candidatePath, candidateIdentity);
+    scriptAuthority.expectHost(candidateIdentity);
     let committed = false;
     try {
       committed = await hostMutationQueueRef.current.enqueue({
         kind: "commit",
-        entry: candidate,
+        candidate,
         checkpoint: result.checkpoint,
         onAccepted() {
           if (acceptedFixedPoint) return;
@@ -375,13 +361,13 @@ export function useVnDevtoolsController({
       }
     }
     if (!committed) {
-      expectedHostEntryIdentitiesRef.current.delete(candidateIdentity);
+      scriptAuthority.rejectHost(candidateIdentity);
       if (acceptedFixedPoint) fixedPointCoordinatorRef.current!.rollback(acceptedFixedPoint);
-      if (initializedEntriesRef.current.get(candidatePath) === candidateIdentity) {
+      if (scriptAuthority.installedIdentity(candidatePath) === candidateIdentity) {
         if (previousInitializedIdentity) {
-          initializedEntriesRef.current.set(candidatePath, previousInitializedIdentity);
+          scriptAuthority.install(candidatePath, previousInitializedIdentity);
         } else {
-          initializedEntriesRef.current.delete(candidatePath);
+          scriptAuthority.clearInstalled(candidatePath);
         }
       }
       if (task.isCurrent()) {
@@ -397,6 +383,10 @@ export function useVnDevtoolsController({
     // A user may explicitly unpin after host acceptance. Do not resurrect that
     // target when the already-accepted restore finishes.
     if (acceptedFixedPoint) fixedPointCoordinatorRef.current!.complete(acceptedFixedPoint, result.checkpoint);
+    installedMaterializationProvenanceRef.current = {
+      storySession: storySessionRef.current,
+      executedScriptPaths: result.executedScriptPaths
+    };
     if (!task.isCurrent()) return;
     const installedDisplay = createInstallableVnDevtoolsInspectionDisplay(candidateInspection, expectedRevision);
     const nextStatus: VnDevtoolsStatus = {
@@ -405,23 +395,20 @@ export function useVnDevtoolsController({
       degraded: result.degraded,
       ...(updateId !== undefined ? { updateId } : {})
     };
-    cachedScriptDisplaysRef.current.set(candidatePath, {
+    scriptAuthority.cache(candidatePath, {
       display: installedDisplay,
       diagnostics: [],
       status: nextStatus
     });
-    if (candidatePath === viewedScriptPathRef.current) {
-      previewAuthorizationRef.current.authorize();
+    if (candidatePath === scriptAuthority.viewedScriptPath()) {
+      scriptAuthority.authorizePreview(candidatePath);
       setInspectionDisplay(installedDisplay);
       setHasUpdateBadge(false);
-      setUpdatedScriptPaths((current) => {
-        const next = new Set(current);
-        next.delete(candidatePath);
-        return next;
-      });
+      scriptAuthority.clearUpdated(candidatePath);
+      setScriptAuthorityRevision((current) => current + 1);
     }
     setStatus(nextStatus);
-  }, [entry, installFixedPoint]);
+  }, [entry, installFixedPoint, scriptAuthority]);
 
   const handleMaterializationResult = useCallback(async ({
     candidateInspection,
@@ -430,7 +417,7 @@ export function useVnDevtoolsController({
     task,
     updateId
   }: {
-    candidateInspection: VnDebugEntryInspection;
+    candidateInspection: VnDebugScriptInspection;
     expectedRevision?: string;
     result: VnDebugMaterializationResult;
     task: ReturnType<ReturnType<typeof createVnDevtoolsLatestTaskController>["begin"]>;
@@ -478,7 +465,7 @@ export function useVnDevtoolsController({
     target,
     updateId
   }: {
-    candidateInspection: VnDebugEntryInspection;
+    candidateInspection: VnDebugScriptInspection;
     expectedRevision?: string;
     target: VnDebugTargetAnchor;
     updateId?: number;
@@ -514,17 +501,14 @@ export function useVnDevtoolsController({
   }, [entry, handleMaterializationResult]);
 
   useEffect(() => {
-    const identity = entryIdentity(entry);
-    if (expectedHostEntryIdentitiesRef.current.delete(identity)) {
-      initializedEntriesRef.current.set(entry.source.scriptPath, identity);
-      return;
-    }
-    if (initializedEntriesRef.current.get(entry.source.scriptPath) === identity) return;
+    const identity = scriptCandidateIdentity(entry);
+    if (scriptAuthority.observeHost(entry.source.scriptPath, identity)) return;
+    if (scriptAuthority.installedIdentity(entry.source.scriptPath) === identity) return;
     const task = latestTasksRef.current.begin();
     const persistedTarget = persistedTargetRestoreCompletedRef.current
       ? undefined
       : initialSession.pinnedTarget;
-    previewAuthorizationRef.current.freeze();
+    scriptAuthority.freezePreview(entry.source.scriptPath);
     setInspectionDisplay((current) => current
       ? createReadOnlyVnDevtoolsInspectionDisplay(current.inspection)
       : current);
@@ -542,21 +526,28 @@ export function useVnDevtoolsController({
       }).then(async (prepared) => {
         if (!task.isCurrent()) return;
         persistedTargetRestoreCompletedRef.current = true;
-        initializedEntriesRef.current.set(entry.source.scriptPath, identity);
+        scriptAuthority.install(entry.source.scriptPath, identity);
         if (prepared.kind === "retain-read-only") {
-          previewAuthorizationRef.current.freeze();
-          setInspectionDisplay(createReadOnlyVnDevtoolsInspectionDisplay(prepared.inspection));
-          setStatus({
+          scriptAuthority.freezePreview(entry.source.scriptPath);
+          const display = createReadOnlyVnDevtoolsInspectionDisplay(prepared.inspection);
+          const nextStatus: VnDevtoolsStatus = {
             phase: prepared.reason === "invalid-source" || prepared.reason === "catalog-link-error"
               ? "error"
               : "blocked",
             message: prepared.message ?? initialCandidateFailureMessage(prepared.reason),
             degraded: prepared.inspection.degraded
+          };
+          scriptAuthority.cache(entry.source.scriptPath, {
+            display,
+            diagnostics: toBridgeDiagnostics(initialCandidate.diagnostics, "initial"),
+            status: nextStatus
           });
+          setInspectionDisplay(display);
+          setStatus(nextStatus);
           return;
         }
         if (prepared.kind === "materialize-pinned-target") {
-          previewAuthorizationRef.current.authorize();
+          scriptAuthority.authorizePreview(entry.source.scriptPath);
           setInspectionDisplay(createInstallableVnDevtoolsInspectionDisplay(
             prepared.inspection,
             prepared.expectedRevision
@@ -571,42 +562,49 @@ export function useVnDevtoolsController({
         }
         if (prepared.kind === "adopt-for-next-start") {
           const candidate = candidateFromVnDebugInspection(entry, prepared.inspection);
-          const candidateIdentity = entryIdentity(candidate);
-          expectedHostEntryIdentitiesRef.current.add(candidateIdentity);
+          const candidateIdentity = scriptCandidateIdentity(candidate);
+          scriptAuthority.expectHost(candidateIdentity);
           const adopted = await hostMutationQueueRef.current.enqueue({
             kind: "adopt",
-            entry: candidate
+            candidate
           }, task.signal);
-          if (!adopted) expectedHostEntryIdentitiesRef.current.delete(candidateIdentity);
+          if (!adopted) scriptAuthority.rejectHost(candidateIdentity);
           if (!task.isCurrent()) return;
           if (!adopted) {
             setInspectionDisplay(createReadOnlyVnDevtoolsInspectionDisplay(prepared.inspection));
             setStatus({
               phase: "blocked",
-              message: "The host rejected the verified initial source; the previous entry remains installed.",
+              message: "The host rejected the verified initial source; the previous definition remains installed.",
               degraded: prepared.inspection.degraded
             });
             return;
           }
-          initializedEntriesRef.current.set(candidate.source.scriptPath, candidateIdentity);
-          previewAuthorizationRef.current.authorize();
-          setInspectionDisplay(createInstallableVnDevtoolsInspectionDisplay(
+          scriptAuthority.install(candidate.source.scriptPath, candidateIdentity);
+          scriptAuthority.authorizePreview(candidate.source.scriptPath);
+          const display = createInstallableVnDevtoolsInspectionDisplay(
             prepared.inspection,
             prepared.expectedRevision
-          ));
-          setStatus({
+          );
+          const nextStatus: VnDevtoolsStatus = {
             phase: "ready",
             message: "Verified initial source adopted for the next New Game.",
             degraded: prepared.inspection.degraded
+          };
+          scriptAuthority.cache(entry.source.scriptPath, {
+            display,
+            diagnostics: toBridgeDiagnostics(initialCandidate.diagnostics, "initial"),
+            status: nextStatus
           });
+          setInspectionDisplay(display);
+          setStatus(nextStatus);
           return;
         }
-        previewAuthorizationRef.current.authorize();
-        setInspectionDisplay(createInstallableVnDevtoolsInspectionDisplay(
+        scriptAuthority.authorizePreview(entry.source.scriptPath);
+        const display = createInstallableVnDevtoolsInspectionDisplay(
           prepared.inspection,
           prepared.expectedRevision
-        ));
-        setStatus(prepared.kind === "require-preview-target"
+        );
+        const nextStatus: VnDevtoolsStatus = prepared.kind === "require-preview-target"
           ? {
               phase: "blocked",
               message: "The verified initial source changed while VN is active. Preview a line before installing it.",
@@ -616,7 +614,14 @@ export function useVnDevtoolsController({
               phase: "ready",
               message: "Initial source revision verified by the server and browser. Choose a line and press Preview.",
               degraded: prepared.inspection.degraded
-            });
+            };
+        scriptAuthority.cache(entry.source.scriptPath, {
+          display,
+          diagnostics: toBridgeDiagnostics(initialCandidate.diagnostics, "initial"),
+          status: nextStatus
+        });
+        setInspectionDisplay(display);
+        setStatus(nextStatus);
       }).catch((error: unknown) => {
         if (error instanceof Error && error.name === "AbortError") return;
         if (!task.isCurrent()) return;
@@ -628,24 +633,27 @@ export function useVnDevtoolsController({
       return;
     }
     if (updateSource) {
-      void inspectVnDebugEntry(entry.entry, entry.source).then((nextInspection) => {
+      void inspectVnDebugScript(entry.entry, entry.source).then((nextInspection) => {
         if (!task.isCurrent()) return;
         persistedTargetRestoreCompletedRef.current = true;
-        initializedEntriesRef.current.set(entry.source.scriptPath, identity);
-        previewAuthorizationRef.current.freeze();
-        setInspectionDisplay(createReadOnlyVnDevtoolsInspectionDisplay(nextInspection));
-        setStatus({
+        scriptAuthority.install(entry.source.scriptPath, identity);
+        scriptAuthority.freezePreview(entry.source.scriptPath);
+        const display = createReadOnlyVnDevtoolsInspectionDisplay(nextInspection);
+        const nextStatus: VnDevtoolsStatus = {
           phase: "blocked",
           message: "The Vite server did not provide an initial source handshake; restore and adoption are disabled."
-        });
+        };
+        scriptAuthority.cache(entry.source.scriptPath, { display, diagnostics: [], status: nextStatus });
+        setInspectionDisplay(display);
+        setStatus(nextStatus);
       });
       return;
     }
-    void inspectVnDebugEntry(entry.entry, entry.source).then(async (nextInspection) => {
+    void inspectVnDebugScript(entry.entry, entry.source).then(async (nextInspection) => {
       if (!task.isCurrent()) return;
       persistedTargetRestoreCompletedRef.current = true;
-      initializedEntriesRef.current.set(entry.source.scriptPath, identity);
-      previewAuthorizationRef.current.authorize(nextInspection.canMaterialize);
+      scriptAuthority.install(entry.source.scriptPath, identity);
+      scriptAuthority.authorizePreview(entry.source.scriptPath, nextInspection.canMaterialize);
       setInspectionDisplay(nextInspection.canMaterialize
         ? createInstallableVnDevtoolsInspectionDisplay(nextInspection)
         : createReadOnlyVnDevtoolsInspectionDisplay(nextInspection));
@@ -665,23 +673,23 @@ export function useVnDevtoolsController({
           vnActive
         })) {
           const candidate = candidateFromVnDebugInspection(entry, nextInspection);
-          const candidateIdentity = entryIdentity(candidate);
-          expectedHostEntryIdentitiesRef.current.add(candidateIdentity);
+          const candidateIdentity = scriptCandidateIdentity(candidate);
+          scriptAuthority.expectHost(candidateIdentity);
           const adopted = await hostMutationQueueRef.current.enqueue({
             kind: "adopt",
-            entry: candidate
+            candidate
           }, task.signal);
-          if (!adopted) expectedHostEntryIdentitiesRef.current.delete(candidateIdentity);
+          if (!adopted) scriptAuthority.rejectHost(candidateIdentity);
           if (!task.isCurrent()) return;
           if (!adopted) {
             setStatus({
               phase: "blocked",
-              message: "The host rejected the canonical source revision; the previous entry remains installed.",
+              message: "The host rejected the canonical source revision; the previous definition remains installed.",
               degraded: nextInspection.degraded
             });
             return;
           }
-          initializedEntriesRef.current.set(candidate.source.scriptPath, candidateIdentity);
+          scriptAuthority.install(candidate.source.scriptPath, candidateIdentity);
           setStatus({
             phase: "ready",
             message: "Canonical source revision adopted for the next New Game.",
@@ -702,30 +710,28 @@ export function useVnDevtoolsController({
         degraded: nextInspection.degraded
       });
     });
-  }, [entry, handleMaterializationResult, initialCandidate, initialSession.pinnedTarget, runMaterialization, updateSource, vnActive]);
+  }, [entry, handleMaterializationResult, initialCandidate, initialSession.pinnedTarget, runMaterialization, scriptAuthority, updateSource, vnActive]);
 
   const handleSourceUpdate = useCallback((update: NaniDevtoolsViteUpdate) => {
       const updateCandidate = createVnDevtoolsScriptCandidate(entryDefinition, catalog, update.scriptPath);
       if (update.entryId !== entryDefinition.id || !updateCandidate) return;
       if (!updateGateRef.current.accept(update.updateId)) return;
-      const updateIsViewed = update.scriptPath === viewedScriptPathRef.current;
-      const markScriptUpdated = () => setUpdatedScriptPaths((current) => {
-        const next = new Set(current);
-        next.add(update.scriptPath);
-        return next;
-      });
+      const updateIsViewed = update.scriptPath === scriptAuthority.viewedScriptPath();
       // Freeze synchronously. React may not have committed the read-only
       // display before a user click, so the ref is the authoritative guard
       // against previewing stale source while this updateId is being consumed.
       if (updateIsViewed) {
-        previewAuthorizationRef.current.freeze();
+        scriptAuthority.freezePreview(update.scriptPath);
         setInspectionDisplay((current) => current
           ? createReadOnlyVnDevtoolsInspectionDisplay(current.inspection)
           : current);
       }
-      const task = latestTasksRef.current.begin();
+      const task = updateIsViewed
+        ? latestTasksRef.current.begin()
+        : scriptAuthority.beginTask(update.scriptPath);
       const updateDiagnostics = toBridgeDiagnostics(update.diagnostics, String(update.updateId));
-      markScriptUpdated();
+      scriptAuthority.markUpdated(update.scriptPath);
+      setScriptAuthorityRevision((current) => current + 1);
       if (updateIsViewed) {
         setPendingDecision(undefined);
         setBridgeDiagnostics(updateDiagnostics);
@@ -738,21 +744,25 @@ export function useVnDevtoolsController({
         });
       }
       const fixedTarget = armedTargetRef.current;
+      const installedProvenance = installedMaterializationProvenanceRef.current;
+      const executedScriptPaths = installedProvenance?.storySession === runtime.presentation.storySession
+        ? [...runtime.shell.storyRuntime.executedScriptPaths, ...installedProvenance.executedScriptPaths]
+        : runtime.shell.storyRuntime.executedScriptPaths;
       void prepareVnDevtoolsCandidateUpdate({
         activeCandidate: updateCandidate,
         update,
         ...(fixedTarget ? { pinnedTarget: fixedTarget } : {}),
         decisions: sessionSnapshotRef.current.decisions,
-        vnActive: isVnDevtoolsUpdateRuntimeActive({
-          hasFixedPoint: Boolean(fixedTarget),
+        impact: classifyVnDevtoolsScriptUpdateImpact({
+          executedScriptPaths,
           runtimeScriptPath: runtime.shell.storyRuntime.state.currentScriptPath,
-          runtimeVisitedScriptPaths: runtimeScriptHistoryRef.current.paths,
           updatedScriptPath: update.scriptPath,
           vnActive
         }),
         signal: task.signal
       }).then(async (prepared) => {
         if (!task.isCurrent()) return;
+        const isUpdateViewed = () => update.scriptPath === scriptAuthority.viewedScriptPath();
         if (prepared.kind === "retain-last-known-good") {
           const display = createReadOnlyVnDevtoolsInspectionDisplay(prepared.inspection);
           const nextStatus: VnDevtoolsStatus = {
@@ -765,13 +775,13 @@ export function useVnDevtoolsController({
             updateId: update.updateId,
             degraded: prepared.inspection.degraded
           };
-          cachedScriptDisplaysRef.current.set(update.scriptPath, {
+          scriptAuthority.cache(update.scriptPath, {
             display,
             diagnostics: updateDiagnostics,
             status: nextStatus
           });
-          if (updateIsViewed) {
-            previewAuthorizationRef.current.freeze();
+          if (isUpdateViewed()) {
+            scriptAuthority.freezePreview(update.scriptPath);
             setInspectionDisplay(display);
             setStatus(nextStatus);
           }
@@ -781,8 +791,8 @@ export function useVnDevtoolsController({
           prepared.inspection,
           prepared.expectedRevision
         );
-        if (updateIsViewed) {
-          previewAuthorizationRef.current.authorize();
+        if (isUpdateViewed()) {
+          scriptAuthority.authorizePreview(update.scriptPath);
           setInspectionDisplay(candidateDisplay);
         }
         if (prepared.kind === "refresh-source-mapping") {
@@ -793,32 +803,32 @@ export function useVnDevtoolsController({
           ) {
             const nextStatus: VnDevtoolsStatus = {
               phase: "blocked",
-              message: "The fixed point no longer has a unique source match; the last-known-good entry remains installed.",
+              message: "The fixed point no longer has a unique source match; the last-known-good catalog remains installed.",
               updateId: update.updateId
             };
-            if (updateIsViewed) setStatus(nextStatus);
+            if (isUpdateViewed()) setStatus(nextStatus);
             return;
           }
           const candidate = candidateFromVnDebugInspection(updateCandidate, prepared.inspection);
-          const candidateIdentity = entryIdentity(candidate);
-          expectedHostEntryIdentitiesRef.current.add(candidateIdentity);
+          const candidateIdentity = scriptCandidateIdentity(candidate);
+          scriptAuthority.expectHost(candidateIdentity);
           const adopted = await hostMutationQueueRef.current.enqueue({
             kind: "adopt",
-            entry: candidate
+            candidate
           }, task.signal);
-          if (!adopted) expectedHostEntryIdentitiesRef.current.delete(candidateIdentity);
+          if (!adopted) scriptAuthority.rejectHost(candidateIdentity);
           if (!task.isCurrent()) return;
           if (!adopted) {
             const nextStatus: VnDevtoolsStatus = {
               phase: "blocked",
-              message: "The host rejected the source mapping update; the last-known-good entry remains installed.",
+              message: "The host rejected the source mapping update; the last-known-good catalog remains installed.",
               updateId: update.updateId
             };
-            if (updateIsViewed) setStatus(nextStatus);
+            if (isUpdateViewed()) setStatus(nextStatus);
             return;
           }
-          initializedEntriesRef.current.set(candidate.source.scriptPath, candidateIdentity);
-          cachedScriptDisplaysRef.current.set(update.scriptPath, {
+          scriptAuthority.install(candidate.source.scriptPath, candidateIdentity);
+          scriptAuthority.cache(update.scriptPath, {
             display: candidateDisplay,
             diagnostics: updateDiagnostics,
             status: {
@@ -830,14 +840,11 @@ export function useVnDevtoolsController({
           if (prepared.remappedTarget) {
             fixedPointCoordinatorRef.current!.replace(prepared.remappedTarget, lastCheckpointRef.current);
           }
-          if (updateIsViewed) {
+          if (isUpdateViewed()) {
             setStatus({ phase: "ready", message: "Source mapping updated; runtime presentation was not remounted.", updateId: update.updateId });
             setHasUpdateBadge(false);
-            setUpdatedScriptPaths((current) => {
-              const next = new Set(current);
-              next.delete(update.scriptPath);
-              return next;
-            });
+            scriptAuthority.clearUpdated(update.scriptPath);
+            setScriptAuthorityRevision((current) => current + 1);
           }
           return;
         }
@@ -851,50 +858,49 @@ export function useVnDevtoolsController({
           });
           return;
         }
-        if (prepared.kind === "adopt-for-next-start") {
+        if (prepared.kind === "adopt-catalog") {
           const candidate = candidateFromVnDebugInspection(updateCandidate, prepared.inspection);
-          const candidateIdentity = entryIdentity(candidate);
-          expectedHostEntryIdentitiesRef.current.add(candidateIdentity);
+          const candidateIdentity = scriptCandidateIdentity(candidate);
+          scriptAuthority.expectHost(candidateIdentity);
           const adopted = await hostMutationQueueRef.current.enqueue({
             kind: "adopt",
-            entry: candidate
+            candidate
           }, task.signal);
-          if (!adopted) expectedHostEntryIdentitiesRef.current.delete(candidateIdentity);
+          if (!adopted) scriptAuthority.rejectHost(candidateIdentity);
           if (!task.isCurrent()) return;
           if (!adopted) {
             const nextStatus: VnDevtoolsStatus = {
               phase: "blocked",
-              message: "The host rejected the source update; the previous entry remains installed.",
+              message: "The host rejected the source update; the previous definition remains installed.",
               updateId: update.updateId
             };
-            if (updateIsViewed) setStatus(nextStatus);
+            if (isUpdateViewed()) setStatus(nextStatus);
             return;
           }
-          initializedEntriesRef.current.set(candidate.source.scriptPath, candidateIdentity);
+          scriptAuthority.install(candidate.source.scriptPath, candidateIdentity);
           const nextStatus: VnDevtoolsStatus = {
             phase: "ready",
-            message: updateIsViewed
-              ? "New revision adopted for the next New Game."
+            message: isUpdateViewed()
+              ? prepared.impact === "next-start"
+                ? "New revision adopted for the next New Game."
+                : "Updated script installed for future navigation; the current session was unchanged."
               : "Updated script installed in the catalog for future navigation; the current session was unchanged.",
             updateId: update.updateId
           };
-          cachedScriptDisplaysRef.current.set(update.scriptPath, {
+          scriptAuthority.cache(update.scriptPath, {
             display: candidateDisplay,
             diagnostics: updateDiagnostics,
             status: nextStatus
           });
-          if (updateIsViewed) {
+          if (isUpdateViewed()) {
             setStatus(nextStatus);
             setHasUpdateBadge(false);
-            setUpdatedScriptPaths((current) => {
-              const next = new Set(current);
-              next.delete(update.scriptPath);
-              return next;
-            });
+            scriptAuthority.clearUpdated(update.scriptPath);
+            setScriptAuthorityRevision((current) => current + 1);
           }
           return;
         }
-        if (updateIsViewed) setStatus({
+        if (isUpdateViewed()) setStatus({
           phase: "blocked",
           message: "The source changed while VN is active. Preview a line to arm a stable return point.",
           updateId: update.updateId
@@ -907,9 +913,9 @@ export function useVnDevtoolsController({
           message: error instanceof Error ? error.message : "The saved source could not be inspected.",
           updateId: update.updateId
         };
-        if (updateIsViewed) setStatus(nextStatus);
+        if (update.scriptPath === scriptAuthority.viewedScriptPath()) setStatus(nextStatus);
       });
-  }, [catalog, collapsed, entryDefinition, handleMaterializationResult, runtime.shell.storyRuntime.state.currentScriptPath, vnActive]);
+  }, [catalog, collapsed, entryDefinition, handleMaterializationResult, runtime.presentation.storySession, runtime.shell.storyRuntime.executedScriptPaths, runtime.shell.storyRuntime.state.currentScriptPath, scriptAuthority, vnActive]);
   const handleSourceUpdateRef = useRef(handleSourceUpdate);
   handleSourceUpdateRef.current = handleSourceUpdate;
 
@@ -918,7 +924,10 @@ export function useVnDevtoolsController({
     return updateSource.subscribe((update) => handleSourceUpdateRef.current(update));
   }, [updateSource]);
 
-  useEffect(() => () => latestTasksRef.current.cancel(), []);
+  useEffect(() => () => {
+    latestTasksRef.current.cancel();
+    scriptAuthority.cancelTasks();
+  }, [scriptAuthority]);
 
   const diagnostics = useMemo(
     () => createDiagnostics(inspection, runtime.diagnostics.runtimeDiagnostics, bridgeDiagnostics),
@@ -931,7 +940,7 @@ export function useVnDevtoolsController({
       Boolean(
         inspection
         && inspection.source.scriptPath === runtime.shell.storyRuntime.state.currentScriptPath
-        && vnDebugEntryIdentity(inspection) === vnDebugEntryIdentity(entry)
+        && vnDebugScriptIdentity(inspection) === vnDebugScriptIdentity(entry)
       ),
       runtime.shell.storyRuntime.active,
       runtime.shell.storyRuntime.state.instructionPointer,
@@ -972,7 +981,7 @@ export function useVnDevtoolsController({
 
   const previewLine = useCallback((lineId: string) => {
     updateLayout({ bottomPanelOpen: true, activePanel: "state" });
-    if (!previewAuthorizationRef.current.isAuthorized() || !inspection || !canMaterializeVnDevtoolsInspection(inspectionDisplay)) {
+    if (!scriptAuthority.canPreview(entry.source.scriptPath) || !inspection || !canMaterializeVnDevtoolsInspection(inspectionDisplay)) {
       setStatus({
         phase: "blocked",
         message: "The displayed source was rejected and is available for diagnostics only. Save a verified candidate before previewing it."
@@ -986,7 +995,7 @@ export function useVnDevtoolsController({
       target,
       ...(inspectionDisplay.expectedRevision ? { expectedRevision: inspectionDisplay.expectedRevision } : {})
     });
-  }, [inspection, inspectionDisplay, lineModel.anchorByLineId, runMaterialization, updateLayout]);
+  }, [entry.source.scriptPath, inspection, inspectionDisplay, lineModel.anchorByLineId, runMaterialization, scriptAuthority, updateLayout]);
 
   const submitDecision = useCallback((submission: VnDevtoolsDecisionSubmission) => {
     if (!pendingDecision) return;
@@ -1046,7 +1055,7 @@ export function useVnDevtoolsController({
       scriptPath: source.scriptPath,
       revision: inspection?.source.scriptPath === source.scriptPath
         ? inspection.revision
-        : cachedScriptDisplaysRef.current.get(source.scriptPath)?.display.inspection.revision
+        : scriptAuthority.cached(source.scriptPath)?.display.inspection.revision
           ?? source.scriptRevision,
       viewed: source.scriptPath === entry.source.scriptPath,
       runtime: source.scriptPath === runtime.shell.storyRuntime.state.currentScriptPath,
@@ -1068,29 +1077,27 @@ export function useVnDevtoolsController({
         if (!catalog.some((source) => source.scriptPath === scriptPath)) return;
         persistedTargetRestoreCompletedRef.current = true;
         latestTasksRef.current.cancel();
-        const cached = cachedScriptDisplaysRef.current.get(scriptPath);
+        scriptAuthority.view(scriptPath);
+        const cached = scriptAuthority.cached(scriptPath);
         if (cached) {
           const selectedCandidate = createVnDevtoolsScriptCandidate(entryDefinition, catalog, scriptPath);
           if (selectedCandidate) {
-            initializedEntriesRef.current.set(scriptPath, entryIdentity(selectedCandidate));
+            scriptAuthority.install(scriptPath, scriptCandidateIdentity(selectedCandidate));
           }
-          previewAuthorizationRef.current.authorize(cached.display.access === "installable");
+          scriptAuthority.authorizePreview(scriptPath, cached.display.access === "installable");
           setInspectionDisplay(cached.display);
           setBridgeDiagnostics(cached.diagnostics);
           setStatus(cached.status);
         } else {
-          initializedEntriesRef.current.delete(scriptPath);
-          previewAuthorizationRef.current.freeze();
+          scriptAuthority.clearInstalled(scriptPath);
+          scriptAuthority.freezePreview(scriptPath);
           setInspectionDisplay(undefined);
           setBridgeDiagnostics([]);
           setStatus({ phase: "inspecting", message: "Inspecting selected Nani source.", cancellable: true });
         }
         setViewedScriptPath(scriptPath);
-        setUpdatedScriptPaths((current) => {
-          const next = new Set(current);
-          next.delete(scriptPath);
-          return next;
-        });
+        scriptAuthority.clearUpdated(scriptPath);
+        setScriptAuthorityRevision((current) => current + 1);
         setSelectedLineId(undefined);
         selectedTargetRef.current = undefined;
         persistSession({ viewedScriptPath: scriptPath });
@@ -1168,7 +1175,7 @@ export function useVnDevtoolsController({
         latestTasksRef.current.cancel();
         setPendingDecision(undefined);
         const reauthorizeInstalledSource = canReauthorizeVnDevtoolsInspection(inspectionDisplay, entry);
-        previewAuthorizationRef.current.authorize(reauthorizeInstalledSource);
+        scriptAuthority.authorizePreview(entry.source.scriptPath, reauthorizeInstalledSource);
         if (reauthorizeInstalledSource && inspection) {
           setInspectionDisplay(createInstallableVnDevtoolsInspectionDisplay(inspection));
         }
@@ -1204,9 +1211,9 @@ export function useVnDevtoolsController({
 }
 
 function createLineModel(
-  inspection: VnDebugEntryInspection | undefined,
+  inspection: VnDebugScriptInspection | undefined,
   previewAuthorized: boolean,
-  mapsInstalledEntry: boolean,
+  mapsInstalledScript: boolean,
   runtimeActive: boolean,
   instructionPointer: number,
   pinnedTarget: VnDebugTargetAnchor | undefined,
@@ -1220,7 +1227,7 @@ function createLineModel(
   const currentAnchor = resolveCurrentVnDevtoolsAnchor({
     inspection,
     instructionPointer,
-    mapsInstalledEntry,
+    mapsInstalledScript,
     runtimeActive
   });
   const anchorByLineId = new Map<string, VnDebugTargetAnchor>();
@@ -1261,7 +1268,7 @@ function createLineModel(
       previewability: previewAuthorized ? mapPreviewability(sourceLine.previewability) : "blocked",
       current: Boolean(currentAnchor && sourceLine.anchors.some((candidate) => anchorsEqual(candidate, currentAnchor))),
       pinned: Boolean(
-        mapsInstalledEntry
+        mapsInstalledScript
         && pinnedTarget
         && sourceLine.anchors.some((candidate) => anchorsEqual(candidate, pinnedTarget))
       ),
@@ -1271,7 +1278,7 @@ function createLineModel(
   return { lines, anchorByLineId, ...(currentAnchor ? { currentAnchor } : {}) };
 }
 
-function mapPreviewability(previewability: VnDebugEntryInspection["sourceLines"][number]["previewability"]): VnDevtoolsLinePreviewability {
+function mapPreviewability(previewability: VnDebugScriptInspection["sourceLines"][number]["previewability"]): VnDevtoolsLinePreviewability {
   if (previewability === "stable") return "previewable";
   if (previewability === "decision") return "decision-required";
   return previewability ?? "no-stable-result";
@@ -1304,7 +1311,7 @@ function toDockDecision(result: VnDebugMaterializationDecisionRequired): VnDevto
 }
 
 function createDiagnostics(
-  inspection: VnDebugEntryInspection | undefined,
+  inspection: VnDebugScriptInspection | undefined,
   runtimeDiagnostics: readonly {
     code: string;
     severity: "info" | "warning" | "error";
@@ -1416,6 +1423,6 @@ function anchorIdentity(anchor: VnDebugTargetAnchor): string {
   return vnDebugAnchorIdentity(anchor);
 }
 
-function entryIdentity(value: VnDevtoolsScriptCandidate | VnDebugEntryInspection): string {
-  return vnDebugEntryIdentity(value);
+function scriptCandidateIdentity(value: VnDevtoolsScriptCandidate | VnDebugScriptInspection): string {
+  return vnDebugScriptIdentity(value);
 }

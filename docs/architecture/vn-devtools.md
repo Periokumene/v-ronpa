@@ -9,18 +9,21 @@ VS Code save
   -> allowlisted Vite source event
   -> Node + browser parse/compile/revision check
   -> headless stable-state materialization
-  -> app-owned atomic restore
+  -> shared host transaction + app policy callback
   -> Story/Pixi/UI/persistent-media inspection
 ```
 
 `app-vn-runtime/debug` owns source inspection, stable anchors, decision traces,
-and materialization. `app-vn-devtools` owns the reusable controller hook,
-latest-wins/serial-commit coordination, Dock, tab-session data, and Vite bridge.
-Game A owns only one story definition (entry, runtime catalog, and character
-plans by script path), flow transition, and atomic checkpoint commit.
+materialization, and materialization provenance. `app-vn-devtools` owns the
+reusable controller hook, per-script authority coordinator, HMR impact
+classification, latest-wins/serial host transaction, definition rollback,
+Dock, tab-session data, and Vite bridge. Game A owns only one story definition
+(entry, runtime catalog, and character plans by script path), the lightweight
+candidate-plan decorator, `gameId`, flow transition, diagnostics, and layout.
 Its product `App` module contains the ordinary game composition only; a
-compile-time DEV branch lazy-loads a separate host module containing the entry
-swap/restore transaction and Dock. `app-vn-shell` remains the product interaction
+compile-time DEV branch lazy-loads a separate host module which calls the shared
+transaction hook and mounts the Dock. `app-vn-shell` owns product interaction
+and Pixi script-presentation preparation.
 surface. Harness uses the explicit read-only runtime snapshot but does not mount
 the workbench.
 
@@ -106,7 +109,11 @@ irrevocable and finishes observing its new Story session before queued work runs
 Superseded queued work is skipped and the newest valid candidate runs next.
 Compiler or catalog-link errors keep the last-known-good catalog record and scene.
 
-The controller tracks script paths executed in the current runtime story session.
+The runtime exposes the ordered, deduplicated script paths that actually
+contributed to the current story session. This includes intermediate scripts
+crossed without a React render; restore starts a new history containing only
+the restored script, and reset clears it. The controller consumes that history
+instead of inferring visits from viewed files, fixed points, or React renders.
 If the current or an already-executed script changes, an existing fixed point is
 rematerialized through the candidate catalog; without a fixed point, the
 last-known-good catalog remains installed until the user chooses a Preview
@@ -116,22 +123,27 @@ always applies to the updated record, even when the fixed-point target belongs
 to another script. A semantic no-op update remaps a fixed anchor only when the
 anchor belongs to that record; fixed points in other scripts are unaffected.
 
-Switching `viewedScriptPath` changes Workbench state only: it never replays,
+One pure per-script authority coordinator owns installed candidate identities,
+expected host identities, inspection/status/diagnostic caches, Preview
+authorization, and update badges. Switching `viewedScriptPath` changes
+Workbench state only: it never replays,
 remaps, or invalidates a fixed point owned by another script. A persisted fixed
 point is restored once at controller boot through the complete catalog, even if
 the tab reopens while viewing a different script. Once source/revision/catalog
 verification succeeds, a failed or stale fixed-point restore does not turn the
 verified source into an untrusted single-script mapping.
 
-Game A is the only mutation authority. It installs a successful candidate by:
+The shared `useVnDevtoolsHostTransaction()` is the only host mutation mechanism.
+It installs a successful candidate by:
 
-1. verifying the candidate again and deriving that script's layered-character preload plan
-   from the same compiled script used for its revision;
+1. verifying the complete candidate catalog again, then invoking an app policy
+   callback; Game A's callback only derives that script's layered-character plan
+   from the already-verified inspection;
    an equivalent plan reuses the installed plan reference so source-only or
    non-character changes do not remount Pixi;
 2. holding the candidate catalog record and pending checkpoint together;
 3. publishing controller acceptance only after async verification completes,
-   rendering that catalog and plan map, then awaiting `restoreVnState()` without
+   rendering that definition, then awaiting `restoreVnState()` without
    a partial Story/Pixi/UI/media commit;
 4. rolling back the whole story definition only if restore rejects before
    mutation;
@@ -139,7 +151,9 @@ Game A is the only mutation authority. It installs a successful candidate by:
    entering VN flow, and waiting for exactly one new presentation session before
    reporting success.
 
-Restore validates game, entry, and revision before mutation. The workbench never
+`useVnDevtoolsDefinitionState()` owns the active definition, synchronized ref,
+pending definition, and rollback owner. Restore validates game, entry, and
+revision before mutation. The workbench never
 writes the save database, and it never stores checkpoints or source text.
 
 ## Source-first IDE workspace

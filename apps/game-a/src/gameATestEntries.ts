@@ -1,43 +1,30 @@
-import type { VnEntryDef } from "@v-ronpa/contracts";
 import {
+  gameATestEntryLocators,
+  gameATestScriptCatalogs,
   gameATestScriptMetadataByPath,
-  gameATestScriptSourcesByPath
 } from "./generatedTestScripts";
 import type { GameAStoryDefinition } from "./gameAScripts";
 
-type GameATestScriptPath = keyof typeof gameATestScriptMetadataByPath;
+type GameATestCatalogName = keyof typeof gameATestEntryLocators;
 
-export const gameASmokeStoryDefinition = createTestStoryDefinition({
-  id: "vn:game-a-test-smoke",
-  scriptPath: "game-a/test/smoke.nani"
-});
+export const gameASmokeStoryDefinition = createTestStoryDefinition("smoke");
+export const gameACharacterSmokeStoryDefinition = createTestStoryDefinition("characterSmoke");
 
-export const gameACharacterSmokeStoryDefinition = createTestStoryDefinition({
-  id: "vn:game-a-test-character",
-  scriptPath: "game-a/test/character-smoke.nani"
-});
-
-function createTestStoryDefinition({
-  id,
-  scriptPath
-}: {
-  id: string;
-  scriptPath: GameATestScriptPath;
-}): GameAStoryDefinition {
-  const metadata = gameATestScriptMetadataByPath[scriptPath];
-  const source = gameATestScriptSourcesByPath[scriptPath];
-  if (!metadata || !source) throw new Error(`Missing generated test script '${scriptPath}'.`);
-  const entry: VnEntryDef = {
-    id,
-    title: id,
-    initialScriptPath: scriptPath,
-    startLabel: "Start",
-    profile: "vn2d",
-    assetRefs: metadata.assetRefs
+function createTestStoryDefinition(name: GameATestCatalogName): GameAStoryDefinition {
+  const locator = gameATestEntryLocators[name];
+  const catalog = gameATestScriptCatalogs[name];
+  const entry = {
+    ...locator,
+    title: locator.id,
+    profile: "vn2d" as const,
+    assetRefs: catalog.flatMap((source) => gameATestScriptMetadataByPath[source.scriptPath]?.assetRefs ?? [])
   };
   return {
     entry,
-    catalog: [source],
-    characterPreloadPlanByScriptPath: { [scriptPath]: metadata.characterPreloadPlan }
+    catalog,
+    characterPreloadPlanByScriptPath: Object.fromEntries(catalog.map((source) => [
+      source.scriptPath,
+      gameATestScriptMetadataByPath[source.scriptPath]?.characterPreloadPlan ?? []
+    ]))
   };
 }

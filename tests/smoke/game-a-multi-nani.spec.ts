@@ -1,4 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+
+const chapterSourceFile = fileURLToPath(
+  new URL("../../apps/game-a/src/nani/chapter-02.nani", import.meta.url)
+);
 
 test.setTimeout(240_000);
 
@@ -144,6 +150,59 @@ test("an opening fixed point never blocks viewing or previewing chapter-02 befor
   await expect(chapterTarget.locator(".vn-devtools-preview-button")).toBeEnabled();
 });
 
+test("a future-script HMR installs only its catalog record even when opening has a fixed point", async ({ page }) => {
+  const originalSource = await readFile(chapterSourceFile, "utf8");
+  const updatedSource = originalSource.replace(
+    "Alice: 这还差不多。跟紧一点，别又站在雨里发呆。",
+    "Alice: 这还差不多（future HMR probe）。跟紧一点，别又站在雨里发呆。"
+  );
+  expect(updatedSource).not.toBe(originalSource);
+  await page.addInitScript(() => {
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v10");
+    sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v3");
+  });
+
+  try {
+    await page.goto("/");
+    const workbench = page.getByTestId("vn-devtools-dock");
+    await expect(workbench).toBeVisible();
+    await page.waitForFunction(() =>
+      typeof (window as Window & { render_game_to_text?: () => string }).render_game_to_text === "function"
+    );
+    await expect.poll(async () => (await readSnapshot(page)).workbench.phase).toBe("ready");
+    await expect(page.getByTestId("title-new-game")).toBeEnabled();
+    await clickByTestId(page, "title-new-game");
+    const openingTarget = workbench.locator('[data-testid^="vn-devtools-line-"]')
+      .filter({ hasText: "吃下我" })
+      .first();
+    await openingTarget.hover();
+    await openingTarget.locator(".vn-devtools-preview-button").click();
+    await expect.poll(async () => (await readSnapshot(page)).workbench.phase).toBe("ready");
+    const before = await readSnapshot(page);
+    expect(before.story.executedScriptPaths).toEqual(["game-a/opening.nani"]);
+
+    await writeFile(chapterSourceFile, updatedSource, "utf8");
+    const scriptPicker = workbench.locator("details.vn-devtools-script-picker");
+    await scriptPicker.locator("summary").click();
+    await expect(workbench.getByRole("option", { name: /chapter-02\.nani/ })).toContainText("Updated", {
+      timeout: 15_000
+    });
+    await workbench.getByRole("option", { name: /chapter-02\.nani/ }).click();
+    await expect.poll(async () => (await readSnapshot(page)).workbench.message).toContain("future navigation");
+    const after = await readSnapshot(page);
+    expect(after.story).toEqual(before.story);
+    expect(after.pixi).toEqual(before.pixi);
+    expect(after.workbench.runtimeScriptPath).toBe("game-a/opening.nani");
+    expect(after.workbench.viewedScriptPath).toBe("game-a/chapter-02.nani");
+    await page.screenshot({
+      path: "test-results/game-a-multi-nani-future-hmr-stage-unchanged.png",
+      fullPage: true
+    });
+  } finally {
+    await writeFile(chapterSourceFile, originalSource, "utf8");
+  }
+});
+
 async function advanceProductionStoryToFinalOpeningChoice(page: Page): Promise<void> {
   await expect.poll(async () => (await readSnapshot(page)).story.choices.length).toBeGreaterThan(0);
   for (let attempt = 0; attempt < 120; attempt += 1) {
@@ -200,10 +259,13 @@ interface GameASnapshot {
     blockedLineCount: number;
   };
   pixi: {
+    revision: number;
     characters: string[];
     weather: string[];
   };
   story: {
+    storySession: number;
+    executedScriptPaths: string[];
     choices: string[];
     text: string | null;
   };

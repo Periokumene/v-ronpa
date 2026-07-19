@@ -1,10 +1,10 @@
 import {
   EMPTY_VN_DEBUG_DECISION_TRACE,
-  inspectVnDebugEntry,
+  inspectVnDebugScript,
   materializeVnDebugTarget,
   resolveVnDebugAnchor,
   type VnDebugDecisionTrace,
-  type VnDebugEntryInspection,
+  type VnDebugScriptInspection,
   type VnDebugMaterializationResult,
   type VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
@@ -19,52 +19,56 @@ import {
 export type PreparedVnDevtoolsCandidateUpdate =
   | {
       kind: "retain-last-known-good";
-      inspection: VnDebugEntryInspection;
+      inspection: VnDebugScriptInspection;
       reason: "invalid-source" | "revision-mismatch" | "catalog-link-error";
       message?: string;
   }
   | {
     kind: "refresh-source-mapping";
-    inspection: VnDebugEntryInspection;
+    inspection: VnDebugScriptInspection;
     expectedRevision: string;
     remappedTarget?: VnDebugTargetAnchor;
   }
   | {
     kind: "materialize-pinned-target";
-    inspection: VnDebugEntryInspection;
+    inspection: VnDebugScriptInspection;
     expectedRevision: string;
     result: VnDebugMaterializationResult;
   }
-  | { kind: "adopt-for-next-start"; inspection: VnDebugEntryInspection; expectedRevision: string }
-  | { kind: "require-preview-target"; inspection: VnDebugEntryInspection; expectedRevision: string };
+  | {
+      kind: "adopt-catalog";
+      inspection: VnDebugScriptInspection;
+      expectedRevision: string;
+      impact: "next-start" | "future-navigation";
+    }
+  | { kind: "require-preview-target"; inspection: VnDebugScriptInspection; expectedRevision: string };
+
+export type VnDevtoolsScriptUpdateImpact = "next-start" | "future-navigation" | "executed-session";
 
 export interface PrepareVnDevtoolsCandidateUpdateInput {
   activeCandidate: VnDevtoolsScriptCandidate;
   update: NaniDevtoolsViteUpdate;
   pinnedTarget?: VnDebugTargetAnchor;
   decisions?: VnDebugDecisionTrace;
-  vnActive: boolean;
+  impact: VnDevtoolsScriptUpdateImpact;
   signal?: AbortSignal;
 }
 
-export function isVnDevtoolsUpdateRuntimeActive({
-  hasFixedPoint,
+export function classifyVnDevtoolsScriptUpdateImpact({
+  executedScriptPaths = [],
   runtimeScriptPath,
-  runtimeVisitedScriptPaths = [],
   updatedScriptPath,
   vnActive
 }: {
-  hasFixedPoint: boolean;
+  executedScriptPaths?: Iterable<string>;
   runtimeScriptPath: string;
-  runtimeVisitedScriptPaths?: Iterable<string>;
   updatedScriptPath: string;
   vnActive: boolean;
-}): boolean {
-  return vnActive && (
-    updatedScriptPath === runtimeScriptPath
-    || hasFixedPoint
-    || new Set(runtimeVisitedScriptPaths).has(updatedScriptPath)
-  );
+}): VnDevtoolsScriptUpdateImpact {
+  if (!vnActive) return "next-start";
+  return updatedScriptPath === runtimeScriptPath || new Set(executedScriptPaths).has(updatedScriptPath)
+    ? "executed-session"
+    : "future-navigation";
 }
 
 /**
@@ -75,10 +79,10 @@ export function isVnDevtoolsUpdateRuntimeActive({
 export async function prepareVnDevtoolsCandidateUpdate({
   activeCandidate,
   decisions = EMPTY_VN_DEBUG_DECISION_TRACE,
+  impact,
   pinnedTarget,
   signal,
-  update,
-  vnActive
+  update
 }: PrepareVnDevtoolsCandidateUpdateInput): Promise<PreparedVnDevtoolsCandidateUpdate> {
   throwIfAborted(signal);
   const candidateSource = {
@@ -87,15 +91,16 @@ export async function prepareVnDevtoolsCandidateUpdate({
     scriptRevision: update.serverRevision ?? activeCandidate.source.scriptRevision
   };
   const candidateCatalog = replaceVnDevtoolsCandidateSource(activeCandidate, candidateSource);
-  const inspection = await inspectVnDebugEntry(activeCandidate.entry, candidateSource);
+  const inspection = await inspectVnDebugScript(activeCandidate.entry, candidateSource);
   throwIfAborted(signal);
+  const replayTarget = impact === "executed-session" ? pinnedTarget : undefined;
   const plan = planVnDevtoolsCandidate({
     serverRevision: update.serverRevision,
     browserRevision: inspection.revision,
     activeRevision: activeCandidate.source.scriptRevision,
     canMaterialize: inspection.canMaterialize,
-    hasPinnedTarget: Boolean(pinnedTarget),
-    vnActive
+    hasPinnedTarget: Boolean(replayTarget),
+    vnActive: impact === "executed-session"
   });
 
   if (plan.kind === "retain-last-known-good") {
@@ -132,14 +137,14 @@ export async function prepareVnDevtoolsCandidateUpdate({
     };
   }
   if (plan.kind === "materialize-pinned-target") {
-    if (!pinnedTarget) {
+    if (!replayTarget) {
       return { kind: "retain-last-known-good", inspection, reason: "invalid-source" };
     }
     const result = await materializeVnDebugTarget({
       entry: inspection.entry,
       catalog: candidateCatalog.catalog,
       inspection,
-      target: pinnedTarget,
+      target: replayTarget,
       decisions,
       expectedRevision,
       ...(signal ? { signal } : {})
@@ -147,7 +152,14 @@ export async function prepareVnDevtoolsCandidateUpdate({
     throwIfAborted(signal);
     return { kind: plan.kind, inspection, expectedRevision, result };
   }
-  if (plan.kind === "adopt-for-next-start") return { kind: plan.kind, inspection, expectedRevision };
+  if (plan.kind === "adopt-for-next-start") {
+    return {
+      kind: "adopt-catalog",
+      inspection,
+      expectedRevision,
+      impact: impact === "executed-session" ? "next-start" : impact
+    };
+  }
   return { kind: "require-preview-target", inspection, expectedRevision };
 }
 

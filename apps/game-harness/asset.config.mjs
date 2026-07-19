@@ -6,10 +6,15 @@ export default {
   exportName: "harnessRuntimeAssets",
   fontFacesExportName: "harnessFontFaces",
   fragmentsExportName: "harnessRuntimeAssetFragments",
+  entryLocatorExportName: "harnessVnEntryLocator",
   scriptMetadataExportName: "harnessScriptMetadataByPath",
+  scriptCatalogExportName: "harnessScriptCatalog",
   scriptSourcesExportName: "harnessScriptSourcesByPath",
-  entryInitialScriptPath: "harness/harness-showcase.nani",
-  entryStartLabel: "Start",
+  entry: {
+    id: "vn:harness-showcase",
+    initialScriptPath: "harness/harness-showcase.nani",
+    startLabel: "Start"
+  },
   providers: ["pixi"],
   voiceLocales: ["zh"],
   scripts: [

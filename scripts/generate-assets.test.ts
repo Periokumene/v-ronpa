@@ -31,10 +31,17 @@ describe("generated Game A script metadata boundaries", () => {
     const testModule = generateGameATestScriptMetadataModule();
 
     expect(productModule).toContain('"game-a/opening.nani"');
+    expect(productModule).toContain("export const gameAVnEntryLocator");
+    expect(productModule).toContain("export const gameAScriptCatalog");
+    expect(productModule).toContain('"id": "vn:game-a-main"');
     expect(productModule).not.toContain('"game-a/test/');
     expect(productModule).not.toContain("gameATestScriptMetadataByPath");
     expect(testModule).toContain('"game-a/test/smoke.nani"');
     expect(testModule).toContain('"game-a/test/character-smoke.nani"');
+    expect(testModule).toContain("export const gameATestEntryLocators");
+    expect(testModule).toContain("export const gameATestScriptCatalogs");
+    expect(testModule).toContain('"smoke"');
+    expect(testModule).toContain('"characterSmoke"');
     expect(testModule).not.toContain('"game-a/opening.nani"');
   });
 });

@@ -429,6 +429,7 @@ function createRuntime({
     storyPlayActiveActions: { "toggle-auto": true },
     storyRuntime: {
       active: true,
+      executedScriptPaths: ["test.nani"],
       state: {
         currentScriptPath: "test.nani",
         instructionPointer: 1,

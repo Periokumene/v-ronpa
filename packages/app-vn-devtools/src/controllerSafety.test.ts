@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type {
   VnDebugDecisionTrace,
-  VnDebugEntryInspection,
+  VnDebugScriptInspection,
   VnDebugMaterializationDecisionRequired,
   VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
@@ -34,7 +34,7 @@ describe("VN devtools controller safety", () => {
       sourceText: "#Start\nNarrator: Hello."
     };
     const candidate = { entry, source, catalog: [source] };
-    const inspection = { entry, source, canMaterialize: true } as unknown as VnDebugEntryInspection;
+    const inspection = { entry, source, canMaterialize: true } as unknown as VnDebugScriptInspection;
     const rejected = createReadOnlyVnDevtoolsInspectionDisplay(inspection);
     const accepted = createInstallableVnDevtoolsInspectionDisplay(inspection, "sha256:verified");
 
@@ -74,18 +74,18 @@ describe("VN devtools controller safety", () => {
     const currentAnchor = anchor("current");
     const inspection = {
       commands: [{ anchor: currentAnchor }]
-    } as VnDebugEntryInspection;
+    } as VnDebugScriptInspection;
 
     expect(resolveCurrentVnDevtoolsAnchor({
       inspection,
       instructionPointer: 0,
-      mapsInstalledEntry: true,
+      mapsInstalledScript: true,
       runtimeActive: false
     })).toBeUndefined();
     expect(resolveCurrentVnDevtoolsAnchor({
       inspection,
       instructionPointer: 1,
-      mapsInstalledEntry: true,
+      mapsInstalledScript: true,
       runtimeActive: true
     })).toBe(currentAnchor);
   });

@@ -1,6 +1,6 @@
 import {
   resolveVnDebugAnchor,
-  type VnDebugEntryInspection,
+  type VnDebugScriptInspection,
   type VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
 import { vnDebugAnchorsEqual } from "./controllerSafety";
@@ -12,7 +12,7 @@ import {
 } from "./types";
 
 export interface ResolveVnDevtoolsSelectionInput {
-  inspection: VnDebugEntryInspection;
+  inspection: VnDebugScriptInspection;
   lines: readonly VnDevtoolsSourceLine[];
   anchorsByLineId: ReadonlyMap<string, VnDebugTargetAnchor>;
   previousAnchor?: VnDebugTargetAnchor;

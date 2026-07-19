@@ -728,7 +728,7 @@ function collectCommandMetadata(
   }
 
   const endpointValues = [
-    ...(command.commandId === "goto" || command.commandId === "call" ? [firstArgValue] : []),
+    ...(command.commandId === "goto" ? [firstArgValue] : []),
     ...(command.commandId === "choice" ? [command.params.goto] : [])
   ];
   for (const value of endpointValues) {

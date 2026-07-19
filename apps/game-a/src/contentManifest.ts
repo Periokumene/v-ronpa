@@ -4,19 +4,17 @@ import {
   gameAFontFaces,
   gameARuntimeAssetFragments,
   gameARuntimeAssets,
+  gameAVnEntryLocator,
   gameAScriptMetadataByPath
 } from "./generatedAssets";
 
-export const gameAVnScriptPath = "game-a/opening.nani";
 const GAME_A_MAIN_BACKGROUND_ID = "bg:game-a-academy-hall-fullscreen";
 const GAME_A_INNER_BACKGROUND_ID = "bg:game-a-snow-outskirts-frame";
 const gameAScriptAssetRefs = Object.values(gameAScriptMetadataByPath).flatMap((metadata) => metadata.assetRefs);
 
 export const gameAVnEntry = {
-  id: "vn:game-a-main",
+  ...gameAVnEntryLocator,
   title: "Game A",
-  initialScriptPath: gameAVnScriptPath,
-  startLabel: "Start",
   profile: "vn2d" as const,
   assetRefs: [
     ...dedupeAssetRefs(gameAScriptAssetRefs),

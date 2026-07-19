@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { inspectVnDebugEntry, type VnDebugDecisionTrace } from "@v-ronpa/app-vn-runtime/debug";
+import { inspectVnDebugScript, type VnDebugDecisionTrace } from "@v-ronpa/app-vn-runtime/debug";
 import type { VnEntryDef, VnRuntimeScriptSource } from "@v-ronpa/contracts";
 import {
-  isVnDevtoolsUpdateRuntimeActive,
+  classifyVnDevtoolsScriptUpdateImpact,
   prepareVnDevtoolsCandidateUpdate
 } from "./candidateUpdates";
 import type { VnDevtoolsScriptCandidate } from "./scriptCandidate";
@@ -10,38 +10,33 @@ import type { NaniDevtoolsViteUpdate } from "./viteProtocol";
 
 describe("Nani devtools candidate update preparation", () => {
   it("adopts a future-script update without treating the current session as changed", () => {
-    expect(isVnDevtoolsUpdateRuntimeActive({
-      hasFixedPoint: false,
+    expect(classifyVnDevtoolsScriptUpdateImpact({
       runtimeScriptPath: "game-a/opening.nani",
       updatedScriptPath: "game-a/chapter-02.nani",
-      vnActive: true
-    })).toBe(false);
-    expect(isVnDevtoolsUpdateRuntimeActive({
-      hasFixedPoint: false,
+      vnActive: false
+    })).toBe("next-start");
+    expect(classifyVnDevtoolsScriptUpdateImpact({
       runtimeScriptPath: "game-a/chapter-02.nani",
       updatedScriptPath: "game-a/chapter-02.nani",
       vnActive: true
-    })).toBe(true);
-    expect(isVnDevtoolsUpdateRuntimeActive({
-      hasFixedPoint: true,
+    })).toBe("executed-session");
+    expect(classifyVnDevtoolsScriptUpdateImpact({
       runtimeScriptPath: "game-a/chapter-02.nani",
       updatedScriptPath: "game-a/opening.nani",
       vnActive: true
-    })).toBe(true);
-    expect(isVnDevtoolsUpdateRuntimeActive({
-      hasFixedPoint: false,
+    })).toBe("future-navigation");
+    expect(classifyVnDevtoolsScriptUpdateImpact({
+      executedScriptPaths: ["game-a/opening.nani", "game-a/chapter-02.nani"],
       runtimeScriptPath: "game-a/chapter-02.nani",
-      runtimeVisitedScriptPaths: ["game-a/opening.nani", "game-a/chapter-02.nani"],
       updatedScriptPath: "game-a/opening.nani",
       vnActive: true
-    })).toBe(true);
-    expect(isVnDevtoolsUpdateRuntimeActive({
-      hasFixedPoint: false,
+    })).toBe("executed-session");
+    expect(classifyVnDevtoolsScriptUpdateImpact({
+      executedScriptPaths: ["game-a/opening.nani", "game-a/chapter-02.nani"],
       runtimeScriptPath: "game-a/chapter-02.nani",
-      runtimeVisitedScriptPaths: ["game-a/opening.nani", "game-a/chapter-02.nani"],
       updatedScriptPath: "game-a/chapter-03.nani",
       vnActive: true
-    })).toBe(false);
+    })).toBe("future-navigation");
   });
 
   it("retains last-known-good state for invalid source and server/browser revision disagreement", async () => {
@@ -49,12 +44,12 @@ describe("Nani devtools candidate update preparation", () => {
     const invalid = await prepareVnDevtoolsCandidateUpdate({
       activeCandidate: activeEntry,
       update: update("#Start\n#Start", null),
-      vnActive: true
+      impact: "executed-session"
     });
     const mismatch = await prepareVnDevtoolsCandidateUpdate({
       activeCandidate: activeEntry,
       update: update("#Start\nNarrator: Changed.|#changed|", "sha256:server-disagrees"),
-      vnActive: true
+      impact: "executed-session"
     });
 
     expect(invalid).toMatchObject({ kind: "retain-last-known-good", reason: "invalid-source" });
@@ -66,7 +61,7 @@ describe("Nani devtools candidate update preparation", () => {
     const prepared = await prepareVnDevtoolsCandidateUpdate({
       activeCandidate: activeEntry,
       update: update("#Start\n; reformatted comment\nNarrator: Active.|#active|", activeEntry.source.scriptRevision),
-      vnActive: true
+      impact: "executed-session"
     });
 
     expect(prepared.kind).toBe("refresh-source-mapping");
@@ -82,12 +77,12 @@ describe("Nani devtools candidate update preparation", () => {
       profile: "vn2d",
       assetRefs: []
     };
-    const opening = await inspectVnDebugEntry(runtimeEntry, {
+    const opening = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/opening.nani",
       scriptRevision: "pending",
       sourceText: "#Start\n; old comment\n@goto game-a/chapter-02.nani#Start"
     });
-    const chapter = await inspectVnDebugEntry(runtimeEntry, {
+    const chapter = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/chapter-02.nani",
       scriptRevision: "pending",
       sourceText: "#Start\nNarrator: Chapter.|#chapter|"
@@ -111,7 +106,7 @@ describe("Nani devtools candidate update preparation", () => {
         diagnostics: []
       },
       pinnedTarget: fixedTarget,
-      vnActive: true
+      impact: "executed-session"
     });
 
     expect(prepared).toMatchObject({
@@ -123,8 +118,8 @@ describe("Nani devtools candidate update preparation", () => {
   it("materializes a changed revision through the pinned target before exposing it to the host", async () => {
     const activeEntry = await canonicalEntry("#Start\nNarrator: Active.|#active|");
     const changedSource = "#Start\n@set route:\"updated\"\nNarrator: Updated.|#active|";
-    const changedInspection = await inspectVnDebugEntry(activeEntry.entry, { ...activeEntry.source, sourceText: changedSource });
-    const activeInspection = await inspectVnDebugEntry(activeEntry.entry, activeEntry.source);
+    const changedInspection = await inspectVnDebugScript(activeEntry.entry, { ...activeEntry.source, sourceText: changedSource });
+    const activeInspection = await inspectVnDebugScript(activeEntry.entry, activeEntry.source);
     const pinnedTarget = activeInspection.commands[0]!.anchor;
     const decisions: VnDebugDecisionTrace = { choices: [], inputs: [] };
     const prepared = await prepareVnDevtoolsCandidateUpdate({
@@ -132,7 +127,7 @@ describe("Nani devtools candidate update preparation", () => {
       update: update(changedSource, changedInspection.revision),
       pinnedTarget,
       decisions,
-      vnActive: true
+      impact: "executed-session"
     });
 
     expect(prepared.kind).toBe("materialize-pinned-target");
@@ -152,12 +147,12 @@ describe("Nani devtools candidate update preparation", () => {
       profile: "vn2d",
       assetRefs: []
     };
-    const activeOpening = await inspectVnDebugEntry(runtimeEntry, {
+    const activeOpening = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/opening.nani",
       scriptRevision: "pending",
       sourceText: "#Start\n@set route:\"old\"\n@goto game-a/chapter-02.nani#Start"
     });
-    const chapter = await inspectVnDebugEntry(runtimeEntry, {
+    const chapter = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/chapter-02.nani",
       scriptRevision: "pending",
       sourceText: "#Start\nNarrator: Chapter.|#chapter|"
@@ -168,7 +163,7 @@ describe("Nani devtools candidate update preparation", () => {
       source: activeOpening.source
     };
     const changedSource = "#Start\n@set route:\"new\"\n@goto game-a/chapter-02.nani#Start";
-    const changedOpening = await inspectVnDebugEntry(runtimeEntry, {
+    const changedOpening = await inspectVnDebugScript(runtimeEntry, {
       ...activeOpening.source,
       sourceText: changedSource
     });
@@ -184,7 +179,7 @@ describe("Nani devtools candidate update preparation", () => {
         diagnostics: []
       },
       pinnedTarget: chapter.commands[0]!.anchor,
-      vnActive: true
+      impact: "executed-session"
     });
 
     expect(prepared.kind).toBe("materialize-pinned-target");
@@ -207,12 +202,12 @@ describe("Nani devtools candidate update preparation", () => {
       profile: "vn2d",
       assetRefs: []
     };
-    const opening = await inspectVnDebugEntry(runtimeEntry, {
+    const opening = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/opening.nani",
       scriptRevision: "pending",
       sourceText: "#Start\n@goto game-a/chapter-02.nani#Start"
     });
-    const chapter = await inspectVnDebugEntry(runtimeEntry, {
+    const chapter = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/chapter-02.nani",
       scriptRevision: "pending",
       sourceText: "#Start\nNarrator: Chapter."
@@ -223,7 +218,7 @@ describe("Nani devtools candidate update preparation", () => {
       source: chapter.source
     };
     const changedSource = "#Other\nNarrator: Broken.";
-    const changedChapter = await inspectVnDebugEntry(runtimeEntry, {
+    const changedChapter = await inspectVnDebugScript(runtimeEntry, {
       ...chapter.source,
       sourceText: changedSource
     });
@@ -238,7 +233,7 @@ describe("Nani devtools candidate update preparation", () => {
         serverRevision: changedChapter.revision,
         diagnostics: []
       },
-      vnActive: false
+      impact: "next-start"
     })).resolves.toMatchObject({
       kind: "retain-last-known-good",
       reason: "catalog-link-error",
@@ -249,19 +244,43 @@ describe("Nani devtools candidate update preparation", () => {
   it("separates inactive adoption from active sessions that have no fixed point", async () => {
     const activeEntry = await canonicalEntry("#Start\nNarrator: Active.|#active|");
     const sourceText = "#Start\nNarrator: Changed.|#changed|";
-    const candidate = await inspectVnDebugEntry(activeEntry.entry, { ...activeEntry.source, sourceText });
+    const candidate = await inspectVnDebugScript(activeEntry.entry, { ...activeEntry.source, sourceText });
     const candidateUpdate = update(sourceText, candidate.revision);
 
     await expect(prepareVnDevtoolsCandidateUpdate({
       activeCandidate: activeEntry,
       update: candidateUpdate,
-      vnActive: false
-    })).resolves.toMatchObject({ kind: "adopt-for-next-start" });
+      impact: "next-start"
+    })).resolves.toMatchObject({ kind: "adopt-catalog" });
     await expect(prepareVnDevtoolsCandidateUpdate({
       activeCandidate: activeEntry,
       update: candidateUpdate,
-      vnActive: true
+      impact: "executed-session"
     })).resolves.toMatchObject({ kind: "require-preview-target" });
+  });
+
+  it("never lets a fixed point expand a future-script update into session replay", async () => {
+    const activeEntry = await canonicalEntry("#Start\nNarrator: Active.|#active|");
+    const sourceText = "#Start\nNarrator: Changed.|#changed|";
+    const candidate = await inspectVnDebugScript(activeEntry.entry, { ...activeEntry.source, sourceText });
+
+    await expect(prepareVnDevtoolsCandidateUpdate({
+      activeCandidate: activeEntry,
+      update: update(sourceText, candidate.revision),
+      impact: "future-navigation",
+      pinnedTarget: {
+        kind: "command",
+        scriptPath: "game-a/opening.nani",
+        revision: "sha256:fixed",
+        commandIndex: 0,
+        commandId: "print",
+        line: 1,
+        ordinal: 0
+      }
+    })).resolves.toMatchObject({
+      kind: "adopt-catalog",
+      impact: "future-navigation"
+    });
   });
 
   it("honors cancellation before any candidate can reach the commit boundary", async () => {
@@ -272,7 +291,7 @@ describe("Nani devtools candidate update preparation", () => {
     await expect(prepareVnDevtoolsCandidateUpdate({
       activeCandidate: activeEntry,
       update: update(activeEntry.source.sourceText, activeEntry.source.scriptRevision),
-      vnActive: true,
+      impact: "executed-session",
       signal: controller.signal
     })).rejects.toMatchObject({ name: "AbortError" });
   });
@@ -292,7 +311,7 @@ async function canonicalEntry(sourceText: string): Promise<VnDevtoolsScriptCandi
     scriptRevision: "sha256:declared",
     sourceText
   };
-  const inspection = await inspectVnDebugEntry(entry, declared);
+  const inspection = await inspectVnDebugScript(entry, declared);
   return { entry, source: inspection.source, catalog: [inspection.source] };
 }
 

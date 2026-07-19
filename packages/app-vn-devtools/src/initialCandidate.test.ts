@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { VnEntryDef, VnRuntimeScriptSource } from "@v-ronpa/contracts";
-import { inspectVnDebugEntry } from "@v-ronpa/app-vn-runtime/debug";
+import { inspectVnDebugScript } from "@v-ronpa/app-vn-runtime/debug";
 import { prepareVnDevtoolsInitialCandidate } from "./initialCandidate";
 import type { VnDevtoolsScriptCandidate } from "./scriptCandidate";
 import type { NaniDevtoolsViteInitialCandidate } from "./viteProtocol";
@@ -33,13 +33,13 @@ describe("Nani devtools initial candidate handshake", () => {
       profile: "vn2d",
       assetRefs: []
     };
-    const generated = await inspectVnDebugEntry(runtimeEntry, {
+    const generated = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: runtimeEntry.initialScriptPath,
       scriptRevision: "pending",
       sourceText: generatedSource
     });
     const savedSource = "#Start\nNarrator: Saved before refresh.|#line|";
-    const saved = await inspectVnDebugEntry(runtimeEntry, {
+    const saved = await inspectVnDebugScript(runtimeEntry, {
       ...generated.source,
       sourceText: savedSource
     });
@@ -64,11 +64,11 @@ describe("Nani devtools initial candidate handshake", () => {
     const generatedEntry = await canonicalEntry("#Start\nNarrator: Active.|#active|");
     const sourceText = "#Start\n@set route:\"restored\"\nNarrator: Restored.|#active|";
     const activeEntry = withSource(generatedEntry, sourceText);
-    const initialInspection = await inspectVnDebugEntry(activeEntry.entry, activeEntry.source);
+    const initialInspection = await inspectVnDebugScript(activeEntry.entry, activeEntry.source);
     const prepared = await prepareVnDevtoolsInitialCandidate({
       activeCandidate: activeEntry,
       candidate: candidate(sourceText, initialInspection.revision),
-      pinnedTarget: (await inspectVnDebugEntry(generatedEntry.entry, generatedEntry.source)).commands[0]!.anchor,
+      pinnedTarget: (await inspectVnDebugScript(generatedEntry.entry, generatedEntry.source)).commands[0]!.anchor,
       vnActive: false
     });
 
@@ -84,7 +84,7 @@ describe("Nani devtools initial candidate handshake", () => {
     const generatedEntry = await canonicalEntry("#Start\nNarrator: Active.|#active|");
     const sourceText = "#Start\nNarrator: Changed.|#changed|";
     const activeEntry = withSource(generatedEntry, sourceText);
-    const inspection = await inspectVnDebugEntry(activeEntry.entry, activeEntry.source);
+    const inspection = await inspectVnDebugScript(activeEntry.entry, activeEntry.source);
     const initialCandidate = candidate(sourceText, inspection.revision);
 
     await expect(prepareVnDevtoolsInitialCandidate({
@@ -108,12 +108,12 @@ describe("Nani devtools initial candidate handshake", () => {
       profile: "vn2d",
       assetRefs: []
     };
-    const opening = await inspectVnDebugEntry(runtimeEntry, {
+    const opening = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/opening.nani",
       scriptRevision: "pending",
       sourceText: "#Start\nNarrator: Opening.|#opening|"
     });
-    const chapter = await inspectVnDebugEntry(runtimeEntry, {
+    const chapter = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/chapter-02.nani",
       scriptRevision: "pending",
       sourceText: "#Start\nNarrator: Chapter.|#chapter|"
@@ -155,12 +155,12 @@ describe("Nani devtools initial candidate handshake", () => {
       profile: "vn2d",
       assetRefs: []
     };
-    const opening = await inspectVnDebugEntry(runtimeEntry, {
+    const opening = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/opening.nani",
       scriptRevision: "pending",
       sourceText: "#Start\n@goto game-a/chapter-02.nani#Start"
     });
-    const brokenChapter = await inspectVnDebugEntry(runtimeEntry, {
+    const brokenChapter = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/chapter-02.nani",
       scriptRevision: "pending",
       sourceText: "#Other\nNarrator: Missing Start."
@@ -203,7 +203,7 @@ async function canonicalEntry(sourceText: string): Promise<VnDevtoolsScriptCandi
     scriptRevision: "sha256:declared",
     sourceText
   };
-  const inspection = await inspectVnDebugEntry(entry, source);
+  const inspection = await inspectVnDebugScript(entry, source);
   return { entry, source: inspection.source, catalog: [inspection.source] };
 }
 

@@ -6,7 +6,6 @@ import {
   type PixiPresenterDiagnostic,
   type PixiPresentationTaskSnapshot,
   type PixiPresenterPort,
-  type LayeredCharacterPreloadPlan,
   type PixiThumbnailMime,
   type PixiThumbnailCaptureOptions,
   type PixiThumbnailCaptureResult,
@@ -15,9 +14,16 @@ import {
 import type { PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
 import type { PresentationTaskObservation } from "@v-ronpa/app-vn-runtime";
 
+export interface VnPixiCharacterPreparationPlanEntry {
+  readonly characterId: string;
+  readonly appearanceExpressions: readonly string[];
+}
+
+export type VnPixiCharacterPreparationPlan = readonly VnPixiCharacterPreparationPlanEntry[];
+
 export interface PixiStageHandle {
   ready: Promise<void>;
-  prepareCharacters(plan: LayeredCharacterPreloadPlan): Promise<PixiCharacterPreparationResult>;
+  prepareCharacters(plan: VnPixiCharacterPreparationPlan): Promise<PixiCharacterPreparationResult>;
   captureThumbnail<Mime extends PixiThumbnailMime = "image/webp">(
     options?: PixiThumbnailCaptureOptions<Mime>
   ): Promise<PixiThumbnailCaptureResult<Mime> | undefined>;
@@ -34,7 +40,7 @@ export interface PixiLayerProps {
   // Host surface.
   visible: boolean;
   characterOutlineEnabled: boolean;
-  characterPreloadPlan: LayeredCharacterPreloadPlan;
+  characterPreloadPlan: VnPixiCharacterPreparationPlan;
   assetResolver?: PixiAssetResolver;
 
   // Render side effects.

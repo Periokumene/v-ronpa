@@ -4,8 +4,8 @@ import type {
   VnRuntimeScriptSource
 } from "@v-ronpa/contracts";
 import {
-  inspectVnDebugEntry,
-  type VnDebugEntryInspection
+  inspectVnDebugScript,
+  type VnDebugScriptInspection
 } from "@v-ronpa/app-vn-runtime/debug";
 import { linkRuntimeScriptCatalog } from "@v-ronpa/nani-runtime-compiler";
 
@@ -45,7 +45,7 @@ export function replaceVnDevtoolsCandidateSource(
 
 export function candidateFromVnDebugInspection(
   installed: VnDevtoolsScriptCandidate,
-  inspection: VnDebugEntryInspection
+  inspection: VnDebugScriptInspection
 ): VnDevtoolsScriptCandidate {
   return replaceVnDevtoolsCandidateSource(installed, inspection.source);
 }
@@ -60,7 +60,7 @@ export async function validateVnDevtoolsCandidateCatalog(
   candidate: VnDevtoolsScriptCandidate
 ): Promise<VnDevtoolsCandidateCatalogValidation> {
   const inspections = await Promise.all(
-    candidate.catalog.map((source) => inspectVnDebugEntry(candidate.entry, source))
+    candidate.catalog.map((source) => inspectVnDebugScript(candidate.entry, source))
   );
   const invalid = inspections.find((inspection) => !inspection.canMaterialize);
   if (invalid) {

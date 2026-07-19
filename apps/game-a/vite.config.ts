@@ -23,22 +23,19 @@ export function resolveGameAStoryDefinitionModule(mode: string): string {
 }
 
 export function resolveGameANaniDevtoolsEntries(mode: string) {
-  const smokeIndex = mode === GAME_A_CHARACTER_SMOKE_VITE_MODE ? 1 : 0;
-  const scripts = mode === GAME_A_SMOKE_VITE_MODE || mode === GAME_A_CHARACTER_SMOKE_VITE_MODE
-    ? [gameAAssetConfig.testScripts[smokeIndex]]
-    : gameAAssetConfig.scripts;
-  const entryId = mode === GAME_A_SMOKE_VITE_MODE
-    ? "vn:game-a-test-smoke"
+  const testCatalogName = mode === GAME_A_SMOKE_VITE_MODE
+    ? "smoke"
     : mode === GAME_A_CHARACTER_SMOKE_VITE_MODE
-      ? "vn:game-a-test-character"
-      : "vn:game-a-main";
-  return scripts.flatMap((script) => script
-    ? [{
-        sourceFile: fileURLToPath(new URL(`../../${script.sourceFile}`, import.meta.url)),
-        scriptPath: script.scriptPath,
-        entryId
-      }]
-    : []);
+      ? "characterSmoke"
+      : undefined;
+  const configuredCatalog = testCatalogName
+    ? gameAAssetConfig.testCatalogs[testCatalogName]
+    : { entry: gameAAssetConfig.entry, scripts: gameAAssetConfig.scripts };
+  return configuredCatalog.scripts.map((script) => ({
+    sourceFile: fileURLToPath(new URL(`../../${script.sourceFile}`, import.meta.url)),
+    scriptPath: script.scriptPath,
+    entryId: configuredCatalog.entry.id
+  }));
 }
 
 export default defineConfig(({ mode }) => {

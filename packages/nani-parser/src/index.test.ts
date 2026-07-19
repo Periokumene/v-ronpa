@@ -39,6 +39,7 @@ describe("nani parser", () => {
         "#Start",
         "@goto game-a/chapter-02.nani",
         '@choice "Continue" goto:game-a/chapter-02.nani#Start',
+        "@call game-a/unsupported.nani#Start",
         "@goto #Start",
         '@choice "Again" goto:#Start'
       ].join("\n")

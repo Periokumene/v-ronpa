@@ -14,10 +14,12 @@ tests require byte-for-byte and digest parity, so generated metadata, source
 updates, materialization, save identity, and caches cannot invent separate
 revision rules.
 
-Entries listed in an app's separate `testScripts` collection are emitted into an
-explicitly named test metadata export, separate from the product `scripts`
-metadata object. Product manifests import only the product export, while
-dedicated test-mode entry modules import the test export. There is no per-entry
+Every config also declares one `entry` locator (`id`, `initialScriptPath`, and
+optional `startLabel`). Named `testCatalogs` each own an independent entry
+locator and ordered script list. Generation emits entry locators, ordered
+catalogs, source indexes, metadata, and preload plans for production and for
+each test catalog. Product manifests import only the product exports, while
+dedicated test-mode entry modules select a named test catalog. There is no per-entry
 `testOnly` marker. The production bundle scan rejects test script paths and
 therefore also guards this tree-shaking boundary.
 
@@ -69,8 +71,8 @@ Density is not duplicated in `character.json`.
 
 ## Catalog-scoped layered-character preparation
 
-The pure layered-character model derives one `LayeredCharacterPreloadPlan` from each compiled RuntimeScript; asset
-generation and the Game A DEV catalog-record transaction call this same projection. It collects explicit
+The pure layered-character model derives one `VnPixiCharacterPreparationPlan` from each compiled RuntimeScript; asset
+generation and the Game A DEV content decorator call the same layered-character projection. It collects explicit
 `@char` character IDs, the default expression `""`, expression changes from `@char` and `@slide`, and applies wildcard
 expressions to every explicit character in the script. IDs and expressions are deduplicated and stably sorted. The plan is
 stored only in generated script metadata beside `scriptRevision` and `assetRefs`; it is not copied into ContentManifest,
@@ -91,8 +93,9 @@ Game A opening currently prepares 16 layers (about 0.09 MiB compressed and 1.18 
 layers (about 2.51 MiB compressed and 29.37 MiB decoded). Preparing the full Ema pack would decode about 111.79 MiB and is
 forbidden as a shared policy.
 
-New-game, cross-script navigation, Devtools preview, and restore wait on the
-app-owned stage handle. Restore adds expressions still visible in the saved Pixi
+`app-vn-shell` owns `usePixiVnScriptPreparation()`, the shared adapter used by
+new-game, cross-script navigation, Devtools Preview, and restore. It waits on the
+stage handle, selects the target script plan, and adds expressions still visible in the saved Pixi
 snapshot. Preparation returns a Result; failure leaves Story/Pixi/UI/media and
 the instruction pointer unchanged, while harmless resource-cache work may remain. Runtime
 requests outside the plan emit `asset-unprepared-character-expression`, switch synchronously to empty, and never initiate a

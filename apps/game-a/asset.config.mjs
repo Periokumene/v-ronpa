@@ -6,13 +6,20 @@ export default {
   exportName: "gameARuntimeAssets",
   fontFacesExportName: "gameAFontFaces",
   fragmentsExportName: "gameARuntimeAssetFragments",
+  entryLocatorExportName: "gameAVnEntryLocator",
   scriptMetadataExportName: "gameAScriptMetadataByPath",
+  scriptCatalogExportName: "gameAScriptCatalog",
   scriptSourcesExportName: "gameAScriptSourcesByPath",
   testScriptOutputPath: "apps/game-a/src/generatedTestScripts.ts",
+  testEntryLocatorsExportName: "gameATestEntryLocators",
   testScriptMetadataExportName: "gameATestScriptMetadataByPath",
+  testScriptCatalogsExportName: "gameATestScriptCatalogs",
   testScriptSourcesExportName: "gameATestScriptSourcesByPath",
-  entryInitialScriptPath: "game-a/opening.nani",
-  entryStartLabel: "Start",
+  entry: {
+    id: "vn:game-a-main",
+    initialScriptPath: "game-a/opening.nani",
+    startLabel: "Start"
+  },
   providers: ["pixi"],
   voiceLocales: ["zh"],
   scripts: [
@@ -25,16 +32,34 @@ export default {
       scriptPath: "game-a/chapter-02.nani"
     }
   ],
-  testScripts: [
-    {
-      sourceFile: "apps/game-a/src/test-nani/smoke.nani",
-      scriptPath: "game-a/test/smoke.nani"
+  testCatalogs: {
+    smoke: {
+      entry: {
+        id: "vn:game-a-test-smoke",
+        initialScriptPath: "game-a/test/smoke.nani",
+        startLabel: "Start"
+      },
+      scripts: [
+        {
+          sourceFile: "apps/game-a/src/test-nani/smoke.nani",
+          scriptPath: "game-a/test/smoke.nani"
+        }
+      ]
     },
-    {
-      sourceFile: "apps/game-a/src/test-nani/character-smoke.nani",
-      scriptPath: "game-a/test/character-smoke.nani"
+    characterSmoke: {
+      entry: {
+        id: "vn:game-a-test-character",
+        initialScriptPath: "game-a/test/character-smoke.nani",
+        startLabel: "Start"
+      },
+      scripts: [
+        {
+          sourceFile: "apps/game-a/src/test-nani/character-smoke.nani",
+          scriptPath: "game-a/test/character-smoke.nani"
+        }
+      ]
     }
-  ],
+  },
   idOverrides: {},
   fontFaceOverrides: {
     "font:fusion-pixel-12px-proportional-zh-hans": {

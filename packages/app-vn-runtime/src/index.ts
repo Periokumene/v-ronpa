@@ -1,6 +1,5 @@
 export { INVALID_VN_START_LABEL_DIAGNOSTIC_CODE } from "./runtimeDiagnostics";
 export { useVnRuntime } from "./useVnRuntime";
-export { compileVnRuntimeCatalog } from "./runtimeCatalog";
 export type { UseVnRuntimeOptions } from "./useVnRuntime";
 export type {
   PresentationTaskObservation,

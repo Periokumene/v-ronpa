@@ -91,6 +91,23 @@ export function deriveLayeredCharacterPreloadPlan(script: RuntimeScript): Layere
     }));
 }
 
+/** Reuses the installed plan when a newly derived plan is semantically equal. */
+export function stabilizeLayeredCharacterPreloadPlan(
+  installed: LayeredCharacterPreloadPlan | undefined,
+  candidate: LayeredCharacterPreloadPlan
+): LayeredCharacterPreloadPlan {
+  if (!installed || installed.length !== candidate.length) return candidate;
+  const equal = installed.every((entry, index) => {
+    const next = candidate[index];
+    return next?.characterId === entry.characterId
+      && next.appearanceExpressions.length === entry.appearanceExpressions.length
+      && entry.appearanceExpressions.every(
+        (expression, expressionIndex) => next.appearanceExpressions[expressionIndex] === expression
+      );
+  });
+  return equal ? installed : candidate;
+}
+
 function stringRuntimeParam(command: RuntimeCommand, key: string): string | undefined {
   const value = command.params[key];
   return typeof value === "string" ? value : undefined;

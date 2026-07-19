@@ -1,20 +1,18 @@
-import type { VnEntryDef, VnRuntimeScriptCatalog } from "@v-ronpa/contracts";
-import type { LayeredCharacterPreloadPlan } from "@v-ronpa/app-vn-shell";
+import type { VnRuntimeDefinition } from "@v-ronpa/app-vn-runtime";
+import type { VnPixiCharacterPreparationPlan } from "@v-ronpa/app-vn-shell";
 import { gameAVnEntry } from "./contentManifest";
 import {
+  gameAScriptCatalog,
   gameAScriptMetadataByPath,
-  gameAScriptSourcesByPath
 } from "./generatedAssets";
 
-export interface GameAStoryDefinition {
-  entry: VnEntryDef;
-  catalog: VnRuntimeScriptCatalog;
-  characterPreloadPlanByScriptPath: Readonly<Record<string, LayeredCharacterPreloadPlan>>;
+export interface GameAStoryDefinition extends VnRuntimeDefinition {
+  characterPreloadPlanByScriptPath: Readonly<Record<string, VnPixiCharacterPreparationPlan>>;
 }
 
 export const gameAStoryDefinition: GameAStoryDefinition = {
   entry: gameAVnEntry,
-  catalog: Object.values(gameAScriptSourcesByPath),
+  catalog: gameAScriptCatalog,
   characterPreloadPlanByScriptPath: Object.fromEntries(
     Object.entries(gameAScriptMetadataByPath).map(([scriptPath, metadata]) => [
       scriptPath,

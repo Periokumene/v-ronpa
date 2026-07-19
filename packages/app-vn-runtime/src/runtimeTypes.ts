@@ -21,6 +21,7 @@ import type {
 export interface VnStoryRuntime {
   state: StoryRuntimeSnapshot;
   active: boolean;
+  executedScriptPaths: readonly string[];
 }
 
 export interface VnInteractionFacts {
@@ -172,10 +173,7 @@ export type VnStartResult =
       message: string;
     };
 
-export type VnScriptPresentationPreparationReason = "start" | "navigation" | "restore" | "debug-preview";
-
 export interface VnScriptPresentationPreparationInput {
-  reason: VnScriptPresentationPreparationReason;
   scriptPath: string;
   pixiStage?: PixiStageSnapshot;
   signal: AbortSignal;
@@ -190,8 +188,8 @@ export type PrepareVnScriptPresentation = (
 ) => Promise<VnScriptPresentationPreparationResult>;
 
 export interface VnRuntimeDefinition {
-  entry: VnEntryDef;
-  catalog: VnRuntimeScriptCatalog;
+  readonly entry: VnEntryDef;
+  readonly catalog: VnRuntimeScriptCatalog;
 }
 
 export interface StartVnStoryOptions {

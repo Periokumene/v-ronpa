@@ -22,13 +22,13 @@ import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import { projectVnRuntimeStep } from "./runtimeProjection";
 import { collectVnSaveCheckpoint } from "./checkpoint";
 import {
-  inspectVnDebugEntry,
+  inspectVnDebugScript,
   materializeVnDebugTarget,
-  type VnDebugEntryInspection
+  type VnDebugScriptInspection
 } from "./debugMaterializer";
 
 function projectLiveCheckpointThroughCommand(
-  inspection: VnDebugEntryInspection,
+  inspection: VnDebugScriptInspection,
   stopCommandIndex: number
 ): SaveableVnState {
   const boot = createVnSession({
@@ -237,7 +237,7 @@ describe("projectVnRuntimeStep", () => {
       scriptPath: "projection-parity.nani",
       sourceText,
     });
-    const inspection = await inspectVnDebugEntry(declaredEntry, source);
+    const inspection = await inspectVnDebugScript(declaredEntry, source);
     const boot = createVnSession({ scriptPath: source.scriptPath, sourceText, startLabel: "Start" });
     const advanced = advanceVnSession(boot.session);
     const projected = projectVnRuntimeStep({
@@ -296,7 +296,7 @@ describe("projectVnRuntimeStep", () => {
         scriptPath: "projection-stable-target-parity.nani",
         sourceText
       });
-      const inspection = await inspectVnDebugEntry(fixture.entry, fixture.source);
+      const inspection = await inspectVnDebugScript(fixture.entry, fixture.source);
       const stopCommand = inspection.commands.find(
         ({ command }) => command.canonicalName === stopCanonicalName
       );

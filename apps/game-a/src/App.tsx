@@ -8,10 +8,9 @@ import {
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings,
   useGameSettingsAdapter,
-  usePixiStageReadiness
+  usePixiVnScriptPreparation
 } from "@v-ronpa/app-vn-shell";
 import { SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS } from "@v-ronpa/media-save";
-import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import { RichTextFontStyles } from "@v-ronpa/ui-kit";
 import { gameAContentManifest } from "./contentManifest";
 import { gameAStoryDefinition, type GameAStoryDefinition } from "./gameAScripts";
@@ -71,37 +70,15 @@ export function GameAAppCore({
   const dialogueBleepSettings = useMemo(() => settingsToDialogueBleepRuntimeSettings(settings.settings), [settings.settings]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
   const startPromiseRef = useRef<Promise<boolean> | undefined>(undefined);
-  const pixiStage = usePixiStageReadiness();
-  const initialCharacterPreloadPlan = storyDefinition.characterPreloadPlanByScriptPath[
-    storyDefinition.entry.initialScriptPath
-  ] ?? [];
-  const prepareScriptPresentation = useCallback(
-    async ({ scriptPath, pixiStage: savedPixiStage, signal }: { scriptPath: string; pixiStage?: PixiStageSnapshot; signal: AbortSignal }) => {
-      if (!(await pixiStage.waitUntilReady()) || signal.aborted || !pixiStage.handle) {
-        return { ok: false as const, code: "pixi-stage-unavailable", message: "The Pixi stage is not ready." };
-      }
-      const basePlan = storyDefinition.characterPreloadPlanByScriptPath[scriptPath] ?? [];
-      const visiblePlan = savedPixiStage
-        ? Object.values(savedPixiStage.charactersById).map((character) => ({
-            characterId: character.id,
-            appearanceExpressions: [character.appearanceExpression]
-          }))
-        : [];
-      const result = await pixiStage.handle.prepareCharacters([...basePlan, ...visiblePlan]);
-      return result.ok
-        ? result
-        : {
-            ok: false as const,
-            code: "character-prepare-failed",
-            message: `Failed to prepare ${result.failures.map((failure) => `${failure.characterId}.${failure.expression || "default"}`).join(", ")}.`
-          };
-    },
-    [pixiStage.handle, pixiStage.waitUntilReady, storyDefinition.characterPreloadPlanByScriptPath]
-  );
+  const pixiPreparation = usePixiVnScriptPreparation({
+    initialScriptPath: storyDefinition.entry.initialScriptPath,
+    plansByScriptPath: storyDefinition.characterPreloadPlanByScriptPath
+  });
+  const pixiStage = pixiPreparation.stage;
   const runtime = useGameAVnRuntime({
     entry: storyDefinition.entry,
     catalog: storyDefinition.catalog,
-    prepareScriptPresentation,
+    prepareScriptPresentation: pixiPreparation.prepareScriptPresentation,
     assetResolver: assetRegistry,
     ...(gameAContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: gameAContentManifest.audio.dialogueBleep } : {}),
     dialogueBleepSettings,
@@ -197,7 +174,7 @@ export function GameAAppCore({
             active={flow.mode === "vn" && runtime.shell.storyRuntime.active}
             assetResolver={assetRegistry}
             characterOutlineEnabled={true}
-            characterPreloadPlan={initialCharacterPreloadPlan}
+            characterPreloadPlan={pixiPreparation.initialCharacterPreloadPlan}
             diagnostics={runtime.diagnostics}
             presentation={runtime.presentation}
             onStageHandleChanged={pixiStage.onStageHandleChanged}

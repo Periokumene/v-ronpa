@@ -97,6 +97,7 @@ export function GameANaniDevtools({
         },
         story: {
           storySession: current.runtime.presentation.storySession,
+          executedScriptPaths: current.runtime.shell.storyRuntime.executedScriptPaths,
           instructionPointer: current.runtime.shell.storyRuntime.state.instructionPointer,
           text: current.runtime.shell.storyRuntime.state.text?.current?.text ?? null,
           variables: current.runtime.shell.storyRuntime.state.variables,
