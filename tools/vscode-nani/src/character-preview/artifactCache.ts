@@ -11,6 +11,7 @@ export class CharacterPreviewArtifactCache {
   private readonly pending = new Map<string, Promise<PreviewArtifact>>();
   private readonly maxArtifacts: number;
   private readonly maxBytes: number;
+  private cleanupQueue: Promise<void> = Promise.resolve();
 
   constructor(
     readonly directory: string,
@@ -22,7 +23,7 @@ export class CharacterPreviewArtifactCache {
 
   async initialize(): Promise<void> {
     await mkdir(this.directory, { recursive: true });
-    await this.cleanup();
+    await this.enqueueCleanup();
   }
 
   getOrCreate(
@@ -60,27 +61,44 @@ export class CharacterPreviewArtifactCache {
       } catch (writeError) {
         if (!isAlreadyExists(writeError)) throw writeError;
       }
-      await this.cleanup(path);
+      await this.enqueueCleanup(path);
     }
     return { fingerprint: preview.fingerprint, path, layerCount: preview.layers.length };
   }
 
+  private enqueueCleanup(protectedPath?: string): Promise<void> {
+    const cleanup = this.cleanupQueue.then(() => this.cleanup(protectedPath));
+    this.cleanupQueue = cleanup.catch(() => undefined);
+    return cleanup;
+  }
+
   private async cleanup(protectedPath?: string): Promise<void> {
     const entries = await readdir(this.directory, { withFileTypes: true });
-    const files = (await Promise.all(entries
+    const discoveredFiles = await Promise.all(entries
       .filter((entry) => entry.isFile() && entry.name.endsWith(".svg"))
       .map(async (entry) => {
         const path = join(this.directory, entry.name);
-        const info = await stat(path);
-        return { path, size: info.size, mtimeMs: info.mtimeMs };
-      })))
+        try {
+          const info = await stat(path);
+          return { path, size: info.size, mtimeMs: info.mtimeMs };
+        } catch (error) {
+          if (isMissing(error)) return undefined;
+          throw error;
+        }
+      }));
+    const files = discoveredFiles
+      .filter((file): file is NonNullable<typeof file> => file !== undefined)
       .sort((left, right) => right.mtimeMs - left.mtimeMs);
     let bytes = files.reduce((sum, file) => sum + file.size, 0);
     let count = files.length;
     for (const file of [...files].reverse()) {
       if (count <= this.maxArtifacts && bytes <= this.maxBytes) break;
       if (file.path === protectedPath) continue;
-      await unlink(file.path);
+      try {
+        await unlink(file.path);
+      } catch (error) {
+        if (!isMissing(error)) throw error;
+      }
       bytes -= file.size;
       count -= 1;
     }

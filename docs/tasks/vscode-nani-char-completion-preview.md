@@ -18,7 +18,7 @@
 - State: `Review`
 - Owner: `Codex`
 - Created: `2026-07-18`
-- Updated: `2026-07-18`
+- Updated: `2026-07-19`
 - Completed Commit: `This task's final implementation commit`
 - Archive Target: `docs/archive/completed-tasks/vscode-nani-char-completion-preview.md`
 
@@ -86,6 +86,7 @@ Required regression cases:
 - Rejection: missing/changed assets and invalid document versions do not attach stale preview documentation.
 - No-op: character IDs, non-character resources, commands, params, labels, and snippets retain their existing documentation and never invoke the preview engine.
 - Compatibility: existing character Hover continues to work.
+- Cache boundary: when the global SVG LRU is already at its artifact limit, resolving the candidate contribution and projected complete-character previews concurrently succeeds without cleanup races.
 
 Test placement:
 
@@ -96,7 +97,7 @@ Test placement:
 
 Allowed:
 
-- Change only `tools/vscode-nani/package.json` version from `0.4.0` to `0.5.0` for the new feature.
+- Change only `tools/vscode-nani/package.json` version from `0.4.0` to `0.5.0` for the new feature and to `0.5.1` for the cache-race hotfix.
 - Do not add, remove, or update dependencies.
 - Do not edit `pnpm-lock.yaml`.
 
@@ -176,6 +177,22 @@ Evidence is stored only in ignored `output/vscode-nani-char-completion-preview/`
   - `output/vscode-nani-char-completion-preview/MOUTH0-complete.png`
   - Temporary edits to `opening.nani` were undone; `apps/**` has no diff.
 - Residual UX note: VS Code owns whether the completion details pane is expanded. The extension supplies native documentation but does not force-open or focus it; once expanded, candidate selection drives lazy preview resolution.
+
+### 0.5.1 Cache Race Hotfix
+
+- Root cause: completion resolution creates the candidate contribution and complete-character SVGs concurrently. At the 64-artifact cache limit, both cleanup passes could observe the same old entry and attempt to delete it; the second `unlink` raised `ENOENT`, which surfaced as “无法生成预览”.
+- Serialized artifact-cache cleanup and made concurrent filesystem disappearance idempotent for both metadata reads and deletion. Rendering remains concurrent; only the short LRU maintenance pass is queued.
+- Added a regression that saturates a two-entry cache and concurrently creates two different protected artifacts, then verifies both returned files exist and the LRU remains within its limit.
+- Verification:
+  - `pnpm --filter v-ronpa-nani test`: 13 files / 90 tests passed.
+  - `pnpm --filter v-ronpa-nani test:extension`: 10 tests passed.
+  - `pnpm --filter v-ronpa-nani check-types`, `build:prod`, and `package:vsix`: passed.
+  - Reloaded the installed extension and exercised completion previews at the real 64-artifact cache limit. `EYE1`, `MOUTH0`, and `MOUTH6` each displayed both candidate and complete-character images; the new extension-host output log contained no preview error or `ENOENT`.
+- VSIX:
+  - `/Users/periokumene/Dev/v-ronpa/tools/vscode-nani/v-ronpa-nani-0.5.1.vsix`
+  - SHA-256: `045ef63a61bb62f13df2478a2b51206cb8b5a40011ab62fcc2de16ca5339b296`
+  - Installed version: `v-ronpa.v-ronpa-nani@0.5.1`.
+  - Installed and built bundle SHA-256 both equal `c8faccdb6bebcc5204c4f8af966ca6287e72ef1262e1bc0b0e16d7ec4898e1f3`.
 
 ## Merge Target
 

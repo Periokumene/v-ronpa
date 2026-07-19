@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -40,6 +40,27 @@ describe("character preview artifact cache", () => {
     await cache.getOrCreate(preview("a"), renderer);
     await cache.getOrCreate(preview("b"), renderer);
     await cache.getOrCreate(preview("c"), renderer);
+    expect(readdirSync(root).filter((name) => name.endsWith(".svg"))).toHaveLength(2);
+  });
+
+  it("serializes cleanup when different artifacts fill a saturated cache concurrently", async () => {
+    const root = tempRoot();
+    const cache = new CharacterPreviewArtifactCache(root, { maxArtifacts: 2, maxBytes: 1024 });
+    await cache.initialize();
+    const renderer: CharacterPreviewArtifactRenderer = { render: () => "<svg>fixture</svg>" };
+    const first = await cache.getOrCreate(preview("a"), renderer);
+    const second = await cache.getOrCreate(preview("b"), renderer);
+    const oldTime = new Date(1_000);
+    utimesSync(first.path, oldTime, oldTime);
+    utimesSync(second.path, oldTime, oldTime);
+
+    const [complete, contribution] = await Promise.all([
+      cache.getOrCreate(preview("complete"), renderer),
+      cache.getOrCreate(preview("contribution"), renderer)
+    ]);
+
+    expect(existsSync(complete.path)).toBe(true);
+    expect(existsSync(contribution.path)).toBe(true);
     expect(readdirSync(root).filter((name) => name.endsWith(".svg"))).toHaveLength(2);
   });
 });
