@@ -11,8 +11,7 @@ describe("game-a content manifest", () => {
     expect(gameAContentManifest.vnEntries).toHaveLength(1);
     expect(gameAContentManifest.vnEntries[0]).toMatchObject({
       id: gameAVnEntry.id,
-      scriptPath: gameAVnEntry.scriptPath,
-      scriptRevision: gameAVnEntry.scriptRevision
+      initialScriptPath: gameAVnEntry.initialScriptPath
     });
     expect(new Set(gameAVnEntry.assetRefs.map((ref) => ref.id))).toEqual(
       new Set([
@@ -30,7 +29,7 @@ describe("game-a content manifest", () => {
     );
     expect(
       gameAContentManifest.vnEntries.every(
-        (entry) => !entry.id.startsWith("vn:game-a-test-") && !entry.scriptPath.startsWith("game-a/test/")
+        (entry) => !entry.id.startsWith("vn:game-a-test-") && !entry.initialScriptPath.startsWith("game-a/test/")
       )
     ).toBe(true);
     expect(gameAContentManifest.assets).toEqual([

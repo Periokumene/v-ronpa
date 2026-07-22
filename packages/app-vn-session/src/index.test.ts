@@ -11,6 +11,7 @@ import {
   restoreVnSession,
   stepVnSessionInstruction,
   submitVnSessionInput,
+  switchVnSessionScript,
   toggleVnSessionAuto,
   toggleVnSessionSkip
 } from "./index";
@@ -79,6 +80,39 @@ Narrator: First.`,
     expect(chosen.session.story.variables.route).toBe("right");
     expect(snapshot.story.variables.route).toBe("right");
     expect(restored.story.variables.route).toBe("right");
+  });
+
+  it("switches scripts while preserving story and play state and clearing transient boundaries", () => {
+    const first = createVnSession({
+      scriptPath: "game/opening.nani",
+      sourceText: '#Start\n@set route:"milk"\nNarrator: Before.\n@choice "Continue" goto:game/chapter-02.nani#Start',
+      startLabel: "Start"
+    });
+    const before = advanceVnSession(first.session, "start");
+    const choices = advanceVnSession(before.session, "manual");
+    const requested = chooseVnSessionOption(toggleVnSessionAuto(choices.session), 0);
+    const target = createVnSession({
+      scriptPath: "game/chapter-02.nani",
+      sourceText: "#Start\nNarrator: After.\n@end"
+    });
+    const switched = switchVnSessionScript(requested.session, {
+      script: target.session.script,
+      instructionPointer: target.session.script.labels.Start ?? 0
+    });
+
+    expect(requested.playStep.story.navigationRequest).toEqual({ endpoint: "game/chapter-02.nani#Start" });
+    expect(switched.story).toMatchObject({
+      currentScriptPath: "game/chapter-02.nani",
+      instructionPointer: 0,
+      variables: { route: "milk" },
+      backlog: [{ speaker: "Narrator", text: "Before." }],
+      pendingChoices: [],
+      ended: false
+    });
+    expect(switched.story.text?.current?.text).toBe("Before.");
+    expect(switched.story.presentationWait).toBeUndefined();
+    expect(switched.story.runtimeWait).toBeUndefined();
+    expect(switched.play).toEqual(requested.session.play);
   });
 
   it("resolves choices without advancing and reports invalid decisions", () => {

@@ -1,34 +1,38 @@
-import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
 import {
   EMPTY_VN_DEBUG_DECISION_TRACE,
-  inspectVnDebugEntry,
+  inspectVnDebugScript,
   materializeVnDebugTarget,
-  resolveVnDebugAnchor,
   type VnDebugDecisionTrace,
-  type VnDebugEntryInspection,
+  type VnDebugScriptInspection,
   type VnDebugMaterializationResult,
   type VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
 import type { NaniDevtoolsViteInitialCandidate } from "./viteProtocol";
+import {
+  replaceVnDevtoolsCandidateSource,
+  validateVnDevtoolsCandidateCatalog,
+  type VnDevtoolsScriptCandidate
+} from "./scriptCandidate";
 
 export type PreparedVnDevtoolsInitialCandidate =
   | {
       kind: "retain-read-only";
-      inspection: VnDebugEntryInspection;
-      reason: "invalid-source" | "revision-mismatch" | "identity-mismatch" | "source-mismatch" | "target-invalid";
+      inspection: VnDebugScriptInspection;
+      reason: "invalid-source" | "revision-mismatch" | "catalog-link-error" | "identity-mismatch";
+      message?: string;
     }
   | {
       kind: "materialize-pinned-target";
-      inspection: VnDebugEntryInspection;
+      inspection: VnDebugScriptInspection;
       expectedRevision: string;
       result: VnDebugMaterializationResult;
     }
-  | { kind: "adopt-for-next-start"; inspection: VnDebugEntryInspection; expectedRevision: string }
-  | { kind: "require-preview-target"; inspection: VnDebugEntryInspection; expectedRevision: string }
-  | { kind: "ready"; inspection: VnDebugEntryInspection; expectedRevision: string };
+  | { kind: "adopt-for-next-start"; inspection: VnDebugScriptInspection; expectedRevision: string }
+  | { kind: "require-preview-target"; inspection: VnDebugScriptInspection; expectedRevision: string }
+  | { kind: "ready"; inspection: VnDebugScriptInspection; expectedRevision: string };
 
 export interface PrepareVnDevtoolsInitialCandidateInput {
-  activeEntry: VnRuntimeEntry;
+  activeCandidate: VnDevtoolsScriptCandidate;
   candidate: NaniDevtoolsViteInitialCandidate;
   pinnedTarget?: VnDebugTargetAnchor;
   decisions?: VnDebugDecisionTrace;
@@ -41,7 +45,7 @@ export interface PrepareVnDevtoolsInitialCandidateInput {
  * adoption is exposed until the Vite server digest and browser digest agree.
  */
 export async function prepareVnDevtoolsInitialCandidate({
-  activeEntry,
+  activeCandidate,
   candidate,
   decisions = EMPTY_VN_DEBUG_DECISION_TRACE,
   pinnedTarget,
@@ -49,27 +53,20 @@ export async function prepareVnDevtoolsInitialCandidate({
   vnActive
 }: PrepareVnDevtoolsInitialCandidateInput): Promise<PreparedVnDevtoolsInitialCandidate> {
   throwIfAborted(signal);
-  if (candidate.entryId !== activeEntry.id || candidate.scriptPath !== activeEntry.scriptPath) {
+  if (candidate.entryId !== activeCandidate.entry.id || candidate.scriptPath !== activeCandidate.source.scriptPath) {
     return {
       kind: "retain-read-only",
-      inspection: await inspectVnDebugEntry(activeEntry),
+      inspection: await inspectVnDebugScript(activeCandidate.entry, activeCandidate.source),
       reason: "identity-mismatch"
     };
   }
-  if (candidate.sourceText !== activeEntry.sourceText) {
-    return {
-      kind: "retain-read-only",
-      inspection: await inspectVnDebugEntry(activeEntry),
-      reason: "source-mismatch"
-    };
-  }
-
-  const candidateEntry: VnRuntimeEntry = {
-    ...activeEntry,
+  const candidateSource = {
+    ...activeCandidate.source,
     sourceText: candidate.sourceText,
-    scriptRevision: candidate.serverRevision ?? activeEntry.scriptRevision
+    scriptRevision: candidate.serverRevision ?? activeCandidate.source.scriptRevision
   };
-  const inspection = await inspectVnDebugEntry(candidateEntry);
+  const candidateCatalog = replaceVnDevtoolsCandidateSource(activeCandidate, candidateSource);
+  const inspection = await inspectVnDebugScript(activeCandidate.entry, candidateSource);
   throwIfAborted(signal);
   if (!candidate.serverRevision || !inspection.canMaterialize) {
     return { kind: "retain-read-only", inspection, reason: "invalid-source" };
@@ -77,17 +74,24 @@ export async function prepareVnDevtoolsInitialCandidate({
   if (inspection.revision !== candidate.serverRevision) {
     return { kind: "retain-read-only", inspection, reason: "revision-mismatch" };
   }
+  const catalogValidation = await validateVnDevtoolsCandidateCatalog(candidateCatalog);
+  throwIfAborted(signal);
+  if (!catalogValidation.ok) {
+    return {
+      kind: "retain-read-only",
+      inspection,
+      reason: catalogValidation.code,
+      message: catalogValidation.message
+    };
+  }
 
   const expectedRevision = candidate.serverRevision;
   if (pinnedTarget) {
-    const resolvedTarget = resolveVnDebugAnchor(inspection, pinnedTarget);
-    if (!resolvedTarget) {
-      return { kind: "retain-read-only", inspection, reason: "target-invalid" };
-    }
     const result = await materializeVnDebugTarget({
       entry: inspection.entry,
+      catalog: candidateCatalog.catalog,
       inspection,
-      target: resolvedTarget,
+      target: pinnedTarget,
       decisions,
       expectedRevision,
       ...(signal ? { signal } : {})
@@ -95,7 +99,7 @@ export async function prepareVnDevtoolsInitialCandidate({
     throwIfAborted(signal);
     return { kind: "materialize-pinned-target", inspection, expectedRevision, result };
   }
-  if (expectedRevision !== activeEntry.scriptRevision) {
+  if (expectedRevision !== activeCandidate.source.scriptRevision) {
     return vnActive
       ? { kind: "require-preview-target", inspection, expectedRevision }
       : { kind: "adopt-for-next-start", inspection, expectedRevision };

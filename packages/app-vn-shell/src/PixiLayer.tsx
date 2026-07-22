@@ -6,16 +6,24 @@ import {
   type PixiPresenterDiagnostic,
   type PixiPresentationTaskSnapshot,
   type PixiPresenterPort,
-  type LayeredCharacterPreloadPlan,
   type PixiThumbnailMime,
   type PixiThumbnailCaptureOptions,
   type PixiThumbnailCaptureResult,
+  type PixiCharacterPreparationResult,
 } from "@v-ronpa/pixi-presenter";
 import type { PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
 import type { PresentationTaskObservation } from "@v-ronpa/app-vn-runtime";
 
+export interface VnPixiCharacterPreparationPlanEntry {
+  readonly characterId: string;
+  readonly appearanceExpressions: readonly string[];
+}
+
+export type VnPixiCharacterPreparationPlan = readonly VnPixiCharacterPreparationPlanEntry[];
+
 export interface PixiStageHandle {
   ready: Promise<void>;
+  prepareCharacters(plan: VnPixiCharacterPreparationPlan): Promise<PixiCharacterPreparationResult>;
   captureThumbnail<Mime extends PixiThumbnailMime = "image/webp">(
     options?: PixiThumbnailCaptureOptions<Mime>
   ): Promise<PixiThumbnailCaptureResult<Mime> | undefined>;
@@ -32,7 +40,7 @@ export interface PixiLayerProps {
   // Host surface.
   visible: boolean;
   characterOutlineEnabled: boolean;
-  characterPreloadPlan: LayeredCharacterPreloadPlan;
+  characterPreloadPlan: VnPixiCharacterPreparationPlan;
   assetResolver?: PixiAssetResolver;
 
   // Render side effects.
@@ -61,6 +69,7 @@ export function PixiLayer({
   const onTasksChangedRef = useRef<typeof onTasksChanged>(onTasksChanged);
   const onDiagnosticRef = useRef<typeof onDiagnostic>(onDiagnostic);
   const onStageHandleChangedRef = useRef<typeof onStageHandleChanged>(onStageHandleChanged);
+  const initialCharacterPreloadPlanRef = useRef(characterPreloadPlan);
 
   useEffect(() => {
     onTasksChangedRef.current = onTasksChanged;
@@ -81,7 +90,7 @@ export function PixiLayer({
       host,
       active: visible,
       characterOutlineEnabled,
-      characterPreloadPlan,
+      characterPreloadPlan: initialCharacterPreloadPlanRef.current,
       ...(assetResolver ? { assetResolver } : {}),
       onDiagnostic: (diagnostic: PixiPresenterDiagnostic) => onDiagnosticRef.current?.(diagnostic),
       onTasksChanged: (tasks: PixiPresentationTaskSnapshot[]) => onTasksChangedRef.current?.(tasks)
@@ -92,6 +101,7 @@ export function PixiLayer({
     const ready = presenter.mount();
     onStageHandleChangedRef.current?.({
       ready,
+      prepareCharacters: (plan) => presenter.prepareCharacters(plan),
       captureThumbnail: (captureOptions) => presenter.captureThumbnail(captureOptions)
     });
     void ready.then(() => {
@@ -102,7 +112,7 @@ export function PixiLayer({
       presenter.destroy();
       presenterRef.current = null;
     };
-  }, [assetResolver, characterOutlineEnabled, characterPreloadPlan]);
+  }, [assetResolver, characterOutlineEnabled]);
 
   useEffect(() => {
     presenterRef.current?.setActive(visible);

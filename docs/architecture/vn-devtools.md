@@ -9,18 +9,21 @@ VS Code save
   -> allowlisted Vite source event
   -> Node + browser parse/compile/revision check
   -> headless stable-state materialization
-  -> app-owned atomic restore
+  -> shared host transaction + app policy callback
   -> Story/Pixi/UI/persistent-media inspection
 ```
 
 `app-vn-runtime/debug` owns source inspection, stable anchors, decision traces,
-and materialization. `app-vn-devtools` owns the reusable controller hook,
-latest-wins/serial-commit coordination, Dock, tab-session data, and Vite bridge.
-Game A owns only the active launch definition (entry plus derived character
-preload plan), flow transition, and atomic checkpoint commit.
+materialization, and materialization provenance. `app-vn-devtools` owns the
+reusable controller hook, per-script authority coordinator, HMR impact
+classification, latest-wins/serial host transaction, definition rollback,
+Dock, tab-session data, and Vite bridge. Game A owns only one story definition
+(entry, runtime catalog, and character plans by script path), the lightweight
+candidate-plan decorator, `gameId`, flow transition, diagnostics, and layout.
 Its product `App` module contains the ordinary game composition only; a
-compile-time DEV branch lazy-loads a separate host module containing the entry
-swap/restore transaction and Dock. `app-vn-shell` remains the product interaction
+compile-time DEV branch lazy-loads a separate host module which calls the shared
+transaction hook and mounts the Dock. `app-vn-shell` owns product interaction
+and Pixi script-presentation preparation.
 surface. Harness uses the explicit read-only runtime snapshot but does not mount
 the workbench.
 
@@ -34,7 +37,7 @@ leakage.
 ## One execution authority
 
 Inspection parses and compiles the current source and computes its canonical
-semantic revision. Materialization starts at the entry's authored start label,
+semantic revision. Materialization starts at the entry's authored initial script/start label,
 uses `stepVnSessionInstruction()` for Story behavior, and sends each result
 through the same `projectVnRuntimeStep()` used by the live runtime. It never
 mutates React state, renderers, media handles, saves, or browser storage.
@@ -44,7 +47,9 @@ choice/input sequence produce the same saveable checkpoint at the same stable
 position as normal play. The checkpoint contains Story, terminal Pixi, UI
 visibility, BGM intent, and looping-SFX intent. Transient animation, waits,
 hints/tasks, dialog reveal, toasts, one-shots, voice, movies, timers, and playback
-cursors are intentionally absent.
+cursors are intentionally absent. It follows the same linked catalog endpoints
+and tab-local decision trace across scripts, so a later-file target contains all
+preceding Story/Pixi/UI/media state.
 
 The materializer returns a strict result union:
 
@@ -75,18 +80,21 @@ are discarded when semantic identity can no longer be proven.
 
 ## Source updates and atomic commit
 
-The Vite bridge watches only configured `.nani` files. Its DEV virtual module
+The Vite bridge watches every `.nani` in the configured production catalog. Its DEV virtual module
 provides an initial Node-inspected source, diagnostics, and revision, so a manual
-refresh uses the same two-sided verification as a later save. The initial
-candidate must also match the app's active `?raw` source byte-for-byte; the Vite
+refresh uses the same two-sided verification as a later save. The generated
+catalog is the last-known-good runtime input, not a second source authority: a
+newer saved `.nani` may legitimately differ from it on first load. The Vite
 bridge invalidates its virtual snapshot before awaiting HMR inspection, closing
-the save/refresh race. Every HMR candidate
+the save/refresh race, while Node's semantic revision, the browser's independent
+semantic revision, and a full-catalog link pass jointly authorize that saved
+candidate. Every HMR candidate
 carries a monotonic update ID, current source, diagnostics, and a server revision.
 Parser/compiler diagnostics carry their original half-open UTF-16 `TextSpan`
 through the Vite protocol; bridge failures without a source token remain
 location-free rather than receiving a guessed span.
-The browser independently inspects the exact same source; a source or digest
-disagreement blocks the candidate. Receiving an update synchronously freezes the
+The browser independently inspects the exact same source; a digest disagreement
+or any broken catalog endpoint blocks the candidate. Receiving an update synchronously freezes the
 old source's Preview authority even before React paints its read-only state, so a
 consumed update ID cannot be stolen by a stale click.
 
@@ -99,31 +107,53 @@ adoptions and commits share one serial queue. Cancellation is only a ticket up t
 host acceptance: after `restoreVnState()` succeeds, that transaction is
 irrevocable and finishes observing its new Story session before queued work runs.
 Superseded queued work is skipped and the newest valid candidate runs next.
-Compiler errors keep the last-known-good running launch and scene.
+Compiler or catalog-link errors keep the last-known-good catalog record and scene.
 
-If a revision changes while a fixed point exists, Game A rematerializes that
-anchor. Without a fixed point, an inactive runtime adopts the entry for the next
-new game; an active runtime keeps the current entry until the developer chooses
-a preview target. A semantic no-op source update refreshes line mapping without
-reinstalling presentation state.
+The runtime exposes the ordered, deduplicated script paths that actually
+contributed to the current story session. This includes intermediate scripts
+crossed without a React render; restore starts a new history containing only
+the restored script, and reset clears it. The controller consumes that history
+instead of inferring visits from viewed files, fixed points, or React renders.
+If the current or an already-executed script changes, an existing fixed point is
+rematerialized through the candidate catalog; without a fixed point, the
+last-known-good catalog remains installed until the user chooses a Preview
+target. A valid update to a script not involved in the current session replaces
+only that catalog record for a future goto. Candidate revision authentication
+always applies to the updated record, even when the fixed-point target belongs
+to another script. A semantic no-op update remaps a fixed anchor only when the
+anchor belongs to that record; fixed points in other scripts are unaffected.
 
-Game A is the only mutation authority. It installs a successful candidate by:
+One pure per-script authority coordinator owns installed candidate identities,
+expected host identities, inspection/status/diagnostic caches, Preview
+authorization, and update badges. Switching `viewedScriptPath` changes
+Workbench state only: it never replays,
+remaps, or invalidates a fixed point owned by another script. A persisted fixed
+point is restored once at controller boot through the complete catalog, even if
+the tab reopens while viewing a different script. Once source/revision/catalog
+verification succeeds, a failed or stale fixed-point restore does not turn the
+verified source into an untrusted single-script mapping.
 
-1. verifying the candidate again and deriving its layered-character preload plan
-   from the same compiled script used for its revision;
+The shared `useVnDevtoolsHostTransaction()` is the only host mutation mechanism.
+It installs a successful candidate by:
+
+1. verifying the complete candidate catalog again, then invoking an app policy
+   callback; Game A's callback only derives that script's layered-character plan
+   from the already-verified inspection;
    an equivalent plan reuses the installed plan reference so source-only or
    non-character changes do not remount Pixi;
-2. holding the candidate launch definition and pending checkpoint together;
+2. holding the candidate catalog record and pending checkpoint together;
 3. publishing controller acceptance only after async verification completes,
-   atomically rendering that entry and plan, then calling `restoreVnState()`
-   before paint;
-4. rolling back the whole launch definition only if restore rejects before
+   rendering that definition, then awaiting `restoreVnState()` without
+   a partial Story/Pixi/UI/media commit;
+4. rolling back the whole story definition only if restore rejects before
    mutation;
 5. treating successful restore as the non-cancellable linearization point,
    entering VN flow, and waiting for exactly one new presentation session before
    reporting success.
 
-Restore validates game, entry, and revision before mutation. The workbench never
+`useVnDevtoolsDefinitionState()` owns the active definition, synchronized ref,
+pending definition, and rollback owner. Restore validates game, entry, and
+revision before mutation. The workbench never
 writes the save database, and it never stores checkpoints or source text.
 
 ## Source-first IDE workspace
@@ -139,6 +169,11 @@ independently scrolling full source
 resizable Problems / State / transient Branch panel
 revision + current + pin + update + message status bar
 ```
+
+The file bar exposes an accessible, keyboard-operated script listbox. The
+controller keeps `viewedScriptPath` separate from the runtime's
+`currentScriptPath`; selecting a file changes only inspection state and records
+the viewed path in the v3 tab session.
 
 The source is always the main stage and always keeps every authored line in its
 original order. IDE Find matches source characters, labels, command metadata,
@@ -182,8 +217,8 @@ after the host has accepted a checkpoint; and Resolve decision while Branch
 needs focus. The host-acceptance boundary is therefore visible and never
 pretends that an accepted restore can be rolled back.
 
-Layout persistence is schema v2 and is a hard cut: v1 values are ignored rather
-than migrated. A tab stores only collapsed state, Dock width, bottom-panel open
+Layout persistence is schema v3 and is a hard cut: older values are ignored rather
+than migrated. A tab stores only collapsed state, Dock width, viewed script path, bottom-panel open
 state, persisted State/Problems page, clamped `120–360px` panel height, fixed
 anchor, and temporary decision trace. Search, current match, selected line,
 Symbols/Find popovers, source, diagnostics, and checkpoints are never persisted.
@@ -249,16 +284,15 @@ view, and leave the exact token underline visible. Presenter/asset warning or er
 diagnostics promote the visible workbench status to `degraded`, including errors
 that arrive asynchronously after a stable checkpoint was installed.
 
-On browser refresh the v2 session values trigger fresh Node/browser source
-verification, inspection, anchor resolution, and materialization. Source errors
+On browser refresh the v3 session values trigger fresh Node/browser source
+verification, full-catalog linking, anchor resolution, and materialization. Source errors
 or handshake mismatches after refresh show diagnostics and a neutral game
 surface rather than restoring an unverified old visual scene.
 
 ## Explicit non-goals
 
-The first version does not provide in-browser source editing, file writes,
+The workbench does not provide in-browser source editing, file writes,
 editor integration, a command sandbox, real-time snippet replay, authored
 fixtures, variable overrides, named route presets, a CLI, semantic debug URLs,
-worker execution, persistent checkpoint graphs, host-state transactions, or new
-Nani syntax. The wait command remains catalog-stubbed pending its timer and
-pacing correctness project.
+worker execution, persistent checkpoint graphs, chapter trees, script graphs,
+dynamic endpoints, host-state transactions, or new Nani syntax.

@@ -10,6 +10,7 @@ import { parseScenario } from "@v-ronpa/nani-parser";
 import {
   compileRuntimeScript,
   digestRuntimeScriptSemantics,
+  linkRuntimeScriptCatalog,
   serializeRuntimeScriptSemantics
 } from "./index";
 import { assertCommandNormalizerRegistry } from "./normalizers";
@@ -20,6 +21,52 @@ function diagnosticSummaries(diagnostics: ReturnType<typeof compileRuntimeScript
 }
 
 describe("nani runtime compiler", () => {
+  it("links local, direct goto, and choice endpoints against one catalog", () => {
+    const opening = compileRuntimeScript(parseScenario({
+      scriptPath: "game-a/opening.nani",
+      sourceText: [
+        "#Start",
+        "@goto #Start",
+        "@goto game-a/chapter-02.nani",
+        '@choice "Continue" goto:game-a/chapter-02.nani#Start'
+      ].join("\n")
+    })).script;
+    const chapter = compileRuntimeScript(parseScenario({
+      scriptPath: "game-a/chapter-02.nani",
+      sourceText: "#Start\n@end"
+    })).script;
+
+    expect(linkRuntimeScriptCatalog(
+      { initialScriptPath: opening.scriptPath, startLabel: "Start" },
+      [opening, chapter]
+    ).diagnostics).toEqual([]);
+  });
+
+  it.each([
+    ["duplicate-script-path", "@end", "duplicate"],
+    ["endpoint-script-missing", "@goto game-a/missing.nani", "missing script"],
+    ["endpoint-label-missing", "@goto game-a/chapter-02.nani#Missing", "missing label"],
+    ["endpoint-relative-path", "@goto ../chapter-02.nani", "relative"],
+    ["endpoint-wildcard", "@goto game-a/*.nani", "wildcard"],
+    ["endpoint-not-static", "@goto {targetScript}", "dynamic"],
+    ["endpoint-script-extension-required", "@goto game-a/chapter-02", "extension"]
+  ] as const)("rejects %s catalog navigation (%s)", (code, command, _description) => {
+    const opening = compileRuntimeScript(parseScenario({
+      scriptPath: "game-a/opening.nani",
+      sourceText: command
+    })).script;
+    const chapter = compileRuntimeScript(parseScenario({
+      scriptPath: code === "duplicate-script-path" ? opening.scriptPath : "game-a/chapter-02.nani",
+      sourceText: "#Start\n@end"
+    })).script;
+    const linked = linkRuntimeScriptCatalog(
+      { initialScriptPath: opening.scriptPath },
+      [opening, chapter]
+    );
+
+    expect(linked.diagnostics.map((diagnostic) => diagnostic.code)).toContain(code);
+  });
+
   it("keeps an explicit normalizer for every implemented catalog command", () => {
     expect(assertCommandNormalizerRegistry).not.toThrow();
   });

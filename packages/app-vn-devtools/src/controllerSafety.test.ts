@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type {
   VnDebugDecisionTrace,
-  VnDebugEntryInspection,
+  VnDebugScriptInspection,
   VnDebugMaterializationDecisionRequired,
   VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
@@ -22,12 +22,19 @@ describe("VN devtools controller safety", () => {
   it("keeps a rejected candidate visible without granting materialization access", () => {
     const entry = {
       id: "opening",
+      title: "Opening",
+      initialScriptPath: "game-a/opening.nani",
+      startLabel: "Start",
+      profile: "vn2d" as const,
+      assetRefs: []
+    };
+    const source = {
       scriptPath: "game-a/opening.nani",
       scriptRevision: "sha256:verified",
-      sourceText: "#Start\nNarrator: Hello.",
-      startLabel: "Start"
+      sourceText: "#Start\nNarrator: Hello."
     };
-    const inspection = { entry, canMaterialize: true } as VnDebugEntryInspection;
+    const candidate = { entry, source, catalog: [source] };
+    const inspection = { entry, source, canMaterialize: true } as unknown as VnDebugScriptInspection;
     const rejected = createReadOnlyVnDevtoolsInspectionDisplay(inspection);
     const accepted = createInstallableVnDevtoolsInspectionDisplay(inspection, "sha256:verified");
 
@@ -41,11 +48,15 @@ describe("VN devtools controller safety", () => {
       expectedRevision: "sha256:verified"
     });
     expect(canMaterializeVnDevtoolsInspection(rejected)).toBe(false);
-    expect(canPinCurrentVnDevtoolsInspection(rejected, entry)).toBe(false);
+    expect(canPinCurrentVnDevtoolsInspection(rejected, candidate)).toBe(false);
     expect(canMaterializeVnDevtoolsInspection(accepted)).toBe(true);
-    expect(canPinCurrentVnDevtoolsInspection(accepted, entry)).toBe(true);
-    expect(canReauthorizeVnDevtoolsInspection(rejected, entry)).toBe(true);
-    expect(canReauthorizeVnDevtoolsInspection(rejected, { ...entry, sourceText: "changed" })).toBe(false);
+    expect(canPinCurrentVnDevtoolsInspection(accepted, candidate)).toBe(true);
+    expect(canReauthorizeVnDevtoolsInspection(rejected, candidate)).toBe(true);
+    expect(canReauthorizeVnDevtoolsInspection(rejected, {
+      ...candidate,
+      source: { ...source, sourceText: "changed" },
+      catalog: [{ ...source, sourceText: "changed" }]
+    })).toBe(false);
   });
 
   it("freezes stale preview synchronously when a source update starts", () => {
@@ -63,18 +74,18 @@ describe("VN devtools controller safety", () => {
     const currentAnchor = anchor("current");
     const inspection = {
       commands: [{ anchor: currentAnchor }]
-    } as VnDebugEntryInspection;
+    } as VnDebugScriptInspection;
 
     expect(resolveCurrentVnDevtoolsAnchor({
       inspection,
       instructionPointer: 0,
-      mapsInstalledEntry: true,
+      mapsInstalledScript: true,
       runtimeActive: false
     })).toBeUndefined();
     expect(resolveCurrentVnDevtoolsAnchor({
       inspection,
       instructionPointer: 1,
-      mapsInstalledEntry: true,
+      mapsInstalledScript: true,
       runtimeActive: true
     })).toBe(currentAnchor);
   });

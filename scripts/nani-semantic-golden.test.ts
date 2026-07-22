@@ -22,7 +22,8 @@ describe("Nani semantic golden from integration baseline", () => {
     expect(golden.canonicalization).toBe("stable-json-v1");
     expect(diagnosticGolden.baseline).toBe(golden.baseline);
     expect(golden.intentionalOverrides).toEqual({
-      "game-a-smoke": "Editor Tools moves the visual/audio setup before the first stable Workbench target and records its route/text identity."
+      "game-a-smoke": "Editor Tools moves the visual/audio setup before the first stable Workbench target and records its route/text identity.",
+      "game-a-production-catalog": "The accepted multi-Nani hard cut splits the former MILKBEGIN segment into chapter-02 and links it from opening with one static endpoint."
     });
   });
 

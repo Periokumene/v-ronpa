@@ -5,12 +5,14 @@ import {
   type VnMediaCheckpoint,
   type VnUiCheckpoint
 } from "@v-ronpa/contracts";
-import type { VnRestoreResult, VnRuntimeEntry, VnSaveCheckpointResult } from "./runtimeTypes";
+import type { VnRestoreResult, VnSaveCheckpointResult } from "./runtimeTypes";
 
 export function collectVnSaveCheckpoint({
   active,
   allowInactive = false,
-  entry,
+  entryId,
+  script,
+  transitionActive = false,
   pixiStage,
   story,
   media,
@@ -18,12 +20,17 @@ export function collectVnSaveCheckpoint({
 }: {
   active: boolean;
   allowInactive?: boolean;
-  entry: Pick<VnRuntimeEntry, "id" | "scriptRevision">;
+  entryId: string;
+  script: { scriptPath: string; scriptRevision: string };
+  transitionActive?: boolean;
   pixiStage: PixiStageSnapshot;
   story: StoryRuntimeSnapshot;
   media: VnMediaCheckpoint;
   ui: VnUiCheckpoint;
 }): VnSaveCheckpointResult {
+  if (transitionActive) {
+    return { ok: false, code: "script-transition", message: "VN checkpoints cannot be created during script navigation." };
+  }
   if ((!allowInactive && !active) || story.ended) {
     return { ok: false, code: "inactive-entry", message: "VN checkpoints require an active story entry." };
   }
@@ -43,8 +50,8 @@ export function collectVnSaveCheckpoint({
   return {
     ok: true,
     value: {
-      entryId: entry.id,
-      scriptRevision: entry.scriptRevision,
+      entryId,
+      script,
       story: createSaveableStorySnapshot(story),
       pixiStage,
       media,
@@ -56,17 +63,17 @@ export function collectVnSaveCheckpoint({
 export function validateVnRestoreIdentity({
   expectedEntryId,
   expectedGameId,
-  expectedScriptRevision,
+  expectedScript,
   savedEntryId,
   savedGameId,
-  savedScriptRevision
+  savedScript
 }: {
   expectedEntryId: string;
   expectedGameId: string;
-  expectedScriptRevision: string;
+  expectedScript?: { scriptPath: string; scriptRevision: string };
   savedEntryId: string;
   savedGameId: string;
-  savedScriptRevision: string;
+  savedScript: { scriptPath: string; scriptRevision: string };
 }): Extract<VnRestoreResult, { ok: false }> | undefined {
   if (savedGameId !== expectedGameId) {
     return { ok: false, code: "game-mismatch", message: `Save game '${savedGameId}' does not match '${expectedGameId}'.` };
@@ -74,11 +81,18 @@ export function validateVnRestoreIdentity({
   if (savedEntryId !== expectedEntryId) {
     return { ok: false, code: "entry-mismatch", message: `Save entry '${savedEntryId}' does not match '${expectedEntryId}'.` };
   }
-  if (savedScriptRevision !== expectedScriptRevision) {
+  if (!expectedScript) {
+    return {
+      ok: false,
+      code: "script-missing",
+      message: `Save script '${savedScript.scriptPath}' is not registered.`
+    };
+  }
+  if (savedScript.scriptRevision !== expectedScript.scriptRevision) {
     return {
       ok: false,
       code: "script-revision-mismatch",
-      message: `Save script revision '${savedScriptRevision}' does not match '${expectedScriptRevision}'.`
+      message: `Save script revision '${savedScript.scriptRevision}' does not match '${expectedScript.scriptRevision}'.`
     };
   }
   return undefined;

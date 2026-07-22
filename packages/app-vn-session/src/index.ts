@@ -10,6 +10,7 @@ import {
 } from "@v-ronpa/story-engine";
 import {
   advanceStoryPlay,
+  chooseStoryPlayOption,
   createInitialStoryPlayState,
   stopStoryPlayAutomation,
   toggleAutoStoryPlay,
@@ -63,6 +64,12 @@ export interface VnSessionRestoreInput {
   active?: boolean;
 }
 
+export interface VnSessionScriptSwitchInput {
+  script: RuntimeScript;
+  instructionPointer: number;
+  diagnostics?: Partial<VnSessionDiagnostics>;
+}
+
 export function createVnSession(entry: VnEntrySource): VnSessionStep {
   const parsed = parseScenario({ sourceText: entry.sourceText, scriptPath: entry.scriptPath });
   const compiled = compileRuntimeScript(parsed);
@@ -99,16 +106,11 @@ export function stepVnSessionInstruction(session: VnSessionState): VnSessionStep
 }
 
 export function chooseVnSessionOption(session: VnSessionState, index: number): VnSessionPlayStep {
-  const resolved = resolveVnSessionChoice(session, index);
-  const advanced = advanceStoryPlay(stopStoryPlayAutomation(session.play, "choice"), {
-    state: resolved.session.story,
+  return toPlayStep(session, chooseStoryPlayOption(session.play, {
+    state: session.story,
     script: session.script,
-    source: "choice"
-  });
-  return toPlayStep(resolved.session, {
-    ...advanced,
-    story: combineStorySteps(resolved.storyStep, advanced.story)
-  });
+    index
+  }));
 }
 
 export function resolveVnSessionChoice(session: VnSessionState, index: number): VnSessionStep {
@@ -167,6 +169,31 @@ export function restoreVnSession({ active = true, diagnostics = {}, script, snap
   };
 }
 
+/** Pure cross-script switch. Presentation preparation and commit remain runtime-owned. */
+export function switchVnSessionScript(
+  session: VnSessionState,
+  { diagnostics = {}, instructionPointer, script }: VnSessionScriptSwitchInput
+): VnSessionState {
+  return {
+    ...session,
+    active: true,
+    diagnostics: {
+      parser: diagnostics.parser ?? [],
+      compiler: diagnostics.compiler ?? []
+    },
+    script,
+    story: {
+      ...session.story,
+      currentScriptPath: script.scriptPath,
+      instructionPointer,
+      pendingChoices: [],
+      presentationWait: undefined,
+      runtimeWait: undefined,
+      ended: false
+    }
+  };
+}
+
 function toPlayStep(session: VnSessionState, playStep: StoryPlayStep): VnSessionPlayStep {
   return {
     session: {
@@ -189,15 +216,6 @@ function toReducerStep(session: VnSessionState, storyStep: StoryStepperResult): 
     },
     storyStep,
     emittedRuntimeCommands: storyStep.emittedRuntimeCommands
-  };
-}
-
-function combineStorySteps(first: StoryStepperResult, second: StoryStepperResult): StoryStepperResult {
-  return {
-    state: second.state,
-    diagnostics: [...first.diagnostics, ...second.diagnostics],
-    emittedRuntimeCommands: [...first.emittedRuntimeCommands, ...second.emittedRuntimeCommands],
-    ...(second.stopReason ? { stopReason: second.stopReason } : {})
   };
 }
 

@@ -12,7 +12,7 @@ describe("VnRuntimeDebugSnapshot", () => {
     const script = compileRuntimeScript(parsed).script;
     const story = createInitialStoryState(script);
     const input = {
-      storyRuntime: { active: true, state: story },
+      storyRuntime: { active: true, executedScriptPaths: [story.currentScriptPath], state: story },
       pixiStageRuntime: {
         snapshot: createInitialPixiStageSnapshot(),
         hints: [],

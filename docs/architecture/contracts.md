@@ -13,10 +13,15 @@ outcomes are debug-only types under `app-vn-runtime/debug`; they are not public
 content contracts and are never serialized into SaveData. The workbench does
 not add syntax, parser/IR shapes, RuntimeCommand variants, or save fields.
 
-## SaveData v7
+## ContentManifest v4 and SaveData v8
 
-SaveData has one accepted version: `7`. It requires top-level `gameId`. A VN
-section requires `entryId`, generated `scriptRevision`, a `SaveableStorySnapshot`,
+ContentManifest has one accepted version: `4`. A `VnEntryDef` identifies one VN
+experience with `initialScriptPath` and optional `startLabel`; script source and
+revision do not live on the entry. Runtime source is an ordered, path-unique
+`VnRuntimeScriptCatalog` of `{ scriptPath, sourceText, scriptRevision }` records.
+
+SaveData has one accepted version: `8`. It requires top-level `gameId`. A VN
+section requires `entryId`, `script: { scriptPath, scriptRevision }`, a `SaveableStorySnapshot`,
 terminal `PixiStageSnapshot`, terminal visibility for `dialog`, `commandBar`, and
 `toastLayer`, plus canonical persistent-media intent. Media intent is keyed by BGM
 group and looping-SFX tracking key and stores only `sourceRef`, target `volume`,
@@ -34,11 +39,12 @@ stopping live media or mutating app state.
 The global inventory, evidence, and character sections remain shared across
 VN/Navi/Trial. A VN-focused game may provide valid empty initial gameplay state.
 
-There is no v6 migration, legacy database fallback, extension bag, or deprecated
-schema alias. A v7 VN section without `media` is invalid.
+There is no manifest v3 or SaveData v7 migration, legacy database fallback,
+extension bag, or deprecated schema alias. `story` does not duplicate the saved
+script path. Game A and Harness use fresh v10 database namespaces.
 
 The change record and supersession scope are defined by
-[SaveData v7 VN Persistent Media](../ccr/save-data-v7-vn-persistent-media.md).
+[Game A Multi-Nani Runtime Hard Cut](../ccr/game-a-multi-nani-runtime-hard-cut.md).
 
 ## Flow and overlays
 

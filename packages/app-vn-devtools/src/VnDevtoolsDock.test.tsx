@@ -96,6 +96,60 @@ describe("VnDevtoolsDock", () => {
     expect(actions.previewLine).toHaveBeenCalledWith("line:dialog");
   });
 
+  it("exposes a keyboard-operated multi-script listbox without changing runtime state", async () => {
+    const actions = createActions();
+    const element = VnDevtoolsDock({
+      controller: createController(actions, {
+        scripts: [
+          {
+            scriptPath: "game-a/opening.nani",
+            revision: "sha256:opening",
+            viewed: true,
+            runtime: true
+          },
+          {
+            scriptPath: "game-a/chapter-02.nani",
+            revision: "sha256:chapter-02",
+            viewed: false,
+            runtime: false,
+            hasUpdateBadge: true
+          }
+        ]
+      })
+    });
+    const listbox = findByAriaLabel(element, "VN scripts");
+    expect(listbox?.props.role).toBe("listbox");
+    const options = findAll(listbox, (node) => node.props.role === "option");
+    expect(options).toHaveLength(2);
+    expect(options.map((option) => option.props["aria-selected"])).toEqual([true, false]);
+    expect(collectText(options[1]).join(" ")).toContain("Updated");
+
+    const focus = vi.fn();
+    const summaryFocus = vi.fn();
+    const details = {
+      open: true,
+      querySelector: (selector: string) => selector.includes('data-script-index="1"')
+        ? { focus }
+        : selector === "summary"
+          ? { focus: summaryFocus }
+          : null
+    };
+    (options[0]?.props as { onKeyDown: (event: unknown) => void }).onKeyDown({
+      key: "ArrowDown",
+      preventDefault: vi.fn(),
+      currentTarget: { closest: () => details }
+    });
+    await Promise.resolve();
+    expect(focus).toHaveBeenCalledOnce();
+
+    (options[1]?.props as { onClick: (event: unknown) => void }).onClick({
+      currentTarget: { closest: () => details }
+    });
+    await Promise.resolve();
+    expect(actions.selectScript).toHaveBeenCalledWith("game-a/chapter-02.nani");
+    expect(details.open).toBe(false);
+  });
+
   it("renders Problems and transient Branch panels with skinned semantic decision inputs", () => {
     const actions = createActions();
     const problems = VnDevtoolsDock({
@@ -229,8 +283,14 @@ function createController(
 ): VnDevtoolsController {
   return {
     entryId: "opening",
-    scriptPath: "game-a/opening.nani",
-    scriptRevision: "sha256:1234567890abcdef",
+    viewedScriptPath: "game-a/opening.nani",
+    runtimeScriptPath: "game-a/opening.nani",
+    scripts: [{
+      scriptPath: "game-a/opening.nani",
+      revision: "sha256:1234567890abcdef",
+      viewed: true,
+      runtime: true
+    }],
     lines: [
       { id: "line:start", lineNumber: 1, sourceText: "#Start", label: "Start", previewability: "previewable" },
       {
@@ -282,6 +342,7 @@ function createController(
 
 function createActions(): VnDevtoolsActions {
   return {
+    selectScript: vi.fn<(scriptPath: string) => void>(),
     selectLine: vi.fn<(lineId: string) => void>(),
     previewLine: vi.fn<(lineId: string) => void>(),
     pinCurrent: vi.fn<() => void>(),

@@ -130,11 +130,14 @@ export function advanceStoryPlay(play: StoryPlayState, input: AdvanceStoryPlayIn
 
 export function chooseStoryPlayOption(play: StoryPlayState, input: ChooseStoryPlayInput): StoryPlayStep {
   const chosen = chooseStoryOption(input.state, input.script, input.index);
-  const advanced = advanceToNextStop(chosen.state, input.script);
+  const advanced = chosen.navigationRequest
+    ? chosen
+    : advanceToNextStop(chosen.state, input.script);
   const story: StoryStepperResult = {
     state: advanced.state,
     diagnostics: [...chosen.diagnostics, ...advanced.diagnostics],
     emittedRuntimeCommands: advanced.emittedRuntimeCommands,
+    ...(advanced.navigationRequest ? { navigationRequest: advanced.navigationRequest } : {}),
     ...(advanced.stopReason ? { stopReason: advanced.stopReason } : {})
   };
   const stopped = stopStoryPlayAutomation(play, "choice");
@@ -188,6 +191,7 @@ export function autoDelayForVisibleChars(visibleCharCount: number, timing: Story
 
 function applyStoryStep(play: StoryPlayState, story: StoryStepperResult, source: StoryPlayAdvanceSource): StoryPlayState {
   const currentStop = createCurrentStop(story, source);
+  if (story.navigationRequest) return { ...play, currentStop };
   if (story.state.ended) return { ...play, mode: "manual", lastStopReason: "story-ended", currentStop };
   if (story.state.pendingChoices.length > 0) return { ...play, mode: "manual", lastStopReason: "choice", currentStop };
   return { ...play, currentStop };

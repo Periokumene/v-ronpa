@@ -6,7 +6,7 @@ export type { VnRuntimeDiagnostic } from "./runtimeDiagnostics";
 export {
   DEFAULT_VN_DEBUG_MAX_INSTRUCTIONS,
   EMPTY_VN_DEBUG_DECISION_TRACE,
-  inspectVnDebugEntry,
+  inspectVnDebugScript,
   materializeVnDebugTarget,
   resolveVnDebugAnchor
 } from "./debugMaterializer";
@@ -16,7 +16,7 @@ export type {
   VnDebugChoiceRequest,
   VnDebugCommandInspection,
   VnDebugDecisionTrace,
-  VnDebugEntryInspection,
+  VnDebugScriptInspection,
   VnDebugInputDecision,
   VnDebugInputRequest,
   VnDebugLabelOutlineItem,

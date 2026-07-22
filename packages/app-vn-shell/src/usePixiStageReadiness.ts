@@ -1,7 +1,14 @@
 import { useCallback, useRef, useState } from "react";
 import type { PixiStageHandle } from "./PixiLayer";
 
-export function usePixiStageReadiness() {
+export interface PixiStageReadiness {
+  handle: PixiStageHandle | undefined;
+  pending: boolean;
+  onStageHandleChanged(handle: PixiStageHandle | undefined): void;
+  waitUntilReady(): Promise<boolean>;
+}
+
+export function usePixiStageReadiness(): PixiStageReadiness {
   const handleRef = useRef<PixiStageHandle | undefined>(undefined);
   const waitPromiseRef = useRef<Promise<boolean> | undefined>(undefined);
   const [handle, setHandle] = useState<PixiStageHandle | undefined>(undefined);

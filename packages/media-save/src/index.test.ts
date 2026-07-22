@@ -54,15 +54,14 @@ const howlerMock = vi.hoisted(() => {
 vi.mock("howler", () => ({ Howl: howlerMock.Howl }));
 
 const baseSave = SaveDataSchema.parse({
-  version: 7 as const,
+  version: 8 as const,
   gameId: "game:test",
   savedAt: "2026-06-14T00:00:00.000Z",
   mode: "navi" as const,
   vn: {
     entryId: "vn:opening",
-    scriptRevision: "sha256:test",
+    script: { scriptPath: "opening.nani", scriptRevision: "sha256:test" },
     story: {
-      currentScriptPath: "opening.nani",
       instructionPointer: 4,
       variables: {},
       backlog: [{ speaker: "Felix", text: "A saved line." }],

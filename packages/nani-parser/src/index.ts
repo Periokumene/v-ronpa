@@ -1,5 +1,10 @@
 export { parseScenario } from "./parser.ts";
 export { resolveNaniSourceRef } from "./sourceMap.ts";
+export { parseStaticNaniEndpoint, staticNaniEndpointText } from "./endpoint.ts";
+export type {
+  StaticNaniEndpointErrorCode,
+  StaticNaniEndpointParseResult
+} from "./endpoint.ts";
 export type {
   AssetRef,
   CommandArgIR,

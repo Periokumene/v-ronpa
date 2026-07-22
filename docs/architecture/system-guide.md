@@ -12,29 +12,33 @@ interaction state back into the machine.
 
 ## Package ownership
 
-- `contracts`: public schemas, SaveData v7, `.nani` runtime IR.
+- `contracts`: public schemas, ContentManifest v4, SaveData v8, and `.nani` runtime IR.
 - `nani-parser`: generic `.nani` ScenarioIR plus a required UTF-16 source-map
   sidecar; owns syntax diagnostics and cooked-to-source projection.
-- `nani-runtime-compiler`: catalog binding, validation, normalization, and
+- `nani-runtime-compiler`: command binding, static endpoint/catalog linking, validation, normalization, and
   runtime-boundary diagnostics; consumes parser IR and source map together,
   binding only from ordered `CommandIR.args`; owns the one semantic serializer
   used by Node asset revisions and browser WebCrypto revisions.
-- `app-vn-session`: story session orchestration.
+- `app-vn-session`: story session orchestration and pure cross-script switching.
 - `app-vn-dispatch`: headless command fanout and pure UI/media transactions.
 - `pixi-stage-model`: pure Pixi snapshot reducer, hints, waits, diagnostics.
-- `app-vn-runtime`: React runtime hook, canonical capability ports, shared pure
-  step projection, and an explicit debug-only inspection/materialization entry.
-- `app-vn-devtools`: reusable workbench controller, latest-wins source/commit
-  coordination, read-only React Dock, tab-session helpers, and a Vite-only Nani
-  source bridge.
+- `app-vn-runtime`: React runtime hook, canonical capability ports, runtime-owned
+  execution history, operation/navigation coordinators, shared pure step
+  projection, and an explicit debug-only inspection/materialization entry.
+- `app-vn-devtools`: reusable workbench controller, per-script authority and HMR
+  impact coordinators, shared host definition/restore transaction, read-only
+  React Dock, tab-session helpers, and a Vite-only Nani source bridge.
 - `app-vn-shell`: DOM shell, canonical modal pause-surface ownership, shared
   pause/save/load/settings behavior, the internal document-level web-game
-  browser policy, and Pixi host. Paused section slots provide content only;
+  browser policy, Pixi host, and the shared Pixi script-preparation adapter.
+  Paused section slots provide content only;
   playable dialog, choices, and commands are omitted until resume.
 - `pixi-presenter`: Pixi renderer adapter only; it does not interpret runtime commands.
 - `runtime-assets-pixi`: Pixi-owned AssetRegistry fragment only.
 - `navi-director` / `trial-director`: mode-specific state and flow.
-- app packages: flow/save/overlay composition and per-game content.
+- app packages: flow/save/overlay composition, per-game content, manifest, and
+  application policy callbacks; reusable runtime/Devtools/Pixi mechanisms stay
+  in shared packages.
 
 ## Renderer boundaries
 

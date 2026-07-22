@@ -3,12 +3,12 @@ import type { SaveData } from "@v-ronpa/contracts";
 import { restoreGameAVnSave } from "./useGameAVnRuntime";
 
 describe("game-a VN runtime wrapper", () => {
-  it("returns restore rejection to the save controller", () => {
+  it("returns restore rejection to the save controller", async () => {
     const rejection = { ok: false as const, code: "script-revision-mismatch" as const, message: "revision mismatch" };
-    const restoreVnState = vi.fn(() => rejection);
+    const restoreVnState = vi.fn(async () => rejection);
     const save = createSave();
 
-    expect(restoreGameAVnSave({ restoreVnState }, save)).toBe(rejection);
+    await expect(restoreGameAVnSave({ restoreVnState }, save)).resolves.toBe(rejection);
     expect(restoreVnState).toHaveBeenCalledWith({ gameId: "game-a", state: save.vn });
   });
 
@@ -22,15 +22,14 @@ describe("game-a VN runtime wrapper", () => {
 
 function createSave(): SaveData {
   return {
-    version: 7,
+    version: 8,
     gameId: "game-a",
     savedAt: "2026-07-11T00:00:00.000Z",
     mode: "vn",
     vn: {
-      entryId: "vn:game-a-opening",
-      scriptRevision: "sha256:test",
+      entryId: "vn:game-a-main",
+      script: { scriptPath: "game-a/opening.nani", scriptRevision: "sha256:test" },
       story: {
-        currentScriptPath: "game-a/opening.nani",
         instructionPointer: 1,
         variables: {},
         backlog: [],

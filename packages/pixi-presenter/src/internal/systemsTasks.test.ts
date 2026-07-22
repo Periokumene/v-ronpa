@@ -713,7 +713,10 @@ describe("pixi presentation task system integration", () => {
       onDiagnostic: (diagnostic) => diagnostics.push(diagnostic)
     });
 
-    await expect(system.preload([{ characterId: "Ema", appearanceExpressions: ["Pensive1"] }])).resolves.toBeUndefined();
+    await expect(system.preload([{ characterId: "Ema", appearanceExpressions: ["Pensive1"] }])).resolves.toEqual({
+      ok: false,
+      failures: [{ characterId: "Ema", expression: "Pensive1" }]
+    });
     const instance = system.instantiate(characterActor("Ema", "Pensive1"));
 
     expect(instance.container.label).toBe("empty-character:Ema:Pensive1");

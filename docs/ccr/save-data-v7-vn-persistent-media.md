@@ -1,5 +1,9 @@
 # CCR: SaveData v7 VN Persistent Media
 
+> Superseded note: persistent-media intent remains active, but SaveData v7,
+> entry-level script revision identity, and database namespace values are
+> superseded by `game-a-multi-nani-runtime-hard-cut.md`.
+
 ## Requested Change
 
 Replace SaveData v6 with a hard-cut v7 contract that includes canonical VN

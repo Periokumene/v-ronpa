@@ -120,6 +120,7 @@ export interface VnDevtoolsSourceLocation {
 }
 
 export interface VnDevtoolsActions {
+  selectScript: (scriptPath: string) => void;
   selectLine: (lineId: string) => void;
   previewLine: (lineId: string) => void;
   pinCurrent: () => void;
@@ -134,10 +135,19 @@ export interface VnDevtoolsActions {
   copyLocation: (location: VnDevtoolsSourceLocation) => void;
 }
 
+export interface VnDevtoolsScriptItem {
+  scriptPath: string;
+  revision: string;
+  viewed: boolean;
+  runtime: boolean;
+  hasUpdateBadge?: boolean;
+}
+
 export interface VnDevtoolsController {
   entryId: string;
-  scriptPath: string;
-  scriptRevision?: string;
+  viewedScriptPath: string;
+  runtimeScriptPath: string;
+  scripts: readonly VnDevtoolsScriptItem[];
   lines: readonly VnDevtoolsSourceLine[];
   selectedLineId?: string;
   searchQuery: string;

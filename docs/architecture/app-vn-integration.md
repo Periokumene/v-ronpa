@@ -19,8 +19,26 @@ Apps do not reach through an inspection object to perform product actions.
 Apps own SaveData composition. They call `createVnSaveCheckpoint()` and pass its
 Result into the shared save controller. The controller requires `canSave` for UI
 capability and treats collection rejection as the final race-safe authority. A
-checkpoint contains the terminal Story/Pixi/UI state and canonical VN persistent
-media intent; restore materializes BGM and looping SFX from the beginning.
+checkpoint contains the terminal Story/Pixi/UI state, current catalog script
+identity, and canonical VN persistent-media intent; restore materializes BGM
+and looping SFX from the beginning.
+
+Apps and Harness compose the standard `VnRuntimeDefinition { entry, catalog }`.
+`useVnRuntime()` receives that entry and ordered catalog plus an optional renderer-agnostic
+`prepareScriptPresentation()` adapter. `startStory()` and `restoreVnState()` are
+asynchronous Results. Start, cross-script goto, and restore prepare the target
+script before one Story/Pixi/UI/media commit; reset, restore, catalog replacement,
+and unmount invalidate late preparations.
+
+`VnStoryRuntime.executedScriptPaths` is runtime-owned execution provenance for
+the current state. New game records every script traversed, including scripts
+crossed inside one async operation; restore records only its target; reset
+clears it. Devtools HMR impact classification consumes this value and must not
+infer execution from viewed scripts or fixed points.
+
+Pixi apps use `usePixiVnScriptPreparation()` from `app-vn-shell`. The adapter
+owns stage readiness, target-plan lookup, visible-expression merging, and the
+idempotent `prepareCharacters()` Result. Apps provide only plans by script path.
 
 An `AudioPort` passed to `useVnRuntime()` is exclusively owned by that runtime.
 Reset, accepted restore, and unmount all use one disposal path: invalidate voice
@@ -29,14 +47,14 @@ handles and related refs. Identity rejection happens before cleanup.
 `VnLifecyclePort.resetRuntime()` has no soft-media option.
 
 Game A uses `gameId: game-a`; Harness uses `gameId: game-harness`. Both use one
-AssetRegistry, one Pixi presenter host, the same shared pause sections, and v9
+AssetRegistry, one Pixi presenter host, the same shared pause sections, and v10
 database namespaces. Game A must not import session, dispatch, presenter, Pixi,
 Navi, Trial, Dexie, or Howler packages directly.
 
 Harness-only runtime diagnostics helpers are available from the explicit
 `@v-ronpa/app-vn-runtime/debug` entry. `useVnRuntimeWithDebug()` adds one
 read-only `VnRuntimeDebugSnapshot` to the four canonical ports. Game A's
-development workbench uses the entry's headless inspector/materializer and
+development workbench uses the entry catalog's headless inspector/materializer and
 commits only through `VnLifecyclePort.restoreVnState()`; see
 [Nani devtools](vn-devtools.md).
 

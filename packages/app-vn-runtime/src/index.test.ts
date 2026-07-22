@@ -531,6 +531,7 @@ describe("app VN runtime helpers", () => {
     const runtimeScript = compileScenario("Felix: Runtime.", "runtime-playback-test.nani");
     const storyRuntime: VnStoryRuntime = {
       active: true,
+      executedScriptPaths: [runtimeScript.scriptPath],
       state: createInitialStoryState(runtimeScript)
     };
 
@@ -577,6 +578,7 @@ describe("app VN runtime helpers", () => {
     const runtimeScript = compileScenario("Felix: Runtime.", "runtime-advance-test.nani");
     const activeStory: VnStoryRuntime = {
       active: true,
+      executedScriptPaths: [runtimeScript.scriptPath],
       state: createInitialStoryState(runtimeScript)
     };
 
@@ -623,7 +625,7 @@ describe("app VN runtime helpers", () => {
 
 function manifestWithAssets(runtimeAssets: RuntimeAsset[]): ContentManifest {
   return {
-    version: 3 as const,
+    version: 4 as const,
     assets: [],
     fonts: [],
     runtimeAssets,

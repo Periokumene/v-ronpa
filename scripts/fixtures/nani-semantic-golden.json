@@ -2,22 +2,38 @@
   "baseline": "a7bb0091234f7796df3db93a7bfe3f0ae948e300",
   "canonicalization": "stable-json-v1",
   "intentionalOverrides": {
-    "game-a-smoke": "Editor Tools moves the visual/audio setup before the first stable Workbench target and records its route/text identity."
+    "game-a-smoke": "Editor Tools moves the visual/audio setup before the first stable Workbench target and records its route/text identity.",
+    "game-a-production-catalog": "The accepted multi-Nani hard cut splits the former MILKBEGIN segment into chapter-02 and links it from opening with one static endpoint."
   },
   "corpora": {
     "game-a-opening": {
       "sourceFile": "apps/game-a/src/nani/opening.nani",
       "scriptPath": "game-a/opening.nani",
-      "sourceSha256": "607f18610cd3b11b5f96af4c400846ef15e21250af2fd71c3921e74476ab9922",
-      "sourceUtf16Length": 3219,
-      "statementCount": 89,
-      "commandCount": 84,
-      "scenarioIRSha256": "042d07881e2bdb261429c4937180c0cd60490ae23a23f0e1ca170459ec3673f0",
+      "sourceSha256": "a9408f4915a49b9c7fdd76dc2097d6a9f2c7c6a720f5966e0729f1e40af6b226",
+      "sourceUtf16Length": 1736,
+      "statementCount": 50,
+      "commandCount": 46,
+      "scenarioIRSha256": "56f0a55d4dad4c14597d3a56bb2ef98d2ed0bd158823dbffab50665f2dbed47d",
       "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "runtimeScriptSha256": "2a7e12093b97b7ea4fdd8824d11b590e2c20b744c60319c8ae8be26b3d02b45a",
+      "runtimeScriptSha256": "d67281acd30adcf80ff628a66951a37a97984be2546eb89c616a041b256d2679",
       "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "scenarioAssetsSha256": "46df50c3cb94ec109f8bdaf9c4808ad3cbdf14b03a75a010f60384df675b3802",
       "runtimeAssetsSha256": "ec75148cd18a76a0873d659def180136a936dd2a37cae799381cd583b3b6485c",
+      "dependenciesSha256": "b65bce2ef9910e0993905ba480963cdaf41fb3677fde2fb298ca4321f9456a61"
+    },
+    "game-a-chapter-02": {
+      "sourceFile": "apps/game-a/src/nani/chapter-02.nani",
+      "scriptPath": "game-a/chapter-02.nani",
+      "sourceSha256": "14852648005eb6a3056d96c8a4e054b014691afddb9c1ec05a1d6e7a65a98686",
+      "sourceUtf16Length": 1496,
+      "statementCount": 39,
+      "commandCount": 38,
+      "scenarioIRSha256": "996784f4e387c1f603ec3c12d6c7289a40ffab13a3e39ea87012f2e4d66faa40",
+      "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "runtimeScriptSha256": "f5730e8a36195f5a1c6f90f5e704d70893c1ea3a4333a2b867c4094ed718489b",
+      "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "scenarioAssetsSha256": "706a85778a86dc21d5ee274142e686b268ba8bcde40908ee2e4a658f44705324",
+      "runtimeAssetsSha256": "c9b4970f73505fe30ed300f9f55ebff889581434f5521767439638bb432a615f",
       "dependenciesSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     "game-a-smoke": {
@@ -98,10 +114,16 @@
   },
   "generatedMetadata": {
     "game-a/opening.nani": {
-      "scriptRevision": "sha256:1a3d0dbd1ca33a44199143bddef846a09b98e1c7baf4a044437886fd9c2f2bcc",
-      "metadataSha256": "5d5d5b1fbddb560eb86af350728c5a0a43f6f3ddcddedf01cb23f05aad63efa3",
+      "scriptRevision": "sha256:592fa1e248fe981196ef834d2eb03e006815298ef9e2b20279f68f72d682e0e1",
+      "metadataSha256": "25fc914b902201dc0e1eccfc8d3ac3da34cc0aee67c96b4a05266cd7efdabc74",
       "assetRefsSha256": "2442137159443315283d17be9f0c4afb6ec954238321283f0448d19f5e166b1f",
-      "characterPreloadPlanSha256": "338d38a50929d18ad55d47b75fdf2721226300944f45b903d21fe703085129b2"
+      "characterPreloadPlanSha256": "73ab351adc3f52a59ccbfd87a737505a6a12e88cc4958bb0871267773753becf"
+    },
+    "game-a/chapter-02.nani": {
+      "scriptRevision": "sha256:e2202734ecef7753d23983e0eb2aada60049d9abd4afa9a84cf265fb8f88864e",
+      "metadataSha256": "2a83a13c7a614a7ef56acd7a25d7cbad7af49d8500b375a2f8e86e2fd1eebba1",
+      "assetRefsSha256": "c9b4970f73505fe30ed300f9f55ebff889581434f5521767439638bb432a615f",
+      "characterPreloadPlanSha256": "24f8a7a25946689f1e1eb581203ffa8728690e4fcb374ca70abc83e6d44e02ad"
     },
     "game-a/test/smoke.nani": {
       "scriptRevision": "sha256:c0673449a776f61399c429ffa7c9152ea4ae708537bfe89338565b0c3c8cfaa0",

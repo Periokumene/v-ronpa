@@ -17,7 +17,11 @@ export type ChoiceRuntimeOption = StoryChoiceOption;
 
 export type StoryRuntimeState = StoryRuntimeSnapshot;
 
-export type StoryStopReason = "text" | "choices" | "ended" | "presentation-wait" | "runtime-wait" | "max-steps";
+export type StoryStopReason = "text" | "choices" | "ended" | "presentation-wait" | "runtime-wait" | "script-navigation" | "max-steps";
+
+export interface StoryScriptNavigationRequest {
+  endpoint: string;
+}
 
 export type StoryStepperDiagnosticCode =
   | "invalid-choice"
@@ -43,6 +47,7 @@ export interface StoryStepperResult {
   state: StoryRuntimeState;
   diagnostics: StoryStepperDiagnostic[];
   emittedRuntimeCommands: RuntimeCommand[];
+  navigationRequest?: StoryScriptNavigationRequest;
   stopReason?: StoryStopReason;
 }
 
@@ -69,6 +74,7 @@ interface RuntimeCommandExecutionResult {
   state: StoryRuntimeState;
   diagnostics: StoryStepperDiagnostic[];
   emittedRuntimeCommands: RuntimeCommand[];
+  navigationRequest?: StoryScriptNavigationRequest;
 }
 
 interface RuntimeValueResolution {
@@ -184,6 +190,16 @@ export function advanceToNextStop(
     diagnostics.push(...result.diagnostics);
     emittedRuntimeCommands.push(...result.emittedRuntimeCommands);
     steps += 1;
+
+    if (result.navigationRequest) {
+      return {
+        state: nextState,
+        diagnostics,
+        emittedRuntimeCommands,
+        navigationRequest: result.navigationRequest,
+        stopReason: "script-navigation"
+      };
+    }
 
     if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
       return { state: nextState, diagnostics, emittedRuntimeCommands };
@@ -306,6 +322,15 @@ export function chooseStoryOption(state: StoryRuntimeState, script: RuntimeScrip
 
   const cleared = { ...state, pendingChoices: [] };
   const withChoiceSet = choice.setExpression ? applySetExpression(cleared, choice.setExpression) : cleared;
+  if (choice.goto && !choice.goto.startsWith("#")) {
+    return {
+      state: withChoiceSet,
+      diagnostics: [],
+      emittedRuntimeCommands: [],
+      navigationRequest: { endpoint: choice.goto },
+      stopReason: "script-navigation"
+    };
+  }
   return {
     state: choice.goto ? jumpToLabel(withChoiceSet, script, choice.goto) : withChoiceSet,
     diagnostics: [],
@@ -743,21 +768,16 @@ function executeGoto(state: StoryRuntimeState, script: RuntimeScript, command: R
   if (!label) {
     return {
       state,
-      diagnostics: [createDiagnostic("invalid-goto", "@goto requires a local label target.", "warning")],
+      diagnostics: [createDiagnostic("invalid-goto", "@goto requires a static endpoint.", "error")],
       emittedRuntimeCommands: []
     };
   }
-  if (isUnsupportedGotoTarget(label)) {
+  if (!label.startsWith("#")) {
     return {
       state,
-      diagnostics: [
-        createDiagnostic(
-          "unsupported-command-param",
-          `@goto target ${label} is outside this task's local-label boundary; cross-script goto is not implemented.`,
-          "warning"
-        )
-      ],
-      emittedRuntimeCommands: []
+      diagnostics: [],
+      emittedRuntimeCommands: [],
+      navigationRequest: { endpoint: label }
     };
   }
   const normalized = normalizeLocalLabel(label);
@@ -800,11 +820,6 @@ function jumpToLabel(state: StoryRuntimeState, script: RuntimeScript, label: str
 
 function normalizeLocalLabel(label: string): string {
   return label.startsWith("#") ? label.slice(1) : label;
-}
-
-function isUnsupportedGotoTarget(label: string): boolean {
-  if (label.startsWith("#")) return false;
-  return label.includes("#") || label.includes("/") || label.includes("\\") || label.includes(".") || label.includes(":");
 }
 
 function stringParam(command: RuntimeCommand, key: string): string | undefined {

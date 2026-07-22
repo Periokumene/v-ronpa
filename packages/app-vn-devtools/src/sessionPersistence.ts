@@ -12,7 +12,7 @@ import type {
   VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
 
-export const VN_DEVTOOLS_SESSION_VERSION = 2 as const;
+export const VN_DEVTOOLS_SESSION_VERSION = 3 as const;
 
 export interface VnDevtoolsStorageLike {
   getItem: (key: string) => string | null;
@@ -26,6 +26,7 @@ export interface VnDevtoolsPersistedSessionState {
   collapsed: boolean;
   width: number;
   layout: VnDevtoolsLayoutState;
+  viewedScriptPath?: string;
   pinnedTarget?: VnDebugTargetAnchor;
   decisions?: readonly VnDevtoolsPersistedDecision[];
 }
@@ -52,6 +53,9 @@ export function loadVnDevtoolsSessionState(
       layout
     };
     const pinnedTarget = canonicalizeTargetAnchor(value.pinnedTarget);
+    if (typeof value.viewedScriptPath === "string" && value.viewedScriptPath) {
+      state.viewedScriptPath = value.viewedScriptPath;
+    }
     if (pinnedTarget !== undefined) state.pinnedTarget = pinnedTarget;
     if (Array.isArray(value.decisions)) {
       state.decisions = value.decisions
@@ -77,6 +81,7 @@ export function saveVnDevtoolsSessionState(
       layout: canonicalizeLayout(state.layout) ?? createDefaultVnDevtoolsLayoutState()
     };
     const pinnedTarget = canonicalizeTargetAnchor(state.pinnedTarget);
+    if (state.viewedScriptPath) normalized.viewedScriptPath = state.viewedScriptPath;
     if (pinnedTarget !== undefined) normalized.pinnedTarget = pinnedTarget;
     if (state.decisions !== undefined) {
       normalized.decisions = state.decisions

@@ -17,6 +17,7 @@ import {
   resolveVnSessionChoice,
   resolveVnSessionInput,
   stepVnSessionInstruction,
+  switchVnSessionScript,
   type VnSessionState
 } from "@v-ronpa/app-vn-session";
 import type {
@@ -25,12 +26,16 @@ import type {
   RuntimeScript,
   SaveableVnState,
   StoryChoiceOption,
-  StoryScalar
+  StoryScalar,
+  VnEntryDef,
+  VnRuntimeScriptCatalog,
+  VnRuntimeScriptSource
 } from "@v-ronpa/contracts";
-import { parseScenario, type LabelIR } from "@v-ronpa/nani-parser";
+import { parseScenario, parseStaticNaniEndpoint, type LabelIR } from "@v-ronpa/nani-parser";
 import {
   compileRuntimeScript,
-  digestRuntimeScriptSemantics
+  digestRuntimeScriptSemantics,
+  linkRuntimeScriptCatalog
 } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import { collectVnSaveCheckpoint } from "./checkpoint";
@@ -40,7 +45,6 @@ import {
   createVnRuntimeStartLabelDiagnostics,
   type VnRuntimeDiagnostic
 } from "./runtimeDiagnostics";
-import type { VnRuntimeEntry } from "./runtimeTypes";
 import { projectVnRuntimeStep } from "./runtimeProjection";
 
 export const DEFAULT_VN_DEBUG_MAX_INSTRUCTIONS = 10_000;
@@ -82,8 +86,9 @@ export interface VnDebugLabelOutlineItem {
   anchor: VnDebugTargetAnchor;
 }
 
-export interface VnDebugEntryInspection {
-  entry: VnRuntimeEntry;
+export interface VnDebugScriptInspection {
+  entry: VnEntryDef;
+  source: VnRuntimeScriptSource;
   declaredRevisionMatches: boolean;
   script: RuntimeScript;
   revision: string;
@@ -115,9 +120,10 @@ export interface VnDebugDecisionTrace {
 export const EMPTY_VN_DEBUG_DECISION_TRACE: VnDebugDecisionTrace = { choices: [], inputs: [] };
 
 interface VnDebugMaterializationBase {
-  inspection: VnDebugEntryInspection;
+  inspection: VnDebugScriptInspection;
   diagnostics: VnRuntimeDiagnostic[];
   executedInstructions: number;
+  executedScriptPaths: string[];
   degraded: boolean;
   target: VnDebugTargetAnchor;
   lastStableAnchor?: VnDebugTargetAnchor;
@@ -162,6 +168,7 @@ export type VnDebugMaterializationBlockedCode =
   | "decision-invalid"
   | "loop-detected"
   | "instruction-limit"
+  | "catalog-link-error"
   | "unstable-checkpoint";
 
 export interface VnDebugMaterializationBlocked extends VnDebugMaterializationBase {
@@ -176,11 +183,12 @@ export type VnDebugMaterializationResult =
   | VnDebugMaterializationBlocked;
 
 export interface MaterializeVnDebugTargetInput {
-  entry: VnRuntimeEntry;
+  entry: VnEntryDef;
+  catalog: VnRuntimeScriptCatalog;
   target: VnDebugTargetAnchor;
   decisions?: VnDebugDecisionTrace;
   expectedRevision?: string;
-  inspection?: VnDebugEntryInspection;
+  inspection?: VnDebugScriptInspection;
   maxInstructions?: number;
   nowMs?: number;
   profile?: VnRuntimeProfile;
@@ -188,13 +196,18 @@ export interface MaterializeVnDebugTargetInput {
   signal?: AbortSignal;
 }
 
-export async function inspectVnDebugEntry(entry: VnRuntimeEntry): Promise<VnDebugEntryInspection> {
-  const parsed = parseScenario({ sourceText: entry.sourceText, scriptPath: entry.scriptPath });
+export async function inspectVnDebugScript(
+  entry: VnEntryDef,
+  source: VnRuntimeScriptSource
+): Promise<VnDebugScriptInspection> {
+  const parsed = parseScenario({ sourceText: source.sourceText, scriptPath: source.scriptPath });
   const compiled = compileRuntimeScript(parsed);
   const revision = await digestRuntimeScriptSemantics(compiled.script);
   const diagnostics = [
     ...createInitialVnRuntimeDiagnostics(parsed.diagnostics, compiled.diagnostics),
-    ...createVnRuntimeStartLabelDiagnostics(compiled.script, entry.startLabel)
+    ...(source.scriptPath === entry.initialScriptPath
+      ? createVnRuntimeStartLabelDiagnostics(compiled.script, entry.startLabel)
+      : [])
   ];
   const commandAnchors = createCommandAnchors(compiled.script, revision);
   const commands = compiled.script.commands.map((command, commandIndex) => {
@@ -220,7 +233,7 @@ export async function inspectVnDebugEntry(entry: VnRuntimeEntry): Promise<VnDebu
     lineCommands.push(command);
     commandsByLine.set(command.command.loc.line, lineCommands);
   }
-  const sourceLines = entry.sourceText.split(/\r?\n/u).map((text, offset) => {
+  const sourceLines = source.sourceText.split(/\r?\n/u).map((text, offset) => {
     const line = offset + 1;
     const lineCommands = commandsByLine.get(line) ?? [];
     const label = labelsByLine.get(line);
@@ -233,11 +246,12 @@ export async function inspectVnDebugEntry(entry: VnRuntimeEntry): Promise<VnDebu
       ...(preview?.previewReason ? { previewReason: preview.previewReason } : {})
     } satisfies VnDebugSourceLine;
   });
-  const candidateEntry = { ...entry, scriptRevision: revision };
+  const candidateSource = { ...source, scriptRevision: revision };
   const canMaterialize = !diagnostics.some((diagnostic) => diagnostic.severity === "error");
   return {
-    entry: candidateEntry,
-    declaredRevisionMatches: entry.scriptRevision === revision,
+    entry,
+    source: candidateSource,
+    declaredRevisionMatches: source.scriptRevision === revision,
     script: compiled.script,
     revision,
     sourceLines,
@@ -252,6 +266,7 @@ export async function inspectVnDebugEntry(entry: VnRuntimeEntry): Promise<VnDebu
 }
 
 export async function materializeVnDebugTarget({
+  catalog,
   decisions = EMPTY_VN_DEBUG_DECISION_TRACE,
   entry,
   expectedRevision,
@@ -263,34 +278,57 @@ export async function materializeVnDebugTarget({
   signal,
   target
 }: MaterializeVnDebugTargetInput): Promise<VnDebugMaterializationResult> {
-  const inspection = providedInspection ?? await inspectVnDebugEntry(entry);
+  const inspections = await Promise.all(catalog.map((source) => inspectVnDebugScript(entry, source)));
+  const inspectionsByPath = new Map(inspections.map((candidate) => [candidate.source.scriptPath, candidate]));
+  if (providedInspection) inspectionsByPath.set(providedInspection.source.scriptPath, providedInspection);
+  const inspection = inspectionsByPath.get(target.scriptPath) ?? providedInspection ?? inspections[0];
+  if (!inspection) throw new Error("The VN debug catalog is empty.");
   const base = () => ({
     inspection,
     diagnostics,
     executedInstructions,
+    executedScriptPaths: [...new Set(executedScriptPaths)],
     degraded,
     target,
     ...(lastStableAnchor ? { lastStableAnchor } : {})
   });
   let diagnostics = [...inspection.diagnostics];
   let executedInstructions = 0;
+  let executedScriptPaths: string[] = [];
   let degraded = inspection.diagnostics.some(
     (diagnostic) => diagnostic.severity === "warning" && diagnostic.code !== "declared-only-command"
   );
   let lastStableAnchor: VnDebugTargetAnchor | undefined;
 
   if (signal?.aborted) throw abortError();
-  if (providedInspection && !sameDebugEntrySource(entry, providedInspection.entry)) {
+  const linked = linkRuntimeScriptCatalog(entry, inspections.map((candidate) => candidate.script));
+  if (linked.diagnostics.length > 0) {
+    return blocked(base(), "catalog-link-error", linked.diagnostics[0]!.message);
+  }
+  const invalidCatalogScript = inspections.find((candidate) => !candidate.canMaterialize);
+  if (invalidCatalogScript) {
+    return blocked(
+      base(),
+      "invalid-source",
+      `The candidate catalog script '${invalidCatalogScript.source.scriptPath}' contains parser or compiler errors.`
+    );
+  }
+  if (providedInspection && !catalog.some((source) => sameDebugScriptSource(source, providedInspection.source))) {
     return blocked(base(), "invalid-source", "The supplied inspection does not belong to the requested runtime entry source.");
   }
   if (!inspection.canMaterialize) {
     return blocked(base(), "invalid-source", "The candidate source contains parser, compiler, or start-label errors.");
   }
-  if (expectedRevision && inspection.revision !== expectedRevision) {
+  // expectedRevision authenticates the candidate source supplied by the
+  // server/browser handshake. During a cross-script fixed-point replay that
+  // candidate can be a predecessor of the target, so comparing the target
+  // script's revision would reject a valid catalog transaction.
+  const revisionInspection = providedInspection ?? inspection;
+  if (expectedRevision && revisionInspection.revision !== expectedRevision) {
     return blocked(
       base(),
       "revision-mismatch",
-      `Browser revision ${inspection.revision} does not match server revision ${expectedRevision}.`
+      `Browser revision ${revisionInspection.revision} for '${revisionInspection.source.scriptPath}' does not match server revision ${expectedRevision}.`
     );
   }
   const resolvedTarget = resolveVnDebugAnchor(inspection, target);
@@ -307,18 +345,25 @@ export async function materializeVnDebugTarget({
     return blocked(base(), "no-stable-result", targetCommand.previewReason ?? "The command has no stable checkpoint result.");
   }
 
+  const initialInspection = inspectionsByPath.get(entry.initialScriptPath);
+  if (!initialInspection) {
+    return blocked(base(), "invalid-source", `The entry initial script '${entry.initialScriptPath}' is not in the debug catalog.`);
+  }
   const boot = createVnSession({
-    scriptPath: inspection.entry.scriptPath,
-    sourceText: inspection.entry.sourceText,
-    ...(inspection.entry.startLabel ? { startLabel: inspection.entry.startLabel } : {})
+    scriptPath: initialInspection.source.scriptPath,
+    sourceText: initialInspection.source.sourceText,
+    ...(entry.startLabel ? { startLabel: entry.startLabel } : {})
   });
   let session = boot.session;
+  let currentInspection = initialInspection;
+  executedScriptPaths = [initialInspection.source.scriptPath];
   let pixiStage = createInitialPixiStageSnapshot();
   let mediaState = createInitialMediaRuntimeState();
   let uiState = createInitialUiRuntimeState();
   let targetChoiceSeen = false;
   let labelReached = false;
   let choiceGroupAnchor: VnDebugTargetAnchor | undefined;
+  let navigationCount = 0;
   const seenStates = new Set<string>();
   const limit = Math.max(1, Math.floor(maxInstructions));
 
@@ -341,7 +386,7 @@ export async function materializeVnDebugTarget({
 
     if (session.story.runtimeWait) {
       const wait = session.story.runtimeWait;
-      const waitAnchor = inspection.commands[wait.commandIndex]?.anchor ?? lastStableAnchor ?? resolvedTarget;
+      const waitAnchor = currentInspection.commands[wait.commandIndex]?.anchor ?? lastStableAnchor ?? resolvedTarget;
       if (wait.kind === "input") {
         const decision = findInputDecision(decisions, waitAnchor);
         if (!decision) {
@@ -363,12 +408,18 @@ export async function materializeVnDebugTarget({
         session = resolved.session;
         uiState = deriveUiRuntimeLifecycleState(uiState, session.story);
         lastStableAnchor = waitAnchor;
-        if (resolvedTarget.kind === "command" && resolvedTarget.commandIndex === wait.commandIndex) {
-          return ready(base(), inspection.entry, session, pixiStage, mediaState, uiState, resolvedTarget);
+        if (
+          resolvedTarget.scriptPath === currentInspection.source.scriptPath
+          && resolvedTarget.kind === "command"
+          && resolvedTarget.commandIndex === wait.commandIndex
+        ) {
+          return ready(base(), entry, currentInspection.source, session, pixiStage, mediaState, uiState, resolvedTarget);
         }
         continue;
       }
-      const waitTargeted = resolvedTarget.kind === "command" && resolvedTarget.commandIndex === wait.commandIndex;
+      const waitTargeted = resolvedTarget.scriptPath === currentInspection.source.scriptPath
+        && resolvedTarget.kind === "command"
+        && resolvedTarget.commandIndex === wait.commandIndex;
       if (waitTargeted) {
         return blocked(base(), "no-stable-result", `@${wait.commandId} has no stable checkpoint at its active runtime wait.`);
       }
@@ -380,7 +431,7 @@ export async function materializeVnDebugTarget({
     const nextCommand = session.script.commands[session.story.instructionPointer];
     if (session.story.pendingChoices.length > 0 && !isChoiceGroupCommand(nextCommand)) {
       if (targetChoiceSeen || (resolvedTarget.kind === "label" && labelReached)) {
-        return ready(base(), inspection.entry, session, pixiStage, mediaState, uiState, resolvedTarget);
+        return ready(base(), entry, currentInspection.source, session, pixiStage, mediaState, uiState, resolvedTarget);
       }
       const enabledChoices = session.story.pendingChoices.filter((choice) => choice.enabled !== false);
       if (enabledChoices.length === 0) {
@@ -407,7 +458,21 @@ export async function materializeVnDebugTarget({
       if (resolved.storyStep.diagnostics.some(isErrorDiagnostic)) {
         return blocked(base(), "decision-invalid", "The selected choice is no longer enabled or valid.");
       }
-      session = resolved.session;
+      if (resolved.storyStep.navigationRequest) {
+        navigationCount += 1;
+        if (navigationCount > 32) return blocked(base(), "loop-detected", "Debug navigation exceeded 32 cross-script transitions.");
+        const navigation = switchDebugNavigation(
+          resolved.session,
+          resolved.storyStep.navigationRequest.endpoint,
+          inspectionsByPath
+        );
+        if (!navigation.ok) return blocked(base(), "catalog-link-error", navigation.message);
+        session = navigation.session;
+        currentInspection = navigation.inspection;
+        executedScriptPaths.push(navigation.inspection.source.scriptPath);
+      } else {
+        session = resolved.session;
+      }
       choiceGroupAnchor = undefined;
       continue;
     }
@@ -419,15 +484,19 @@ export async function materializeVnDebugTarget({
     seenStates.add(cycleKey);
 
     const commandIndex = session.story.instructionPointer;
-    const commandInspection = inspection.commands[commandIndex];
+    const commandInspection = currentInspection.commands[commandIndex];
     const command = commandInspection?.command;
     if (!commandInspection || !command) {
       return blocked(base(), "target-unreachable", "The target is beyond the executable command stream.");
     }
     const commandAnchor = commandInspection.anchor;
-    if (resolvedTarget.kind === "label" && commandIndex === resolvedTarget.commandIndex) labelReached = true;
+    if (
+      resolvedTarget.scriptPath === currentInspection.source.scriptPath
+      && resolvedTarget.kind === "label"
+      && commandIndex === resolvedTarget.commandIndex
+    ) labelReached = true;
     if (isChoiceGroupCommand(command) && !choiceGroupAnchor) {
-      choiceGroupAnchor = createChoiceGroupDecisionAnchor(inspection, commandIndex);
+      choiceGroupAnchor = createChoiceGroupDecisionAnchor(currentInspection, commandIndex);
     }
 
     const step = stepVnSessionInstruction(session);
@@ -439,7 +508,7 @@ export async function materializeVnDebugTarget({
       previousMediaState: mediaState,
       previousPixiStage: pixiStage,
       previousUiState: uiState,
-      profile: profile ?? inspection.entry.profile ?? "vn2d",
+      profile: profile ?? entry.profile,
       runtimeCommands: step.emittedRuntimeCommands,
       session: step.session,
       ...(routeTable ? { routeTable } : {})
@@ -455,15 +524,33 @@ export async function materializeVnDebugTarget({
       return blocked(base(), "expression-error", `@${command.canonicalName} could not be projected deterministically.`);
     }
     if (projected.transient.gameplayEvents.length > 0) {
-      return blocked(base(), "gameplay-event", "A gameplay event was encountered before the target; Game A cannot restore host state atomically.");
+      return blocked(base(), "gameplay-event", "A gameplay event was encountered before the target; the debug materializer cannot restore host-owned gameplay state atomically.");
     }
     if (commandInspection.previewability === "degraded" || stepDiagnostics.length > 0) degraded = true;
     session = projected.session;
     pixiStage = projected.stable.pixiStage;
     mediaState = projected.stable.mediaState;
     uiState = projected.stable.uiState;
-    const commandIsTarget = resolvedTarget.kind === "command" && resolvedTarget.commandIndex === commandIndex;
+    const commandIsTarget = resolvedTarget.scriptPath === currentInspection.source.scriptPath
+      && resolvedTarget.kind === "command"
+      && resolvedTarget.commandIndex === commandIndex;
     if (commandIsTarget && command.commandId === "choice") targetChoiceSeen = true;
+
+    if (step.storyStep.navigationRequest) {
+      navigationCount += 1;
+      if (navigationCount > 32) return blocked(base(), "loop-detected", "Debug navigation exceeded 32 cross-script transitions.");
+      const navigation = switchDebugNavigation(
+        session,
+        step.storyStep.navigationRequest.endpoint,
+        inspectionsByPath
+      );
+      if (!navigation.ok) return blocked(base(), "catalog-link-error", navigation.message);
+      session = navigation.session;
+      currentInspection = navigation.inspection;
+      executedScriptPaths.push(navigation.inspection.source.scriptPath);
+      choiceGroupAnchor = undefined;
+      continue;
+    }
 
     if (session.story.presentationWait) {
       if (session.story.presentationWait.channel === "ui") {
@@ -486,10 +573,10 @@ export async function materializeVnDebugTarget({
       && !session.story.runtimeWait
       && !session.story.presentationWait
     ) {
-      return ready(base(), inspection.entry, session, pixiStage, mediaState, uiState, resolvedTarget);
+      return ready(base(), entry, currentInspection.source, session, pixiStage, mediaState, uiState, resolvedTarget);
     }
     if (commandIsTarget && command.commandId !== "choice" && !session.story.runtimeWait) {
-      return ready(base(), inspection.entry, session, pixiStage, mediaState, uiState, resolvedTarget);
+      return ready(base(), entry, currentInspection.source, session, pixiStage, mediaState, uiState, resolvedTarget);
     }
     if (
       resolvedTarget.kind === "label"
@@ -499,7 +586,7 @@ export async function materializeVnDebugTarget({
       && isObservableStableCommand(commandInspection)
     ) {
       if (command.commandId !== "choice" || !isChoiceGroupCommand(session.script.commands[session.story.instructionPointer])) {
-        return ready(base(), inspection.entry, session, pixiStage, mediaState, uiState, resolvedTarget);
+        return ready(base(), entry, currentInspection.source, session, pixiStage, mediaState, uiState, resolvedTarget);
       }
     }
   }
@@ -508,10 +595,10 @@ export async function materializeVnDebugTarget({
 }
 
 export function resolveVnDebugAnchor(
-  inspection: VnDebugEntryInspection,
+  inspection: VnDebugScriptInspection,
   anchor: VnDebugTargetAnchor
 ): VnDebugTargetAnchor | undefined {
-  if (anchor.scriptPath !== inspection.entry.scriptPath) return undefined;
+  if (anchor.scriptPath !== inspection.source.scriptPath) return undefined;
   if (anchor.kind === "label") {
     const matches = inspection.labels.filter((candidate) => candidate.name === anchor.label);
     if (matches.length === 1) return matches[0]!.anchor;
@@ -589,7 +676,7 @@ function stableCommandId(command: RuntimeCommand): string | undefined {
 }
 
 function createChoiceGroupDecisionAnchor(
-  inspection: VnDebugEntryInspection,
+  inspection: VnDebugScriptInspection,
   commandIndex: number
 ): VnDebugTargetAnchor {
   const commandAnchor = inspection.commands[commandIndex]!.anchor;
@@ -632,7 +719,7 @@ function createChoiceGroupDecisionAnchor(
 
 function classifyVnDebugCommand(command: RuntimeCommand): { previewability: VnDebugPreviewability; reason?: string } {
   if (command.commandId === "gameplay") {
-    return { previewability: "blocked", reason: "Game A cannot atomically restore gameplay host state in this version." };
+    return { previewability: "blocked", reason: "The debug materializer cannot atomically restore host-owned gameplay state." };
   }
   if (command.status !== "implemented") {
     return { previewability: "degraded", reason: `@${command.canonicalName} is stubbed and is materialized as the formal runtime no-op.` };
@@ -698,9 +785,39 @@ function selectChoiceDecisionIndex(
   return matches.length === 1 ? matches[0]!.index : undefined;
 }
 
+function switchDebugNavigation(
+  session: VnSessionState,
+  endpoint: string,
+  inspectionsByPath: ReadonlyMap<string, VnDebugScriptInspection>
+):
+  | { ok: true; session: VnSessionState; inspection: VnDebugScriptInspection }
+  | { ok: false; message: string } {
+  const parsed = parseStaticNaniEndpoint(endpoint, session.script.scriptPath);
+  if (!parsed.ok) return { ok: false, message: parsed.message };
+  const inspection = inspectionsByPath.get(parsed.endpoint.scriptPath);
+  if (!inspection) {
+    return { ok: false, message: `Nani navigation target '${parsed.endpoint.scriptPath}' is not in the debug catalog.` };
+  }
+  const instructionPointer = parsed.endpoint.label
+    ? inspection.script.labels[parsed.endpoint.label]
+    : 0;
+  if (instructionPointer === undefined) {
+    return {
+      ok: false,
+      message: `Nani navigation label '#${parsed.endpoint.label}' does not exist in '${inspection.source.scriptPath}'.`
+    };
+  }
+  return {
+    ok: true,
+    inspection,
+    session: switchVnSessionScript(session, { script: inspection.script, instructionPointer })
+  };
+}
+
 function ready(
   base: Omit<VnDebugMaterializationBase, "status">,
-  entry: VnRuntimeEntry,
+  entry: VnEntryDef,
+  source: VnRuntimeScriptSource,
   session: VnSessionState,
   pixiStage: PixiStageSnapshot,
   mediaState: MediaRuntimeState,
@@ -710,7 +827,8 @@ function ready(
   const checkpoint = collectVnSaveCheckpoint({
     active: session.active,
     allowInactive: false,
-    entry,
+    entryId: entry.id,
+    script: { scriptPath: source.scriptPath, scriptRevision: source.scriptRevision },
     story: session.story,
     pixiStage,
     media: createVnMediaCheckpoint(mediaState),
@@ -769,6 +887,7 @@ function isObservableStableCommand(command: VnDebugCommandInspection): boolean {
 
 function materializationCycleKey(session: VnSessionState): string {
   return stableJson({
+    scriptPath: session.story.currentScriptPath,
     instructionPointer: session.story.instructionPointer,
     variables: session.story.variables,
     choices: session.story.pendingChoices,
@@ -805,12 +924,10 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value) ?? "null";
 }
 
-function sameDebugEntrySource(left: VnRuntimeEntry, right: VnRuntimeEntry): boolean {
-  return left.id === right.id
-    && left.scriptPath === right.scriptPath
+function sameDebugScriptSource(left: VnRuntimeScriptSource, right: VnRuntimeScriptSource): boolean {
+  return left.scriptPath === right.scriptPath
     && left.sourceText === right.sourceText
-    && left.startLabel === right.startLabel
-    && left.profile === right.profile;
+    && left.scriptRevision === right.scriptRevision;
 }
 
 function abortError(): Error {

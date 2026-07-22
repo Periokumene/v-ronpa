@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { VnDebugEntryInspection, VnDebugTargetAnchor } from "@v-ronpa/app-vn-runtime/debug";
+import type { VnDebugScriptInspection, VnDebugTargetAnchor } from "@v-ronpa/app-vn-runtime/debug";
 import { mergeVnDevtoolsLayout, resolveVnDevtoolsSelection } from "./controllerViewState";
 import type { VnDevtoolsSourceLine } from "./types";
 
@@ -15,11 +15,22 @@ const rematchedAnchor: VnDebugTargetAnchor = {
 };
 
 const inspection = {
-  entry: { id: "opening", scriptPath: "game-a/opening.nani" },
+  entry: {
+    id: "opening",
+    title: "Opening",
+    initialScriptPath: "game-a/opening.nani",
+    profile: "vn2d",
+    assetRefs: []
+  },
+  source: {
+    scriptPath: "game-a/opening.nani",
+    scriptRevision: "sha256:new",
+    sourceText: "Narrator: moved"
+  },
   revision: "sha256:new",
   commands: [{ anchor: rematchedAnchor }],
   labels: []
-} as unknown as VnDebugEntryInspection;
+} as unknown as VnDebugScriptInspection;
 
 describe("VN devtools controller view state", () => {
   it("rematches a selected source target by stable anchor after an HMR line move", () => {

@@ -1,11 +1,11 @@
-import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
 import {
   type VnDebugDecisionTrace,
-  type VnDebugEntryInspection,
+  type VnDebugScriptInspection,
   type VnDebugMaterializationDecisionRequired,
   type VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
 import type { VnDevtoolsDecisionSubmission, VnDevtoolsStatus } from "./types";
+import type { VnDevtoolsScriptCandidate } from "./scriptCandidate";
 
 /**
  * The Dock always displays the newest saved source, including a rejected
@@ -15,11 +15,11 @@ import type { VnDevtoolsDecisionSubmission, VnDevtoolsStatus } from "./types";
 export type VnDevtoolsInspectionDisplay =
   | {
     access: "read-only";
-    inspection: VnDebugEntryInspection;
+    inspection: VnDebugScriptInspection;
   }
   | {
     access: "installable";
-    inspection: VnDebugEntryInspection;
+    inspection: VnDebugScriptInspection;
     expectedRevision?: string;
   };
 
@@ -44,13 +44,13 @@ export function createVnDevtoolsPreviewAuthorization(): VnDevtoolsPreviewAuthori
 }
 
 export function createReadOnlyVnDevtoolsInspectionDisplay(
-  inspection: VnDebugEntryInspection
+  inspection: VnDebugScriptInspection
 ): VnDevtoolsInspectionDisplay {
   return { access: "read-only", inspection };
 }
 
 export function createInstallableVnDevtoolsInspectionDisplay(
-  inspection: VnDebugEntryInspection,
+  inspection: VnDebugScriptInspection,
   expectedRevision?: string
 ): VnDevtoolsInspectionDisplay {
   return {
@@ -68,35 +68,35 @@ export function canMaterializeVnDevtoolsInspection(
 
 export function canPinCurrentVnDevtoolsInspection(
   display: VnDevtoolsInspectionDisplay | undefined,
-  installedEntry: VnRuntimeEntry
+  installedEntry: VnDevtoolsScriptCandidate
 ): boolean {
   return canMaterializeVnDevtoolsInspection(display)
-    && vnDebugEntryIdentity(display.inspection.entry) === vnDebugEntryIdentity(installedEntry);
+    && vnDebugScriptIdentity(display.inspection) === vnDebugScriptIdentity(installedEntry);
 }
 
 /** A cancelled candidate may restore preview access only to the installed source. */
 export function canReauthorizeVnDevtoolsInspection(
   display: VnDevtoolsInspectionDisplay | undefined,
-  installedEntry: VnRuntimeEntry
+  installedEntry: VnDevtoolsScriptCandidate
 ): boolean {
   return Boolean(
     display?.inspection.canMaterialize
-    && vnDebugEntryIdentity(display.inspection.entry) === vnDebugEntryIdentity(installedEntry)
+    && vnDebugScriptIdentity(display.inspection) === vnDebugScriptIdentity(installedEntry)
   );
 }
 
 export function resolveCurrentVnDevtoolsAnchor({
   inspection,
   instructionPointer,
-  mapsInstalledEntry,
+  mapsInstalledScript,
   runtimeActive
 }: {
-  inspection: VnDebugEntryInspection | undefined;
+  inspection: VnDebugScriptInspection | undefined;
   instructionPointer: number;
-  mapsInstalledEntry: boolean;
+  mapsInstalledScript: boolean;
   runtimeActive: boolean;
 }): VnDebugTargetAnchor | undefined {
-  if (!inspection || !runtimeActive || !mapsInstalledEntry || inspection.commands.length === 0) return undefined;
+  if (!inspection || !runtimeActive || !mapsInstalledScript || inspection.commands.length === 0) return undefined;
   const activeCommandIndex = Math.max(0, Math.min(inspection.commands.length - 1, instructionPointer - 1));
   return inspection.commands[activeCommandIndex]?.anchor;
 }
@@ -150,12 +150,14 @@ export function vnDebugAnchorIdentity(anchor: VnDebugTargetAnchor): string {
     ?? `${anchor.revision}:${anchor.kind}:${anchor.commandIndex}:${anchor.label ?? anchor.commandId ?? ""}`;
 }
 
-export function vnDebugEntryIdentity(entry: VnRuntimeEntry): string {
+export function vnDebugScriptIdentity(value: VnDevtoolsScriptCandidate | VnDebugScriptInspection): string {
+  const entry = value.entry;
+  const source = value.source;
   return [
     entry.id,
-    entry.scriptPath,
-    entry.scriptRevision,
-    entry.sourceText,
+    source.scriptPath,
+    source.scriptRevision,
+    source.sourceText,
     entry.startLabel ?? "",
     entry.profile ?? ""
   ].join("\u0000");

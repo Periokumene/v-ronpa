@@ -1,45 +1,74 @@
-import type { VnRuntimeEntry } from "@v-ronpa/app-vn-runtime";
 import {
   EMPTY_VN_DEBUG_DECISION_TRACE,
-  inspectVnDebugEntry,
+  inspectVnDebugScript,
   materializeVnDebugTarget,
   resolveVnDebugAnchor,
   type VnDebugDecisionTrace,
-  type VnDebugEntryInspection,
+  type VnDebugScriptInspection,
   type VnDebugMaterializationResult,
   type VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
 import { planVnDevtoolsCandidate } from "./sourceUpdates";
 import type { NaniDevtoolsViteUpdate } from "./viteProtocol";
+import {
+  replaceVnDevtoolsCandidateSource,
+  validateVnDevtoolsCandidateCatalog,
+  type VnDevtoolsScriptCandidate
+} from "./scriptCandidate";
 
 export type PreparedVnDevtoolsCandidateUpdate =
   | {
-    kind: "retain-last-known-good";
-    inspection: VnDebugEntryInspection;
-    reason: "invalid-source" | "revision-mismatch";
+      kind: "retain-last-known-good";
+      inspection: VnDebugScriptInspection;
+      reason: "invalid-source" | "revision-mismatch" | "catalog-link-error";
+      message?: string;
   }
   | {
     kind: "refresh-source-mapping";
-    inspection: VnDebugEntryInspection;
+    inspection: VnDebugScriptInspection;
     expectedRevision: string;
     remappedTarget?: VnDebugTargetAnchor;
   }
   | {
     kind: "materialize-pinned-target";
-    inspection: VnDebugEntryInspection;
+    inspection: VnDebugScriptInspection;
     expectedRevision: string;
     result: VnDebugMaterializationResult;
   }
-  | { kind: "adopt-for-next-start"; inspection: VnDebugEntryInspection; expectedRevision: string }
-  | { kind: "require-preview-target"; inspection: VnDebugEntryInspection; expectedRevision: string };
+  | {
+      kind: "adopt-catalog";
+      inspection: VnDebugScriptInspection;
+      expectedRevision: string;
+      impact: "next-start" | "future-navigation";
+    }
+  | { kind: "require-preview-target"; inspection: VnDebugScriptInspection; expectedRevision: string };
+
+export type VnDevtoolsScriptUpdateImpact = "next-start" | "future-navigation" | "executed-session";
 
 export interface PrepareVnDevtoolsCandidateUpdateInput {
-  activeEntry: VnRuntimeEntry;
+  activeCandidate: VnDevtoolsScriptCandidate;
   update: NaniDevtoolsViteUpdate;
   pinnedTarget?: VnDebugTargetAnchor;
   decisions?: VnDebugDecisionTrace;
-  vnActive: boolean;
+  impact: VnDevtoolsScriptUpdateImpact;
   signal?: AbortSignal;
+}
+
+export function classifyVnDevtoolsScriptUpdateImpact({
+  executedScriptPaths = [],
+  runtimeScriptPath,
+  updatedScriptPath,
+  vnActive
+}: {
+  executedScriptPaths?: Iterable<string>;
+  runtimeScriptPath: string;
+  updatedScriptPath: string;
+  vnActive: boolean;
+}): VnDevtoolsScriptUpdateImpact {
+  if (!vnActive) return "next-start";
+  return updatedScriptPath === runtimeScriptPath || new Set(executedScriptPaths).has(updatedScriptPath)
+    ? "executed-session"
+    : "future-navigation";
 }
 
 /**
@@ -48,28 +77,30 @@ export interface PrepareVnDevtoolsCandidateUpdateInput {
  * result is an inspection/status update that preserves last-known-good state.
  */
 export async function prepareVnDevtoolsCandidateUpdate({
-  activeEntry,
+  activeCandidate,
   decisions = EMPTY_VN_DEBUG_DECISION_TRACE,
+  impact,
   pinnedTarget,
   signal,
-  update,
-  vnActive
+  update
 }: PrepareVnDevtoolsCandidateUpdateInput): Promise<PreparedVnDevtoolsCandidateUpdate> {
   throwIfAborted(signal);
-  const candidateEntry: VnRuntimeEntry = {
-    ...activeEntry,
+  const candidateSource = {
+    ...activeCandidate.source,
     sourceText: update.sourceText,
-    scriptRevision: update.serverRevision ?? activeEntry.scriptRevision
+    scriptRevision: update.serverRevision ?? activeCandidate.source.scriptRevision
   };
-  const inspection = await inspectVnDebugEntry(candidateEntry);
+  const candidateCatalog = replaceVnDevtoolsCandidateSource(activeCandidate, candidateSource);
+  const inspection = await inspectVnDebugScript(activeCandidate.entry, candidateSource);
   throwIfAborted(signal);
+  const replayTarget = impact === "executed-session" ? pinnedTarget : undefined;
   const plan = planVnDevtoolsCandidate({
     serverRevision: update.serverRevision,
     browserRevision: inspection.revision,
-    activeRevision: activeEntry.scriptRevision,
+    activeRevision: activeCandidate.source.scriptRevision,
     canMaterialize: inspection.canMaterialize,
-    hasPinnedTarget: Boolean(pinnedTarget),
-    vnActive
+    hasPinnedTarget: Boolean(replayTarget),
+    vnActive: impact === "executed-session"
   });
 
   if (plan.kind === "retain-last-known-good") {
@@ -82,8 +113,22 @@ export async function prepareVnDevtoolsCandidateUpdate({
   if (!expectedRevision) {
     return { kind: "retain-last-known-good", inspection, reason: "invalid-source" };
   }
+  const catalogValidation = await validateVnDevtoolsCandidateCatalog(candidateCatalog);
+  throwIfAborted(signal);
+  if (!catalogValidation.ok) {
+    return {
+      kind: "retain-last-known-good",
+      inspection,
+      reason: catalogValidation.code,
+      message: catalogValidation.message
+    };
+  }
   if (plan.kind === "refresh-source-mapping") {
-    const remappedTarget = pinnedTarget ? resolveVnDebugAnchor(inspection, pinnedTarget) : undefined;
+    const remappedTarget = pinnedTarget
+      ? pinnedTarget.scriptPath === inspection.source.scriptPath
+        ? resolveVnDebugAnchor(inspection, pinnedTarget)
+        : pinnedTarget
+      : undefined;
     return {
       kind: plan.kind,
       inspection,
@@ -92,13 +137,14 @@ export async function prepareVnDevtoolsCandidateUpdate({
     };
   }
   if (plan.kind === "materialize-pinned-target") {
-    if (!pinnedTarget) {
+    if (!replayTarget) {
       return { kind: "retain-last-known-good", inspection, reason: "invalid-source" };
     }
     const result = await materializeVnDebugTarget({
       entry: inspection.entry,
+      catalog: candidateCatalog.catalog,
       inspection,
-      target: pinnedTarget,
+      target: replayTarget,
       decisions,
       expectedRevision,
       ...(signal ? { signal } : {})
@@ -106,7 +152,14 @@ export async function prepareVnDevtoolsCandidateUpdate({
     throwIfAborted(signal);
     return { kind: plan.kind, inspection, expectedRevision, result };
   }
-  if (plan.kind === "adopt-for-next-start") return { kind: plan.kind, inspection, expectedRevision };
+  if (plan.kind === "adopt-for-next-start") {
+    return {
+      kind: "adopt-catalog",
+      inspection,
+      expectedRevision,
+      impact: impact === "executed-session" ? "next-start" : impact
+    };
+  }
   return { kind: "require-preview-target", inspection, expectedRevision };
 }
 

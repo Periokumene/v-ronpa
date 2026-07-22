@@ -19,8 +19,9 @@ Required gates:
 
 The Nani workbench is a Game A development surface in its first version. Harness
 does not mount or depend on `app-vn-devtools`; future host-state materialization
-must compose through an app-owned atomic commit boundary rather than expanding
-the VN debug core.
+must compose through the shared `app-vn-devtools` host transaction with only
+app policy callbacks, rather than expanding the VN debug core or cloning the
+transaction in an app.
 
 Game A product Nani lives only under `apps/game-a/src/nani/**`. Test-only Nani
 lives under `apps/game-a/src/test-nani/**` and has a separate generated metadata

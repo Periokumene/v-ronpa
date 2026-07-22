@@ -104,7 +104,7 @@ describe("pixi presenter port", () => {
   });
 
   it("keeps queued reconciliation behind the character preparation readiness barrier", async () => {
-    const deferred = createDeferred<void>();
+    const deferred = createDeferred<Awaited<ReturnType<ActorSystem["preloadCharacters"]>>>();
     vi.spyOn(Application.prototype, "init").mockImplementation(async function (this: Application) {
       Object.defineProperty(this, "renderer", { configurable: true, value: { width: 960, height: 540 } });
       Object.defineProperty(this, "ticker", {
@@ -132,7 +132,7 @@ describe("pixi presenter port", () => {
     expect(preload).toHaveBeenCalledWith(characterPreloadPlan);
     expect(reconcile).not.toHaveBeenCalled();
 
-    deferred.resolve();
+    deferred.resolve({ ok: true });
     await ready;
 
     expect(reconcile).toHaveBeenCalledOnce();
@@ -173,7 +173,7 @@ describe("pixi presenter port", () => {
   });
 
   it("destroys an inactive presenter only once when preparation finishes late", async () => {
-    const deferred = createDeferred<void>();
+    const deferred = createDeferred<Awaited<ReturnType<ActorSystem["preloadCharacters"]>>>();
     const tickerAdd = vi.fn();
     vi.spyOn(Application.prototype, "init").mockImplementation(async function (this: Application) {
       Object.defineProperty(this, "renderer", { configurable: true, value: { width: 960, height: 540 } });
@@ -195,7 +195,7 @@ describe("pixi presenter port", () => {
     const ready = presenter.mount();
     await vi.waitFor(() => expect(preload).toHaveBeenCalledOnce());
     presenter.destroy();
-    deferred.resolve();
+    deferred.resolve({ ok: true });
     await ready;
 
     expect(destroy).toHaveBeenCalledTimes(1);

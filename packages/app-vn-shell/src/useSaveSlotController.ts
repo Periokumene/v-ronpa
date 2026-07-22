@@ -14,7 +14,7 @@ export interface SaveSlotControllerOptions {
   port: SavePort;
   policy: SaveSlotPolicy;
   collectSaveData: () => SaveDataCollectionResult;
-  restoreSaveData: (save: SaveData) => SaveDataRestoreResult | void;
+  restoreSaveData: (save: SaveData) => SaveDataRestoreResult | void | Promise<SaveDataRestoreResult | void>;
   capturePreview?: (() => Promise<SaveSlotPreview | undefined> | SaveSlotPreview | undefined) | undefined;
   canSave: () => boolean;
 }
@@ -259,7 +259,7 @@ export function useSaveSlotController({
         return false;
       }
       if (!result.value) return false;
-      const restored = restoreSaveData(result.value.data);
+      const restored = await restoreSaveData(result.value.data);
       if (restored && !restored.ok) {
         setLastError({ code: restored.code, message: restored.message });
         return false;
@@ -279,7 +279,7 @@ export function useSaveSlotController({
           return false;
         }
         if (!result.value) return false;
-        const restored = restoreSaveData(result.value.data);
+        const restored = await restoreSaveData(result.value.data);
         if (restored && !restored.ok) {
           setLastError({ code: restored.code, message: restored.message });
           return false;

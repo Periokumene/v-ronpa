@@ -28,6 +28,15 @@ export interface CharacterSystemOptions {
   onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
 }
 
+export interface CharacterPreparationFailure {
+  characterId: string;
+  expression: string;
+}
+
+export type CharacterPreparationResult =
+  | { ok: true }
+  | { ok: false; failures: CharacterPreparationFailure[] };
+
 interface LoadedCharacterPack {
   entryUri: string;
   character: LayeredCharacterDefinition;
@@ -186,39 +195,43 @@ export class CharacterSystem {
   private readonly metadata = new Map<string, Promise<LayeredCharacterLayerMetadata>>();
   private readonly textures = new Map<string, Promise<Texture>>();
   private readonly prepared = new Map<string, PreparedCharacterResult>();
+  private readonly preparing = new Map<string, Promise<PreparedCharacterResult>>();
+  private readonly uploadedTextures = new Set<Texture>();
+  private readonly textureUploads = new Map<Texture, Promise<void>>();
   private readonly planMissDiagnostics = new Set<string>();
   private destroyed = false;
 
   constructor(private readonly options: CharacterSystemOptions) {}
 
-  async preload(plan: LayeredCharacterPreloadPlan): Promise<void> {
-    const results = await Promise.all(
-      plan.flatMap(({ characterId, appearanceExpressions }) =>
-        appearanceExpressions.map((expression) => this.prepareExpression(characterId, expression.trim()))
-      )
-    );
-    if (this.destroyed) return;
-    for (const result of results) this.prepared.set(characterResultKey(result.characterId, result.expression), result);
-    const uniqueTextures = new Set<Texture>();
-    for (const result of results) {
-      if (result.kind !== "ready") continue;
-      for (const item of result.textures) uniqueTextures.add(item.texture);
-    }
-    if (uniqueTextures.size === 0 || !this.options.renderer) return;
-    try {
-      await this.options.renderer.prepare.upload([...uniqueTextures]);
-    } catch (error) {
-      if (this.destroyed) return;
-      for (const result of results) {
-        if (result.kind !== "ready" || result.textures.length === 0) continue;
-        this.emitLoadFailed(result.characterId, result.expression, new Error(`Failed to upload prepared character textures: ${formatError(error)}`));
-        this.prepared.set(characterResultKey(result.characterId, result.expression), {
-          kind: "invalid",
-          characterId: result.characterId,
-          expression: result.expression
-        });
+  async preload(plan: LayeredCharacterPreloadPlan): Promise<CharacterPreparationResult> {
+    const requested = new Map<string, { characterId: string; expression: string }>();
+    for (const { characterId, appearanceExpressions } of plan) {
+      for (const rawExpression of appearanceExpressions) {
+        const expression = rawExpression.trim();
+        requested.set(characterResultKey(characterId, expression), { characterId, expression });
       }
     }
+    const results = await Promise.all(
+      [...requested.values()].map(({ characterId, expression }) => this.prepareExpressionOnce(characterId, expression))
+    );
+    const ready = results.filter((result): result is Extract<PreparedCharacterResult, { kind: "ready" }> =>
+      result.kind === "ready");
+    const uploadError = await this.uploadPreparedTextures(ready);
+    if (uploadError) {
+      for (const result of ready) {
+        this.emitLoadFailed(
+          result.characterId,
+          result.expression,
+          new Error(`Failed to upload prepared character textures: ${formatError(uploadError)}`)
+        );
+        const invalid = { kind: "invalid", characterId: result.characterId, expression: result.expression } as const;
+        this.prepared.set(characterResultKey(result.characterId, result.expression), invalid);
+      }
+    }
+    const failures = results
+      .filter((result) => result.kind === "invalid" || Boolean(uploadError))
+      .map((result) => ({ characterId: result.characterId, expression: result.expression }));
+    return failures.length > 0 ? { ok: false, failures } : { ok: true };
   }
 
   createPresentation(actorId: string): CharacterPresentation {
@@ -261,7 +274,55 @@ export class CharacterSystem {
     this.metadata.clear();
     this.textures.clear();
     this.prepared.clear();
+    this.preparing.clear();
+    this.uploadedTextures.clear();
+    this.textureUploads.clear();
     this.planMissDiagnostics.clear();
+  }
+
+  private prepareExpressionOnce(characterId: string, expression: string): Promise<PreparedCharacterResult> {
+    const key = characterResultKey(characterId, expression);
+    const prepared = this.prepared.get(key);
+    if (prepared) return Promise.resolve(prepared);
+    const inFlight = this.preparing.get(key);
+    if (inFlight) return inFlight;
+    const promise = (async () => {
+      const result = await this.prepareExpression(characterId, expression);
+      if (!this.destroyed) this.prepared.set(key, result);
+      return result;
+    })().finally(() => this.preparing.delete(key));
+    this.preparing.set(key, promise);
+    return promise;
+  }
+
+  private async uploadPreparedTextures(
+    results: Array<Extract<PreparedCharacterResult, { kind: "ready" }>>
+  ): Promise<unknown | undefined> {
+    if (!this.options.renderer) return undefined;
+    const textures = [...new Set(results.flatMap((result) => result.textures.map((item) => item.texture)))];
+    const waits = new Set<Promise<void>>();
+    const fresh = textures.filter((texture) => {
+      if (this.uploadedTextures.has(texture)) return false;
+      const inFlight = this.textureUploads.get(texture);
+      if (inFlight) {
+        waits.add(inFlight);
+        return false;
+      }
+      return true;
+    });
+    if (fresh.length > 0) {
+      const upload = Promise.resolve(this.options.renderer.prepare.upload(fresh)).then(() => {
+        if (!this.destroyed) fresh.forEach((texture) => this.uploadedTextures.add(texture));
+      }).finally(() => fresh.forEach((texture) => this.textureUploads.delete(texture)));
+      fresh.forEach((texture) => this.textureUploads.set(texture, upload));
+      waits.add(upload);
+    }
+    try {
+      await Promise.all(waits);
+      return undefined;
+    } catch (error) {
+      return error;
+    }
   }
 
   private async prepareExpression(characterId: string, expression: string): Promise<PreparedCharacterResult> {

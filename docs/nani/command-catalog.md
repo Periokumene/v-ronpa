@@ -93,6 +93,23 @@ combined wait correctness. The generated matrix below is authoritative; use
   compiler consumes both, owns catalog and runtime-boundary diagnostics, and
   emits required source spans without adding provenance to RuntimeCommand.
 - Implemented RuntimeCommand params use canonical runtime field names only.
+
+### Static navigation endpoints
+
+`@goto` and `@choice ... goto:` use one parser/linker:
+
+```nani
+@goto #LocalLabel
+@goto game-a/chapter-02.nani
+@goto game-a/chapter-02.nani#Start
+@choice "Continue" goto:game-a/chapter-02.nani#Start
+```
+
+`#Label` is local to the current script. Cross-script endpoints require a full,
+registered logical path ending in `.nani`; an omitted label starts at pointer
+zero. Relative or absolute paths, wildcards, dynamic expressions, unknown
+scripts, unknown labels, and malformed endpoints are catalog-link errors. File
+order never implies navigation, and `@end` completes the whole entry.
   Raw aliases stay in `sourceCommand`.
 - `{...}` parameter expressions are preserved by the compiler and evaluated by
   StoryEngine against story variables. The compiler must not replace expression

@@ -4,7 +4,8 @@
 > VN checkpoint fields in this CCR were superseded successively by
 > `save-data-v5-vn-state-authority.md`,
 > `save-data-v6-stable-vn-checkpoint.md`, and
-> `save-data-v7-vn-persistent-media.md`.
+> `save-data-v7-vn-persistent-media.md`; the current hard-cut shape is in
+> `game-a-multi-nani-runtime-hard-cut.md`.
 
 ## Summary
 

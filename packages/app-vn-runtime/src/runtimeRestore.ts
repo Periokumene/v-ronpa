@@ -42,6 +42,7 @@ export function createVnRuntimeRestorePlan({
   const mediaRuntime = createVnMediaCheckpoint(media);
   const storyRuntime = {
     active: active ?? !story.ended,
+    executedScriptPaths: [script.scriptPath],
     state: {
       ...createInitialStoryState(script),
       ...story

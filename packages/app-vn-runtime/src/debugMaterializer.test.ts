@@ -1,16 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { PIXI_MAIN_BACKGROUND_ID } from "@v-ronpa/contracts";
-import type { VnRuntimeEntry } from "./runtimeTypes";
 import {
-  inspectVnDebugEntry,
-  materializeVnDebugTarget,
+  PIXI_MAIN_BACKGROUND_ID,
+  type VnEntryDef,
+  type VnRuntimeScriptSource
+} from "@v-ronpa/contracts";
+import {
+  inspectVnDebugScript as inspectDebugScriptImpl,
+  materializeVnDebugTarget as materializeDebugTarget,
   type VnDebugChoiceRequest,
-  type VnDebugInputRequest
+  type VnDebugInputRequest,
+  type MaterializeVnDebugTargetInput
 } from "./debugMaterializer";
 
 describe("VN debug inspection and materialization", () => {
   it("materializes Story, Pixi, UI, and persistent media from the canonical start label", async () => {
-    const inspection = await inspectVnDebugEntry(entry([
+    const inspection = await inspectVnDebugScript(entry([
       "#Start",
       '@set route:"preview"',
       "@back bg:harness effect:fade time:0.2 wait!",
@@ -42,7 +46,7 @@ describe("VN debug inspection and materialization", () => {
   });
 
   it("stops at a complete choice group, and requests a decision only when traversing beyond it", async () => {
-    const inspection = await inspectVnDebugEntry(entry([
+    const inspection = await inspectVnDebugScript(entry([
       "#Start",
       '@choice "Left" goto:#Left id:left',
       '@choice "Right" goto:#Right id:right',
@@ -82,7 +86,7 @@ describe("VN debug inspection and materialization", () => {
   });
 
   it("requires a separate decision for choice groups that reuse the same option ids", async () => {
-    const inspection = await inspectVnDebugEntry(entry([
+    const inspection = await inspectVnDebugScript(entry([
       "#Start",
       '@choice "First yes" goto:#FirstYes id:yes',
       '@choice "First no" goto:#FirstNo id:no',
@@ -150,7 +154,7 @@ describe("VN debug inspection and materialization", () => {
   });
 
   it("requires explicit input even when a default exists, then checkpoints the submitted value", async () => {
-    const inspection = await inspectVnDebugEntry(entry([
+    const inspection = await inspectVnDebugScript(entry([
       "#Start",
       '@input codename type:string summary:"Codename" value:Felix',
       "Narrator: After input.|#after_input|"
@@ -173,7 +177,7 @@ describe("VN debug inspection and materialization", () => {
   });
 
   it("rejects an invalid typed input decision without entering a synchronous replay loop", async () => {
-    const inspection = await inspectVnDebugEntry(entry([
+    const inspection = await inspectVnDebugScript(entry([
       "#Start",
       '@input score type:number summary:"Score"',
       "Narrator: After input.|#after_number_input|"
@@ -200,7 +204,7 @@ describe("VN debug inspection and materialization", () => {
   });
 
   it("requests input when a label resolves to an input as its first observable point", async () => {
-    const inspection = await inspectVnDebugEntry(entry([
+    const inspection = await inspectVnDebugScript(entry([
       "#Start",
       "@goto #Profile",
       "#Profile",
@@ -216,7 +220,7 @@ describe("VN debug inspection and materialization", () => {
   });
 
   it("automatically traverses one enabled choice and reuses a unique text/goto decision without an id", async () => {
-    const automatic = await inspectVnDebugEntry(entry([
+    const automatic = await inspectVnDebugScript(entry([
       "#Start",
       '@choice "Locked" goto:#Locked enabled:false',
       '@choice "Open" goto:#Open enabled:true',
@@ -230,7 +234,7 @@ describe("VN debug inspection and materialization", () => {
     expect(autoResult.status).toBe("ready");
     if (autoResult.status === "ready") expect(autoResult.checkpoint.story.text?.current?.text).toBe("Open route.");
 
-    const branching = await inspectVnDebugEntry(entry([
+    const branching = await inspectVnDebugScript(entry([
       "#Start",
       '@choice "Left" goto:#Left',
       '@choice "Right" goto:#Right',
@@ -263,7 +267,7 @@ describe("VN debug inspection and materialization", () => {
   });
 
   it("honors conditions and goto, and blocks expression failures, limits, and end targets", async () => {
-    const conditional = await inspectVnDebugEntry(entry([
+    const conditional = await inspectVnDebugScript(entry([
       "#Start",
       "@set showBg:true",
       "@back bg:harness if:{showBg}",
@@ -283,7 +287,7 @@ describe("VN debug inspection and materialization", () => {
       expect(conditionalResult.checkpoint.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
     }
 
-    const expression = await inspectVnDebugEntry(entry([
+    const expression = await inspectVnDebugScript(entry([
       "#Start",
       "@back bg:harness if:{missingVariable}",
       "Narrator: Never.|#after_expression|"
@@ -292,7 +296,7 @@ describe("VN debug inspection and materialization", () => {
     expect(await materializeVnDebugTarget({ entry: expression.entry, inspection: expression, target: expressionTarget }))
       .toMatchObject({ status: "blocked", code: "expression-error" });
 
-    const limited = await inspectVnDebugEntry(entry("#Start\n@set a:1\n@set b:2\nNarrator: Late.|#late|"));
+    const limited = await inspectVnDebugScript(entry("#Start\n@set a:1\n@set b:2\nNarrator: Late.|#late|"));
     const limitedTarget = limited.commands.find((command) => command.anchor.stableId === "print:late")!.anchor;
     expect(await materializeVnDebugTarget({
       entry: limited.entry,
@@ -301,26 +305,26 @@ describe("VN debug inspection and materialization", () => {
       maxInstructions: 1
     })).toMatchObject({ status: "blocked", code: "instruction-limit" });
 
-    const ended = await inspectVnDebugEntry(entry("#Start\n@end"));
+    const ended = await inspectVnDebugScript(entry("#Start\n@end"));
     expect(await materializeVnDebugTarget({ entry: ended.entry, inspection: ended, target: ended.commands[0]!.anchor }))
       .toMatchObject({ status: "blocked", code: "no-stable-result" });
   });
 
   it("reuses explicit ids across revisions but refuses ambiguous or deleted targets", async () => {
-    const first = await inspectVnDebugEntry(entry("#Start\nNarrator: Before.|#stable_text|"));
+    const first = await inspectVnDebugScript(entry("#Start\nNarrator: Before.|#stable_text|"));
     const anchor = first.commands[0]!.anchor;
-    const edited = await inspectVnDebugEntry(entry("#Start\n// inserted\nNarrator: After.|#stable_text|"));
+    const edited = await inspectVnDebugScript(entry("#Start\n// inserted\nNarrator: After.|#stable_text|"));
     const remapped = await materializeVnDebugTarget({ entry: edited.entry, inspection: edited, target: anchor });
     expect(remapped.status).toBe("ready");
     if (remapped.status === "ready") expect(remapped.checkpoint.story.text?.current?.text).toBe("After.");
 
-    const deleted = await inspectVnDebugEntry(entry("#Start\nNarrator: Other.|#other_text|"));
+    const deleted = await inspectVnDebugScript(entry("#Start\nNarrator: Other.|#other_text|"));
     const invalid = await materializeVnDebugTarget({ entry: deleted.entry, inspection: deleted, target: anchor });
     expect(invalid).toMatchObject({ status: "blocked", code: "target-invalid" });
   });
 
   it("refuses to materialize an inspection paired with a different entry source", async () => {
-    const inspection = await inspectVnDebugEntry(entry("#Start\nNarrator: Inspected.|#inspected|"));
+    const inspection = await inspectVnDebugScript(entry("#Start\nNarrator: Inspected.|#inspected|"));
     const mismatchedEntry = entry("#Start\nNarrator: Different.|#different|");
 
     expect(await materializeVnDebugTarget({
@@ -335,7 +339,7 @@ describe("VN debug inspection and materialization", () => {
   });
 
   it("blocks host gameplay effects, transient-only targets, loops, and revision disagreements", async () => {
-    const gameplay = await inspectVnDebugEntry(entry([
+    const gameplay = await inspectVnDebugScript(entry([
       "#Start",
       "@gameplay grant-item item:key",
       "Narrator: Never commit.|#after_gameplay|"
@@ -344,22 +348,22 @@ describe("VN debug inspection and materialization", () => {
     expect(await materializeVnDebugTarget({ entry: gameplay.entry, inspection: gameplay, target: gameplayTarget }))
       .toMatchObject({ status: "blocked", code: "gameplay-event" });
 
-    const transient = await inspectVnDebugEntry(entry("#Start\n@flash color:#fff time:0.1"));
+    const transient = await inspectVnDebugScript(entry("#Start\n@flash color:#fff time:0.1"));
     expect(await materializeVnDebugTarget({ entry: transient.entry, inspection: transient, target: transient.commands[0]!.anchor }))
       .toMatchObject({ status: "blocked", code: "no-stable-result" });
 
-    const trialKeyword = await inspectVnDebugEntry(entry('#Start\n@trialKeyword id:door text:"Door"'));
+    const trialKeyword = await inspectVnDebugScript(entry('#Start\n@trialKeyword id:door text:"Door"'));
     expect(await materializeVnDebugTarget({
       entry: trialKeyword.entry,
       inspection: trialKeyword,
       target: trialKeyword.commands[0]!.anchor
     })).toMatchObject({ status: "blocked", code: "no-stable-result" });
 
-    const stubbed = await inspectVnDebugEntry(entry("#Start\n@wait i"));
+    const stubbed = await inspectVnDebugScript(entry("#Start\n@wait i"));
     expect(await materializeVnDebugTarget({ entry: stubbed.entry, inspection: stubbed, target: stubbed.commands[0]!.anchor }))
       .toMatchObject({ status: "ready", degraded: true });
 
-    const looping = await inspectVnDebugEntry(entry("#Start\n@goto #Start\nNarrator: Unreachable.|#unreachable|"));
+    const looping = await inspectVnDebugScript(entry("#Start\n@goto #Start\nNarrator: Unreachable.|#unreachable|"));
     const loopTarget = looping.commands.find((command) => command.anchor.stableId === "print:unreachable")!.anchor;
     expect(await materializeVnDebugTarget({ entry: looping.entry, inspection: looping, target: loopTarget }))
       .toMatchObject({ status: "blocked", code: "loop-detected" });
@@ -374,7 +378,7 @@ describe("VN debug inspection and materialization", () => {
 
   it("yields during long replay so a newer task can abort before the commit boundary", async () => {
     const setup = Array.from({ length: 512 }, (_, index) => `@set replay_step:${index}`);
-    const inspection = await inspectVnDebugEntry(entry([
+    const inspection = await inspectVnDebugScript(entry([
       "#Start",
       ...setup,
       "Narrator: Must not install.|#after_long_replay|"
@@ -394,7 +398,7 @@ describe("VN debug inspection and materialization", () => {
   });
 
   it("commits deterministic fallback diagnostics as degraded instead of discarding the stable result", async () => {
-    const inspection = await inspectVnDebugEntry(entry([
+    const inspection = await inspectVnDebugScript(entry([
       "#Start",
       "@rain power:2 hue:999",
       "Narrator: Normalized preview.|#normalized_preview|"
@@ -410,7 +414,7 @@ describe("VN debug inspection and materialization", () => {
   });
 
   it("marks degradation from the executed path rather than unreachable stubbed commands", async () => {
-    const inspection = await inspectVnDebugEntry(entry([
+    const inspection = await inspectVnDebugScript(entry([
       "#Start",
       "Narrator: Stable first.|#stable_first|",
       "@goto #End",
@@ -427,7 +431,7 @@ describe("VN debug inspection and materialization", () => {
   });
 
   it("returns the stable no-op state when a targeted conditional choice is disabled", async () => {
-    const inspection = await inspectVnDebugEntry(entry([
+    const inspection = await inspectVnDebugScript(entry([
       "#Start",
       "@set enabled:false",
       '@choice "Hidden" goto:#Hidden if:{enabled}',
@@ -443,15 +447,156 @@ describe("VN debug inspection and materialization", () => {
     expect(result.checkpoint.story.pendingChoices).toEqual([]);
     expect(result.checkpoint.story.variables.enabled).toBe(false);
   });
+
+  it("replays from the entry start through a cross-script choice into the target anchor", async () => {
+    const runtimeEntry: VnEntryDef = {
+      id: "vn:debug-multi",
+      title: "Multi-script debug",
+      initialScriptPath: "game-a/chapter-01.nani",
+      startLabel: "Start",
+      profile: "vn2d",
+      assetRefs: []
+    };
+    const firstDraft: VnRuntimeScriptSource = {
+      scriptPath: "game-a/chapter-01.nani",
+      scriptRevision: "pending",
+      sourceText: [
+        "#Start",
+        '@set route:"from-first"',
+        "@back bg:harness",
+        '@choice "Continue" goto:game-a/chapter-02.nani#Start id:continue',
+        '@choice "Stay" goto:#Stay id:stay',
+        "#Stay",
+        "Narrator: Stayed.|#stayed|"
+      ].join("\n")
+    };
+    const secondDraft: VnRuntimeScriptSource = {
+      scriptPath: "game-a/chapter-02.nani",
+      scriptRevision: "pending",
+      sourceText: "#Start\nNarrator: Arrived.|#arrived|\n@end"
+    };
+    const first = await inspectDebugScriptImpl(runtimeEntry, firstDraft);
+    const second = await inspectDebugScriptImpl(runtimeEntry, secondDraft);
+    const catalog = [first.source, second.source];
+    const target = second.commands.find((command) => command.anchor.stableId === "print:arrived")!.anchor;
+
+    const requested = await materializeDebugTarget({
+      entry: runtimeEntry,
+      catalog,
+      inspection: second,
+      target
+    });
+    expect(requested.status).toBe("decision-required");
+    if (requested.status !== "decision-required" || requested.decision.kind !== "choice") return;
+
+    const result = await materializeDebugTarget({
+      entry: runtimeEntry,
+      catalog,
+      inspection: second,
+      target,
+      decisions: {
+        inputs: [],
+        choices: [{
+          anchor: requested.decision.anchor,
+          choiceId: "continue",
+          text: "Continue",
+          goto: "game-a/chapter-02.nani#Start"
+        }]
+      }
+    });
+
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.checkpoint.script).toEqual({
+      scriptPath: second.source.scriptPath,
+      scriptRevision: second.source.scriptRevision
+    });
+    expect(result.checkpoint.story.variables).toEqual({ route: "from-first" });
+    expect(result.checkpoint.story.text?.current?.text).toBe("Arrived.");
+    expect(result.checkpoint.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
+    expect(result.executedScriptPaths).toEqual([
+      "game-a/chapter-01.nani",
+      "game-a/chapter-02.nani"
+    ]);
+  });
+
+  it("authenticates the updated catalog record instead of the cross-script fixed-point target", async () => {
+    const runtimeEntry: VnEntryDef = {
+      id: "vn:debug-cross-revision",
+      title: "Cross-script revision",
+      initialScriptPath: "game-a/opening.nani",
+      startLabel: "Start",
+      profile: "vn2d",
+      assetRefs: []
+    };
+    const opening = await inspectDebugScriptImpl(runtimeEntry, {
+      scriptPath: "game-a/opening.nani",
+      scriptRevision: "pending",
+      sourceText: [
+        "#Start",
+        '@set route:"updated-opening"',
+        "@goto game-a/chapter-02.nani#Start"
+      ].join("\n")
+    });
+    const chapter = await inspectDebugScriptImpl(runtimeEntry, {
+      scriptPath: "game-a/chapter-02.nani",
+      scriptRevision: "pending",
+      sourceText: "#Start\nNarrator: Cross-script target.|#target|\n@end"
+    });
+    const target = chapter.commands.find((command) => command.anchor.stableId === "print:target")!.anchor;
+
+    const result = await materializeDebugTarget({
+      entry: runtimeEntry,
+      catalog: [opening.source, chapter.source],
+      inspection: opening,
+      target,
+      expectedRevision: opening.revision
+    });
+
+    expect(result).toMatchObject({
+      status: "ready",
+      checkpoint: {
+        script: { scriptPath: "game-a/chapter-02.nani" },
+        story: { variables: { route: "updated-opening" } }
+      }
+    });
+  });
 });
 
-function entry(sourceText: string): VnRuntimeEntry {
+interface DebugTestScript {
+  entry: VnEntryDef;
+  source: VnRuntimeScriptSource;
+}
+
+function entry(sourceText: string): DebugTestScript {
   return {
-    id: "vn:debug-test",
-    scriptPath: "game-a/debug-test.nani",
-    scriptRevision: "sha256:generated-placeholder",
-    sourceText,
-    startLabel: "Start",
-    profile: "vn2d"
+    entry: {
+      id: "vn:debug-test",
+      title: "Debug test",
+      initialScriptPath: "game-a/debug-test.nani",
+      startLabel: "Start",
+      profile: "vn2d",
+      assetRefs: []
+    },
+    source: {
+      scriptPath: "game-a/debug-test.nani",
+      scriptRevision: "sha256:generated-placeholder",
+      sourceText
+    }
   };
+}
+
+function inspectVnDebugScript(value: DebugTestScript) {
+  return inspectDebugScriptImpl(value.entry, value.source);
+}
+
+function materializeVnDebugTarget(
+  input: Omit<MaterializeVnDebugTargetInput, "catalog" | "entry"> & {
+    entry: VnEntryDef | DebugTestScript;
+  }
+) {
+  const testEntry = "source" in input.entry ? input.entry : undefined;
+  const runtimeEntry: VnEntryDef = testEntry?.entry ?? input.entry as VnEntryDef;
+  const catalog = testEntry ? [testEntry.source] : [input.inspection!.source];
+  return materializeDebugTarget({ ...input, entry: runtimeEntry, catalog });
 }

@@ -21,7 +21,22 @@ const legacySymbols = [
   "canStoryAdvanceFromSource",
   "canCompletePauseRuntimeWaitFromSource",
   "canToggleStoryAutomation",
-  "shouldAnimateStoryPlayPacing"
+  "shouldAnimateStoryPlayPacing",
+  "VnRuntimeEntry",
+  "GameAVnLaunchDefinition",
+  "gameALaunchDefinition",
+  "activeLaunchDefinition",
+  "gameAOpeningLaunchDefinition",
+  "resolveGameALaunchDefinitionModule",
+  "inspectVnDebugEntry",
+  "VnDebugEntryInspection",
+  "VnScriptPresentationPreparationReason",
+  "preparationReason",
+  "gameADevtoolsCommit",
+  "GameADevtoolsCommitSettlement",
+  "entryInitialScriptPath",
+  "entryStartLabel",
+  "testScripts"
 ];
 
 for (const sourceRoot of activeRoots) {
@@ -50,7 +65,12 @@ checkProductionPattern(
 
 const runtimeIndex = readFileSync(join(root, "packages/app-vn-runtime/src/index.ts"), "utf8");
 if (/export\s+\*/u.test(runtimeIndex)) failures.push("packages/app-vn-runtime/src/index.ts: wildcard exports are forbidden.");
-for (const debugOnlySymbol of ["useVnRuntimeWithDebug", "UseVnRuntimeWithDebugResult", "VnRuntimeDebugSnapshot"]) {
+for (const debugOnlySymbol of [
+  "useVnRuntimeWithDebug",
+  "UseVnRuntimeWithDebugResult",
+  "VnRuntimeDebugSnapshot",
+  "compileVnRuntimeCatalog"
+]) {
   if (new RegExp(`\\b${debugOnlySymbol}\\b`, "u").test(runtimeIndex)) {
     failures.push(`packages/app-vn-runtime/src/index.ts: debug-only symbol '${debugOnlySymbol}' leaked through the product root.`);
   }
@@ -123,6 +143,81 @@ for (const secondEntryModule of [
   if (moduleSpecifierPattern(secondEntryModule).test(stripComments(gameADevHost))) {
     failures.push(`${gameADevHostPath}: the DEV host must receive the Vite-selected entry from App instead of importing '${secondEntryModule}'.`);
   }
+}
+for (const sharedTransactionToken of [
+  "commitSequenceRef",
+  "pendingCommitRef",
+  "pendingRollbackRef",
+  "installVnDevtoolsHostCommit",
+  "createVnDevtoolsHostCommitSettlement"
+]) {
+  if (new RegExp(`\\b${sharedTransactionToken}\\b`, "u").test(stripComments(gameADevHost))) {
+    failures.push(`${gameADevHostPath}: shared Devtools transaction token '${sharedTransactionToken}' must stay in app-vn-devtools.`);
+  }
+}
+
+const contractsPath = "packages/contracts/src/index.ts";
+const contracts = readFileSync(join(root, contractsPath), "utf8");
+const vnEntrySchemaBody = contracts.match(/export const VnEntryDefSchema\s*=\s*z[\s\S]*?\.strict\(\);/u)?.[0];
+if (!vnEntrySchemaBody) {
+  failures.push(`${contractsPath}: missing canonical VnEntryDefSchema.`);
+} else {
+  for (const entryLevelField of ["scriptPath", "scriptRevision", "sourceText", "characterPreloadPlan"]) {
+    if (new RegExp(`\\b${entryLevelField}\\s*:`, "u").test(vnEntrySchemaBody)) {
+      failures.push(`${contractsPath}: entry-level '${entryLevelField}' is forbidden; script identity belongs to the catalog record.`);
+    }
+  }
+  if (!/\binitialScriptPath\s*:/u.test(vnEntrySchemaBody)) {
+    failures.push(`${contractsPath}: VnEntryDefSchema must expose the catalog-owned initialScriptPath.`);
+  }
+}
+
+const gameAViteConfigPath = "apps/game-a/vite.config.ts";
+const gameAViteConfig = stripComments(readFileSync(join(root, gameAViteConfigPath), "utf8"));
+if (!/gameAAssetConfig\.scripts/u.test(gameAViteConfig)) {
+  failures.push(`${gameAViteConfigPath}: production Nani Devtools membership must come from gameAAssetConfig.scripts.`);
+}
+if (/gameAAssetConfig\.scripts\s*\[\s*0\s*\]/u.test(gameAViteConfig)) {
+  failures.push(`${gameAViteConfigPath}: production Nani Devtools must not collapse the catalog to its first script.`);
+}
+for (const hardcodedEntryIdentity of ["vn:game-a-main", "vn:game-a-test-smoke", "vn:game-a-test-character"]) {
+  if (gameAViteConfig.includes(hardcodedEntryIdentity)) {
+    failures.push(`${gameAViteConfigPath}: entry identity '${hardcodedEntryIdentity}' must come from asset.config.mjs.`);
+  }
+}
+
+const gameAContentManifestPath = "apps/game-a/src/contentManifest.ts";
+const gameAContentManifest = stripComments(readFileSync(join(root, gameAContentManifestPath), "utf8"));
+for (const hardcodedLocator of ["vn:game-a-main", "game-a/opening.nani"]) {
+  if (gameAContentManifest.includes(hardcodedLocator)) {
+    failures.push(`${gameAContentManifestPath}: entry locator '${hardcodedLocator}' must come from generated assets.`);
+  }
+}
+
+const gameAStoryDefinitionPath = "apps/game-a/src/gameAScripts.ts";
+const gameAStoryDefinition = stripComments(readFileSync(join(root, gameAStoryDefinitionPath), "utf8"));
+if (/Object\.values\s*\(\s*gameAScriptSourcesByPath\s*\)/u.test(gameAStoryDefinition)) {
+  failures.push(`${gameAStoryDefinitionPath}: the ordered generated catalog is the only runtime catalog authority.`);
+}
+
+const gameAApp = stripComments(readFileSync(join(root, gameAProductAppPath), "utf8"));
+if (/const\s+prepareScriptPresentation\b/u.test(gameAApp)) {
+  failures.push(`${gameAProductAppPath}: Pixi script preparation belongs to usePixiVnScriptPreparation in app-vn-shell.`);
+}
+
+const naniParserPath = "packages/nani-parser/src/parser.ts";
+const naniParser = stripComments(readFileSync(join(root, naniParserPath), "utf8"));
+if (/canonicalName\s*===\s*["']call["']/u.test(naniParser)) {
+  failures.push(`${naniParserPath}: unsupported @call must not contribute dependency edges.`);
+}
+
+const pixiLayerPath = "packages/app-vn-shell/src/PixiLayer.tsx";
+const pixiLayer = stripComments(readFileSync(join(root, pixiLayerPath), "utf8"));
+if (!/initialCharacterPreloadPlanRef\s*=\s*useRef\(characterPreloadPlan\)/u.test(pixiLayer)) {
+  failures.push(`${pixiLayerPath}: the initial character plan must be captured once for presenter mount.`);
+}
+if (/\},\s*\[[^\]]*characterPreloadPlan[^\]]*\]\);/u.test(pixiLayer)) {
+  failures.push(`${pixiLayerPath}: character plan changes must use prepareCharacters and must not remount the presenter.`);
 }
 
 if (failures.length > 0) {

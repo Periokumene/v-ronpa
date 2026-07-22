@@ -799,7 +799,7 @@ describe("story engine", () => {
     ]);
   });
 
-  it("diagnoses unsupported or missing goto targets instead of silently dropping them", () => {
+  it("returns a cross-script navigation request and diagnoses a missing local label", () => {
     const runtimeScript = runtimeScriptFixture(
       "goto-boundary.nani",
       [
@@ -813,13 +813,8 @@ describe("story engine", () => {
 
     const crossScript = storyReducer(state, { type: "STEP", script: runtimeScript });
     expect(crossScript.state.instructionPointer).toBe(1);
-    expect(crossScript.diagnostics).toEqual([
-      {
-        code: "unsupported-command-param",
-        message: "@goto target other.nani#Start is outside this task's local-label boundary; cross-script goto is not implemented.",
-        severity: "warning"
-      }
-    ]);
+    expect(crossScript.diagnostics).toEqual([]);
+    expect(crossScript.navigationRequest).toEqual({ endpoint: "other.nani#Start" });
 
     state = crossScript.state;
     const missing = storyReducer(state, { type: "STEP", script: runtimeScript });
@@ -834,6 +829,20 @@ describe("story engine", () => {
 
     const resumed = reduceWithoutDiagnostics(missing.state, { type: "STEP", script: runtimeScript });
     expect(selectCurrentStoryLine(resumed.state)).toEqual({ speaker: "Mira", text: "After invalid goto." });
+  });
+
+  it("uses the same navigation request for a cross-script choice", () => {
+    const runtimeScript = runtimeScriptFixture("choice-navigation.nani", [
+      runtimeCommand("choice", "choice", { text: "Continue", goto: "game/chapter-02.nani#Start", setExpression: "route:milk" })
+    ]);
+    const choices = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+    const chosen = chooseStoryOption(choices.state, runtimeScript, 0);
+
+    expect(chosen.navigationRequest).toEqual({ endpoint: "game/chapter-02.nani#Start" });
+    expect(chosen.stopReason).toBe("script-navigation");
+    expect(chosen.state.variables.route).toBe("milk");
+    expect(chosen.state.pendingChoices).toEqual([]);
+    expect(chosen.state.ended).toBe(false);
   });
 
   it("keeps the public story runtime snapshot serializable", () => {

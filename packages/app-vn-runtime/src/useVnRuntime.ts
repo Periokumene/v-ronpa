@@ -50,6 +50,7 @@ import {
   submitVnSessionInput,
   toggleVnSessionAuto,
   toggleVnSessionSkip,
+  type VnSessionPlayStep,
   type VnSessionState
 } from "@v-ronpa/app-vn-session";
 import {
@@ -98,8 +99,14 @@ import {
   type VnRuntimeMediaHandleStore
 } from "./runtimeMedia";
 import { createVnRuntimeRestorePlan } from "./runtimeRestore";
+import { compileVnRuntimeCatalog, type CompiledVnRuntimeCatalog } from "./runtimeCatalog";
 import { projectVnRuntimeStep } from "./runtimeProjection";
 import { collectVnSaveCheckpoint, validateVnRestoreIdentity } from "./checkpoint";
+import { coordinateVnScriptNavigation } from "./runtimeNavigationCoordinator";
+import {
+  createVnRuntimeOperationCoordinator,
+  type VnRuntimeOperation
+} from "./runtimeOperations";
 import type {
   VnDialogRevealRuntime,
   VnInteractionFacts,
@@ -108,12 +115,14 @@ import type {
   VnPixiStageRuntime,
   VnRuntimeDialogueBleepSettings,
   VnRuntimeDialogRevealSettings,
-  VnRuntimeEntry,
+  PrepareVnScriptPresentation,
   VnRestoreResult,
   RestoreVnRuntimeStateInput,
   VnSaveCheckpointResult,
+  VnStartResult,
   StartVnStoryOptions,
   UseVnRuntimeResult,
+  VnRuntimeDefinition,
   VnRuntimeVoiceSettings,
   VnStoryRuntime,
   VnUiRuntime
@@ -127,6 +136,7 @@ import {
   resolveVnPresentationWaitAdvanceSource,
   shouldAnimateVnStoryPlayPacing,
   syncVnRuntimeToastDismissalTimers,
+  vnVisualRuntimeDriverKey,
   vnPixiPresentationTaskKey,
   vnPresentationWaitKey,
   vnPresentationWaitTaskKey
@@ -143,9 +153,9 @@ const DEFAULT_DIALOG_REVEAL_SETTINGS: VnRuntimeDialogRevealSettings = {
 };
 const MAX_DIALOG_REVEAL_EVENTS = 50;
 
-export interface UseVnRuntimeOptions {
+export interface UseVnRuntimeOptions extends VnRuntimeDefinition {
   gameId: string;
-  entry: VnRuntimeEntry;
+  prepareScriptPresentation?: PrepareVnScriptPresentation;
   assetResolver?: AssetResolver;
   /** The VN runtime takes exclusive ownership of this port and stops it on reset, restore, and unmount. */
   audioPort?: AudioPort;
@@ -166,12 +176,30 @@ interface CommitVnSessionStepInput {
   active: boolean;
   forcePixiCommit?: boolean;
   pacing?: StoryPlayPacing;
+  previousMediaState?: MediaRuntimeState;
   previousPixiStage: PixiStageSnapshot;
+  previousUiState?: UiRuntimeState;
   session: VnSessionState;
   source: StoryPlayAdvanceSource;
   storyDiagnostics?: StoryStepperDiagnostic[];
   runtimeCommands: RuntimeCommand[];
 }
+
+interface CoordinateVnSessionStepInput {
+  beforeCommit?: () => void;
+  operation?: VnRuntimeOperation<CompiledVnRuntimeCatalog>;
+  pacing?: StoryPlayPacing;
+  resetExecutedScriptPaths?: boolean;
+  previousMediaState?: MediaRuntimeState;
+  previousPixiStage: PixiStageSnapshot;
+  previousUiState?: UiRuntimeState;
+  source: StoryPlayAdvanceSource;
+  step: VnSessionPlayStep;
+}
+
+type CoordinateVnSessionStepResult =
+  | { ok: true; session: VnSessionState }
+  | { ok: false; cancelled: boolean; code: string; message: string };
 
 interface CommitDialogRevealResult {
   diagnostics: VnRuntimeDiagnostic[];
@@ -185,42 +213,52 @@ export function useVnRuntime({
   dialogRevealSettings = DEFAULT_DIALOG_REVEAL_SETTINGS,
   dialogueBleepConfig,
   dialogueBleepSettings = DEFAULT_DIALOGUE_BLEEP_SETTINGS,
+  catalog,
   entry,
   gameId,
   onGameplayEvents,
   onRuntimeStatus,
   onStoryEnd,
   profile,
+  prepareScriptPresentation,
   routeTable,
   storyPlayTiming,
   videoPort: configuredVideoPort,
   voiceSettings = DEFAULT_VOICE_SETTINGS
 }: UseVnRuntimeOptions): UseVnRuntimeResult {
-  const bootStep = useMemo(
-    () =>
-      createVnSession({
-        scriptPath: entry.scriptPath,
-        sourceText: entry.sourceText,
-        ...(entry.startLabel ? { startLabel: entry.startLabel } : {})
-      }),
-    [entry.scriptPath, entry.sourceText, entry.startLabel]
+  const compiledCatalog = useMemo(
+    () => compileVnRuntimeCatalog(entry, catalog),
+    [catalog, entry.initialScriptPath, entry.startLabel]
   );
-  const bootSession = bootStep.session;
+  const bootSession = useMemo(
+    () =>
+      compiledCatalog.recordsByPath.get(entry.initialScriptPath)?.bootSession ??
+      createVnSession({ scriptPath: entry.initialScriptPath, sourceText: "" }).session,
+    [compiledCatalog, entry.initialScriptPath]
+  );
   const startLabelDiagnostics = useMemo(
     () => createVnRuntimeStartLabelDiagnostics(bootSession.script, entry.startLabel),
     [bootSession.script, entry.startLabel]
   );
   const hasInvalidStartLabel = startLabelDiagnostics.some((diagnostic) => diagnostic.severity === "error");
-  const runtimeProfile = profile ?? entry.profile ?? "vn2d";
+  const runtimeProfile = profile ?? entry.profile;
   const audioPort = useMemo(() => configuredAudioPort ?? createHowlerAudioPort(), [configuredAudioPort]);
   const videoPort = useMemo(() => configuredVideoPort ?? createHtmlVideoPort(), [configuredVideoPort]);
   const initialRuntimeDiagnostics = useMemo(
     () =>
       limitVnRuntimeDiagnostics([
-        ...createInitialVnRuntimeDiagnostics(bootSession.diagnostics.parser, bootSession.diagnostics.compiler),
+        ...compiledCatalog.records.flatMap((record) =>
+          createInitialVnRuntimeDiagnostics(record.bootSession.diagnostics.parser, record.bootSession.diagnostics.compiler)
+        ),
+        ...compiledCatalog.diagnostics.map((diagnostic) => ({
+          source: "story" as const,
+          code: diagnostic.code,
+          severity: diagnostic.severity,
+          message: diagnostic.message
+        })),
         ...startLabelDiagnostics
       ]),
-    [bootSession.diagnostics.compiler, bootSession.diagnostics.parser, startLabelDiagnostics]
+    [compiledCatalog, startLabelDiagnostics]
   );
   const [session, setSession] = useState<VnSessionState>(() => ({ ...bootSession, active: false }));
   const [pixiStageRuntime, setPixiStageRuntime] = useState<VnPixiStageRuntime>(() => createInitialVnPixiStageRuntime());
@@ -232,8 +270,10 @@ export function useVnRuntime({
   }));
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<VnRuntimeDiagnostic[]>(() => initialRuntimeDiagnostics);
   const [storySession, setStorySession] = useState(0);
+  const [executedScriptPaths, setExecutedScriptPaths] = useState<readonly string[]>([]);
 
   const sessionRef = useRef(session);
+  const executedScriptPathsRef = useRef(executedScriptPaths);
   const pixiStageRuntimeRef = useRef(pixiStageRuntime);
   const mediaRuntimeRef = useRef(mediaRuntime);
   const uiRuntimeRef = useRef(uiRuntime);
@@ -251,10 +291,20 @@ export function useVnRuntime({
   const advanceStoryRef = useRef<(source?: StoryPlayAdvanceSource) => void>(() => undefined);
   const voiceAutoAdvanceGateControllerRef = useRef<VnVoiceAutoAdvanceGateController | undefined>(undefined);
   const voiceEffectTokenRef = useRef(0);
+  const compiledCatalogRef = useRef<CompiledVnRuntimeCatalog>(compiledCatalog);
+  if (compiledCatalogRef.current !== compiledCatalog) compiledCatalogRef.current = compiledCatalog;
+  const runtimeOperationsRef = useRef(createVnRuntimeOperationCoordinator<CompiledVnRuntimeCatalog>());
+  const navigationActiveRef = useRef(false);
+  const [navigationActive, setNavigationActive] = useState(false);
+
+  useEffect(() => {
+    const operation = runtimeOperationsRef.current.current();
+    if (operation && operation.catalog !== compiledCatalog) invalidateRuntimeOperation();
+  }, [compiledCatalog]);
 
   const storyRuntime: VnStoryRuntime = useMemo(
-    () => ({ active: session.active, state: session.story }),
-    [session.active, session.story]
+    () => ({ active: session.active, executedScriptPaths, state: session.story }),
+    [executedScriptPaths, session.active, session.story]
   );
   const storyPlay = session.play;
   const storyPlaySchedule = useMemo(
@@ -262,9 +312,10 @@ export function useVnRuntime({
       selectStoryPlaySchedule(session.play, session.story, {
         active: session.active,
         hostReadyForAuto: true,
+        hostBlocked: navigationActive,
         ...(storyPlayTiming ? { timing: storyPlayTiming } : {})
       }),
-    [session.active, session.play, session.story, storyPlayTiming]
+    [navigationActive, session.active, session.play, session.story, storyPlayTiming]
   );
   const storyPlayActiveActions: Partial<Record<GameUiAction, boolean>> = useMemo(
     () => ({
@@ -357,6 +408,7 @@ export function useVnRuntime({
   const shouldDriveVisualRuntime =
     shouldDriveDialogReveal({ active: session.active, reveal: dialogRevealRuntime.state }) ||
     hasActiveUiRuntimeTransitions(uiRuntime.state);
+  const visualRuntimeDriverKey = vnVisualRuntimeDriverKey(dialogRevealRuntime.state, uiRuntime.state);
 
   useEffect(() => {
     if (!shouldDriveVisualRuntime) return;
@@ -374,7 +426,7 @@ export function useVnRuntime({
     };
     frame = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(frame);
-  }, [shouldDriveVisualRuntime]);
+  }, [shouldDriveVisualRuntime, visualRuntimeDriverKey]);
 
   useEffect(() => {
     const wait = session.story.presentationWait;
@@ -422,6 +474,7 @@ export function useVnRuntime({
 
   useEffect(() => {
     return () => {
+      runtimeOperationsRef.current.invalidate();
       for (const timeout of Object.values(toastTimeoutsRef.current)) window.clearTimeout(timeout);
       toastTimeoutsRef.current = {};
       disposeRuntimeMedia();
@@ -432,6 +485,33 @@ export function useVnRuntime({
     const resolved = typeof next === "function" ? next(sessionRef.current) : next;
     sessionRef.current = resolved;
     setSession(resolved);
+  }
+
+  function setExecutedScriptPathsNow(next: readonly string[]) {
+    const resolved = [...new Set(next)];
+    executedScriptPathsRef.current = resolved;
+    setExecutedScriptPaths(resolved);
+  }
+
+  function beginRuntimeOperation(): VnRuntimeOperation<CompiledVnRuntimeCatalog> {
+    return runtimeOperationsRef.current.begin(compiledCatalogRef.current);
+  }
+
+  function invalidateRuntimeOperation() {
+    runtimeOperationsRef.current.invalidate();
+    navigationActiveRef.current = false;
+    setNavigationActive(false);
+  }
+
+  function isCurrentRuntimeOperation(operation: VnRuntimeOperation<CompiledVnRuntimeCatalog>): boolean {
+    return runtimeOperationsRef.current.isCurrent(operation)
+      && operation.catalog === compiledCatalogRef.current
+      && !operation.controller.signal.aborted;
+  }
+
+  function setNavigationActiveNow(active: boolean) {
+    navigationActiveRef.current = active;
+    setNavigationActive(active);
   }
 
   function setPixiStageRuntimeNow(next: VnPixiStageRuntime | ((current: VnPixiStageRuntime) => VnPixiStageRuntime)) {
@@ -584,16 +664,18 @@ export function useVnRuntime({
   }
 
   function resetRuntime() {
+    invalidateRuntimeOperation();
+    resetRuntimeState();
+  }
+
+  function resetRuntimeState() {
     cancelStoryPlayHostSchedule();
     clearDialogRevealRuntime();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
-    const nextBoot = createVnSession({
-      scriptPath: entry.scriptPath,
-      sourceText: entry.sourceText,
-      ...(entry.startLabel ? { startLabel: entry.startLabel } : {})
-    }).session;
+    const nextBoot = compiledCatalogRef.current.recordsByPath.get(entry.initialScriptPath)?.bootSession ?? bootSession;
     setSessionNow({ ...nextBoot, active: false });
+    setExecutedScriptPathsNow([]);
     disposeRuntimeMedia();
     setMediaRuntimeNow({ state: createInitialMediaRuntimeState() });
     setUiRuntimeNow({ state: createInitialUiRuntimeState() });
@@ -605,42 +687,159 @@ export function useVnRuntime({
     setStorySession((current) => current + 1);
   }
 
-  function startStory(_options: StartVnStoryOptions = {}) {
-    if (hasInvalidStartLabel) {
-      resetRuntime();
-      onRuntimeStatus?.({ action: "story:start", outcome: "invalid-start-label" });
-      return;
+  async function startStory(_options: StartVnStoryOptions = {}): Promise<VnStartResult> {
+    const currentCatalog = compiledCatalogRef.current;
+    const nextBoot = currentCatalog.recordsByPath.get(entry.initialScriptPath)?.bootSession;
+    const catalogInvalid =
+      hasInvalidStartLabel ||
+      currentCatalog.diagnostics.length > 0 ||
+      currentCatalog.records.some((record) =>
+        [...record.bootSession.diagnostics.parser, ...record.bootSession.diagnostics.compiler].some(
+          (diagnostic) => diagnostic.severity === "error"
+        )
+      );
+    if (catalogInvalid || !nextBoot) {
+      onRuntimeStatus?.({ action: "story:start", outcome: "catalog-invalid" });
+      return { ok: false, code: "catalog-invalid", message: "The VN runtime catalog is not linkable." };
     }
-    resetRuntime();
-    const nextBoot = createVnSession({
-      scriptPath: entry.scriptPath,
-      sourceText: entry.sourceText,
-      ...(entry.startLabel ? { startLabel: entry.startLabel } : {})
-    }).session;
+    const operation = beginRuntimeOperation();
+    setNavigationActiveNow(true);
+    const prepared = await prepareRuntimeScript(nextBoot.script.scriptPath, undefined, operation);
+    if (!isCurrentRuntimeOperation(operation)) {
+      return { ok: false, code: "operation-cancelled", message: "VN start was cancelled." };
+    }
+    if (!prepared.ok) {
+      setNavigationActiveNow(false);
+      onRuntimeStatus?.({ action: "story:start", outcome: "presentation-prepare-failed" });
+      return { ok: false, code: "presentation-prepare-failed", message: prepared.message };
+    }
     const resetPixi = createInitialVnPixiStageRuntime().snapshot;
     const firstStep = advanceVnSession(nextBoot, "start");
-    setStorySession((current) => current + 1);
-    commitVnSessionStep({
-      active: !firstStep.session.story.ended,
-      forcePixiCommit: true,
+    const coordinated = await coordinateVnSessionStep({
+      beforeCommit: () => {
+        cancelStoryPlayHostSchedule();
+        clearDialogRevealRuntime();
+        observedWaitTasksRef.current = undefined;
+        completingWaitKeyRef.current = undefined;
+        disposeRuntimeMedia();
+        setRuntimeDiagnostics(initialRuntimeDiagnostics);
+        setStorySession((current) => current + 1);
+      },
+      operation,
       pacing: firstStep.playStep.intent.pacing,
+      resetExecutedScriptPaths: true,
+      previousMediaState: createInitialMediaRuntimeState(),
       previousPixiStage: resetPixi,
-      runtimeCommands: firstStep.emittedRuntimeCommands,
-      session: firstStep.session,
+      previousUiState: createInitialUiRuntimeState(),
       source: firstStep.playStep.intent.source,
-      storyDiagnostics: firstStep.playStep.story.diagnostics
+      step: firstStep
     });
+    if (!coordinated.ok) {
+      return coordinated.cancelled
+        ? { ok: false, code: "operation-cancelled", message: coordinated.message }
+        : {
+            ok: false,
+            code: coordinated.code === "presentation-prepare-failed" ? "presentation-prepare-failed" : "script-navigation-failed",
+            message: coordinated.message
+          };
+    }
     onRuntimeStatus?.({
       action: "story:start",
-      outcome: firstStep.session.story.presentationWait
+      outcome: coordinated.session.story.presentationWait
         ? "presentation-wait"
-        : firstStep.session.story.pendingChoices.length > 0
+        : coordinated.session.story.pendingChoices.length > 0
           ? "choices"
           : "line"
     });
+    return { ok: true };
+  }
+
+  async function prepareRuntimeScript(
+    scriptPath: string,
+    pixiStage: PixiStageSnapshot | undefined,
+    operation: VnRuntimeOperation<CompiledVnRuntimeCatalog>
+  ) {
+    if (!prepareScriptPresentation) return { ok: true as const };
+    try {
+      return await prepareScriptPresentation({
+        scriptPath,
+        ...(pixiStage ? { pixiStage } : {}),
+        signal: operation.controller.signal
+      });
+    } catch (error) {
+      return {
+        ok: false as const,
+        code: "presentation-prepare-failed",
+        message: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  async function coordinateVnSessionStep({
+    beforeCommit,
+    operation: requestedOperation,
+    pacing = "normal",
+    previousMediaState,
+    previousPixiStage,
+    previousUiState,
+    resetExecutedScriptPaths = false,
+    source,
+    step
+  }: CoordinateVnSessionStepInput): Promise<CoordinateVnSessionStepResult> {
+    const navigationRequest = step.playStep.story.navigationRequest;
+    let operation = requestedOperation;
+
+    if (navigationRequest && !operation) {
+      operation = beginRuntimeOperation();
+      setNavigationActiveNow(true);
+    }
+
+    const fail = (code: string, message: string, cancelled = false): CoordinateVnSessionStepResult => {
+      if (operation && isCurrentRuntimeOperation(operation)) setNavigationActiveNow(false);
+      if (!cancelled) {
+        appendRuntimeDiagnostics([{ source: "story", code, severity: "error", message }]);
+      }
+      return { ok: false, cancelled, code, message };
+    };
+
+    const coordinated = await coordinateVnScriptNavigation({
+      catalog: operation?.catalog ?? compiledCatalogRef.current,
+      isCancelled: () => Boolean(operation && !isCurrentRuntimeOperation(operation)),
+      prepareScript: (scriptPath) => operation
+        ? prepareRuntimeScript(scriptPath, undefined, operation)
+        : Promise.resolve({
+            ok: false as const,
+            code: "script-navigation-operation-missing",
+            message: "Script navigation has no active operation."
+          }),
+      source,
+      step
+    });
+    if (!coordinated.ok) return fail(coordinated.code, coordinated.message, coordinated.cancelled);
+    const nextSession = coordinated.session;
+    beforeCommit?.();
+    setExecutedScriptPathsNow(resetExecutedScriptPaths
+      ? coordinated.executedScriptPaths
+      : [...executedScriptPathsRef.current, ...coordinated.executedScriptPaths]);
+    commitVnSessionStep({
+      active: !nextSession.story.ended,
+      forcePixiCommit: Boolean(requestedOperation && source === "start"),
+      pacing,
+      ...(previousMediaState ? { previousMediaState } : {}),
+      previousPixiStage,
+      ...(previousUiState ? { previousUiState } : {}),
+      runtimeCommands: coordinated.runtimeCommands,
+      session: nextSession,
+      source,
+      storyDiagnostics: coordinated.storyDiagnostics
+    });
+    if (operation && isCurrentRuntimeOperation(operation)) setNavigationActiveNow(false);
+    if (nextSession.story.ended) onStoryEnd?.("story:end");
+    return { ok: true, session: nextSession };
   }
 
   function advanceStory(source: StoryPlayAdvanceSource = "manual") {
+    if (navigationActiveRef.current) return;
     const current = sessionRef.current;
     if (!current.active) return;
 
@@ -661,9 +860,6 @@ export function useVnRuntime({
 
     if (source === "manual" || source === "skip") {
       cancelStoryPlayHostSchedule();
-      if (canAdvanceVnStoryFromSource({ active: current.active, state: current.story }, source)) {
-        clearVoiceAutoAdvanceGate({ stopVoice: true });
-      }
     }
 
     if (current.story.presentationWait) {
@@ -689,79 +885,77 @@ export function useVnRuntime({
     }
 
     const step = advanceVnSession(current, source);
-    commitVnSessionStep({
-      active: !step.session.story.ended,
+    void coordinateVnSessionStep({
+      beforeCommit: () => {
+        if (
+          (source === "manual" || source === "skip")
+          && canAdvanceVnStoryFromSource({ active: current.active, state: current.story }, source)
+        ) clearVoiceAutoAdvanceGate({ stopVoice: true });
+      },
       pacing: step.playStep.intent.pacing,
       previousPixiStage: pixiStageRuntimeRef.current.snapshot,
-      runtimeCommands: step.emittedRuntimeCommands,
-      session: step.session,
       source,
-      storyDiagnostics: step.playStep.story.diagnostics
-    });
-    if (step.session.story.ended) {
-      onStoryEnd?.("story:end");
-    } else {
+      step
+    }).then((result) => {
+      if (!result.ok || result.session.story.ended) return;
       onRuntimeStatus?.({
         action: source === "manual" ? "story:advance" : `story:${source}`,
-        outcome: step.session.story.presentationWait
+        outcome: result.session.story.presentationWait
           ? "presentation-wait"
-          : step.session.story.pendingChoices.length > 0
+          : result.session.story.pendingChoices.length > 0
             ? "choices"
             : "line"
       });
-    }
+    });
   }
   advanceStoryRef.current = advanceStory;
 
   function chooseStory(index: number) {
+    if (navigationActiveRef.current) return;
     cancelStoryPlayHostSchedule();
-    clearVoiceAutoAdvanceGate({ stopVoice: true });
     const current = sessionRef.current;
     if (!current.active) return;
     const step = chooseVnSessionOption(current, index);
-    commitVnSessionStep({
-      active: !step.session.story.ended,
+    void coordinateVnSessionStep({
+      beforeCommit: () => clearVoiceAutoAdvanceGate({ stopVoice: true }),
       pacing: step.playStep.intent.pacing,
       previousPixiStage: pixiStageRuntimeRef.current.snapshot,
-      runtimeCommands: step.emittedRuntimeCommands,
-      session: step.session,
       source: "choice",
-      storyDiagnostics: step.playStep.story.diagnostics
-    });
-    if (step.session.story.ended) {
-      onStoryEnd?.("story:end");
-    } else {
+      step
+    }).then((result) => {
+      if (!result.ok || result.session.story.ended) return;
       onRuntimeStatus?.({
         action: `choice:${index}`,
-        outcome: step.session.story.presentationWait
+        outcome: result.session.story.presentationWait
           ? "presentation-wait"
-          : step.session.story.variables.route
-            ? `route:${String(step.session.story.variables.route)}`
+          : result.session.story.variables.route
+            ? `route:${String(result.session.story.variables.route)}`
             : "choice"
       });
-    }
+    });
   }
 
   function submitStoryInput(value: string | number | boolean) {
+    if (navigationActiveRef.current) return;
     cancelStoryPlayHostSchedule();
-    clearVoiceAutoAdvanceGate({ stopVoice: true });
     const current = sessionRef.current;
     if (!current.active || current.story.runtimeWait?.kind !== "input") return;
     const step = submitVnSessionInput(current, value);
-    commitVnSessionStep({
-      active: !step.session.story.ended,
+    void coordinateVnSessionStep({
+      beforeCommit: () => clearVoiceAutoAdvanceGate({ stopVoice: true }),
       pacing: step.playStep.intent.pacing,
       previousPixiStage: pixiStageRuntimeRef.current.snapshot,
-      runtimeCommands: step.emittedRuntimeCommands,
-      session: step.session,
       source: "manual",
-      storyDiagnostics: step.playStep.story.diagnostics
+      step
+    }).then((result) => {
+      if (result.ok && !result.session.story.ended) {
+        onRuntimeStatus?.({ action: "input:submit", outcome: "input-submitted" });
+      }
     });
-    if (step.session.story.ended) onStoryEnd?.("story:end");
-    else onRuntimeStatus?.({ action: "input:submit", outcome: "input-submitted" });
   }
 
   function toggleStoryAuto() {
+    if (navigationActiveRef.current) return;
     if (!canToggleVnStoryAutomation({ active: sessionRef.current.active, state: sessionRef.current.story })) return;
     const wasAuto = sessionRef.current.play.mode === "auto";
     if (wasAuto) {
@@ -773,6 +967,7 @@ export function useVnRuntime({
   }
 
   function toggleStorySkip() {
+    if (navigationActiveRef.current) return;
     if (!canToggleVnStoryAutomation({ active: sessionRef.current.active, state: sessionRef.current.story })) return;
     const wasSkip = sessionRef.current.play.mode === "skip";
     if (wasSkip) cancelStoryPlayHostSchedule();
@@ -800,20 +995,47 @@ export function useVnRuntime({
     setUiRuntimeNow((current) => ({ state: clearMovieOverlay(current.state) }));
   }
 
-  function restoreVnState({ gameId: savedGameId, state }: RestoreVnRuntimeStateInput): VnRestoreResult {
+  async function restoreVnState({ gameId: savedGameId, state }: RestoreVnRuntimeStateInput): Promise<VnRestoreResult> {
+    const operation = beginRuntimeOperation();
+    setNavigationActiveNow(true);
+    const target = compiledCatalogRef.current.recordsByPath.get(state.script.scriptPath);
     const rejection = validateVnRestoreIdentity({
       expectedEntryId: entry.id,
       expectedGameId: gameId,
-      expectedScriptRevision: entry.scriptRevision,
+      ...(target ? { expectedScript: target.source } : {}),
       savedEntryId: state.entryId,
       savedGameId,
-      savedScriptRevision: state.scriptRevision
+      savedScript: state.script
     });
     if (rejection) {
+      setNavigationActiveNow(false);
       appendRuntimeDiagnostics([
         { source: "story", severity: "error", code: rejection.code, message: rejection.message }
       ]);
       return rejection;
+    }
+    if (!target) {
+      setNavigationActiveNow(false);
+      return { ok: false, code: "script-missing", message: `Save script '${state.script.scriptPath}' is not registered.` };
+    }
+    if (state.story.instructionPointer > target.script.commands.length) {
+      const invalidPointer = {
+        ok: false as const,
+        code: "instruction-pointer-invalid" as const,
+        message: `Save instruction pointer ${state.story.instructionPointer} is outside '${target.script.scriptPath}'.`
+      };
+      setNavigationActiveNow(false);
+      appendRuntimeDiagnostics([{ source: "story", severity: "error", code: invalidPointer.code, message: invalidPointer.message }]);
+      return invalidPointer;
+    }
+    const prepared = await prepareRuntimeScript(target.script.scriptPath, state.pixiStage, operation);
+    if (!isCurrentRuntimeOperation(operation)) {
+      return { ok: false, code: "operation-cancelled", message: "VN restore was cancelled." };
+    }
+    if (!prepared.ok) {
+      setNavigationActiveNow(false);
+      appendRuntimeDiagnostics([{ source: "story", severity: "error", code: prepared.code, message: prepared.message }]);
+      return { ok: false, code: "presentation-prepare-failed", message: prepared.message };
     }
     cancelStoryPlayHostSchedule();
     clearDialogRevealRuntime();
@@ -823,7 +1045,7 @@ export function useVnRuntime({
       active: !state.story.ended,
       media: state.media,
       pixiStage: state.pixiStage,
-      script: bootSession.script,
+      script: target.script,
       story: state.story,
       ui: state.ui
     });
@@ -831,10 +1053,11 @@ export function useVnRuntime({
     setSessionNow(
       restoreVnSession({
         active: plan.storyRuntime.active,
-        script: bootSession.script,
+        script: target.script,
         snapshot: { story: plan.storyRuntime.state, play: plan.storyPlay }
       })
     );
+    setExecutedScriptPathsNow([target.script.scriptPath]);
     setMediaRuntimeNow({ state: plan.mediaRuntime });
     setUiRuntimeNow({ state: plan.uiRuntime });
     setRuntimeDiagnostics((current) => limitVnRuntimeDiagnostics([...current, ...plan.diagnostics]));
@@ -843,6 +1066,7 @@ export function useVnRuntime({
       hintSequence: current.hintSequence + 1
     }));
     setStorySession((current) => current + 1);
+    setNavigationActiveNow(false);
     if (plan.mediaEffects.length > 0) {
       void applyVnRuntimeMediaEffects({
         audioPort,
@@ -863,7 +1087,9 @@ export function useVnRuntime({
     active,
     forcePixiCommit = false,
     pacing = "normal",
+    previousMediaState = mediaRuntimeRef.current.state,
     previousPixiStage,
+    previousUiState = uiRuntimeRef.current.state,
     runtimeCommands,
     session: nextSession,
     source,
@@ -875,9 +1101,9 @@ export function useVnRuntime({
       active,
       animatePixi,
       nowMs,
-      previousMediaState: mediaRuntimeRef.current.state,
+      previousMediaState,
       previousPixiStage,
-      previousUiState: uiRuntimeRef.current.state,
+      previousUiState,
       profile: runtimeProfile,
       runtimeCommands,
       session: nextSession,
@@ -1085,46 +1311,50 @@ export function useVnRuntime({
     const waitKey = vnPresentationWaitKey(wait);
     if (completingWaitKeyRef.current === waitKey) return;
     completingWaitKeyRef.current = waitKey;
-    observedWaitTasksRef.current = undefined;
-
-    if (options.settlePixi && wait.channel === "pixi") {
-      setPixiStageRuntimeNow((currentPixi) => ({
-        ...currentPixi,
-        hints: [],
-        hintSequence: currentPixi.hintSequence + 1,
-        animate: false,
-        presentationTasks: []
-      }));
-    }
-    if (options.settleUi && isUiPresentationWait(wait)) {
-      setUiRuntimeNow((currentUi) => ({ state: settleUiRuntimePresentationWait(currentUi.state, wait) }));
-    }
+    const previousUiState = options.settleUi && isUiPresentationWait(wait)
+      ? settleUiRuntimePresentationWait(uiRuntimeRef.current.state, wait)
+      : uiRuntimeRef.current.state;
 
     const completed = completeVnSessionPresentationWait(current);
     appendRuntimeDiagnostics(collectVnRuntimeDiagnostics({ storyDiagnostics: completed.storyStep.diagnostics }));
     if (completed.storyStep.diagnostics.length > 0) return;
     const step = advanceVnSession(completed.session, advanceSource);
-    commitVnSessionStep({
-      active: !step.session.story.ended,
+    void coordinateVnSessionStep({
+      beforeCommit: () => {
+        observedWaitTasksRef.current = undefined;
+        if (options.settlePixi && wait.channel === "pixi") {
+          setPixiStageRuntimeNow((currentPixi) => ({
+            ...currentPixi,
+            hints: [],
+            hintSequence: currentPixi.hintSequence + 1,
+            animate: false,
+            presentationTasks: []
+          }));
+        }
+        if (advanceSource === "manual" || advanceSource === "skip") {
+          clearVoiceAutoAdvanceGate({ stopVoice: true });
+        }
+      },
       pacing: step.playStep.intent.pacing,
       previousPixiStage: pixiStageRuntimeRef.current.snapshot,
-      runtimeCommands: step.emittedRuntimeCommands,
-      session: step.session,
+      previousUiState,
       source: advanceSource,
-      storyDiagnostics: step.playStep.story.diagnostics
-    });
-    if (step.session.story.ended) {
-      onStoryEnd?.("story:end");
-    } else {
+      step
+    }).then((result) => {
+      if (!result.ok) {
+        completingWaitKeyRef.current = undefined;
+        return;
+      }
+      if (result.session.story.ended) return;
       onRuntimeStatus?.({
         action: advanceSource === "manual" ? "story:advance" : `story:${advanceSource}`,
-        outcome: step.session.story.presentationWait
+        outcome: result.session.story.presentationWait
           ? "presentation-wait"
-          : step.session.story.pendingChoices.length > 0
+          : result.session.story.pendingChoices.length > 0
             ? "choices"
             : "line"
       });
-    }
+    });
   }
 
   function completeRuntimeWaitAndAdvance(source: StoryPlayAdvanceSource, kind: "pause" | "movie") {
@@ -1132,44 +1362,51 @@ export function useVnRuntime({
     const wait = current.story.runtimeWait;
     if (!current.active || !wait || wait.kind !== kind) return;
     if (kind === "pause" && wait.kind === "pause" && !canCompleteVnPauseRuntimeWaitFromSource(wait, source)) return;
-    if (kind === "movie") {
-      pendingMoviePlaybackRef.current = undefined;
-      videoPort.stop();
-      setUiRuntimeNow((currentUi) => ({ state: clearMovieOverlay(currentUi.state) }));
-    }
+    const previousUiState = kind === "movie"
+      ? clearMovieOverlay(uiRuntimeRef.current.state)
+      : uiRuntimeRef.current.state;
     const completed = completeVnSessionRuntimeWait(current, kind);
     appendRuntimeDiagnostics(collectVnRuntimeDiagnostics({ storyDiagnostics: completed.storyStep.diagnostics }));
     if (completed.storyStep.diagnostics.length > 0) return;
     const step = advanceVnSession(completed.session, source);
-    commitVnSessionStep({
-      active: !step.session.story.ended,
+    void coordinateVnSessionStep({
+      beforeCommit: () => {
+        if (kind === "movie") {
+          pendingMoviePlaybackRef.current = undefined;
+          videoPort.stop();
+        }
+        if (source === "manual" || source === "skip") clearVoiceAutoAdvanceGate({ stopVoice: true });
+      },
       pacing: step.playStep.intent.pacing,
       previousPixiStage: pixiStageRuntimeRef.current.snapshot,
-      runtimeCommands: step.emittedRuntimeCommands,
-      session: step.session,
+      previousUiState,
       source,
-      storyDiagnostics: step.playStep.story.diagnostics
-    });
-    if (step.session.story.ended) {
-      onStoryEnd?.("story:end");
-    } else {
+      step
+    }).then((result) => {
+      if (!result.ok || result.session.story.ended) return;
       onRuntimeStatus?.({
         action: source === "manual" ? "story:advance" : `story:${source}`,
-        outcome: step.session.story.runtimeWait
+        outcome: result.session.story.runtimeWait
           ? "runtime-wait"
-          : step.session.story.pendingChoices.length > 0
+          : result.session.story.pendingChoices.length > 0
             ? "choices"
             : "line"
       });
-    }
+    });
   }
 
   function createVnSaveCheckpoint({ allowInactive = false }: { allowInactive?: boolean } = {}): VnSaveCheckpointResult {
     const current = sessionRef.current;
+    const script = compiledCatalogRef.current.recordsByPath.get(current.story.currentScriptPath)?.source;
+    if (!script) {
+      return { ok: false, code: "inactive-entry", message: "The active VN script is not registered." };
+    }
     return collectVnSaveCheckpoint({
       active: current.active,
       allowInactive,
-      entry,
+      entryId: entry.id,
+      script: { scriptPath: script.scriptPath, scriptRevision: script.scriptRevision },
+      transitionActive: navigationActiveRef.current,
       story: current.story,
       pixiStage: pixiStageRuntimeRef.current.snapshot,
       media: createVnMediaCheckpoint(mediaRuntimeRef.current.state),
@@ -1179,18 +1416,19 @@ export function useVnRuntime({
 
   const interactionFacts = useMemo<VnInteractionFacts>(
     () => ({
-      inputLock: session.active ? "dialog" : "none",
+      inputLock: navigationActive ? "cutscene" : session.active ? "dialog" : "none",
       hasActiveStory: session.active,
       storyHasChoices: session.story.pendingChoices.length > 0,
       storyEnded: session.story.ended,
-      isAtStableStop: session.active && !session.story.presentationWait && !session.story.runtimeWait
+      isAtStableStop: session.active && !navigationActive && !session.story.presentationWait && !session.story.runtimeWait
     }),
     [
       session.active,
       session.story.ended,
       session.story.pendingChoices.length,
       session.story.presentationWait,
-      session.story.runtimeWait
+      session.story.runtimeWait,
+      navigationActive
     ]
   );
   return {

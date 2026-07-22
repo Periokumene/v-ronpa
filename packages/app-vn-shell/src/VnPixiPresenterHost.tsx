@@ -1,11 +1,11 @@
 import type { VnDiagnosticsPort, VnPresentationPort, PresentationTaskObservation } from "@v-ronpa/app-vn-runtime";
-import type { LayeredCharacterPreloadPlan, PixiAssetResolver, PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
-import { PixiLayer, type PixiStageHandle } from "./PixiLayer";
+import type { PixiAssetResolver, PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
+import { PixiLayer, type PixiStageHandle, type VnPixiCharacterPreparationPlan } from "./PixiLayer";
 
 export interface VnPixiPresenterHostProps {
   active: boolean;
   characterOutlineEnabled: boolean;
-  characterPreloadPlan: LayeredCharacterPreloadPlan;
+  characterPreloadPlan: VnPixiCharacterPreparationPlan;
   presentation: VnPresentationPort;
   diagnostics?: VnDiagnosticsPort;
   assetResolver?: PixiAssetResolver;

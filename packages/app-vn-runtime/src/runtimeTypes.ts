@@ -5,7 +5,9 @@ import type {
   RichTextDocument,
   RuntimeCommand,
   SaveableVnState,
-  StoryRuntimeSnapshot
+  StoryRuntimeSnapshot,
+  VnEntryDef,
+  VnRuntimeScriptCatalog
 } from "@v-ronpa/contracts";
 import type { MediaRuntimeState, UiRuntimeState, DialogRevealEvent, DialogRevealState } from "@v-ronpa/app-vn-dispatch";
 import type { PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
@@ -19,6 +21,7 @@ import type {
 export interface VnStoryRuntime {
   state: StoryRuntimeSnapshot;
   active: boolean;
+  executedScriptPaths: readonly string[];
 }
 
 export interface VnInteractionFacts {
@@ -90,8 +93,8 @@ export interface VnPresentationPort {
 export interface VnLifecyclePort {
   createVnSaveCheckpoint(options?: { allowInactive?: boolean }): VnSaveCheckpointResult;
   resetRuntime(): void;
-  restoreVnState(input: RestoreVnRuntimeStateInput): VnRestoreResult;
-  startStory(options?: StartVnStoryOptions): void;
+  restoreVnState(input: RestoreVnRuntimeStateInput): Promise<VnRestoreResult>;
+  startStory(options?: StartVnStoryOptions): Promise<VnStartResult>;
 }
 
 /** Canonical diagnostic capability. */
@@ -134,22 +137,14 @@ export interface UseVnRuntimeWithDebugResult extends UseVnRuntimeResult {
   debug: VnRuntimeDebugSnapshot;
 }
 
-export interface VnRuntimeEntry {
-  id: string;
-  scriptRevision: string;
-  scriptPath: string;
-  sourceText: string;
-  startLabel?: string;
-  profile?: "vn2d" | "vn3d";
-}
-
 export type VnSaveCheckpointRejectionCode =
   | "inactive-entry"
   | "input-wait"
   | "movie-wait"
   | "pause-wait"
   | "ui-wait"
-  | "pixi-wait";
+  | "pixi-wait"
+  | "script-transition";
 
 export type VnSaveCheckpointResult =
   | { ok: true; value: SaveableVnState }
@@ -157,7 +152,45 @@ export type VnSaveCheckpointResult =
 
 export type VnRestoreResult =
   | { ok: true }
-  | { ok: false; code: "game-mismatch" | "entry-mismatch" | "script-revision-mismatch"; message: string };
+  | {
+      ok: false;
+      code:
+        | "game-mismatch"
+        | "entry-mismatch"
+        | "script-missing"
+        | "script-revision-mismatch"
+        | "instruction-pointer-invalid"
+        | "presentation-prepare-failed"
+        | "operation-cancelled";
+      message: string;
+    };
+
+export type VnStartResult =
+  | { ok: true }
+  | {
+      ok: false;
+      code: "catalog-invalid" | "script-navigation-failed" | "presentation-prepare-failed" | "operation-cancelled";
+      message: string;
+    };
+
+export interface VnScriptPresentationPreparationInput {
+  scriptPath: string;
+  pixiStage?: PixiStageSnapshot;
+  signal: AbortSignal;
+}
+
+export type VnScriptPresentationPreparationResult =
+  | { ok: true }
+  | { ok: false; code: string; message: string };
+
+export type PrepareVnScriptPresentation = (
+  input: VnScriptPresentationPreparationInput
+) => Promise<VnScriptPresentationPreparationResult>;
+
+export interface VnRuntimeDefinition {
+  readonly entry: VnEntryDef;
+  readonly catalog: VnRuntimeScriptCatalog;
+}
 
 export interface StartVnStoryOptions {
   source?: Extract<StoryPlayAdvanceSource, "start">;

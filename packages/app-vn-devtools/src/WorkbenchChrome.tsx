@@ -30,13 +30,9 @@ const statusLabels = {
 export function WorkbenchFileBar({ controller }: { controller: VnDevtoolsController }) {
   const errorCount = controller.diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
   const warningCount = controller.diagnostics.filter((diagnostic) => diagnostic.severity === "warning").length;
-  const fileLabel = formatFileLabel(controller.scriptPath);
   return (
     <header className="vn-devtools-file-bar" data-testid="vn-devtools-file-bar">
-      <div className="vn-devtools-file-identity" title={controller.scriptPath}>
-        <span>DEV · VN:{controller.entryId}</span>
-        <strong>{fileLabel}</strong>
-      </div>
+      <ScriptPicker controller={controller} />
       <div className="vn-devtools-file-status" data-phase={controller.status.phase}>
         <StatusIcon controller={controller} />
         <span>{statusLabels[controller.status.phase]}</span>
@@ -89,7 +85,7 @@ export function WorkbenchCommandStrip({
         onClick={() => {
           if (selectedLine) {
             controller.actions.copyLocation({
-              scriptPath: controller.scriptPath,
+              scriptPath: controller.viewedScriptPath,
               lineNumber: selectedLine.lineNumber
             });
           }
@@ -104,10 +100,11 @@ export function WorkbenchCommandStrip({
 export function WorkbenchStatusBar({ controller }: { controller: VnDevtoolsController }) {
   const current = controller.lines.find((line) => line.current);
   const pinned = controller.lines.find((line) => line.pinned);
+  const viewedScript = controller.scripts.find((script) => script.viewed);
   return (
     <footer className="vn-devtools-status-bar" data-testid="vn-devtools-status-bar" aria-live="polite">
-      <span title={controller.scriptRevision}>
-        {controller.scriptRevision ? `rev ${controller.scriptRevision.slice(0, 10)}` : "revision unavailable"}
+      <span title={viewedScript?.revision}>
+        {viewedScript ? `rev ${viewedScript.revision.slice(0, 10)}` : "revision unavailable"}
       </span>
       <span>current {current ? `Ln ${current.lineNumber}` : "–"}</span>
       <span>pin {pinned ? `Ln ${pinned.lineNumber}` : "–"}</span>
@@ -117,6 +114,78 @@ export function WorkbenchStatusBar({ controller }: { controller: VnDevtoolsContr
       </span>
       <span className="vn-devtools-shortcut-hint">Ctrl+Enter · Ctrl+J</span>
     </footer>
+  );
+}
+
+function ScriptPicker({ controller }: { controller: VnDevtoolsController }) {
+  const viewedIndex = Math.max(0, controller.scripts.findIndex((script) => script.viewed));
+
+  return (
+    <details className="vn-devtools-file-identity vn-devtools-script-picker">
+      <summary
+        className="vn-devtools-script-trigger"
+        aria-haspopup="listbox"
+        title={controller.viewedScriptPath}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const details = event.currentTarget.closest("details");
+            if (details) details.open = true;
+            const index = event.key === "ArrowDown" ? 0 : controller.scripts.length - 1;
+            queueMicrotask(() => details?.querySelector<HTMLElement>(`[data-script-index="${index}"]`)?.focus());
+          }
+        }}
+      >
+        <span className="vn-devtools-script-labels">
+          <small>DEV · VN:{controller.entryId}</small>
+          <strong>{formatFileLabel(controller.viewedScriptPath)}</strong>
+        </span>
+        <ArrowDown size={13} weight="bold" aria-hidden="true" />
+      </summary>
+      <div className="vn-devtools-script-listbox" role="listbox" aria-label="VN scripts">
+        {controller.scripts.map((script, index) => (
+          <button
+            key={script.scriptPath}
+            type="button"
+            role="option"
+            aria-selected={script.viewed}
+            tabIndex={index === viewedIndex ? 0 : -1}
+            data-script-index={index}
+            onClick={(event) => {
+              controller.actions.selectScript(script.scriptPath);
+              const details = event.currentTarget.closest("details");
+              if (details) details.open = false;
+              queueMicrotask(() => details?.querySelector<HTMLElement>("summary")?.focus());
+            }}
+            onKeyDown={(event) => {
+              const details = event.currentTarget.closest("details");
+              if (event.key === "Escape") {
+                event.preventDefault();
+                if (details) details.open = false;
+                queueMicrotask(() => details?.querySelector<HTMLElement>("summary")?.focus());
+                return;
+              }
+              const next = event.key === "ArrowDown"
+                ? Math.min(controller.scripts.length - 1, index + 1)
+                : event.key === "ArrowUp"
+                  ? Math.max(0, index - 1)
+                  : event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? controller.scripts.length - 1
+                      : undefined;
+              if (next !== undefined) {
+                event.preventDefault();
+                details?.querySelector<HTMLElement>(`[data-script-index="${next}"]`)?.focus();
+              }
+            }}
+          >
+            <span>{formatFileLabel(script.scriptPath)}</span>
+            <small>{script.runtime ? "Running" : script.hasUpdateBadge ? "Updated" : ""}</small>
+          </button>
+        ))}
+      </div>
+    </details>
   );
 }
 
