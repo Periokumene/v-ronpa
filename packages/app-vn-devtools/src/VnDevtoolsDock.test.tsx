@@ -73,6 +73,20 @@ describe("VnDevtoolsDock", () => {
     expect(actions.search).toHaveBeenCalledWith("rain");
   });
 
+  it("runs previewable source lines on double-click and ignores lines without a stable result", () => {
+    const actions = createActions();
+    const element = VnDevtoolsDock({ controller: createController(actions) });
+    const previewableLine = findButtonByAriaLabel(element, "Select line 2");
+    const unavailableLine = findButtonByAriaLabel(element, "Select line 3");
+
+    expect(previewableLine?.props.title).toBe("Double-click to execute through this line and show the stable result");
+    (previewableLine?.props as { onDoubleClick: () => void }).onDoubleClick();
+    (unavailableLine?.props as { onDoubleClick: () => void }).onDoubleClick();
+
+    expect(actions.previewLine).toHaveBeenCalledOnce();
+    expect(actions.previewLine).toHaveBeenCalledWith("line:dialog");
+  });
+
   it("wires Symbols, copy, collapse, panel tabs, and the default Preview primary action", () => {
     const actions = createActions();
     const element = VnDevtoolsDock({ controller: createController(actions) });

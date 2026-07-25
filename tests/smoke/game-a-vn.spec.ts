@@ -188,8 +188,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await advanceUntilText(page, "CHECKPOINT SMOKE 00", 6);
   const storySessionBeforePreview = await readDevtoolsStorySession(page);
   const firstStableLine = page.locator('[data-testid^="vn-devtools-line-"]').filter({ hasText: "CHECKPOINT SMOKE 00" }).first();
-  await firstStableLine.locator(".vn-devtools-line-select").click();
-  await page.getByTestId("vn-devtools-primary-action").click();
+  await firstStableLine.locator(".vn-devtools-line-select").dblclick();
   await expect(workbench).toContainText("Stable checkpoint installed");
   await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "state");
   await expect(firstStableLine.getByLabel("Pinned preview target")).toBeVisible();

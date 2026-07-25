@@ -93,7 +93,11 @@ function SourceLine({ line, match, currentFindMatch, selected, onSelect, onPrevi
         type="button"
         className="vn-devtools-line-select"
         aria-label={`Select line ${line.lineNumber}${line.label ? `, label ${line.label}` : ""}`}
+        title={previewable ? "Double-click to execute through this line and show the stable result" : previewDescription}
         onClick={() => onSelect(line.id)}
+        onDoubleClick={() => {
+          if (previewable) onPreview(line.id);
+        }}
       >
         <span className="vn-devtools-line-gutter">
           <span className="vn-devtools-line-number">{line.lineNumber}</span>
