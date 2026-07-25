@@ -7,3 +7,8 @@ export type {
   NaniCharacterPackDescriptor
 } from "../projectAssetLoader";
 export type { NaniProjectAssetIndex } from "../projectAssets";
+export {
+  NaniProjectScriptService,
+  type NaniCatalogSnapshot,
+  type NaniProjectScriptInvalidation
+} from "../projectScriptService";

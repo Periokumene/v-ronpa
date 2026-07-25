@@ -33,6 +33,13 @@ export type CompletionContext =
       prefix: string;
     }
   | {
+      kind: "endpoint";
+      phase: "target" | "label";
+      range: NaniRange;
+      prefix: string;
+      targetPath?: string;
+    }
+  | {
       kind: "inline";
       range: NaniRange;
     }
@@ -67,6 +74,8 @@ export function getCompletionContext(sourceText: string, position: NaniPosition)
   const line = lineAt(sourceText, position.line);
   const character = clamp(position.character, 0, line.length);
   const before = line.slice(0, character);
+  const endpointContext = getEndpointCompletionContext(before, position.line);
+  if (endpointContext) return endpointContext;
   const labelContext = getLabelCompletionContext(line, before, position.line);
   if (labelContext) return labelContext;
 
@@ -83,6 +92,33 @@ export function getCompletionContext(sourceText: string, position: NaniPosition)
   if (inlineContext) return inlineContext;
 
   return { kind: "none" };
+}
+
+export interface NaniEndpointToken {
+  raw: string;
+  range: NaniRange;
+}
+
+export function getEndpointTokenAtPosition(
+  sourceText: string,
+  position: NaniPosition
+): NaniEndpointToken | undefined {
+  const line = lineAt(sourceText, position.line);
+  const goto = /^\s*@goto\s+(\S+)/u.exec(line);
+  const choice = /^\s*@choice\b.*?(?:^|\s)goto:(\S+)/u.exec(line);
+  const match = goto ?? choice;
+  const raw = match?.[1];
+  if (!match || !raw) return undefined;
+  const start = (match.index ?? 0) + match[0].lastIndexOf(raw);
+  const end = start + raw.length;
+  if (position.character < start || position.character > end) return undefined;
+  return {
+    raw,
+    range: {
+      start: { line: position.line, character: start },
+      end: { line: position.line, character: end }
+    }
+  };
 }
 
 export function lineRange(line: number, text: string): NaniRange {
@@ -114,6 +150,43 @@ function getCommandCompletionContext(before: string, line: number): CompletionCo
       end: { line, character: before.length }
     },
     insertAtSign: false
+  };
+}
+
+function getEndpointCompletionContext(
+  before: string,
+  line: number
+): CompletionContext | undefined {
+  const goto = /^(\s*@goto\s+)(\S*)$/u.exec(before);
+  const choice = /^\s*@choice\b.*?(?:^|\s)goto:(\S*)$/u.exec(before);
+  const raw = goto?.[2] ?? choice?.[1];
+  if (raw === undefined || raw.startsWith("{") || raw.startsWith("\"") || raw.startsWith("'")) {
+    return undefined;
+  }
+  const start = goto
+    ? (goto[1]?.length ?? 0)
+    : before.length - raw.length;
+  const hash = raw.lastIndexOf("#");
+  if (hash >= 0) {
+    return {
+      kind: "endpoint",
+      phase: "label",
+      range: {
+        start: { line, character: start + hash + 1 },
+        end: { line, character: before.length }
+      },
+      prefix: raw.slice(hash + 1),
+      ...(hash > 0 ? { targetPath: raw.slice(0, hash) } : {})
+    };
+  }
+  return {
+    kind: "endpoint",
+    phase: "target",
+    range: {
+      start: { line, character: start },
+      end: { line, character: before.length }
+    },
+    prefix: raw
   };
 }
 

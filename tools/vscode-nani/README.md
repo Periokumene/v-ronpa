@@ -9,6 +9,10 @@ VS Code language support for V-Ronpa `.nani` scripts.
 - Provides catalog-derived command, parameter, and allowed-value completion from bundled `naniCommandCatalog` metadata.
 - Limits normal completion to runtime-implemented commands and compiler-consumed parameters. Handwritten compatibility commands and declared-but-unconsumed parameters still receive hover and compiler diagnostics.
 - Provides current-file label completion for `@goto #` and `goto:#`.
+- Loads production and test Nani catalogs from the nearest `asset.config.mjs` in trusted file workspaces.
+- Completes local labels before registered logical script paths, then completes labels from the selected target after `path.nani#`.
+- Publishes exact shared-linker diagnostics for malformed, dynamic, relative, wildcard, unknown-script, and unknown-label endpoints.
+- Resolves navigation endpoint hovers and Cmd/Ctrl+click definitions across registered `.nani` source files.
 - Discovers the nearest `asset.config.mjs` for an opened `.nani` file and completes generated background, BGM, SFX, video, and layered-character resources.
 - Completes layered-character expression tokens from the matching `compositions.json`, including comma-separated `@char` and `@slide` expressions.
 - Renders a native 320x420 hover preview when the pointer is over the static identity value of an `@char` command.
@@ -29,6 +33,34 @@ Command and parameter docs, runtime support notes, and stateful Pixi effect sema
 
 Normal completion excludes commands whose catalog status is not `implemented` and parameters whose shared `runtimeSupport` is `declared-not-consumed`. This prevents the editor from suggesting options such as `@bgm loop!` or media `wait!` that the current compiler intentionally diagnoses, while preserving compatibility diagnostics for existing scripts.
 
+## Multi-Script Navigation
+
+In a trusted file workspace, the extension reads the nearest `asset.config.mjs`
+and indexes the top-level production `entry/scripts` plus each
+`testCatalogs.<name>.entry/scripts` catalog independently. Physical
+`sourceFile` paths are mapped to their registered logical `scriptPath`, so
+editor diagnostics use the same catalog authority as asset generation and the
+runtime linker.
+
+```nani
+@goto #LocalLabel
+@goto game-a/chapter-02.nani
+@goto game-a/chapter-02.nani#Start
+@choice "Continue" goto:game-a/chapter-02.nani#Start
+```
+
+Local label candidates appear before logical script paths. After a path and
+`#`, IntelliSense switches to labels from that target script. Hover reports the
+resolved script, label, and production/test catalog; Go to Definition opens the
+registered source and selects the label when present.
+
+Untrusted, unconfigured, and unregistered `.nani` files retain the existing
+single-file parser/compiler diagnostics and local-label completion. Catalogs
+containing `sourceFormat` entries such as the Harness TypeScript template are
+intentionally outside the 0.6.0 editor boundary and also fall back to
+single-file support. Configuration conflicts are reported against
+`asset.config.mjs` with diagnostic source `nani-project`.
+
 ## Project Assets
 
 Project-aware completion is enabled only in a [trusted VS Code workspace](https://code.visualstudio.com/docs/editor/workspace-trust). Starting at the current `.nani` file, the extension finds the closest ancestor `asset.config.mjs`, resolves its paths from the closest `pnpm-workspace.yaml` root, and dynamically loads the config.
@@ -37,7 +69,7 @@ The configured generated assets export is the only authority for resource IDs. T
 
 Layered-character token names are read directly from each generated character pack's sibling `compositions.json`. Those files are watched independently, so token edits become available without regenerating or reinstalling the extension.
 
-Use **V-Ronpa Nani: Refresh Project Assets** from the Command Palette if an external tool changes files without producing a filesystem notification. Missing or malformed project metadata is reported in the **V-Ronpa Nani** output channel and never disables parser, compiler, hover, or catalog completion features. The asset index is completion-only: unknown IDs are not diagnosed because external paths and dynamic IDs remain valid authoring inputs.
+Use **V-Ronpa Nani: Refresh Project Assets** from the Command Palette if an external tool changes files without producing a filesystem notification. The existing command now invalidates both asset metadata and Nani script catalogs. Missing or malformed project metadata is reported in the **V-Ronpa Nani** output channel; single-file parser/compiler diagnostics and command hover remain available while project-derived completion falls back. The asset index is completion-only: unknown IDs are not diagnosed because external paths and dynamic IDs remain valid authoring inputs.
 
 ## Character Assembly Preview
 
@@ -53,7 +85,7 @@ Type a partial appearance token such as `@char alice.EYE1,MO` and select a chara
 
 Completion previews close with IntelliSense and do not create a Webview, panel, editor decoration, or background image. The UI intentionally omits token expansion and internal layer provenance. A candidate that only removes layers shows the projected complete character with a short no-new-image state. Preview failures stay in the completion documentation and the `[char-preview]` output channel.
 
-The parser source map is the only diagnostic-location authority. The extension converts each half-open offset span with `TextDocument.positionAt`; it does not inspect messages, search source text, or manufacture fallback ranges. Results computed for an older document version are discarded. If a parser/compiler or span invariant fails, the extension records the error in the **V-Ronpa Nani** output channel and clears diagnostics for that unchanged document version rather than publishing a guessed range.
+The parser source map is the only diagnostic-location authority. The extension converts each half-open offset span to UTF-16 line/column positions; it does not inspect messages, search source text, or manufacture fallback ranges. Results computed for an older document version are discarded. If a parser/compiler or span invariant fails, the extension records the error in the **V-Ronpa Nani** output channel and clears diagnostics for that unchanged document version rather than publishing a guessed range.
 
 ## Local Verification
 

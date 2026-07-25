@@ -1,5 +1,12 @@
-import { lineAt, type NaniPosition, type NaniRange } from "./documentContext";
+import { parseStaticNaniEndpoint } from "@v-ronpa/nani-parser";
+import {
+  getEndpointTokenAtPosition,
+  lineAt,
+  type NaniPosition,
+  type NaniRange
+} from "./documentContext";
 import { commandDocumentationFact, inlineDocumentationFact, paramDocumentationFact } from "./languageFacts";
+import { resolveNavigationTarget, type NaniNavigationIndex } from "./navigationAnalysis";
 
 export interface NaniHover {
   range: NaniRange;
@@ -12,9 +19,39 @@ interface TokenAtPosition {
   end: number;
 }
 
-export function getNaniHover(sourceText: string, position: NaniPosition): NaniHover | undefined {
+export function getNaniHover(
+  sourceText: string,
+  position: NaniPosition,
+  navigation?: NaniNavigationIndex
+): NaniHover | undefined {
+  const endpoint = navigationEndpointHover(sourceText, position, navigation);
+  if (endpoint) return endpoint;
   const line = lineAt(sourceText, position.line);
   return inlineHover(line, position) ?? commandLineHover(line, position);
+}
+
+function navigationEndpointHover(
+  sourceText: string,
+  position: NaniPosition,
+  navigation: NaniNavigationIndex | undefined
+): NaniHover | undefined {
+  if (!navigation) return undefined;
+  const token = getEndpointTokenAtPosition(sourceText, position);
+  if (!token) return undefined;
+  const parsed = parseStaticNaniEndpoint(token.raw, navigation.currentScriptPath);
+  const target = parsed.ok ? resolveNavigationTarget(token.raw, navigation) : undefined;
+  if (!parsed.ok || !target) return undefined;
+  const local = parsed.endpoint.scriptPath === navigation.currentScriptPath;
+  return {
+    range: token.range,
+    contents: [
+      `**Nani ${local ? "local" : "cross-script"} navigation target**`,
+      "",
+      `Script: \`${target.script.scriptPath}\``,
+      `Target: ${target.label ? `\`#${target.label}\`` : "script start"}`,
+      `Catalog: \`${navigation.catalogId}\``
+    ].join("\n")
+  };
 }
 
 function commandLineHover(line: string, position: NaniPosition): NaniHover | undefined {

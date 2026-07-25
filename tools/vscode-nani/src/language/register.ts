@@ -10,7 +10,9 @@ import {
   type NaniDiagnostic
 } from "../diagnostics";
 import { NANI_LANGUAGE_ID } from "../languageFacts";
+import { offsetRange } from "../navigationAnalysis";
 import type { NaniProjectAssetService } from "../project-resources";
+import type { NaniProjectScriptService } from "../projectScriptService";
 
 export interface DeferredCompletionDocumentationContext {
   documentUri: vscode.Uri;
@@ -30,18 +32,26 @@ export interface DeferredCompletionDocumentationProvider {
 export function registerLanguageFeatures(
   context: vscode.ExtensionContext,
   projectAssets: NaniProjectAssetService,
+  projectScripts: NaniProjectScriptService,
   output: vscode.OutputChannel,
   deferredDocumentationProvider?: DeferredCompletionDocumentationProvider
 ): void {
   const diagnostics = vscode.languages.createDiagnosticCollection(NANI_LANGUAGE_ID);
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  const catalogDiagnosticUris = new Set<string>();
   const completionProvider: vscode.CompletionItemProvider<NaniVscodeCompletionItem> = {
     async provideCompletionItems(document, position) {
-      const assetIndex = await projectAssets.getIndex(document.uri);
+      const [assetIndex, snapshot] = await Promise.all([
+        projectAssets.getIndex(document.uri),
+        projectScripts.getSnapshot(document.uri)
+      ]);
+      const navigation = snapshot && projectScripts.isCurrent(snapshot)
+        ? snapshot.analysis.navigation
+        : undefined;
       return getNaniCompletions(document.getText(), {
         line: position.line,
         character: position.character
-      }, assetIndex).map((completion) => toVscodeCompletion(
+      }, assetIndex, navigation).map((completion) => toVscodeCompletion(
         completion,
         document.uri,
         document.version,
@@ -71,18 +81,57 @@ export function registerLanguageFeatures(
       "@", " ", ":", "#", "[", "!", ".", ","
     ),
     vscode.workspace.onDidOpenTextDocument(
-      (document) => void refreshDiagnostics(document, diagnostics, output)
+      (document) => void refreshDiagnostics(
+        document,
+        diagnostics,
+        projectScripts,
+        catalogDiagnosticUris,
+        output
+      )
     ),
     vscode.workspace.onDidChangeTextDocument((event) =>
-      scheduleDiagnostics(event.document, diagnostics, timers, output)
+      scheduleDiagnostics(
+        event.document,
+        diagnostics,
+        timers,
+        projectScripts,
+        catalogDiagnosticUris,
+        output
+      )
     ),
     vscode.workspace.onDidCloseTextDocument((document) => {
       clearScheduledDiagnostic(document, timers);
-      diagnostics.delete(document.uri);
+      void refreshDiagnostics(
+        document,
+        diagnostics,
+        projectScripts,
+        catalogDiagnosticUris,
+        output
+      );
+    }),
+    projectScripts.onDidInvalidate(() => {
+      for (const uri of catalogDiagnosticUris) diagnostics.delete(vscode.Uri.parse(uri));
+      catalogDiagnosticUris.clear();
+      for (const document of vscode.workspace.textDocuments) {
+        scheduleDiagnostics(
+          document,
+          diagnostics,
+          timers,
+          projectScripts,
+          catalogDiagnosticUris,
+          output
+        );
+      }
     })
   );
   for (const document of vscode.workspace.textDocuments) {
-    void refreshDiagnostics(document, diagnostics, output);
+    void refreshDiagnostics(
+      document,
+      diagnostics,
+      projectScripts,
+      catalogDiagnosticUris,
+      output
+    );
   }
 }
 
@@ -90,6 +139,8 @@ function scheduleDiagnostics(
   document: vscode.TextDocument,
   diagnostics: vscode.DiagnosticCollection,
   timers: Map<string, ReturnType<typeof setTimeout>>,
+  projectScripts: NaniProjectScriptService,
+  catalogDiagnosticUris: Set<string>,
   output: vscode.OutputChannel
 ): void {
   if (!isNaniDocument(document)) return;
@@ -97,8 +148,14 @@ function scheduleDiagnostics(
   const key = document.uri.toString();
   timers.set(key, setTimeout(() => {
     timers.delete(key);
-    void refreshDiagnostics(document, diagnostics, output);
-  }, 250));
+    void refreshDiagnostics(
+      document,
+      diagnostics,
+      projectScripts,
+      catalogDiagnosticUris,
+      output
+    );
+  }, 300));
 }
 
 function clearScheduledDiagnostic(
@@ -115,24 +172,61 @@ function clearScheduledDiagnostic(
 async function refreshDiagnostics(
   document: vscode.TextDocument,
   diagnostics: vscode.DiagnosticCollection,
+  projectScripts: NaniProjectScriptService,
+  catalogDiagnosticUris: Set<string>,
   output: vscode.OutputChannel
 ): Promise<void> {
   if (!isNaniDocument(document)) return;
   const version = document.version;
   const sourceText = document.getText();
-  const scriptPath = document.uri.fsPath || document.uri.toString();
   await Promise.resolve();
   try {
+    const snapshot = await projectScripts.getSnapshot(document.uri);
+    if (snapshot) {
+      if (!projectScripts.isCurrent(snapshot)) return;
+      const publications = await mapCatalogDiagnostics(snapshot);
+      if (!projectScripts.isCurrent(snapshot)) return;
+      for (const [uri, mapped] of publications) {
+        diagnostics.set(uri, mapped);
+        catalogDiagnosticUris.add(uri.toString());
+      }
+      return;
+    }
+    if (document.isClosed) {
+      diagnostics.delete(document.uri);
+      return;
+    }
+    const scriptPath = document.uri.fsPath || document.uri.toString();
     const computed = computeNaniDiagnostics(sourceText, scriptPath);
     if (document.isClosed || document.version !== version) return;
     const mapped = computed.map((diagnostic) => toVscodeDiagnostic(document, diagnostic, sourceText.length));
     if (document.isClosed || document.version !== version) return;
     diagnostics.set(document.uri, mapped);
   } catch (error) {
-    if (document.isClosed || document.version !== version) return;
+    if (document.isClosed) {
+      diagnostics.delete(document.uri);
+      return;
+    }
+    if (document.version !== version) return;
     output.appendLine(`[diagnostics] Failed to map ${document.uri.toString()} at version ${version}: ${errorText(error)}`);
     diagnostics.delete(document.uri);
   }
+}
+
+async function mapCatalogDiagnostics(
+  snapshot: import("../projectScriptService").NaniCatalogSnapshot
+): Promise<Array<readonly [vscode.Uri, vscode.Diagnostic[]]>> {
+  const publications: Array<readonly [vscode.Uri, vscode.Diagnostic[]]> = [];
+  for (const [scriptPath, computed] of snapshot.analysis.diagnosticsByScriptPath) {
+    const uri = snapshot.sourceUrisByPath.get(scriptPath);
+    const source = snapshot.analysis.navigation.scripts.get(scriptPath);
+    if (!uri || !source) continue;
+    const mapped = computed.map((diagnostic) =>
+      toVscodeDiagnosticFromSourceText(source.sourceText, diagnostic)
+    );
+    publications.push([uri, mapped]);
+  }
+  return publications;
 }
 
 function isNaniDocument(document: vscode.TextDocument): boolean {
@@ -173,6 +267,21 @@ function toVscodeDiagnostic(
   assertValidNaniDiagnosticSpan(diagnostic, sourceLength);
   const mapped = new vscode.Diagnostic(
     new vscode.Range(document.positionAt(diagnostic.span.start), document.positionAt(diagnostic.span.end)),
+    diagnostic.message,
+    diagnosticSeverity(diagnostic.severity)
+  );
+  mapped.source = diagnostic.source;
+  mapped.code = diagnostic.code;
+  return mapped;
+}
+
+function toVscodeDiagnosticFromSourceText(
+  sourceText: string,
+  diagnostic: NaniDiagnostic
+): vscode.Diagnostic {
+  assertValidNaniDiagnosticSpan(diagnostic, sourceText.length);
+  const mapped = new vscode.Diagnostic(
+    toVscodeRange(offsetRange(sourceText, diagnostic.span)),
     diagnostic.message,
     diagnosticSeverity(diagnostic.severity)
   );

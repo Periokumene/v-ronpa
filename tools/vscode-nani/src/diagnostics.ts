@@ -1,12 +1,5 @@
-import {
-  parseScenario,
-  type NaniParserDiagnostic,
-  type TextSpan
-} from "@v-ronpa/nani-parser";
-import {
-  compileRuntimeScript,
-  type RuntimeCompilerDiagnostic
-} from "@v-ronpa/nani-runtime-compiler";
+import type { TextSpan } from "@v-ronpa/nani-parser";
+import { analyzeNaniDocument } from "./navigationAnalysis";
 
 export interface NaniDiagnostic {
   message: string;
@@ -17,13 +10,7 @@ export interface NaniDiagnostic {
 }
 
 export function computeNaniDiagnostics(sourceText: string, scriptPath: string): NaniDiagnostic[] {
-  const parsedDocument = parseScenario({ sourceText, scriptPath });
-  const compiledScript = compileRuntimeScript(parsedDocument);
-
-  return [
-    ...parsedDocument.diagnostics.map(toNaniDiagnostic),
-    ...compiledScript.diagnostics.map(toNaniDiagnostic)
-  ];
+  return [...analyzeNaniDocument(sourceText, scriptPath).diagnostics];
 }
 
 export function assertValidNaniDiagnosticSpan(
@@ -42,16 +29,4 @@ export function assertValidNaniDiagnosticSpan(
       `Invalid diagnostic span [${String(start)}, ${String(end)}) for source length ${sourceLength}.`
     );
   }
-}
-
-function toNaniDiagnostic(
-  diagnostic: NaniParserDiagnostic | RuntimeCompilerDiagnostic
-): NaniDiagnostic {
-  return {
-    message: diagnostic.message,
-    severity: diagnostic.severity,
-    span: diagnostic.span,
-    source: "nani",
-    code: diagnostic.code
-  };
 }

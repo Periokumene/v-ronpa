@@ -132,6 +132,119 @@ suite("V-Ronpa Nani exact diagnostics", () => {
     assert.deepEqual(vscode.languages.getDiagnostics(document.uri), []);
   });
 
+  test("provides live multi-script diagnostics, completion, hover, and definitions", async () => {
+    const fixture = await createNavigationFixture();
+    const opening = await vscode.workspace.openTextDocument(fixture.openingUri);
+    const chapter = await vscode.workspace.openTextDocument(fixture.chapterUri);
+    const editor = await vscode.window.showTextDocument(opening);
+    await waitForDiagnostics(opening.uri, (diagnostics) => diagnostics.length === 0);
+
+    const completionPosition = new vscode.Position(2, '@choice "Again" goto:'.length);
+    const completions = await executeCompletions(opening.uri, completionPosition, 0);
+    assert.deepEqual(
+      completions.items.slice(0, 3).map(completionLabel),
+      ["#Start", "game/opening.nani", "game/chapter.nani"]
+    );
+
+    const endpointPosition = new vscode.Position(1, "@goto game/".length);
+    const hover = await executeHover(opening.uri, endpointPosition);
+    assert.match(hover, /cross-script navigation target/u);
+    assert.match(hover, /game\/chapter\.nani/u);
+
+    const definitions = await vscode.commands.executeCommand<Array<vscode.Location | vscode.LocationLink>>(
+      "vscode.executeDefinitionProvider",
+      opening.uri,
+      endpointPosition
+    );
+    assert.ok(definitions && definitions.length === 1);
+    const definition = definitions[0];
+    assert.ok(definition);
+    const targetUri = "uri" in definition ? definition.uri : definition.targetUri;
+    const targetRange = "uri" in definition
+      ? definition.range
+      : definition.targetSelectionRange;
+    assert.ok(targetRange);
+    assert.equal(targetUri.toString(), chapter.uri.toString());
+    assert.equal(targetRange.start.line, 0);
+    assert.equal(chapter.getText(targetRange), "Chapter");
+
+    const endpointStart = opening.lineAt(1).text.indexOf("game/chapter");
+    await editor.edit((builder) => {
+      builder.replace(
+        new vscode.Range(1, endpointStart, 1, opening.lineAt(1).text.length),
+        "game/chapter.nani#Missing"
+      );
+    });
+    const invalid = await waitForDiagnostic(
+      opening.uri,
+      (diagnostic) => diagnostic.code === "endpoint-label-missing"
+    );
+    assert.equal(opening.getText(invalid.range), "game/chapter.nani#Missing");
+    const invalidDefinitions = await vscode.commands.executeCommand<
+      Array<vscode.Location | vscode.LocationLink>
+    >(
+      "vscode.executeDefinitionProvider",
+      opening.uri,
+      new vscode.Position(1, endpointStart + 5)
+    );
+    assert.equal(invalidDefinitions?.length ?? 0, 0);
+
+    const chapterEditor = await vscode.window.showTextDocument(chapter);
+    await chapterEditor.edit((builder) => {
+      builder.insert(chapter.positionAt(chapter.getText().length), "\n#Missing\n@end");
+    });
+    await waitForDiagnostics(
+      opening.uri,
+      (diagnostics) => !diagnostics.some((diagnostic) => diagnostic.code === "endpoint-label-missing")
+    );
+
+    const smoke = await vscode.workspace.openTextDocument(fixture.smokeUri);
+    await vscode.window.showTextDocument(smoke);
+    const smokeCompletions = await executeCompletions(
+      smoke.uri,
+      new vscode.Position(1, "@goto ".length),
+      0
+    );
+    assert.deepEqual(
+      smokeCompletions.items.slice(0, 2).map(completionLabel),
+      ["#Start", "game/test/smoke.nani"]
+    );
+    assert.equal(
+      smokeCompletions.items.some((item) => completionLabel(item) === "game/opening.nani"),
+      false
+    );
+
+    const unregisteredUri = vscode.Uri.joinPath(
+      vscode.workspace.workspaceFolders![0]!.uri,
+      "stories/unregistered.nani"
+    );
+    await vscode.workspace.fs.writeFile(
+      unregisteredUri,
+      Buffer.from("#Solo\n@goto #S")
+    );
+    const unregistered = await vscode.workspace.openTextDocument(unregisteredUri);
+    await vscode.window.showTextDocument(unregistered);
+    const fallback = await executeCompletions(
+      unregistered.uri,
+      new vscode.Position(1, "@goto #S".length),
+      0
+    );
+    assert.deepEqual(fallback.items.map(completionLabel), ["#Solo"]);
+  });
+
+  test("publishes duplicate script registration on the project config", async () => {
+    const fixture = await createNavigationFixture(true);
+    await vscode.commands.executeCommand("v-ronpa-nani.refreshProjectAssets");
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(fixture.openingUri));
+
+    const diagnostic = await waitForDiagnostic(
+      fixture.configUri,
+      (candidate) => candidate.source === "nani-project"
+    );
+    assert.equal(diagnostic.code, "invalid-project-script-config");
+    assert.match(diagnostic.message, /registered more than once/u);
+  });
+
   test("renders a real layered character artifact only on the @char identity hover", async () => {
     const fixture = await createCharacterPreviewFixture();
     const source = "@char alice.EYE1 time:not-a-number";
@@ -321,6 +434,66 @@ async function createCharacterPreviewFixture(): Promise<{ bodyPng: vscode.Uri; p
   await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(layers, "MOUTH2.png"), png);
   await vscode.commands.executeCommand("v-ronpa-nani.refreshProjectAssets");
   return { bodyPng, png };
+}
+
+async function createNavigationFixture(duplicate = false): Promise<{
+  configUri: vscode.Uri;
+  openingUri: vscode.Uri;
+  chapterUri: vscode.Uri;
+  smokeUri: vscode.Uri;
+}> {
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+  assert.ok(workspaceFolder);
+  const root = workspaceFolder.uri;
+  const openingUri = vscode.Uri.joinPath(root, "stories/opening.nani");
+  const chapterUri = vscode.Uri.joinPath(root, "stories/chapter.nani");
+  const smokeUri = vscode.Uri.joinPath(root, "stories/smoke.nani");
+  const configUri = vscode.Uri.joinPath(root, "asset.config.mjs");
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "stories"));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "src"));
+  await writeWorkspaceFile("pnpm-workspace.yaml", "packages: []\n");
+  await vscode.workspace.fs.writeFile(
+    openingUri,
+    Buffer.from([
+      "#Start",
+      "@goto game/chapter.nani#Chapter",
+      '@choice "Again" goto:#Start'
+    ].join("\n"))
+  );
+  await vscode.workspace.fs.writeFile(chapterUri, Buffer.from("#Chapter\n@end"));
+  await writeWorkspaceFile("src/generatedAssets.ts", "export const exampleAssets = [];\n");
+  const scripts = [
+    { sourceFile: "stories/opening.nani", scriptPath: "game/opening.nani" },
+    { sourceFile: "stories/chapter.nani", scriptPath: "game/chapter.nani" },
+    ...(duplicate
+      ? [{ sourceFile: "stories/opening.nani", scriptPath: "game/duplicate.nani" }]
+      : [])
+  ];
+  await vscode.workspace.fs.writeFile(
+    configUri,
+    Buffer.from(`export default ${JSON.stringify({
+      publicRoot: "public/example",
+      publicBaseUri: "/example",
+      outputPath: "src/generatedAssets.ts",
+      exportName: "exampleAssets",
+      entry: { initialScriptPath: "game/opening.nani", startLabel: "Start" },
+      scripts,
+      testCatalogs: {
+        smoke: {
+          entry: { initialScriptPath: "game/test/smoke.nani" },
+          scripts: [
+            { sourceFile: "stories/smoke.nani", scriptPath: "game/test/smoke.nani" }
+          ]
+        }
+      }
+    }, null, 2)};\n`)
+  );
+  await vscode.workspace.fs.writeFile(
+    smokeUri,
+    Buffer.from("#Start\n@goto #Start\n@end\n")
+  );
+  await vscode.commands.executeCommand("v-ronpa-nani.refreshProjectAssets");
+  return { configUri, openingUri, chapterUri, smokeUri };
 }
 
 function previewMetadata(drawOrder: number): Record<string, unknown> {

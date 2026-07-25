@@ -68,6 +68,9 @@
           "include": "#expression"
         },
         {
+          "include": "#navigationScriptPath"
+        },
+        {
           "include": "#labelReference"
         },
         {
@@ -165,6 +168,9 @@
               "include": "#number"
             },
             {
+              "include": "#navigationScriptPath"
+            },
+            {
               "include": "#labelReference"
             }
           ]
@@ -230,8 +236,19 @@
       }
     },
     "labelReference": {
-      "name": "variable.other.label-reference.nani",
-      "match": "#[A-Za-z0-9:_./-]+"
+      "match": "(#)([A-Za-z_][A-Za-z0-9_.-]*)",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.label-reference.nani"
+        },
+        "2": {
+          "name": "variable.other.label-fragment.nani"
+        }
+      }
+    },
+    "navigationScriptPath": {
+      "name": "string.unquoted.script-path.nani",
+      "match": "[A-Za-z0-9_][A-Za-z0-9_./-]*\\.nani"
     },
     "string": {
       "patterns": [

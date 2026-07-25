@@ -3,6 +3,7 @@ import { allowedValueCompletionFacts, commandCompletionFacts, paramCompletionFac
 import { emptyProjectAssetIndex, type NaniProjectAssetIndex } from "./projectAssets";
 import { getNaniResourceCompletions } from "./resourceCompletions";
 import type { NaniDeferredCompletionDocumentation } from "./resourceCompletions";
+import type { NaniNavigationIndex } from "./navigationAnalysis";
 
 export type NaniCompletionKind = "command" | "param" | "value" | "label" | "snippet" | "resource";
 
@@ -21,7 +22,8 @@ export interface NaniCompletion {
 export function getNaniCompletions(
   sourceText: string,
   position: NaniPosition,
-  projectAssets: NaniProjectAssetIndex = emptyProjectAssetIndex
+  projectAssets: NaniProjectAssetIndex = emptyProjectAssetIndex,
+  navigation?: NaniNavigationIndex
 ): NaniCompletion[] {
   const context = getCompletionContext(sourceText, position);
   const resources = getNaniResourceCompletions(sourceText, position, projectAssets);
@@ -32,6 +34,57 @@ export function getNaniCompletions(
   }));
 
   if (resources && !resources.combineWithParams) return resourceCompletions;
+
+  if (context.kind === "endpoint") {
+    if (context.phase === "label") {
+      const labels = context.targetPath
+        ? [...(navigation?.scripts.get(context.targetPath)?.labels
+          ? Object.keys(navigation.scripts.get(context.targetPath)?.labels ?? {})
+          : [])]
+        : collectLabels(sourceText);
+      return labels
+        .filter((label) => label.toLowerCase().startsWith(context.prefix.toLowerCase()))
+        .map((label, index) => ({
+          label: `#${label}`,
+          insertText: label,
+          kind: "label" as const,
+          range: context.range,
+          detail: context.targetPath
+            ? `Label in ${context.targetPath}`
+            : "Current file label",
+          isSnippet: false,
+          sortText: `0${index.toString().padStart(4, "0")}`
+        }));
+    }
+    const localLabels = collectLabels(sourceText)
+      .map((label) => `#${label}`)
+      .filter((label) => label.toLowerCase().startsWith(context.prefix.toLowerCase()))
+      .map((label, index): NaniCompletion => ({
+        label,
+        insertText: label,
+        kind: "label",
+        range: context.range,
+        detail: "Current file label",
+        isSnippet: false,
+        sortText: `0${index.toString().padStart(4, "0")}`
+      }));
+    const scriptPaths = navigation
+      ? [...navigation.scripts.keys()]
+        .filter((scriptPath) =>
+          scriptPath.toLowerCase().startsWith(context.prefix.toLowerCase())
+        )
+        .map((scriptPath, index): NaniCompletion => ({
+          label: scriptPath,
+          insertText: scriptPath,
+          kind: "resource",
+          range: context.range,
+          detail: `Nani script · ${navigation.catalogId}`,
+          isSnippet: false,
+          sortText: `1${index.toString().padStart(4, "0")}`
+        }))
+      : [];
+    return [...localLabels, ...scriptPaths];
+  }
 
   if (context.kind === "command") {
     return commandCompletionFacts().map((fact) => ({
