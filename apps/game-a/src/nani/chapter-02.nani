@@ -1,38 +1,38 @@
 #Start
-@char alice.EYE1,MOUTH2,ArmL2,ArmR0,EFFECT2 pos:50 wait!
+@char alice.eye1,mouth1,armR1,armL0 pos:50 wait!
 Alice: 这还差不多。跟紧一点，别又站在雨里发呆。
 nar: 她把伞抬高了一些，刚好让我们都能看见前面的路。
-@char alice.EYE4,MOUTH0,ArmL4,ArmR0,EFFECT0 pos:50 wait!
+@char alice.eye4,mouth4,armR0,armL5 pos:50 wait!
 Alice: 先说好，到了店里不许挑半天。妈妈只让我们买牛奶。
 nar: 我问她，既然只是买牛奶，为什么出门前还特意换了双不怕水的鞋。
-@char alice.EYE2,MOUTH3,ArmL2,ArmR2,EFFECT0 pos:50 wait!
+@char alice.eye3,mouth3,armR0,armL2 pos:50 wait!
 Alice: 因为我知道某个人一定会踩遍路上每一个水坑。
 Alice: 尤其是那种看起来很浅，实际上能把袜子整个灌满的。
-@char alice.EYE0,MOUTH5,ArmL0,ArmR2,EFFECT2 pos:50 wait!
+@char alice.eye0,mouth5,armR0,armL0 pos:50 wait!
 nar: 她说得像一位经验丰富的灾害预报员，却还是把伞更多地偏向了我这边。
 Alice: 你笑什么？我只是不想回去以后听你打喷嚏。
-@char alice.EYE1,MOUTH2,ArmL4,ArmR0,EFFECT2 pos:50 wait!
+@char alice.eye1,mouth2,armR4,armL0 pos:50 wait!
 Alice: 而且你要是真感冒了，最后被妈妈叫去端热水的人还是我。
 nar: 我点点头，郑重保证接下来一步也不会踩错。
-@char alice.EYE4,MOUTH3,ArmL2,ArmR2,EFFECT0 pos:50 wait!
+@char alice.eye4,mouth3,armR0,armL2 pos:50 wait!
 Alice: 停。你脚边那个就是。
 nar: 鞋尖在水坑边缘悬了一瞬。我收回脚，雨滴随即替我在水面踩出密密麻麻的波纹。
-@char alice.EYE0,MOUTH0,ArmL0,ArmR0,EFFECT2 pos:50 wait!
+@char alice.eye0,mouth1,armR1,armL0 pos:50 wait!
 Alice: 看吧。没有我，你走不到街口就会宣布全军覆没。
 nar: 她的语气得意得过分。我决定转移话题，问她准备买哪一种牛奶。
-@char alice.EYE2,MOUTH5,ArmL4,ArmR2,EFFECT0 pos:50 wait!
+@char alice.eye4,mouth4,armR0,armL5 pos:50 wait!
 Alice: 原味。购物清单上写得很清楚，原、味、牛、奶。
 nar: 我提醒她，冰柜最上层通常还会放草莓味和巧克力味。
-@char alice.EYE1,MOUTH0,ArmL2,ArmR0,EFFECT2 pos:50 wait!
+@char alice.eye1,mouth6,armR4,armL0 pos:50 wait!
 Alice: ……如果巧克力味刚好在打折，也不是不能顺便看一眼。
 nar: 雨声忽然变得轻快起来。也许只是因为她终于承认，这趟出门并不完全是为了完成任务。
-@char alice.EYE4,MOUTH2,ArmL0,ArmR2,EFFECT0 pos:50 wait!
+@char alice.eye4,mouth2,armR0,armL2 pos:50 wait!
 Alice: 但是只能看一眼。你不要露出那种已经准备搬空冰柜的表情。
 nar: 我说我脸上只有对生活最朴素的期待。
-@char alice.EYE0,MOUTH3,ArmL4,ArmR0,EFFECT2 pos:50 wait!
+@char alice.eye0,mouth3,armR2,armL0 pos:50 wait!
 Alice: 那就把你的期待收好，先过马路。
 nar: 她伸手挡在我身前，等一辆溅着水花的车驶过去，才带着我踏进斑马线。
-@char alice.EYE2,MOUTH2,ArmL0,ArmR0,EFFECT2 pos:50 wait!
+@char alice.eye0,mouth1,armR0,armL0 pos:50 wait!
 nar: 我们挤在同一把伞下向亮着灯的街角走去。雨还没有停，但这条路已经没有刚才那么漫长了。
 @stopSfx group:rain fade:0.8
 @stopBgm group:music fade:0.8

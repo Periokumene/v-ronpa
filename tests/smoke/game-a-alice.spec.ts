@@ -65,27 +65,27 @@ test("game-a character smoke renders the imported Alice layered states", async (
     "test-results/game-a-alice-transition-end-frame.png"
   ));
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT CHARACTER 01");
-  await expectAliceState(page, "EYE0,MOUTH0");
+  await expectAliceState(page, "eye1,mouth1");
 
   const states = [
     {
       text: "CHECKPOINT CHARACTER 02",
-      expression: "EYE1,MOUTH3,ArmL2"
+      expression: "eye3,mouth3,armR3"
     },
     {
       text: "CHECKPOINT CHARACTER 03",
-      expression: "EYE4,MOUTH5,ArmL4,ArmR2,EFFECT0"
+      expression: "eye4,mouth4,armR2,armL4"
     },
     {
       text: "CHECKPOINT CHARACTER 04",
-      expression: "EYE2,MOUTH2,ArmL0,ArmR0,EFFECT2"
+      expression: "eye2,mouth2,armR0,armL0"
     }
   ] as const;
 
   for (const state of states) {
     await advanceUntilText(page, state.text, 4);
     await expectAliceState(page, state.expression);
-    if (state.expression === "EYE2,MOUTH2,ArmL0,ArmR0,EFFECT2") {
+    if (state.expression === "eye2,mouth2,armR0,armL0") {
       await page.screenshot({ path: "test-results/game-a-alice-outline-multilayer.png", fullPage: true });
     }
   }
@@ -98,7 +98,7 @@ test("game-a character smoke renders the imported Alice layered states", async (
 
 test("a Nani HMR candidate prepares a newly authored Alice expression before preview commit", async ({ page }) => {
   const originalSource = await readFile(characterSourceFile, "utf8");
-  const expression = "EYE3,MOUTH6,ArmL3,ArmR1,EFFECT1";
+  const expression = "eye5,mouth6,armR5,armL5";
   const hmrText = "CHECKPOINT CHARACTER HMR - candidate expression prepared.";
   const updatedSource = originalSource.replace(
     '@choice "完成角色测试" goto:#Complete',
@@ -113,7 +113,7 @@ test("a Nani HMR candidate prepares a newly authored Alice expression before pre
   const candidateLayerRequests: string[] = [];
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname;
-    if (/\/alice\/assets\/layers\/MAIN\/(?:EYE\/3|MOUTH\/6|ArmL\/3|ArmR\/1|EFFECT\/1)\.png$/u.test(pathname)) {
+    if (/\/alice\/assets\/layers\/root\/(?:eye\/5|mouth\/6|armR\/5|armL\/5)\.png$/u.test(pathname)) {
       candidateLayerRequests.push(pathname);
     }
   });
@@ -134,7 +134,7 @@ test("a Nani HMR candidate prepares a newly authored Alice expression before pre
 
     await writeFile(characterSourceFile, updatedSource, "utf8");
     await expect.poll(() => readWorkbenchRevision(page), { timeout: 15_000 }).not.toBe(initialRevision);
-    await expect.poll(() => new Set(candidateLayerRequests).size, { timeout: 15_000 }).toBe(5);
+    await expect.poll(() => new Set(candidateLayerRequests).size, { timeout: 15_000 }).toBe(4);
     await expect(page.getByTestId("pixi-layer")).toHaveAttribute(
       "data-pixi-character-preparation",
       "ready",
@@ -206,11 +206,11 @@ async function advanceVn(page: Page) {
 }
 
 const characterInteriorOffsets = [
-  [0, 200],
-  [-20, 250],
-  [0, 280],
-  [-30, 300],
-  [20, 300]
+  [0, 65],
+  [-30, 137],
+  [0, 162],
+  [-40, 232],
+  [20, 282]
 ] as const;
 
 type CharacterInteriorSample = readonly [red: number, green: number, blue: number, alpha: number];
@@ -239,8 +239,8 @@ async function captureCharacterInterior(page: Page, path: string): Promise<Chara
   const [skin] = samples;
   expect(skin).toBeDefined();
   expect(skin?.[3]).toBe(255);
-  expect(skin?.[0]).toBeGreaterThan(150);
-  expect(skin?.[0]).toBeLessThan(245);
+  expect(skin?.[0]).toBeGreaterThan(200);
+  expect(skin?.[0]).toBeLessThan(252);
   expect((skin?.[0] ?? 0) - (skin?.[1] ?? 0)).toBeGreaterThan(5);
   expect((skin?.[1] ?? 0) - (skin?.[2] ?? 0)).toBeGreaterThan(5);
   return samples as CharacterInteriorSample[];

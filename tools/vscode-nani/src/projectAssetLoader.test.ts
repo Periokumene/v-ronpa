@@ -107,12 +107,16 @@ describe("project asset loading", () => {
     expect(loaded.index.assets).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "alice", kind: "character-pack" }),
+        expect.objectContaining({ id: "alice-kid", kind: "character-pack" }),
         expect.objectContaining({ id: "bgm:game-a-main", kind: "bgm" }),
         expect.objectContaining({ id: "sfx:glug-glug-glug", kind: "sfx" })
       ])
     );
     expect(loaded.index.characterTokens.alice).toEqual(
-      expect.arrayContaining(["Default", "SourcePreview", "EYEOff", "MOUTH6", "EFFECTOff"])
+      expect.arrayContaining(["default", "sourcePreview", "eye5", "mouth6", "armR5", "armL5"])
+    );
+    expect(loaded.index.characterTokens["alice-kid"]).toEqual(
+      expect.arrayContaining(["default", "effect0", "effect2", "effectOff"])
     );
   });
 });

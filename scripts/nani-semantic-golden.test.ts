@@ -23,7 +23,8 @@ describe("Nani semantic golden from integration baseline", () => {
     expect(diagnosticGolden.baseline).toBe(golden.baseline);
     expect(golden.intentionalOverrides).toEqual({
       "game-a-smoke": "Editor Tools moves the visual/audio setup before the first stable Workbench target and records its route/text identity.",
-      "game-a-production-catalog": "The accepted multi-Nani hard cut splits the former MILKBEGIN segment into chapter-02 and links it from opening with one static endpoint."
+      "game-a-production-catalog": "The accepted multi-Nani hard cut splits the former MILKBEGIN segment into chapter-02 and links it from opening with one static endpoint.",
+      "csp-character-v2-alice-hard-cut": "The accepted CSP v2 hard cut replaces Alice assets and updates production/test appearance expressions, generated revisions, and preload plans without compatibility aliases."
     });
   });
 

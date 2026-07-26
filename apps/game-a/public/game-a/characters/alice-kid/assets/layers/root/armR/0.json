@@ -1,0 +1,38 @@
+{
+  "sourcePath": "alice-kid/root/armR/0",
+  "drawOrder": 3,
+  "sprite": {
+    "pivot": {
+      "x": 0,
+      "y": 0
+    },
+    "pixelsPerUnit": 1
+  },
+  "localTransform": {
+    "position": {
+      "x": 549,
+      "y": 735,
+      "z": 0
+    },
+    "scale": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "renderer": {
+    "color": {
+      "r": 1,
+      "g": 1,
+      "b": 1,
+      "a": 1
+    },
+    "flipX": false,
+    "flipY": false
+  }
+}

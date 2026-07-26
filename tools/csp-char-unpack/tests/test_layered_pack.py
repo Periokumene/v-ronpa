@@ -11,6 +11,7 @@ from csp_char_unpack.errors import ToolError
 from csp_char_unpack.layered_pack import build_layered_character_pack, discover_leaf_sprites
 from csp_char_unpack.pipeline import validate_pack
 from csp_char_unpack.psd_report import PsdInspection, PsdNode
+from csp_char_unpack.qa import _variant_sheet
 
 
 class FakeLayer:
@@ -79,89 +80,181 @@ def make_node(
     return PsdNode(node_id, layer, parent_id, ancestors, path, len(ancestors), 0)
 
 
-def valid_inspection(*, arm_visible: bool = True, eye_layer_name: str = "0") -> PsdInspection:
-    root = make_node("L0001", FakeLayer("MAIN", group=True), "/MAIN")
+def valid_inspection(
+    *,
+    group_specs: tuple[tuple[str, tuple[tuple[str, bool], ...]], ...] = (
+        ("mouth", (("0", True), ("1", False))),
+    ),
+    body_visible: bool = True,
+    body_image: Image.Image | None = None,
+) -> PsdInspection:
+    root = make_node("L0001", FakeLayer("root", group=True), "/root")
     body = make_node(
         "L0002",
-        FakeLayer("BODY", group=True, image=image_at(10, 10, (255, 0, 0, 255))),
-        "/MAIN/BODY",
+        FakeLayer(
+            "body",
+            group=True,
+            visible=body_visible,
+            image=body_image or image_at(10, 10, (255, 0, 0, 255)),
+        ),
+        "/root/body",
         parent_id=root.id,
         ancestors=(root.id,),
     )
     body_child = make_node(
-        "L0003", FakeLayer("paint"), "/MAIN/BODY/paint", parent_id=body.id, ancestors=(root.id, body.id)
-    )
-    arm = make_node("L0004", FakeLayer("ArmL", group=True), "/MAIN/ArmL", parent_id=root.id, ancestors=(root.id,))
-    arm0 = make_node(
-        "L0005",
-        FakeLayer("0", group=True, visible=arm_visible, image=image_at(20, 20, (0, 255, 0, 255))),
-        "/MAIN/ArmL/0",
-        parent_id=arm.id,
-        ancestors=(root.id, arm.id),
-    )
-    arm0_child = make_node(
-        "L0006", FakeLayer("paint"), "/MAIN/ArmL/0/paint", parent_id=arm0.id, ancestors=(root.id, arm.id, arm0.id)
-    )
-    arm1 = make_node(
-        "L0007",
-        FakeLayer("1", group=True, visible=False, image=image_at(30, 20, (0, 0, 255, 255))),
-        "/MAIN/ArmL/1",
-        parent_id=arm.id,
-        ancestors=(root.id, arm.id),
-    )
-    arm1_child = make_node(
-        "L0008", FakeLayer("paint"), "/MAIN/ArmL/1/paint", parent_id=arm1.id, ancestors=(root.id, arm.id, arm1.id)
-    )
-    eye = make_node("L0009", FakeLayer("EYE", group=True), "/MAIN/EYE", parent_id=root.id, ancestors=(root.id,))
-    eye0 = make_node(
-        "L0010",
-        FakeLayer(eye_layer_name, group=True, visible=False, image=image_at(40, 10, (255, 255, 0, 255))),
-        f"/MAIN/EYE/{eye_layer_name}",
-        parent_id=eye.id,
-        ancestors=(root.id, eye.id),
-    )
-    eye0_child = make_node(
-        "L0011",
+        "L0003",
         FakeLayer("paint"),
-        f"/MAIN/EYE/{eye_layer_name}/paint",
-        parent_id=eye0.id,
-        ancestors=(root.id, eye.id, eye0.id),
+        "/root/body/paint",
+        parent_id=body.id,
+        ancestors=(root.id, body.id),
     )
-    nodes = [root, body, body_child, arm, arm0, arm0_child, arm1, arm1_child, eye, eye0, eye0_child]
+    nodes = [root, body, body_child]
+    next_id = 4
+    colors = [(0, 255, 0, 255), (0, 0, 255, 255), (255, 255, 0, 255), (255, 0, 255, 255)]
+    for group_index, (group_name, variants) in enumerate(group_specs):
+        group = make_node(
+            f"L{next_id:04d}",
+            FakeLayer(group_name, group=True),
+            f"/root/{group_name}",
+            parent_id=root.id,
+            ancestors=(root.id,),
+        )
+        next_id += 1
+        nodes.append(group)
+        for variant_index, (variant_name, visible) in enumerate(variants):
+            variant = make_node(
+                f"L{next_id:04d}",
+                FakeLayer(
+                    variant_name,
+                    group=True,
+                    visible=visible,
+                    image=image_at(
+                        20 + group_index * 10 + variant_index * 5,
+                        20,
+                        colors[(group_index + variant_index) % len(colors)],
+                    ),
+                ),
+                f"/root/{group_name}/{variant_name}",
+                parent_id=group.id,
+                ancestors=(root.id, group.id),
+            )
+            next_id += 1
+            paint = make_node(
+                f"L{next_id:04d}",
+                FakeLayer("paint"),
+                f"/root/{group_name}/{variant_name}/paint",
+                parent_id=variant.id,
+                ancestors=(root.id, group.id, variant.id),
+            )
+            next_id += 1
+            nodes.extend([variant, paint])
     return PsdInspection(SimpleNamespace(width=100, height=100), nodes, {"width": 100, "height": 100}, [])
 
 
-def test_builds_cropped_pack_with_default_and_builtin_tokens(tmp_path: Path) -> None:
-    inspection = valid_inspection()
-    result = build_layered_character_pack(inspection, tmp_path, "Alice", "/MAIN")
+def test_builds_v2_pack_with_lower_camel_tokens_and_body_anchor(tmp_path: Path) -> None:
+    result = build_layered_character_pack(valid_inspection(), tmp_path, "alice")
 
-    assert result.sprite_count == 4
-    assert result.groups == ("MAIN", "MAIN/ArmL", "MAIN/EYE")
-    assert result.source_preview == ("MAIN>BODY", "MAIN/ArmL>0")
+    assert result.sprite_count == 3
+    assert result.groups == ("root", "root/mouth")
+    assert result.source_preview == ("root>body", "root/mouth>0")
     assert result.tokens == {
-        "SourcePreview": ["MAIN>BODY", "MAIN/ArmL>0"],
-        "Default": ["SourcePreview"],
-        "ArmL0": ["MAIN/ArmL>0"],
-        "ArmL1": ["MAIN/ArmL>1"],
-        "EYE0": ["MAIN/EYE>0"],
-        "EYEOff": ["MAIN/EYE-"],
+        "sourcePreview": ["root>body", "root/mouth>0"],
+        "default": ["sourcePreview"],
+        "mouth0": ["root/mouth>0"],
+        "mouth1": ["root/mouth>1"],
     }
-    metadata = json.loads((tmp_path / "assets/layers/MAIN/ArmL/0.json").read_text(encoding="utf-8"))
+    metadata = json.loads((tmp_path / "assets/layers/root/mouth/0.json").read_text(encoding="utf-8"))
     assert metadata["localTransform"]["position"] == {"x": 20, "y": 80, "z": 0}
     for metadata_path in (tmp_path / "assets/layers").rglob("*.json"):
-        generated_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        assert generated_metadata["sprite"]["pixelsPerUnit"] == 1
-        assert generated_metadata["localTransform"]["scale"] == {"x": 1, "y": 1, "z": 1}
-    assert Image.open(tmp_path / "assets/layers/MAIN/ArmL/0.png").size == (20, 30)
+        generated = json.loads(metadata_path.read_text(encoding="utf-8"))
+        assert generated["sprite"]["pixelsPerUnit"] == 1
+        assert generated["localTransform"]["scale"] == {"x": 1, "y": 1, "z": 1}
     character = json.loads((tmp_path / "character.json").read_text(encoding="utf-8"))
-    assert character["renderSpace"] == {"stageScale": 7.0, "characterAnchor": [50.0, 160.0]}
-    assert validate_pack(tmp_path) == "Validated V-Ronpa character pack 'Alice'."
+    assert character == {
+        "id": "alice",
+        "defaultComposition": ["default"],
+        "renderSpace": {"stageScale": 7.0, "characterAnchor": [50.0, 160.0]},
+    }
+    assert validate_pack(tmp_path) == "Validated V-Ronpa character pack 'alice'."
+
+
+def test_body_only_and_extensible_group_are_supported(tmp_path: Path) -> None:
+    body_only = tmp_path / "body-only"
+    result = build_layered_character_pack(valid_inspection(group_specs=()), body_only, "body-only")
+    assert result.groups == ("root",)
+    assert result.tokens == {
+        "sourcePreview": ["root>body"],
+        "default": ["sourcePreview"],
+    }
+
+    leg_pack = tmp_path / "leg"
+    result = build_layered_character_pack(
+        valid_inspection(group_specs=(("leg", (("0", True), ("1", False), ("2", False))),)),
+        leg_pack,
+        "leg",
+    )
+    assert [name for name in result.tokens if name.startswith("leg")] == ["leg0", "leg1", "leg2"]
+
+
+def test_effect_is_optional_defaults_off_and_generates_explicit_off(tmp_path: Path) -> None:
+    result = build_layered_character_pack(
+        valid_inspection(
+            group_specs=(
+                ("mouth", (("0", True), ("1", False))),
+                ("effect", (("0", False), ("1", False))),
+            )
+        ),
+        tmp_path,
+        "alice-kid",
+    )
+    assert result.source_preview == ("root>body", "root/mouth>0")
+    assert result.tokens["effect0"] == ["root/effect>0"]
+    assert result.tokens["effect1"] == ["root/effect>1"]
+    assert result.tokens["effectOff"] == ["root/effect-"]
+
+
+def test_variant_qa_sheet_covers_every_variant_including_hidden_effect(tmp_path: Path) -> None:
+    pack_root = tmp_path / "pack"
+    result = build_layered_character_pack(
+        valid_inspection(
+            group_specs=(
+                ("mouth", (("0", True), ("1", False), ("2", False))),
+                ("effect", (("0", False), ("1", False))),
+            )
+        ),
+        pack_root,
+        "qa",
+    )
+    mouth_sheet = tmp_path / "reports/variants/mouth.png"
+    effect_sheet = tmp_path / "reports/variants/effect.png"
+    assert _variant_sheet(pack_root, result, "root/mouth", (100, 100), mouth_sheet) == 3
+    assert _variant_sheet(pack_root, result, "root/effect", (100, 100), effect_sheet) == 2
+    assert mouth_sheet.is_file()
+    assert effect_sheet.is_file()
+
+
+def test_source_group_order_becomes_draw_order(tmp_path: Path) -> None:
+    result = build_layered_character_pack(
+        valid_inspection(
+            group_specs=(
+                ("leg", (("0", True),)),
+                ("hairFront", (("0", True),)),
+            )
+        ),
+        tmp_path,
+        "ordered",
+    )
+    assert [(record["id"], record["drawOrder"]) for record in result.sprites] == [
+        ("root>body", 0),
+        ("root/leg>0", 1),
+        ("root/hairFront>0", 2),
+    ]
 
 
 @pytest.mark.parametrize("invalid_kind", ["zero", "non-square", "mixed-density"])
 def test_pack_validator_rejects_invalid_source_pixel_scale(tmp_path: Path, invalid_kind: str) -> None:
     pack_root = tmp_path / invalid_kind
-    build_layered_character_pack(valid_inspection(), pack_root, "Alice", "/MAIN")
+    build_layered_character_pack(valid_inspection(), pack_root, "alice")
     metadata_paths = sorted((pack_root / "assets/layers").rglob("*.json"))
     first = json.loads(metadata_paths[0].read_text(encoding="utf-8"))
     if invalid_kind == "zero":
@@ -180,98 +273,179 @@ def test_pack_validator_rejects_invalid_source_pixel_scale(tmp_path: Path, inval
         validate_pack(pack_root)
 
 
-def test_render_parameters_and_all_sprite_bounds_fallback_are_applied(tmp_path: Path) -> None:
-    inspection = valid_inspection()
-    inspection.by_id["L0002"].layer.name = "TORSO"
-    result = build_layered_character_pack(
-        inspection,
+def test_explicit_render_parameters_are_applied(tmp_path: Path) -> None:
+    build_layered_character_pack(
+        valid_inspection(),
         tmp_path,
-        "Alice",
-        "/MAIN",
+        "alice",
         reference_stage_height=250,
         anchor_bottom_offset=7,
     )
-
     character = json.loads((tmp_path / "character.json").read_text(encoding="utf-8"))
-    assert character["renderSpace"] == {"stageScale": 2.5, "characterAnchor": [50.0, 57.0]}
-    assert "MAIN>TORSO" in result.tokens["SourcePreview"]
+    assert character["renderSpace"] == {"stageScale": 2.5, "characterAnchor": [50.0, 67.0]}
 
 
 def test_rejects_invalid_render_parameters(tmp_path: Path) -> None:
     with pytest.raises(ToolError, match="Reference stage height"):
-        build_layered_character_pack(
-            valid_inspection(), tmp_path, "Alice", "/MAIN", reference_stage_height=0
-        )
+        build_layered_character_pack(valid_inspection(), tmp_path, "alice", reference_stage_height=0)
     with pytest.raises(ToolError, match="Anchor bottom offset"):
-        build_layered_character_pack(
-            valid_inspection(), tmp_path, "Alice", "/MAIN", anchor_bottom_offset=-1
-        )
+        build_layered_character_pack(valid_inspection(), tmp_path, "alice", anchor_bottom_offset=-1)
 
 
-def test_rejects_required_group_with_zero_or_multiple_visible_sprites() -> None:
-    with pytest.raises(ToolError, match="Required group must select exactly one"):
-        discover_leaf_sprites(valid_inspection(arm_visible=False), "/MAIN")
+def test_rejects_missing_main_named_or_non_group_root() -> None:
+    inspection = valid_inspection()
+    inspection.by_id["L0001"].layer.name = "MAIN"
+    inspection.nodes[0].path = "/MAIN"
+    with pytest.raises(ToolError, match="/root"):
+        discover_leaf_sprites(inspection)
 
     inspection = valid_inspection()
-    inspection.by_id["L0007"].layer.visible = True
-    with pytest.raises(ToolError, match="multiple leaf sprites"):
-        discover_leaf_sprites(inspection, "/MAIN")
+    inspection.by_id["L0001"].layer._group = False
+    with pytest.raises(ToolError, match="/root"):
+        discover_leaf_sprites(inspection)
 
 
-def test_optional_eye_group_allows_zero_visible_and_generates_off() -> None:
-    _root, sprites = discover_leaf_sprites(valid_inspection(), "/MAIN")
-    assert not [sprite for sprite in sprites if sprite.group == "MAIN/EYE" and sprite.selected_in_source]
-
-
-def test_rejects_structural_folder_with_direct_drawable_children() -> None:
+def test_rejects_missing_hidden_transparent_or_non_leaf_body(tmp_path: Path) -> None:
     inspection = valid_inspection()
-    root = inspection.by_id["L0001"]
-    inspection.nodes.append(
-        make_node("L9999", FakeLayer("direct"), "/MAIN/direct", parent_id=root.id, ancestors=(root.id,))
+    inspection.nodes = [node for node in inspection.nodes if node.id not in {"L0002", "L0003"}]
+    with pytest.raises(ToolError, match="exactly one"):
+        discover_leaf_sprites(inspection)
+
+    with pytest.raises(ToolError, match="effectively visible"):
+        discover_leaf_sprites(valid_inspection(body_visible=False))
+
+    transparent = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+    with pytest.raises(ToolError, match="empty transparent"):
+        build_layered_character_pack(valid_inspection(body_image=transparent), tmp_path, "alice")
+
+    inspection = valid_inspection()
+    body = inspection.by_id["L0002"]
+    nested = make_node(
+        "L9999",
+        FakeLayer("nested", group=True),
+        "/root/body/nested",
+        parent_id=body.id,
+        ancestors=("L0001", body.id),
     )
-    with pytest.raises(ToolError, match="mixes child folders and drawable layers"):
-        discover_leaf_sprites(inspection, "/MAIN")
+    inspection.nodes.append(nested)
+    with pytest.raises(ToolError, match="Nested runtime folders"):
+        discover_leaf_sprites(inspection)
 
 
-def test_rejects_unsafe_names_case_collisions_and_boundary_properties(tmp_path: Path) -> None:
+def test_rejects_body_and_effect_order_violations() -> None:
     inspection = valid_inspection()
-    inspection.by_id["L0005"].layer.name = "bad-name"
-    with pytest.raises(ToolError, match="expression/path characters"):
-        discover_leaf_sprites(inspection, "/MAIN")
+    root = inspection.nodes.pop(0)
+    body_nodes = inspection.nodes[:2]
+    other_nodes = inspection.nodes[2:]
+    inspection.nodes = [root, *other_nodes, *body_nodes]
+    with pytest.raises(ToolError, match="backmost"):
+        discover_leaf_sprites(inspection)
+
+    inspection = valid_inspection(
+        group_specs=(
+            ("effect", (("0", False),)),
+            ("mouth", (("0", True),)),
+        )
+    )
+    with pytest.raises(ToolError, match="frontmost"):
+        discover_leaf_sprites(inspection)
+
+
+@pytest.mark.parametrize("group_name", ["Mouth", "mouth-name", "mouth/name", "", "éye"])
+def test_rejects_non_lower_camel_runtime_group_names(group_name: str) -> None:
+    with pytest.raises(ToolError, match="lower camel|unsafe|expression/path"):
+        discover_leaf_sprites(valid_inspection(group_specs=((group_name, (("0", True),)),)))
+
+
+@pytest.mark.parametrize(
+    ("variants", "message"),
+    [
+        ((("pose", True),), "decimal integer"),
+        ((("00", True),), "leading zeroes"),
+        ((("0", True), ("2", False)), "continuous"),
+    ],
+)
+def test_rejects_invalid_variant_sequences(
+    variants: tuple[tuple[str, bool], ...],
+    message: str,
+) -> None:
+    with pytest.raises(ToolError, match=message):
+        discover_leaf_sprites(valid_inspection(group_specs=(("mouth", variants),)))
+
+
+@pytest.mark.parametrize(
+    "variants",
+    [
+        (("0", False), ("1", False)),
+        (("0", True), ("1", True)),
+        (("0", False), ("1", True)),
+    ],
+)
+def test_rejects_ordinary_group_without_exactly_variant_zero(
+    variants: tuple[tuple[str, bool], ...],
+) -> None:
+    with pytest.raises(ToolError, match="select only variant 0"):
+        discover_leaf_sprites(valid_inspection(group_specs=(("mouth", variants),)))
+
+
+def test_rejects_visible_effect_variant() -> None:
+    with pytest.raises(ToolError, match="effect variants must all be hidden"):
+        discover_leaf_sprites(valid_inspection(group_specs=(("effect", (("0", True),)),)))
+
+
+def test_rejects_nested_variant_group_and_direct_runtime_drawable() -> None:
+    inspection = valid_inspection()
+    variant = inspection.by_id["L0005"]
+    nested = make_node(
+        "L9999",
+        FakeLayer("nested", group=True),
+        "/root/mouth/0/nested",
+        parent_id=variant.id,
+        ancestors=("L0001", "L0004", variant.id),
+    )
+    inspection.nodes.append(nested)
+    with pytest.raises(ToolError, match="Nested runtime folders"):
+        discover_leaf_sprites(inspection)
+
+    inspection = valid_inspection()
+    group = inspection.by_id["L0004"]
+    inspection.nodes.append(
+        make_node(
+            "L9998",
+            FakeLayer("paint"),
+            "/root/mouth/paint",
+            parent_id=group.id,
+            ancestors=("L0001", group.id),
+        )
+    )
+    with pytest.raises(ToolError, match="only numeric variant folders"):
+        discover_leaf_sprites(inspection)
+
+
+def test_rejects_portable_collisions_and_boundary_properties() -> None:
+    with pytest.raises(ToolError, match="collision"):
+        discover_leaf_sprites(
+            valid_inspection(
+                group_specs=(
+                    ("armR", (("0", True),)),
+                    ("armr", (("0", True),)),
+                )
+            )
+        )
 
     inspection = valid_inspection()
     inspection.by_id["L0004"].layer._mask = True
     with pytest.raises(ToolError, match="unsupported independent-render properties"):
-        discover_leaf_sprites(inspection, "/MAIN")
+        discover_leaf_sprites(inspection)
 
-    inspection = valid_inspection()
-    inspection.by_id["L0005"].layer.name = "Pose"
-    inspection.by_id["L0007"].layer.name = "pose"
-    with pytest.raises(ToolError, match="Case-insensitive runtime/resource collision"):
-        discover_leaf_sprites(inspection, "/MAIN")
 
-    inspection = valid_inspection(eye_layer_name="Off")
+def test_rejects_cross_group_generated_token_collision(tmp_path: Path) -> None:
+    variants = tuple((str(index), index == 0) for index in range(11))
+    inspection = valid_inspection(
+        group_specs=(
+            ("a", variants),
+            ("a1", (("0", True),)),
+        )
+    )
     with pytest.raises(ToolError, match="token collision"):
-        build_layered_character_pack(inspection, tmp_path, "Alice", "/MAIN")
-
-
-def test_rejects_empty_folder_and_transparent_sprite(tmp_path: Path) -> None:
-    inspection = valid_inspection()
-    inspection.nodes = [node for node in inspection.nodes if node.id != "L0011"]
-    with pytest.raises(ToolError, match="Empty folder"):
-        discover_leaf_sprites(inspection, "/MAIN")
-
-    inspection = valid_inspection()
-    inspection.by_id["L0005"].layer._image = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
-    with pytest.raises(ToolError, match="empty transparent image"):
-        build_layered_character_pack(inspection, tmp_path, "Alice", "/MAIN")
-
-
-def test_rejects_missing_or_leaf_character_root() -> None:
-    with pytest.raises(ToolError, match="was not found"):
-        discover_leaf_sprites(valid_inspection(), "/UNKNOWN")
-
-    root = make_node("L0001", FakeLayer("MAIN", group=True, image=image_at(0, 0, (0, 0, 0, 255))), "/MAIN")
-    child = make_node("L0002", FakeLayer("paint"), "/MAIN/paint", parent_id=root.id, ancestors=(root.id,))
-    with pytest.raises(ToolError, match="root must contain sprite folders"):
-        discover_leaf_sprites(PsdInspection(SimpleNamespace(width=100, height=100), [root, child], {}, []), "/MAIN")
+        build_layered_character_pack(inspection, tmp_path, "collision")

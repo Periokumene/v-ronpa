@@ -1,28 +1,56 @@
-# CSP authoring contract
+# CSP authoring contract v2
+
+This document, the v2 preset, validator, and regression tests are the authoritative CSP layered-character authoring
+contract. v2 is a hard cut: `/MAIN`, uppercase preset aliases, nested runtime groups, and v1 visibility rules are rejected.
 
 ## Folder model
 
-- Pass the character root explicitly, normally `/MAIN`. Content outside it is reported but ignored.
-- Every folder with child folders is structural. It may not also contain direct drawable layers.
-- Every folder without child folders is a sprite. Its visible drawable descendants are composited into one cropped PNG.
-- The character root must be structural; empty folders and transparent sprite results are invalid.
-- Folder names are runtime identifiers. They must not be empty, `.` or `..`, contain control characters, or use the reserved
-  expression/path characters `>`, `+`, `-`, `/`, and `\`.
-- Runtime and asset paths must remain distinct under Unicode normalization and case-insensitive filesystems.
+```text
+/root
+  body/
+    <drawable layers>
+  <lowerCamelGroup>/
+    0/
+      <drawable layers>
+    1/
+      <drawable layers>
+  effect/                 # optional
+    0/
+    1/
+```
 
-Hidden leaf folders are still exported as available variants. Hidden drawable layers inside a leaf stay excluded from that
-sprite. Variant selection for `Default` uses effective visibility, including ancestor visibility.
+- `/root` is fixed. Content outside it is reported in `validation.json` and ignored.
+- `body` is the only required direct child. It is one leaf folder, must be effectively visible and non-transparent, and
+  must be the backmost direct child.
+- Every other direct child is an optional runtime group. Its name must match `^[a-z][A-Za-z0-9]*$`.
+- Runtime groups are flat. A group contains only numeric variant leaf folders; a variant contains only drawable layers.
+- Variant names are continuous ASCII decimal integers `0..N` without leading zeroes.
+- `effect`, when present, must be the frontmost direct child.
+- Direct-child source order is the background-to-foreground runtime `drawOrder`. `armL` and `armR` are identifiers only;
+  the tool does not infer, validate, or swap direction from pixels.
+- Runtime names and generated paths/tokens must remain distinct under NFC normalization and case folding. Empty names,
+  controls, and `>+-/\` are unsafe.
+
+Drawable names inside `body` or a variant—such as `C`, `C2`, `L`, `H`, `S`, `basecolor`, `detail`, `line`, `ao`, or
+`shadow`—are not runtime vocabulary.
 
 ## Default visibility
 
-Sibling leaf folders form one exclusive runtime group. Every group must have exactly one effectively visible leaf, with two
-exceptions:
+- `body` is visible.
+- Every ordinary group effectively selects variant `0` and only `0`; all nonzero variants are hidden.
+- Every `effect` variant is hidden. The group is absent from the source/default composition until explicitly selected.
 
-- a group whose exact name is `EYE` may have zero or one;
-- a group whose exact name is `EFFECT` may have zero or one.
+These rules are checked against the CSP/PSD visibility chain. A hidden ordinary parent cannot be used to make a visible
+`0` appear valid.
 
-Two visible leaves in any group are invalid. Zero visible leaves in BODY, ArmL, ArmR, MOUTH, or any unrecognized group are
-also invalid.
+## Generated vocabulary
+
+- `sourcePreview` is the effective source composition.
+- `default` expands to `sourcePreview`.
+- `character.defaultComposition` is `["default"]`.
+- Every ordinary or effect variant generates `${group}${index}`, for example `eye4`, `armR2`, or `leg0`.
+- `effect` additionally generates `effectOff`, which removes the whole group.
+- No other off token or character-specific alias is generated.
 
 ## Rendering boundary
 
@@ -31,28 +59,16 @@ modes are rejected because they cannot be reproduced safely after the folder is 
 blend modes, masks and supported effects inside a leaf are rasterized into that leaf. Recoverable uncommon CSP/PSD content
 is reported as a warning; inability to obtain non-empty pixels is an error.
 
-## Source-pixel invariant
+Every generated leaf uses `sprite.pixelsPerUnit = 1` and
+`localTransform.scale = { x: 1, y: 1, z: 1 }`. One source texel is therefore one character-local unit. The tool and project
+validators require a finite, positive, square, pack-wide source-pixel scale.
 
-Every generated leaf uses `sprite.pixelsPerUnit = 1` and `localTransform.scale = { x: 1, y: 1, z: 1 }`. Therefore one
-source texel is exactly one character-local unit. Project-authored packs may use another density, but every layer in one
-pack must describe the same square source pixel:
-
-```text
-unitsPerPixelX = abs(localTransform.scale.x) / sprite.pixelsPerUnit
-unitsPerPixelY = abs(localTransform.scale.y) / sprite.pixelsPerUnit
-```
-
-Both axes must be finite and positive, X and Y must match, and every layer must match the pack-wide value within relative
-error `1e-6`. The CSP pack validator enforces this before a run is accepted. Do not edit generated density or transform
-metadata after generation; fix the source or generator and produce a new immutable run.
-
-This invariant is consumed twice downstream: project asset validation rejects the promoted pack, and Pixi converts the one
-source texel through the character and actor transforms into final-Filter sampling vectors. VN entries preload only the
-layers named by their generated expression plans. Do not solve a rejected run by adding another density field, renderer
-override, per-layer outline, or a second export standard.
+`stageScale` is `referenceStageHeight / canvasHeight`. The character anchor is
+`[canvasWidth / 2, canvasHeight - bodyAlphaBottom + anchorBottomOffset]`. There is no union-bounds fallback: invalid body
+pixels reject the run.
 
 ## Fixing a rejected run
 
-Open `workspace/outputs/<character>/<run-id>/reports/validation.json`. The failed manifest records the exact archived input,
-so corrections can be compared against the rejected source. Fix the CSP and build again; do not edit generated JSON or PNG
-files in place because every run is immutable evidence.
+Open `workspace/outputs/<character>/<run-id>/reports/validation.json`. Failed runs retain the archived source hash,
+manifest, and any CSP/PSD reports produced before rejection, but contain no partial `character/` directory. Fix the CSP and
+build again; immutable run JSON and PNG files must not be edited in place.

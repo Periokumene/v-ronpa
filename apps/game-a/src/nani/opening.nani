@@ -40,15 +40,14 @@ nar: 好吧，我承认，我承认这有时候会变成一种自我陶醉和扮
 nar: 如果神明真的存在的话，它大概就会是掌管风雨的形象吧。我只是想融化在这场雨里面，融化在这个世界中那样
 nar: 比起很多努力扮演松弛的活着的人，我只是很想在雨声中寻找一场可以把自己淹没的好梦
 nar: 妈妈在喊我了
-@char alice pos:50 scale:0.78,0.78,1 time:0.3 wait!
+@char alice pos:50 time:0.3 wait!
 nar: 雨幕里，一个熟悉的人影停在了街角。
-@char alice.EYE0,MOUTH0 pos:50 wait!
 Alice: 你真的在这里淋了这么久？
-@char alice.EYE1,MOUTH3,ArmL2 pos:50 wait!
+@char alice.eye1,mouth3,armR4 pos:50 wait!
 Alice: 妈妈让我来找你。她说牛奶再不买，店就要关门了。
-@char alice.EYE4,MOUTH5,ArmL4,ArmR2,EFFECT0 pos:50 wait!
+@char alice.eye4,mouth4,armR2,armL5 pos:50 wait!
 Alice: 还有，伞往这边一点。你半边肩膀都湿透了。
-@char alice.EYE2,MOUTH2,ArmL0,ArmR0,EFFECT2 pos:50 wait!
+@char alice.eye2,mouth2,armR0,armL0 pos:50 wait!
 nar: 她把伞沿朝我这边压低了一点，像是不打算再给我逃跑的机会。
 
 @choice "陪我去买牛奶吧" goto:game-a/chapter-02.nani#Start

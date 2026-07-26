@@ -1,0 +1,128 @@
+{
+  "groups": {
+    "root": {
+      "layers": {
+        "body": {
+          "src": "assets/layers/root/body.png",
+          "metadata": "assets/layers/root/body.json"
+        }
+      }
+    },
+    "root/mouth": {
+      "layers": {
+        "6": {
+          "src": "assets/layers/root/mouth/6.png",
+          "metadata": "assets/layers/root/mouth/6.json"
+        },
+        "5": {
+          "src": "assets/layers/root/mouth/5.png",
+          "metadata": "assets/layers/root/mouth/5.json"
+        },
+        "4": {
+          "src": "assets/layers/root/mouth/4.png",
+          "metadata": "assets/layers/root/mouth/4.json"
+        },
+        "3": {
+          "src": "assets/layers/root/mouth/3.png",
+          "metadata": "assets/layers/root/mouth/3.json"
+        },
+        "2": {
+          "src": "assets/layers/root/mouth/2.png",
+          "metadata": "assets/layers/root/mouth/2.json"
+        },
+        "1": {
+          "src": "assets/layers/root/mouth/1.png",
+          "metadata": "assets/layers/root/mouth/1.json"
+        },
+        "0": {
+          "src": "assets/layers/root/mouth/0.png",
+          "metadata": "assets/layers/root/mouth/0.json"
+        }
+      }
+    },
+    "root/eye": {
+      "layers": {
+        "5": {
+          "src": "assets/layers/root/eye/5.png",
+          "metadata": "assets/layers/root/eye/5.json"
+        },
+        "4": {
+          "src": "assets/layers/root/eye/4.png",
+          "metadata": "assets/layers/root/eye/4.json"
+        },
+        "3": {
+          "src": "assets/layers/root/eye/3.png",
+          "metadata": "assets/layers/root/eye/3.json"
+        },
+        "2": {
+          "src": "assets/layers/root/eye/2.png",
+          "metadata": "assets/layers/root/eye/2.json"
+        },
+        "1": {
+          "src": "assets/layers/root/eye/1.png",
+          "metadata": "assets/layers/root/eye/1.json"
+        },
+        "0": {
+          "src": "assets/layers/root/eye/0.png",
+          "metadata": "assets/layers/root/eye/0.json"
+        }
+      }
+    },
+    "root/armR": {
+      "layers": {
+        "4": {
+          "src": "assets/layers/root/armR/4.png",
+          "metadata": "assets/layers/root/armR/4.json"
+        },
+        "3": {
+          "src": "assets/layers/root/armR/3.png",
+          "metadata": "assets/layers/root/armR/3.json"
+        },
+        "2": {
+          "src": "assets/layers/root/armR/2.png",
+          "metadata": "assets/layers/root/armR/2.json"
+        },
+        "1": {
+          "src": "assets/layers/root/armR/1.png",
+          "metadata": "assets/layers/root/armR/1.json"
+        },
+        "0": {
+          "src": "assets/layers/root/armR/0.png",
+          "metadata": "assets/layers/root/armR/0.json"
+        }
+      }
+    },
+    "root/armL": {
+      "layers": {
+        "2": {
+          "src": "assets/layers/root/armL/2.png",
+          "metadata": "assets/layers/root/armL/2.json"
+        },
+        "1": {
+          "src": "assets/layers/root/armL/1.png",
+          "metadata": "assets/layers/root/armL/1.json"
+        },
+        "0": {
+          "src": "assets/layers/root/armL/0.png",
+          "metadata": "assets/layers/root/armL/0.json"
+        }
+      }
+    },
+    "root/effect": {
+      "layers": {
+        "2": {
+          "src": "assets/layers/root/effect/2.png",
+          "metadata": "assets/layers/root/effect/2.json"
+        },
+        "1": {
+          "src": "assets/layers/root/effect/1.png",
+          "metadata": "assets/layers/root/effect/1.json"
+        },
+        "0": {
+          "src": "assets/layers/root/effect/0.png",
+          "metadata": "assets/layers/root/effect/0.json"
+        }
+      }
+    }
+  }
+}

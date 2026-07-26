@@ -22,7 +22,7 @@ const {
   LayeredCharacterLayersSchema
 } = await import(pathToFileURL(join(repoRoot, "packages/contracts/src/index.ts")).href);
 const { createAssetRegistry } = await import(pathToFileURL(join(repoRoot, "packages/asset-registry/src/index.ts")).href);
-const { resolveLayeredCharacterSourcePixelScale } = await import(
+const { resolveLayeredCharacterLayerRefs, resolveLayeredCharacterSourcePixelScale } = await import(
   pathToFileURL(join(repoRoot, "packages/layered-character/src/index.ts")).href
 );
 const { pixiRuntimeAssetFragment } = await import(pathToFileURL(join(repoRoot, "packages/runtime-assets-pixi/src/index.ts")).href);
@@ -212,8 +212,8 @@ function checkCharacterPacks() {
         const layers = LayeredCharacterLayersSchema.parse(readJsonFile(join(packRoot, "layers.json")));
         const compositions = LayeredCharacterCompositionsSchema.parse(readJsonFile(join(packRoot, "compositions.json")));
         if (character.id !== asset.id) fail(`Character pack '${asset.id}' has mismatched character id '${character.id}'.`);
-        if (!compositions.tokens.Default || compositions.tokens.Default.length === 0) {
-          fail(`Character pack '${asset.id}' must define a non-empty Default composition token.`);
+        if (character.defaultComposition.length === 0) {
+          fail(`Character pack '${asset.id}' must define a non-empty character.defaultComposition.`);
         }
         const sourcePixelLayers = [];
         for (const [groupName, group] of Object.entries(layers.groups)) {
@@ -234,6 +234,21 @@ function checkCharacterPacks() {
         const sourcePixelScale = resolveLayeredCharacterSourcePixelScale(sourcePixelLayers);
         if (!sourcePixelScale.ok) {
           fail(`Character pack '${asset.id}' has invalid source-pixel scale: ${sourcePixelScale.message}`);
+        }
+        const resolvedDefault = resolveLayeredCharacterLayerRefs({
+          character,
+          layers,
+          compositions,
+          appearanceExpression: ""
+        });
+        if (resolvedDefault.diagnostics.length > 0) {
+          fail(
+            `Character pack '${asset.id}' default composition does not resolve: ${resolvedDefault.diagnostics
+              .map((item) => item.message)
+              .join("; ")}`
+          );
+        } else if (resolvedDefault.activeLayers.length === 0) {
+          fail(`Character pack '${asset.id}' default composition resolves to no active layers.`);
         }
       } catch (error) {
         fail(`Character pack '${asset.id}' failed schema validation: ${error instanceof Error ? error.message : String(error)}`);

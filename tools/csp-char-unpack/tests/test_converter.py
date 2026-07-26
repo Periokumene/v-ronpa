@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from csp_char_unpack.cli import _main_parser
 from csp_char_unpack.converter import ConversionOptions, convert_clip_to_psd, ensure_clip_header
 from csp_char_unpack.errors import ToolError
 from csp_char_unpack.pipeline import (
@@ -36,7 +37,7 @@ def test_failed_build_archives_input_and_publishes_only_diagnostics(tmp_path: Pa
     workspace = tmp_path / "workspace"
 
     with pytest.raises(ToolError, match="Failed run"):
-        build_pipeline(source, "Alice", "/MAIN", _workspace_root=workspace)
+        build_pipeline(source, "Alice", _workspace_root=workspace)
 
     digest = hash_file(source)
     assert (workspace / "inputs/Alice" / f"{digest}.clip").read_bytes() == b"CSFCHUNK"
@@ -44,6 +45,7 @@ def test_failed_build_archives_input_and_publishes_only_diagnostics(tmp_path: Pa
     assert len(runs) == 1
     manifest = json.loads((runs[0] / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "failed"
+    assert manifest["characterRoot"] == "/root"
     assert not (runs[0] / "character").exists()
     assert (runs[0] / "reports/validation.json").is_file()
 
@@ -79,7 +81,7 @@ def test_character_id_cannot_escape_workspace(tmp_path: Path) -> None:
     source = tmp_path / "broken.clip"
     source.write_bytes(b"CSFCHUNK")
     with pytest.raises(ToolError, match="filesystem-safe"):
-        build_pipeline(source, "../Alice", "/MAIN", _workspace_root=tmp_path / "workspace")
+        build_pipeline(source, "../Alice", _workspace_root=tmp_path / "workspace")
 
 
 def test_rejects_csp_psd_structure_mismatch() -> None:
@@ -90,3 +92,19 @@ def test_rejects_csp_psd_structure_mismatch() -> None:
 
     with pytest.raises(ToolError, match="layer count mismatch"):
         _validate_conversion_structure(csp, {"nodes": []})
+
+
+def test_v2_cli_requires_character_id_and_rejects_removed_character_root() -> None:
+    parser = _main_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["build", "alice.clip"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["list"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            ["build", "alice.clip", "--character-id", "alice", "--character-root", "/MAIN"]
+        )
+
+    parsed = parser.parse_args(["build", "alice.clip", "--character-id", "alice"])
+    assert parsed.character_id == "alice"
+    assert not hasattr(parsed, "character_root")

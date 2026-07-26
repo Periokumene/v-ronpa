@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -47,10 +48,13 @@ def _difference(left: Image.Image, right: Image.Image) -> tuple[Image.Image, dic
     }
 
 
-def _reconstruct_pack(pack_root: Path, result: LayeredPackResult, canvas_size: tuple[int, int]) -> Image.Image:
-    selected = {expression for expression in result.source_preview}
+def _reconstruct_records(
+    pack_root: Path,
+    records: list[dict[str, Any]],
+    canvas_size: tuple[int, int],
+) -> Image.Image:
     records = sorted(
-        (record for record in result.sprites if record["id"] in selected),
+        records,
         key=lambda record: (int(record["drawOrder"]), str(record["id"])),
     )
     canvas = Image.new("RGBA", canvas_size, (0, 0, 0, 0))
@@ -67,8 +71,17 @@ def _reconstruct_pack(pack_root: Path, result: LayeredPackResult, canvas_size: t
             raise ToolError(f"Exported sprite metadata alignment mismatch: {record['id']}.")
         canvas.alpha_composite(asset, dest=(left, top))
     if canvas.getchannel("A").getbbox() is None:
-        raise ToolError("Layered Default reconstruction is empty.")
+        raise ToolError("Layered reconstruction is empty.")
     return canvas
+
+
+def _reconstruct_pack(pack_root: Path, result: LayeredPackResult, canvas_size: tuple[int, int]) -> Image.Image:
+    selected = set(result.source_preview)
+    return _reconstruct_records(
+        pack_root,
+        [record for record in result.sprites if record["id"] in selected],
+        canvas_size,
+    )
 
 
 def _contact_sheet(panels: list[tuple[str, Image.Image]], output: Path) -> None:
@@ -85,6 +98,84 @@ def _contact_sheet(panels: list[tuple[str, Image.Image]], output: Path) -> None:
         sheet.alpha_composite(thumb, dest=(x, y))
     output.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(output)
+
+
+def _variant_crop(
+    records: list[dict[str, Any]],
+    canvas_size: tuple[int, int],
+) -> tuple[int, int, int, int]:
+    bounds = [[int(value) for value in record["alphaBounds"]] for record in records]
+    left = min(item[0] for item in bounds)
+    top = min(item[1] for item in bounds)
+    right = max(item[2] for item in bounds)
+    bottom = max(item[3] for item in bounds)
+    padding = max(64, round(max(right - left, bottom - top) * 0.15))
+    return (
+        max(0, left - padding),
+        max(0, top - padding),
+        min(canvas_size[0], right + padding),
+        min(canvas_size[1], bottom + padding),
+    )
+
+
+def _variant_sheet(
+    pack_root: Path,
+    result: LayeredPackResult,
+    group: str,
+    canvas_size: tuple[int, int],
+    output: Path,
+) -> int:
+    variants = sorted(
+        (record for record in result.sprites if record["group"] == group),
+        key=lambda record: int(record["layer"]),
+    )
+    if not variants:
+        raise ToolError(f"Variant QA group has no sprites: {group}.")
+    selected_default = set(result.source_preview)
+    crop = _variant_crop(variants, canvas_size)
+    panels: list[tuple[str, Image.Image]] = []
+    for variant in variants:
+        selected = {
+            expression
+            for expression in selected_default
+            if not expression.startswith(f"{group}>")
+        }
+        selected.add(str(variant["id"]))
+        composite = _reconstruct_records(
+            pack_root,
+            [record for record in result.sprites if record["id"] in selected],
+            canvas_size,
+        )
+        panels.append((str(variant["layer"]), composite.crop(crop)))
+
+    columns = min(3, len(panels))
+    rows = math.ceil(len(panels) / columns)
+    panel_width, panel_height = 360, 420
+    label_height = 30
+    sheet = Image.new(
+        "RGBA",
+        (panel_width * columns, (panel_height + label_height) * rows),
+        (38, 38, 38, 255),
+    )
+    draw = ImageDraw.Draw(sheet)
+    for index, (label, image) in enumerate(panels):
+        thumb = ImageOps.contain(
+            image.convert("RGBA"),
+            (panel_width, panel_height),
+            Image.Resampling.LANCZOS,
+        )
+        column, row = index % columns, index // columns
+        x = column * panel_width + (panel_width - thumb.width) // 2
+        y = row * (panel_height + label_height) + label_height + (panel_height - thumb.height) // 2
+        draw.text(
+            (column * panel_width + 10, row * (panel_height + label_height) + 8),
+            label,
+            fill="white",
+        )
+        sheet.alpha_composite(thumb, dest=(x, y))
+    output.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(output)
+    return len(panels)
 
 
 def generate_qa(
@@ -114,9 +205,34 @@ def generate_qa(
         [("CSP preview", csp), ("PSD full", full_psd), ("PSD character root", root_psd), ("Layered Default", layered)],
         reports_dir / "qa-contact-sheet.png",
     )
+    variant_sheets: list[dict[str, Any]] = []
+    variant_groups = sorted(
+        {str(record["group"]) for record in result.sprites if str(record["group"]) != "root"},
+        key=lambda group: min(
+            int(record["drawOrder"]) for record in result.sprites if record["group"] == group
+        ),
+    )
+    for group in variant_groups:
+        group_name = group.rsplit("/", 1)[-1]
+        relative_path = Path("variants", f"{group_name}.png")
+        panel_count = _variant_sheet(
+            pack_root,
+            result,
+            group,
+            (width, height),
+            reports_dir / relative_path,
+        )
+        variant_sheets.append(
+            {
+                "group": group,
+                "variantCount": panel_count,
+                "sheet": relative_path.as_posix(),
+            }
+        )
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "gating": False,
         "cspPreviewVsPsdDocument": csp_metrics,
         "psdRootVsLayeredDefault": layered_metrics,
+        "variantSheets": variant_sheets,
     }

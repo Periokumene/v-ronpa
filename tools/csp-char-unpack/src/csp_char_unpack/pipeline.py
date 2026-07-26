@@ -14,6 +14,7 @@ from .converter import UPSTREAM_COMMIT, ConversionOptions, convert_clip_to_psd
 from .csp_report import export_csp_report
 from .errors import ToolError
 from .layered_pack import (
+    CHARACTER_ROOT,
     DEFAULT_ANCHOR_BOTTOM_OFFSET,
     DEFAULT_REFERENCE_STAGE_HEIGHT,
     PRESET_VERSION,
@@ -79,7 +80,6 @@ def _base_manifest(
     cached_input: Path,
     digest: str,
     character_id: str,
-    character_root: str,
     run_id: str,
     created_at: datetime,
     reference_stage_height: float,
@@ -91,7 +91,7 @@ def _base_manifest(
         "runId": run_id,
         "createdAt": created_at.isoformat(),
         "characterId": character_id,
-        "characterRoot": character_root,
+        "characterRoot": CHARACTER_ROOT,
         "preset": {"id": "v-ronpa-layered-character", "version": PRESET_VERSION},
         "parameters": {
             "referenceStageHeight": reference_stage_height,
@@ -148,7 +148,6 @@ def _validate_conversion_structure(csp_report: dict[str, Any], psd_report: dict[
 def _validation_report(
     *,
     status: str,
-    character_root: str,
     result: LayeredPackResult | None,
     warnings: list[Any],
     errors: list[str],
@@ -156,17 +155,17 @@ def _validation_report(
 ) -> dict[str, Any]:
     outside_root: list[str] = []
     if psd_report is not None:
-        prefix = f"{character_root}/"
+        prefix = f"{CHARACTER_ROOT}/"
         outside_root = [
             str(node["path"])
             for node in psd_report["nodes"]
-            if node["path"] != character_root and not str(node["path"]).startswith(prefix)
+            if node["path"] != CHARACTER_ROOT and not str(node["path"]).startswith(prefix)
         ]
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "status": status,
         "presetVersion": PRESET_VERSION,
-        "characterRoot": character_root,
+        "characterRoot": CHARACTER_ROOT,
         "outsideRootPaths": outside_root,
         "spriteCount": result.sprite_count if result else 0,
         "groups": list(result.groups) if result else [],
@@ -181,7 +180,6 @@ def _validation_report(
 def build_pipeline(
     input_file: Path,
     character_id: str,
-    character_root: str,
     *,
     reference_stage_height: float = DEFAULT_REFERENCE_STAGE_HEIGHT,
     anchor_bottom_offset: float = DEFAULT_ANCHOR_BOTTOM_OFFSET,
@@ -191,8 +189,6 @@ def build_pipeline(
     if not source.is_file():
         raise ToolError(f"CSP input does not exist: {source}")
     character_id = _validate_character_id(character_id)
-    if not character_root.startswith("/") or character_root == "/":
-        raise ToolError(f"Character root must be an absolute PSD folder path such as /MAIN: {character_root!r}.")
 
     workspace = (_workspace_root or WORKSPACE_ROOT).expanduser().resolve()
     digest = hash_file(source)
@@ -211,7 +207,6 @@ def build_pipeline(
         cached_input,
         digest,
         character_id,
-        character_root,
         run_id,
         created_at,
         reference_stage_height,
@@ -249,7 +244,6 @@ def build_pipeline(
                 inspection,
                 pack_root,
                 character_id,
-                character_root,
                 reference_stage_height=reference_stage_height,
                 anchor_bottom_offset=anchor_bottom_offset,
             )
@@ -260,7 +254,6 @@ def build_pipeline(
 
         validation = _validation_report(
             status="passed",
-            character_root=character_root,
             result=result,
             warnings=warnings,
             errors=errors,
@@ -293,7 +286,6 @@ def build_pipeline(
             reports / "validation.json",
             _validation_report(
                 status="failed",
-                character_root=character_root,
                 result=result,
                 warnings=warnings,
                 errors=errors,

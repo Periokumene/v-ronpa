@@ -1,0 +1,13 @@
+{
+  "id": "alice-kid",
+  "defaultComposition": [
+    "default"
+  ],
+  "renderSpace": {
+    "stageScale": 0.5,
+    "characterAnchor": [
+      500.0,
+      155.0
+    ]
+  }
+}

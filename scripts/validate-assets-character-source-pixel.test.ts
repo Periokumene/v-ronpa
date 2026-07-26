@@ -15,8 +15,10 @@ import {
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("shipped character-pack source-pixel validation", () => {
-  it("accepts the current Alice and Ema packs at their canonical source-pixel units", () => {
+  it("accepts the current Alice, Alice Kid, and Ema packs at their canonical source-pixel units", () => {
     expect(resolveLayeredCharacterSourcePixelScale(loadPackLayers("apps/game-a/public/game-a/characters/alice")))
+      .toEqual({ ok: true, unitsPerPixel: 1 });
+    expect(resolveLayeredCharacterSourcePixelScale(loadPackLayers("apps/game-a/public/game-a/characters/alice-kid")))
       .toEqual({ ok: true, unitsPerPixel: 1 });
     expect(resolveLayeredCharacterSourcePixelScale(loadPackLayers("apps/game-harness/public/harness/characters/Ema")))
       .toEqual({ ok: true, unitsPerPixel: 0.006 });

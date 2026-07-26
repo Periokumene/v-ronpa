@@ -91,16 +91,15 @@ describe("layered character preview pack loading", () => {
     const defaultPreview = await loadResolvedCharacterPreview(descriptor, request(""));
     const expressionPreview = await loadResolvedCharacterPreview(
       descriptor,
-      request("EYE4,MOUTH5,ArmL4,ArmR2,EFFECT0")
+      request("eye4,mouth4,armR2,armL4")
     );
 
     expect(defaultPreview.layers.length).toBeGreaterThan(0);
     expect(expressionPreview.layers.map((layer) => layer.id)).toEqual(expect.arrayContaining([
-      "MAIN/EYE>4",
-      "MAIN/MOUTH>5",
-      "MAIN/ArmL>4",
-      "MAIN/ArmR>2",
-      "MAIN/EFFECT>0"
+      "root/eye>4",
+      "root/mouth>4",
+      "root/armR>2",
+      "root/armL>4"
     ]));
     expect(expressionPreview.bounds.maxX).toBeGreaterThan(expressionPreview.bounds.minX);
     expect(expressionPreview.bounds.maxY).toBeGreaterThan(expressionPreview.bounds.minY);

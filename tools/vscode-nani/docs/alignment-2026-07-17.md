@@ -73,14 +73,17 @@
 
 ### Project resource vocabulary
 
-Alice's current generated composition tokens are:
+Alice's generated composition tokens were hard-cut on 2026-07-27 to the v2 pack vocabulary:
 
-- Base: `Default`, `SourcePreview`.
-- Eyes: `EYE0`–`EYE5`, `EYEOff`.
-- Mouth: `MOUTH0`–`MOUTH6`.
-- Left arm: `ArmL0`–`ArmL4`.
-- Right arm: `ArmR0`–`ArmR2`.
-- Effect: `EFFECT0`–`EFFECT2`, `EFFECTOff`.
+- Base: `default`, `sourcePreview`.
+- Eyes: `eye0`–`eye5`.
+- Mouth: `mouth0`–`mouth6`.
+- Right arm resource: `armR0`–`armR5`.
+- Left arm resource: `armL0`–`armL5`.
+- Adult Alice has no effect group or effect token.
+
+The imported `alice-kid` pack uses the same base/eye/mouth vocabulary, `armR0`–`armR4`, `armL0`–`armL2`, plus
+`effect0`–`effect2` and `effectOff`. It is indexed for completion and preview but is not production story content.
 
 These are asset-pack data, not language keywords. Other apps and character packs may expose different tokens.
 

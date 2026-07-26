@@ -1,0 +1,89 @@
+{
+  "tokens": {
+    "sourcePreview": [
+      "root>body",
+      "root/mouth>0",
+      "root/eye>0",
+      "root/armR>0",
+      "root/armL>0"
+    ],
+    "default": [
+      "sourcePreview"
+    ],
+    "mouth6": [
+      "root/mouth>6"
+    ],
+    "mouth5": [
+      "root/mouth>5"
+    ],
+    "mouth4": [
+      "root/mouth>4"
+    ],
+    "mouth3": [
+      "root/mouth>3"
+    ],
+    "mouth2": [
+      "root/mouth>2"
+    ],
+    "mouth1": [
+      "root/mouth>1"
+    ],
+    "mouth0": [
+      "root/mouth>0"
+    ],
+    "eye5": [
+      "root/eye>5"
+    ],
+    "eye4": [
+      "root/eye>4"
+    ],
+    "eye3": [
+      "root/eye>3"
+    ],
+    "eye2": [
+      "root/eye>2"
+    ],
+    "eye1": [
+      "root/eye>1"
+    ],
+    "eye0": [
+      "root/eye>0"
+    ],
+    "armR4": [
+      "root/armR>4"
+    ],
+    "armR3": [
+      "root/armR>3"
+    ],
+    "armR2": [
+      "root/armR>2"
+    ],
+    "armR1": [
+      "root/armR>1"
+    ],
+    "armR0": [
+      "root/armR>0"
+    ],
+    "armL2": [
+      "root/armL>2"
+    ],
+    "armL1": [
+      "root/armL>1"
+    ],
+    "armL0": [
+      "root/armL>0"
+    ],
+    "effect2": [
+      "root/effect>2"
+    ],
+    "effect1": [
+      "root/effect>1"
+    ],
+    "effect0": [
+      "root/effect>0"
+    ],
+    "effectOff": [
+      "root/effect-"
+    ]
+  }
+}

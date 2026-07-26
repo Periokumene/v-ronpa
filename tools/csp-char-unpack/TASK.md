@@ -13,7 +13,7 @@
 - State: `Review`
 - Owner: `Codex`
 - Created: `2026-07-14`
-- Updated: `2026-07-16`
+- Updated: `2026-07-27`
 
 ## Allowed Paths
 
@@ -37,19 +37,22 @@ validation, mechanical token generation, project schema/semantic validation and 
 - `build` can only publish below the tool-owned ignored workspace.
 - Every invocation creates a new run; invalid sources retain archive and diagnostics but no character pack.
 - `list` reports runs; `prune` is dry-run by default and never deletes source archives.
-- `/MAIN` leaf folders become sprites. Default comes from CSP visibility; only the v1 Arm/EYE/EFFECT/MOUTH aliases are
-  generated.
+- The v2 root is fixed at `/root`; `body` is the only required leaf and direct lower-camel groups contain continuous
+  numeric variants.
+- Default comes from strict v2 visibility. Lower-camel tokens are mechanical; only `effect` receives an off token.
 - Generated packs are self-contained but are never copied or registered in an app.
 
 ## Regression Requirements
 
 - File boundary: invalid/truncated CSFCHUNK, safe character ids, full-hash archive and failed-run isolation.
-- Structure boundary: missing/leaf roots, mixed structural folders, empty images, boundary properties and visibility
-  cardinality.
-- Token boundary: exact case-preserving aliases, EYE/EFFECT Off tokens, collision rejection and resolver validation.
+- Structure boundary: fixed root, body/effect order, flat groups, numeric continuity, empty images, boundary properties,
+  lower-camel names and strict visibility.
+- Token boundary: mechanical lower-camel variants, effectOff, portable collision rejection and resolver validation.
 - Lifecycle boundary: distinct version ids, list, dry-run prune, applied prune and preserved input archive.
-- End to end: vendored MIT fixture converts to a nontrivial PSD; latest ignored Alice builds 25 sprites from an 800x1000
-  `/MAIN` tree and passes project validation.
+- QA boundary: every runtime group emits a variant sheet whose panel count equals its variant count, including hidden
+  effect variants.
+- End to end: vendored MIT fixture converts to a nontrivial PSD; ignored v2 sources build through `/root` and pass project
+  validation.
 
 ## Required Gates
 

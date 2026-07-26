@@ -1,126 +1,126 @@
 {
   "groups": {
-    "MAIN": {
+    "root": {
       "layers": {
-        "BODY": {
-          "src": "assets/layers/MAIN/BODY.png",
-          "metadata": "assets/layers/MAIN/BODY.json"
+        "body": {
+          "src": "assets/layers/root/body.png",
+          "metadata": "assets/layers/root/body.json"
         }
       }
     },
-    "MAIN/ArmR": {
-      "layers": {
-        "2": {
-          "src": "assets/layers/MAIN/ArmR/2.png",
-          "metadata": "assets/layers/MAIN/ArmR/2.json"
-        },
-        "1": {
-          "src": "assets/layers/MAIN/ArmR/1.png",
-          "metadata": "assets/layers/MAIN/ArmR/1.json"
-        },
-        "0": {
-          "src": "assets/layers/MAIN/ArmR/0.png",
-          "metadata": "assets/layers/MAIN/ArmR/0.json"
-        }
-      }
-    },
-    "MAIN/ArmL": {
-      "layers": {
-        "4": {
-          "src": "assets/layers/MAIN/ArmL/4.png",
-          "metadata": "assets/layers/MAIN/ArmL/4.json"
-        },
-        "3": {
-          "src": "assets/layers/MAIN/ArmL/3.png",
-          "metadata": "assets/layers/MAIN/ArmL/3.json"
-        },
-        "2": {
-          "src": "assets/layers/MAIN/ArmL/2.png",
-          "metadata": "assets/layers/MAIN/ArmL/2.json"
-        },
-        "1": {
-          "src": "assets/layers/MAIN/ArmL/1.png",
-          "metadata": "assets/layers/MAIN/ArmL/1.json"
-        },
-        "0": {
-          "src": "assets/layers/MAIN/ArmL/0.png",
-          "metadata": "assets/layers/MAIN/ArmL/0.json"
-        }
-      }
-    },
-    "MAIN/MOUTH": {
+    "root/mouth": {
       "layers": {
         "6": {
-          "src": "assets/layers/MAIN/MOUTH/6.png",
-          "metadata": "assets/layers/MAIN/MOUTH/6.json"
+          "src": "assets/layers/root/mouth/6.png",
+          "metadata": "assets/layers/root/mouth/6.json"
         },
         "5": {
-          "src": "assets/layers/MAIN/MOUTH/5.png",
-          "metadata": "assets/layers/MAIN/MOUTH/5.json"
+          "src": "assets/layers/root/mouth/5.png",
+          "metadata": "assets/layers/root/mouth/5.json"
         },
         "4": {
-          "src": "assets/layers/MAIN/MOUTH/4.png",
-          "metadata": "assets/layers/MAIN/MOUTH/4.json"
+          "src": "assets/layers/root/mouth/4.png",
+          "metadata": "assets/layers/root/mouth/4.json"
         },
         "3": {
-          "src": "assets/layers/MAIN/MOUTH/3.png",
-          "metadata": "assets/layers/MAIN/MOUTH/3.json"
+          "src": "assets/layers/root/mouth/3.png",
+          "metadata": "assets/layers/root/mouth/3.json"
         },
         "2": {
-          "src": "assets/layers/MAIN/MOUTH/2.png",
-          "metadata": "assets/layers/MAIN/MOUTH/2.json"
+          "src": "assets/layers/root/mouth/2.png",
+          "metadata": "assets/layers/root/mouth/2.json"
         },
         "1": {
-          "src": "assets/layers/MAIN/MOUTH/1.png",
-          "metadata": "assets/layers/MAIN/MOUTH/1.json"
+          "src": "assets/layers/root/mouth/1.png",
+          "metadata": "assets/layers/root/mouth/1.json"
         },
         "0": {
-          "src": "assets/layers/MAIN/MOUTH/0.png",
-          "metadata": "assets/layers/MAIN/MOUTH/0.json"
+          "src": "assets/layers/root/mouth/0.png",
+          "metadata": "assets/layers/root/mouth/0.json"
         }
       }
     },
-    "MAIN/EYE": {
+    "root/eye": {
       "layers": {
         "5": {
-          "src": "assets/layers/MAIN/EYE/5.png",
-          "metadata": "assets/layers/MAIN/EYE/5.json"
+          "src": "assets/layers/root/eye/5.png",
+          "metadata": "assets/layers/root/eye/5.json"
         },
         "4": {
-          "src": "assets/layers/MAIN/EYE/4.png",
-          "metadata": "assets/layers/MAIN/EYE/4.json"
+          "src": "assets/layers/root/eye/4.png",
+          "metadata": "assets/layers/root/eye/4.json"
         },
         "3": {
-          "src": "assets/layers/MAIN/EYE/3.png",
-          "metadata": "assets/layers/MAIN/EYE/3.json"
+          "src": "assets/layers/root/eye/3.png",
+          "metadata": "assets/layers/root/eye/3.json"
         },
         "2": {
-          "src": "assets/layers/MAIN/EYE/2.png",
-          "metadata": "assets/layers/MAIN/EYE/2.json"
+          "src": "assets/layers/root/eye/2.png",
+          "metadata": "assets/layers/root/eye/2.json"
         },
         "1": {
-          "src": "assets/layers/MAIN/EYE/1.png",
-          "metadata": "assets/layers/MAIN/EYE/1.json"
+          "src": "assets/layers/root/eye/1.png",
+          "metadata": "assets/layers/root/eye/1.json"
         },
         "0": {
-          "src": "assets/layers/MAIN/EYE/0.png",
-          "metadata": "assets/layers/MAIN/EYE/0.json"
+          "src": "assets/layers/root/eye/0.png",
+          "metadata": "assets/layers/root/eye/0.json"
         }
       }
     },
-    "MAIN/EFFECT": {
+    "root/armR": {
       "layers": {
+        "5": {
+          "src": "assets/layers/root/armR/5.png",
+          "metadata": "assets/layers/root/armR/5.json"
+        },
+        "4": {
+          "src": "assets/layers/root/armR/4.png",
+          "metadata": "assets/layers/root/armR/4.json"
+        },
+        "3": {
+          "src": "assets/layers/root/armR/3.png",
+          "metadata": "assets/layers/root/armR/3.json"
+        },
         "2": {
-          "src": "assets/layers/MAIN/EFFECT/2.png",
-          "metadata": "assets/layers/MAIN/EFFECT/2.json"
+          "src": "assets/layers/root/armR/2.png",
+          "metadata": "assets/layers/root/armR/2.json"
         },
         "1": {
-          "src": "assets/layers/MAIN/EFFECT/1.png",
-          "metadata": "assets/layers/MAIN/EFFECT/1.json"
+          "src": "assets/layers/root/armR/1.png",
+          "metadata": "assets/layers/root/armR/1.json"
         },
         "0": {
-          "src": "assets/layers/MAIN/EFFECT/0.png",
-          "metadata": "assets/layers/MAIN/EFFECT/0.json"
+          "src": "assets/layers/root/armR/0.png",
+          "metadata": "assets/layers/root/armR/0.json"
+        }
+      }
+    },
+    "root/armL": {
+      "layers": {
+        "5": {
+          "src": "assets/layers/root/armL/5.png",
+          "metadata": "assets/layers/root/armL/5.json"
+        },
+        "4": {
+          "src": "assets/layers/root/armL/4.png",
+          "metadata": "assets/layers/root/armL/4.json"
+        },
+        "3": {
+          "src": "assets/layers/root/armL/3.png",
+          "metadata": "assets/layers/root/armL/3.json"
+        },
+        "2": {
+          "src": "assets/layers/root/armL/2.png",
+          "metadata": "assets/layers/root/armL/2.json"
+        },
+        "1": {
+          "src": "assets/layers/root/armL/1.png",
+          "metadata": "assets/layers/root/armL/1.json"
+        },
+        "0": {
+          "src": "assets/layers/root/armL/0.png",
+          "metadata": "assets/layers/root/armL/0.json"
         }
       }
     }

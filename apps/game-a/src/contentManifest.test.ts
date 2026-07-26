@@ -82,6 +82,9 @@ describe("game-a content manifest", () => {
     expect(registry.url({ id: "alice", kind: "character-pack" })).toBe(
       "/game-a/characters/alice/character.json"
     );
+    expect(registry.url({ id: "alice-kid", kind: "character-pack" })).toBe(
+      "/game-a/characters/alice-kid/character.json"
+    );
     expect(registry.url({ id: "font:fusion-pixel-12px-proportional-zh-hans", kind: "font" })).toBe(
       "/game-a/fonts/fusion-pixel-12px-proportional-zh-hans.woff2"
     );

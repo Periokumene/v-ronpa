@@ -19,13 +19,12 @@ def _main_parser() -> argparse.ArgumentParser:
 
     build = subparsers.add_parser("build", help="Archive, validate and build a CSP layered-character pack.")
     build.add_argument("input", type=Path)
-    build.add_argument("--character-id", default="Alice")
-    build.add_argument("--character-root", default="/MAIN")
+    build.add_argument("--character-id", required=True)
     build.add_argument("--reference-stage-height", type=float, default=DEFAULT_REFERENCE_STAGE_HEIGHT)
     build.add_argument("--anchor-bottom-offset", type=float, default=DEFAULT_ANCHOR_BOTTOM_OFFSET)
 
     listing = subparsers.add_parser("list", help="List versioned build runs for one character.")
-    listing.add_argument("--character-id", default="Alice")
+    listing.add_argument("--character-id", required=True)
 
     prune = subparsers.add_parser("prune", help="Preview or apply deletion of old run directories.")
     prune.add_argument("--character-id", required=True)
@@ -41,7 +40,6 @@ def main() -> None:
             output = build_pipeline(
                 args.input,
                 args.character_id,
-                args.character_root,
                 reference_stage_height=args.reference_stage_height,
                 anchor_bottom_offset=args.anchor_bottom_offset,
             )

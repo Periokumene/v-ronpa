@@ -36,8 +36,8 @@ if (!sourcePixelScale.ok) {
   throw new Error(`Generated character pack has invalid source-pixel scale: ${sourcePixelScale.message}`);
 }
 
-if (!compositions.tokens.Default?.length) {
-  throw new Error("Generated character pack must define a non-empty Default token.");
+if (character.defaultComposition.length === 0) {
+  throw new Error("Generated character pack must define a non-empty character.defaultComposition.");
 }
 
 for (const token of Object.keys(compositions.tokens)) {
@@ -52,9 +52,23 @@ for (const token of Object.keys(compositions.tokens)) {
       `Generated character pack token '${token}' does not resolve: ${resolved.diagnostics.map((item) => item.message).join("; ")}`
     );
   }
-  if (token === "Default" && resolved.activeLayers.length === 0) {
-    throw new Error("Generated character pack Default token resolves to no active layers.");
-  }
+}
+
+const resolvedDefault = resolveLayeredCharacterLayerRefs({
+  character,
+  layers,
+  compositions,
+  appearanceExpression: ""
+});
+if (resolvedDefault.diagnostics.length > 0) {
+  throw new Error(
+    `Generated character pack default composition does not resolve: ${resolvedDefault.diagnostics
+      .map((item) => item.message)
+      .join("; ")}`
+  );
+}
+if (resolvedDefault.activeLayers.length === 0) {
+  throw new Error("Generated character pack default composition resolves to no active layers.");
 }
 
 console.log(`Validated V-Ronpa character pack '${character.id}'.`);

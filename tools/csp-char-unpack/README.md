@@ -1,55 +1,41 @@
 # CSP layered-character unpack tool
 
 This isolated tool turns a Clip Studio Paint `CSFCHUNK` document into a validated V-Ronpa layered-character pack. It
-archives the source, converts through a temporary PSD, validates the authoring tree, composites every leaf folder into a
-sprite, generates the mechanical composition tokens, and emits compact QA evidence.
+archives the source, converts through a temporary PSD, validates the v2 authoring tree, composites every sprite leaf,
+generates mechanical lower-camel composition tokens, and emits QA evidence.
 
-The tool never writes into an app, registers an asset, or edits a `.nani` script. All source archives and runs remain below
-this directory's ignored `workspace/`. See [AUTHORING.md](AUTHORING.md) for the CSP folder contract.
+The tool never writes into an app, registers an asset, or edits a `.nani` script. Source archives and immutable runs remain
+below this directory's ignored `workspace/`. See [AUTHORING.md](AUTHORING.md) for the authoritative v2 contract.
 
-## Setup
+## Setup and commands
 
 ```bash
 cd tools/csp-char-unpack
 uv sync --locked
+
+uv run csp-char-unpack build /absolute/path/alice.clip --character-id alice
+uv run csp-char-unpack build /absolute/path/alice.clip --character-id alice \
+  --reference-stage-height 700 \
+  --anchor-bottom-offset 100
+
+uv run csp-char-unpack list --character-id alice
+uv run csp-char-unpack prune --character-id alice --keep 10
+uv run csp-char-unpack prune --character-id alice --keep 10 --apply
 ```
 
-## Commands
+`--character-id` is required. The root is always `/root`; there is no root-selection option. Render parameters default to
+`700` and `100`. The anchor uses the exact `/root/body` alpha bottom, and invalid body content rejects the run.
 
-Build a new immutable run:
+The CLI has no output-directory option. Every build creates a new UTC timestamped run, including repeated builds of
+identical input. `prune` is a dry run unless `--apply` is present; it only removes run directories and never source
+archives.
 
-```bash
-uv run csp-char-unpack build /absolute/path/alice.clip \
-  --character-id Alice \
-  --character-root /MAIN
-```
-
-The generated render space uses two configurable pixel parameters:
-
-- `--reference-stage-height` defaults to `700` and sets `stageScale` to that value divided by the CSP canvas height.
-- `--anchor-bottom-offset` defaults to `100` and moves the character anchor upward from the exact `BODY` sprite's
-  alpha-bounds bottom. If no valid `BODY` sprite exists, the tool uses the bottom of the union of all sprite alpha bounds.
-
-The anchor X coordinate always uses the CSP canvas center. Positive anchor-bottom offsets move the anchor upward in the
-character-local coordinate system.
-
-The CLI has no output-directory option. Every invocation creates a new UTC timestamped run, including repeated builds of
-identical input. The input archive is content-addressed and reused.
-
-```bash
-uv run csp-char-unpack list --character-id Alice
-uv run csp-char-unpack prune --character-id Alice --keep 10
-uv run csp-char-unpack prune --character-id Alice --keep 10 --apply
-```
-
-`prune` is a dry run unless `--apply` is present. It only removes run directories and never removes archived CSP inputs.
-
-## Workspace
+## Workspace and QA
 
 ```text
 workspace/
-  inputs/Alice/<full-sha256>.clip
-  outputs/Alice/<utc-timestamp>-<sha12>/
+  inputs/alice/<full-sha256>.clip
+  outputs/alice/<utc-timestamp>-<sha12>/
     manifest.json
     reports/
       validation.json
@@ -58,39 +44,41 @@ workspace/
       qa-metrics.json
       qa-contact-sheet.png
       diff.png
-    character/Alice/
+      variants/<group>.png
+    character/alice/
       character.json
       layers.json
       compositions.json
       assets/layers/**
 ```
 
-PSD, SQLite, CSP preview and intermediate images live only in a temporary workspace and are removed at the end. A rejected
-input is still archived; its failed run contains a manifest and diagnostics but no `character/` directory.
+The main contact sheet compares the CSP preview, full PSD, `/root`, and reconstructed default. Each variant sheet starts
+from the default composition and replaces one group through all numeric variants; effect variants are explicitly added
+even though the group defaults off. `qa-metrics.json` records the panel count and sheet path for every group.
 
-## Tokens
+PSD, SQLite, CSP preview, and intermediate images live only in temporary storage. A rejected input remains archived; its
+failed run retains diagnostics and reports but no partial `character/` directory.
 
-`SourcePreview` is the effective visible composition in the CSP, and `Default` references it. Preset `v1` additionally
-recognizes only the exact parent groups `ArmL`, `ArmR`, `MOUTH`, `EYE`, and `EFFECT`. It concatenates root-relative folder
-components without changing case, for example:
+## Generated tokens
+
+For a group such as `armR`:
 
 ```text
-MAIN/ArmL > 0  -> ArmL0   -> MAIN/ArmL>0
-MAIN/MOUTH > 2 -> MOUTH2  -> MAIN/MOUTH>2
+/root/armR/0 -> armR0 -> root/armR>0
+/root/armR/1 -> armR1 -> root/armR>1
 ```
 
-`EYE` and `EFFECT` may have zero visible variants and receive `EYEOff` and `EFFECTOff`, mapped to the supported whole-group
-removal expressions. The tool does not generate character-specific concepts such as `Base`, `Happy`, or `Slice02`.
+Every pack defines `sourcePreview`, `default`, and `character.defaultComposition: ["default"]`. Any optional group can be
+added without a tool update. `effect` alone also receives `effectOff`. The tool does not emit semantic aliases.
 
 ## Manual promotion
 
-After reviewing `reports/`, mirror only the self-contained character directory into the intended app location and update
-the app manifest or script in a separate, explicitly authorized task. The destination is a replacement boundary: remove
-files that are absent from the accepted run instead of merging the run into an older character directory.
+After reviewing reports, mirror only the accepted character directory into the explicitly chosen app target. The target
+is a replacement boundary; never merge stale JSON or PNG files into the new pack.
 
 ```bash
-source=workspace/outputs/Alice/<run-id>/character/Alice
-target=/chosen/app/asset/location/Alice
+source=workspace/outputs/alice/<run-id>/character/alice
+target=/chosen/app/asset/location/alice
 mkdir -p "$target"
 rsync -a --delete "$source/" "$target/"
 
@@ -99,22 +87,15 @@ pnpm generate:assets
 pnpm validate:assets
 ```
 
-Do not use `cp -R` to merge into an existing target: stale JSON, metadata, or PNG files would create a second effective
-pack standard. No promotion command or source receipt is provided intentionally; promotion remains a reviewed human step.
-
-After generation and asset validation, the app asset generator compiles each VN entry into an exact layered-character
-preload plan. The Pixi stage fetches, decodes, and uploads only those referenced layers before the app enters VN; runtime
-`@char` changes are synchronous and a persistent final-color Filter supplies the one-source-pixel white outline. CSP output
-must therefore keep one consistent square source-pixel scale across the pack. Do not compensate downstream with per-layer
-outlines, eight full-character copies, full-pack preload, source-sized RenderTextures, or a compatibility density field.
+No promotion command or tracked source receipt is provided. Promotion remains an explicitly authorized, reviewed task.
 
 ## Verification
 
 ```bash
 uv run ruff check .
 uv run pytest
-node scripts/validate-vronpa-pack.mjs workspace/outputs/Alice/<run-id>/character/Alice
+node scripts/validate-vronpa-pack.mjs workspace/outputs/alice/<run-id>/character/alice
 ```
 
-QA pixel differences are descriptive and never a hard threshold. Structural errors, empty sprites, invalid geometry, token
-resolution failures, inconsistent source-pixel scale and project schema failures reject the run.
+QA pixel differences are descriptive rather than threshold-gated. Structural errors, invalid visibility, empty sprites,
+geometry/token resolution failures, inconsistent source-pixel scale, and project schema failures reject the run.

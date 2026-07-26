@@ -9,8 +9,8 @@ describe("Game A candidate story decoration", () => {
   it("derives only the changed script plan and retains unrelated plans", async () => {
     const candidate = await canonicalCandidate([
       "#Start",
-      "@char alice.EYE3,MOUTH6 pos:50",
-      "@slide alice.EFFECT1",
+      "@char alice.eye5,mouth6,armR5,armL5 pos:50",
+      "@slide alice.eye4",
       "@char bob.Neutral pos:20",
       "Narrator: Candidate.|#candidate|"
     ].join("\n"));
@@ -30,16 +30,16 @@ describe("Game A candidate story decoration", () => {
 
     expect(result.catalog).toBe(active.catalog);
     expect(result.characterPreloadPlanByScriptPath[candidate.source.scriptPath]).toEqual([
-      { characterId: "alice", appearanceExpressions: ["EFFECT1", "EYE3,MOUTH6"] },
+      { characterId: "alice", appearanceExpressions: ["eye4", "eye5,mouth6,armR5,armL5"] },
       { characterId: "bob", appearanceExpressions: ["Neutral"] }
     ]);
     expect(result.characterPreloadPlanByScriptPath["game-a/chapter-02.nani"]).toBe(untouchedPlan);
   });
 
   it("keeps equivalent catalog and character-plan identities stable", async () => {
-    const candidate = await canonicalCandidate("#Start\n@char alice.EYE3\nNarrator: Candidate.|#candidate|");
+    const candidate = await canonicalCandidate("#Start\n@char alice.eye3\nNarrator: Candidate.|#candidate|");
     const inspection = await inspectVnDebugScript(candidate.entry, candidate.source);
-    const installedPlan = [{ characterId: "alice", appearanceExpressions: ["EYE3"] }] as const;
+    const installedPlan = [{ characterId: "alice", appearanceExpressions: ["eye3"] }] as const;
     const active = definition(candidate, { [candidate.source.scriptPath]: installedPlan });
 
     const result = decorateGameACandidateStory({

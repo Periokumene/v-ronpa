@@ -1,92 +1,89 @@
 {
   "tokens": {
-    "SourcePreview": [
-      "MAIN>BODY",
-      "MAIN/ArmR>0",
-      "MAIN/ArmL>0",
-      "MAIN/MOUTH>2",
-      "MAIN/EFFECT>2"
+    "sourcePreview": [
+      "root>body",
+      "root/mouth>0",
+      "root/eye>0",
+      "root/armR>0",
+      "root/armL>0"
     ],
-    "Default": [
-      "SourcePreview"
+    "default": [
+      "sourcePreview"
     ],
-    "ArmR2": [
-      "MAIN/ArmR>2"
+    "mouth6": [
+      "root/mouth>6"
     ],
-    "ArmR1": [
-      "MAIN/ArmR>1"
+    "mouth5": [
+      "root/mouth>5"
     ],
-    "ArmR0": [
-      "MAIN/ArmR>0"
+    "mouth4": [
+      "root/mouth>4"
     ],
-    "ArmL4": [
-      "MAIN/ArmL>4"
+    "mouth3": [
+      "root/mouth>3"
     ],
-    "ArmL3": [
-      "MAIN/ArmL>3"
+    "mouth2": [
+      "root/mouth>2"
     ],
-    "ArmL2": [
-      "MAIN/ArmL>2"
+    "mouth1": [
+      "root/mouth>1"
     ],
-    "ArmL1": [
-      "MAIN/ArmL>1"
+    "mouth0": [
+      "root/mouth>0"
     ],
-    "ArmL0": [
-      "MAIN/ArmL>0"
+    "eye5": [
+      "root/eye>5"
     ],
-    "MOUTH6": [
-      "MAIN/MOUTH>6"
+    "eye4": [
+      "root/eye>4"
     ],
-    "MOUTH5": [
-      "MAIN/MOUTH>5"
+    "eye3": [
+      "root/eye>3"
     ],
-    "MOUTH4": [
-      "MAIN/MOUTH>4"
+    "eye2": [
+      "root/eye>2"
     ],
-    "MOUTH3": [
-      "MAIN/MOUTH>3"
+    "eye1": [
+      "root/eye>1"
     ],
-    "MOUTH2": [
-      "MAIN/MOUTH>2"
+    "eye0": [
+      "root/eye>0"
     ],
-    "MOUTH1": [
-      "MAIN/MOUTH>1"
+    "armR5": [
+      "root/armR>5"
     ],
-    "MOUTH0": [
-      "MAIN/MOUTH>0"
+    "armR4": [
+      "root/armR>4"
     ],
-    "EYE5": [
-      "MAIN/EYE>5"
+    "armR3": [
+      "root/armR>3"
     ],
-    "EYE4": [
-      "MAIN/EYE>4"
+    "armR2": [
+      "root/armR>2"
     ],
-    "EYE3": [
-      "MAIN/EYE>3"
+    "armR1": [
+      "root/armR>1"
     ],
-    "EYE2": [
-      "MAIN/EYE>2"
+    "armR0": [
+      "root/armR>0"
     ],
-    "EYE1": [
-      "MAIN/EYE>1"
+    "armL5": [
+      "root/armL>5"
     ],
-    "EYE0": [
-      "MAIN/EYE>0"
+    "armL4": [
+      "root/armL>4"
     ],
-    "EFFECT2": [
-      "MAIN/EFFECT>2"
+    "armL3": [
+      "root/armL>3"
     ],
-    "EFFECT1": [
-      "MAIN/EFFECT>1"
+    "armL2": [
+      "root/armL>2"
     ],
-    "EFFECT0": [
-      "MAIN/EFFECT>0"
+    "armL1": [
+      "root/armL>1"
     ],
-    "EYEOff": [
-      "MAIN/EYE-"
-    ],
-    "EFFECTOff": [
-      "MAIN/EFFECT-"
+    "armL0": [
+      "root/armL>0"
     ]
   }
 }

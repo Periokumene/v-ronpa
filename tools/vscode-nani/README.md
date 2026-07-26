@@ -73,7 +73,7 @@ Use **V-Ronpa Nani: Refresh Project Assets** from the Command Palette if an exte
 
 ## Character Assembly Preview
 
-Hover the identity expression in a command such as `@char alice.EYE1,MOUTH3` to inspect the assembled layered character. The preview uses the generated character-pack mapping and the shared layered-character resolver, then embeds only the active PNG layers into a content-addressed SVG in VS Code extension storage. It reproduces layer order, anchors, pivots, scale, Z rotation, flips, color multiplication, and alpha. It intentionally does not approximate Pixi outlines, filters, animation, transitions, or stage transforms from other command parameters.
+Hover the identity expression in a command such as `@char alice.eye1,mouth3,armR4` to inspect the assembled layered character. The preview uses the generated character-pack mapping and the shared layered-character resolver, then embeds only the active PNG layers into a content-addressed SVG in VS Code extension storage. It reproduces layer order, anchors, pivots, scale, Z rotation, flips, color multiplication, and alpha. It intentionally does not approximate Pixi outlines, filters, animation, transitions, or stage transforms from other command parameters.
 
 Command-name and non-identity parameter hovers continue to show language documentation. Preview failures are reported inside the hover and under `[char-preview]` in the **V-Ronpa Nani** output channel; they are never added to Problems. During a same-line edit, the last valid image remains visible with an explicit updating or invalid warning. Inserting or deleting a newline clears that conservative line cache.
 
@@ -81,7 +81,7 @@ Use **V-Ronpa Nani: Preview Character at Cursor** to move the caret to the curre
 
 ### Completion Preview
 
-Type a partial appearance token such as `@char alice.EYE1,MO` and select a character token in IntelliSense. The native completion details area lazily shows the candidate's newly active image content and the complete character that would result if the candidate were accepted. Creating or filtering the completion list does not read character PNGs; preview work begins only when VS Code resolves a selected completion item.
+Type a partial appearance token such as `@char alice.eye1,mo` and select a character token in IntelliSense. The native completion details area lazily shows the candidate's newly active image content and the complete character that would result if the candidate were accepted. Creating or filtering the completion list does not read character PNGs; preview work begins only when VS Code resolves a selected completion item.
 
 Completion previews close with IntelliSense and do not create a Webview, panel, editor decoration, or background image. The UI intentionally omits token expansion and internal layer provenance. A candidate that only removes layers shows the projected complete character with a short no-new-image state. Preview failures stay in the completion documentation and the `[char-preview]` output channel.
 

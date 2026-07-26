@@ -3,19 +3,20 @@
   "canonicalization": "stable-json-v1",
   "intentionalOverrides": {
     "game-a-smoke": "Editor Tools moves the visual/audio setup before the first stable Workbench target and records its route/text identity.",
-    "game-a-production-catalog": "The accepted multi-Nani hard cut splits the former MILKBEGIN segment into chapter-02 and links it from opening with one static endpoint."
+    "game-a-production-catalog": "The accepted multi-Nani hard cut splits the former MILKBEGIN segment into chapter-02 and links it from opening with one static endpoint.",
+    "csp-character-v2-alice-hard-cut": "The accepted CSP v2 hard cut replaces Alice assets and updates production/test appearance expressions, generated revisions, and preload plans without compatibility aliases."
   },
   "corpora": {
     "game-a-opening": {
       "sourceFile": "apps/game-a/src/nani/opening.nani",
       "scriptPath": "game-a/opening.nani",
-      "sourceSha256": "a9408f4915a49b9c7fdd76dc2097d6a9f2c7c6a720f5966e0729f1e40af6b226",
-      "sourceUtf16Length": 1736,
-      "statementCount": 50,
-      "commandCount": 46,
-      "scenarioIRSha256": "56f0a55d4dad4c14597d3a56bb2ef98d2ed0bd158823dbffab50665f2dbed47d",
+      "sourceSha256": "791786e75b5609be5b22cbc592fd0ef2027a2f71d3c9b79b7ef95a8fd318276c",
+      "sourceUtf16Length": 1665,
+      "statementCount": 49,
+      "commandCount": 45,
+      "scenarioIRSha256": "00cb58e9919c8801db2b4e85dd47b1b2072bbeee9dcb72ec86ea3ac6eeceb1cf",
       "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "runtimeScriptSha256": "d67281acd30adcf80ff628a66951a37a97984be2546eb89c616a041b256d2679",
+      "runtimeScriptSha256": "2383a74be74c4677cd6231d2636a165dd5991a190185a29733d8901b2515925f",
       "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "scenarioAssetsSha256": "46df50c3cb94ec109f8bdaf9c4808ad3cbdf14b03a75a010f60384df675b3802",
       "runtimeAssetsSha256": "ec75148cd18a76a0873d659def180136a936dd2a37cae799381cd583b3b6485c",
@@ -24,13 +25,13 @@
     "game-a-chapter-02": {
       "sourceFile": "apps/game-a/src/nani/chapter-02.nani",
       "scriptPath": "game-a/chapter-02.nani",
-      "sourceSha256": "14852648005eb6a3056d96c8a4e054b014691afddb9c1ec05a1d6e7a65a98686",
-      "sourceUtf16Length": 1496,
+      "sourceSha256": "60a052fd2548b34af63c0245dc20ea85d14712b0439d492d6acf0d3f40db02c7",
+      "sourceUtf16Length": 1400,
       "statementCount": 39,
       "commandCount": 38,
-      "scenarioIRSha256": "996784f4e387c1f603ec3c12d6c7289a40ffab13a3e39ea87012f2e4d66faa40",
+      "scenarioIRSha256": "9deae1e13324a44fce9466cefc196be1596ef3183ada373de4ede5bc8f7f070f",
       "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "runtimeScriptSha256": "f5730e8a36195f5a1c6f90f5e704d70893c1ea3a4333a2b867c4094ed718489b",
+      "runtimeScriptSha256": "71b11d527aa59c595877a17231c2b78f1a2009805c2d9fefab340cbdfcaeeb80",
       "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "scenarioAssetsSha256": "706a85778a86dc21d5ee274142e686b268ba8bcde40908ee2e4a658f44705324",
       "runtimeAssetsSha256": "c9b4970f73505fe30ed300f9f55ebff889581434f5521767439638bb432a615f",
@@ -54,13 +55,13 @@
     "game-a-character-smoke": {
       "sourceFile": "apps/game-a/src/test-nani/character-smoke.nani",
       "scriptPath": "game-a/test/character-smoke.nani",
-      "sourceSha256": "7143873d30547246f2a3cf1421e0d80c6d170760817e2f4edccb3722dfcee1d6",
-      "sourceUtf16Length": 764,
+      "sourceSha256": "528394458b3648213a1f0e3652d58055d5eb72842a314fc52583edff06106711",
+      "sourceUtf16Length": 721,
       "statementCount": 18,
       "commandCount": 16,
-      "scenarioIRSha256": "38cd121c9e5111a34ce4af3ee105e6110ae96fac6af485a0200e19315ba2ca38",
+      "scenarioIRSha256": "e0030b541a52695fb32dc5c3bb54c8471625844f737b6c6419810fee5cf755bb",
       "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "runtimeScriptSha256": "79110808fb63b95b60e372b931bce148ec5c3dc562218600d7f63f80cbfd9c5e",
+      "runtimeScriptSha256": "788a48588c83df3deb5582c967642f5a58e7ea1bb7de2ec608b93c21c29cd0ee",
       "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "scenarioAssetsSha256": "d0c717ea321dba6ac51bf9677fab66fd481b1076044003a091532405d15ecad6",
       "runtimeAssetsSha256": "887aaabd8eac3866662f1d688df7234fc921f25fc8e90c3eef15cbce544065c0",
@@ -114,16 +115,16 @@
   },
   "generatedMetadata": {
     "game-a/opening.nani": {
-      "scriptRevision": "sha256:592fa1e248fe981196ef834d2eb03e006815298ef9e2b20279f68f72d682e0e1",
-      "metadataSha256": "25fc914b902201dc0e1eccfc8d3ac3da34cc0aee67c96b4a05266cd7efdabc74",
+      "scriptRevision": "sha256:c9697f5419079cdf3da6936fcc2b24a0f816297ed56815d504fa43bb35d9c117",
+      "metadataSha256": "20d13acb62840fe4183c73999241fb681d90d843d539d50fad0f559464fea81b",
       "assetRefsSha256": "2442137159443315283d17be9f0c4afb6ec954238321283f0448d19f5e166b1f",
-      "characterPreloadPlanSha256": "73ab351adc3f52a59ccbfd87a737505a6a12e88cc4958bb0871267773753becf"
+      "characterPreloadPlanSha256": "c2b4a8f62fe9f57b7d1d00c5350ef14bd558f5191a018f8a815e13d57ee3f634"
     },
     "game-a/chapter-02.nani": {
-      "scriptRevision": "sha256:e2202734ecef7753d23983e0eb2aada60049d9abd4afa9a84cf265fb8f88864e",
-      "metadataSha256": "2a83a13c7a614a7ef56acd7a25d7cbad7af49d8500b375a2f8e86e2fd1eebba1",
+      "scriptRevision": "sha256:27aa9c0b1e7d6ca0e8f6ed80e95fea8f22eaa1a535f93cef49aabc86a8e6a501",
+      "metadataSha256": "07d7cb2ac2694e402072ce6d230e9e49d133509dde3ef0051f0abcfa6f698cfd",
       "assetRefsSha256": "c9b4970f73505fe30ed300f9f55ebff889581434f5521767439638bb432a615f",
-      "characterPreloadPlanSha256": "24f8a7a25946689f1e1eb581203ffa8728690e4fcb374ca70abc83e6d44e02ad"
+      "characterPreloadPlanSha256": "cc8e69ce1a115e5c8c821dfdc5812acb5d40528e2adee92bcc4673e6721fb7a5"
     },
     "game-a/test/smoke.nani": {
       "scriptRevision": "sha256:c0673449a776f61399c429ffa7c9152ea4ae708537bfe89338565b0c3c8cfaa0",
@@ -132,10 +133,10 @@
       "characterPreloadPlanSha256": "c333d973b62ff1fb6985414c061cebd4b2b1398dfa645224482cd90552d94781"
     },
     "game-a/test/character-smoke.nani": {
-      "scriptRevision": "sha256:566b52066e57a8e08c85c6dea367149308e8504f23fa747c8ad1ff67cf3cce45",
-      "metadataSha256": "cb164ed7ef016d0af40bf1000a976974778897ba8c5d777fbbfc3e0b4df4e034",
+      "scriptRevision": "sha256:d758ae88248a6d7ec28972d0b4436b856ace7af5e982f8bba9eae00ed22a408f",
+      "metadataSha256": "d2c9c9f8566c519c4af3810ea9b5f7de155a2b1d2c158e03a48ae808c960bd89",
       "assetRefsSha256": "1c7cf5e56650cbf03efe819b5efdf6ab76948a330581e7844235c78266b04908",
-      "characterPreloadPlanSha256": "73ab351adc3f52a59ccbfd87a737505a6a12e88cc4958bb0871267773753becf"
+      "characterPreloadPlanSha256": "e5b244507725c58a55254416a46f35bb59b791c198ad498bb58c5a233f9c09a3"
     },
     "harness/harness-showcase.nani": {
       "scriptRevision": "sha256:0b482f4f9b8776fb36acc7c85bf90db4426966d72d858cabc6d36fe3a2984ac7",
