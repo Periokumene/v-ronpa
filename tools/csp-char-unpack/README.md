@@ -1,11 +1,11 @@
 # CSP layered-character unpack tool
 
 This isolated tool turns a Clip Studio Paint `CSFCHUNK` document into a validated V-Ronpa layered-character pack. It
-archives the source, converts through a temporary PSD, validates the v2 authoring tree, composites every sprite leaf,
+archives the source, converts through a temporary PSD, validates the v3 authoring tree, composites every sprite leaf,
 generates mechanical lower-camel composition tokens, and emits QA evidence.
 
 The tool never writes into an app, registers an asset, or edits a `.nani` script. Source archives and immutable runs remain
-below this directory's ignored `workspace/`. See [AUTHORING.md](AUTHORING.md) for the authoritative v2 contract.
+below this directory's ignored `workspace/`. See [AUTHORING.md](AUTHORING.md) for the authoritative v3 contract.
 
 ## Setup and commands
 
@@ -24,7 +24,7 @@ uv run csp-char-unpack prune --character-id alice --keep 10 --apply
 ```
 
 `--character-id` is required. The root is always `/root`; there is no root-selection option. Render parameters default to
-`700` and `100`. The anchor uses the exact `/root/body` alpha bottom, and invalid body content rejects the run.
+`700` and `100`. The anchor uses the exact `/root/body/0` alpha bottom, and invalid body content rejects the run.
 
 The CLI has no output-directory option. Every build creates a new UTC timestamped run, including repeated builds of
 identical input. `prune` is a dry run unless `--apply` is present; it only removes run directories and never source
@@ -54,7 +54,8 @@ workspace/
 
 The main contact sheet compares the CSP preview, full PSD, `/root`, and reconstructed default. Each variant sheet starts
 from the default composition and replaces one group through all numeric variants; effect variants are explicitly added
-even though the group defaults off. `qa-metrics.json` records the panel count and sheet path for every group.
+even though the group defaults off. The required `body` group receives the same coverage. `qa-metrics.json` records the
+panel count and sheet path for every group.
 
 PSD, SQLite, CSP preview, and intermediate images live only in temporary storage. A rejected input remains archived; its
 failed run retains diagnostics and reports but no partial `character/` directory.
@@ -68,8 +69,15 @@ For a group such as `armR`:
 /root/armR/1 -> armR1 -> root/armR>1
 ```
 
+The required body group uses the same mechanical mapping:
+
+```text
+/root/body/0 -> body0 -> root/body>0
+```
+
 Every pack defines `sourcePreview`, `default`, and `character.defaultComposition: ["default"]`. Any optional group can be
-added without a tool update. `effect` alone also receives `effectOff`. The tool does not emit semantic aliases.
+added without a tool update. `body` does not receive an off token; `effect` alone receives `effectOff`. The tool does not
+emit semantic aliases.
 
 ## Manual promotion
 

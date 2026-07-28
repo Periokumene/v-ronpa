@@ -12,7 +12,7 @@ from .errors import ToolError
 from .psd_report import PsdInspection, PsdNode
 from .util import write_json
 
-PRESET_VERSION = "v2"
+PRESET_VERSION = "v3"
 CHARACTER_ROOT = "/root"
 BODY_NAME = "body"
 EFFECT_GROUP = "effect"
@@ -137,7 +137,7 @@ def discover_leaf_sprites(inspection: PsdInspection) -> tuple[PsdNode, list[Leaf
     ]
     if len(root_matches) != 1:
         if not root_matches:
-            raise ToolError(f"Required v2 character root group was not found: {CHARACTER_ROOT}.")
+            raise ToolError(f"Required v3 character root group was not found: {CHARACTER_ROOT}.")
         ids = ", ".join(node.id for node in root_matches)
         raise ToolError(f"Character root group is ambiguous: {CHARACTER_ROOT}; candidates: {ids}.")
     root = root_matches[0]
@@ -152,20 +152,17 @@ def discover_leaf_sprites(inspection: PsdInspection) -> tuple[PsdNode, list[Leaf
 
     body_matches = [node for node in root_children if str(node.layer.name) == BODY_NAME]
     if len(body_matches) != 1:
-        raise ToolError(f"Character root must contain exactly one direct /root/body leaf; found {len(body_matches)}.")
+        raise ToolError(f"Character root must contain exactly one direct /root/body group; found {len(body_matches)}.")
     body = body_matches[0]
     if root_children[0].id != body.id:
         raise ToolError("/root/body must be the backmost (first) folder in source order.")
-    _validate_group_boundary(body)
-    _require_leaf_folder(body, children)
     if not _effective_visible(body.layer):
         raise ToolError("/root/body must be effectively visible.")
 
-    semantic_groups = [node for node in root_children if node.id != body.id]
-    effect_matches = [node for node in semantic_groups if str(node.layer.name) == EFFECT_GROUP]
+    effect_matches = [node for node in root_children if str(node.layer.name) == EFFECT_GROUP]
     if len(effect_matches) > 1:
         raise ToolError("Character root may contain at most one direct /root/effect group.")
-    if effect_matches and semantic_groups[-1].id != effect_matches[0].id:
+    if effect_matches and root_children[-1].id != effect_matches[0].id:
         raise ToolError("/root/effect must be the frontmost (last) folder in source order.")
 
     _validate_portable_uniqueness(
@@ -173,21 +170,11 @@ def discover_leaf_sprites(inspection: PsdInspection) -> tuple[PsdNode, list[Leaf
         "runtime group/resource path",
     )
 
-    sprites = [
-        LeafSprite(
-            node=body,
-            source_path="/root/body",
-            group="root",
-            layer=BODY_NAME,
-            asset_components=("root", BODY_NAME),
-            draw_order=0,
-            selected_in_source=True,
-        )
-    ]
-    runtime_keys = {("root", BODY_NAME)}
-    portable_runtime_keys = {_portable_key("root>body"): "root>body"}
+    sprites: list[LeafSprite] = []
+    runtime_keys: set[tuple[str, str]] = set()
+    portable_runtime_keys: dict[str, str] = {}
 
-    for draw_order, group_node in enumerate(semantic_groups, start=1):
+    for draw_order, group_node in enumerate(root_children):
         group_name = str(group_node.layer.name)
         _validate_runtime_group_name(group_name, group_node.path)
         _validate_group_boundary(group_node)
@@ -331,8 +318,6 @@ def _preset_tokens(sprites: list[LeafSprite]) -> dict[str, list[str]]:
 
     has_effect = False
     for sprite in sprites:
-        if sprite.layer == BODY_NAME and sprite.group == "root":
-            continue
         group_name = sprite.asset_components[1]
         add(f"{group_name}{sprite.layer}", f"{sprite.group}>{sprite.layer}")
         has_effect = has_effect or group_name == EFFECT_GROUP
@@ -350,10 +335,10 @@ def _character_anchor(
     body_bounds = [
         bounds
         for sprite, bounds in sprites_with_bounds
-        if sprite.group == "root" and sprite.layer == BODY_NAME
+        if sprite.group == "root/body" and sprite.layer == "0"
     ]
     if len(body_bounds) != 1:
-        raise ToolError(f"Body anchor requires exactly one /root/body sprite; found {len(body_bounds)}.")
+        raise ToolError(f"Body anchor requires exactly one /root/body/0 sprite; found {len(body_bounds)}.")
     return [width / 2, height - body_bounds[0][3] + anchor_bottom_offset]
 
 

@@ -1,7 +1,7 @@
 {
   "tokens": {
     "sourcePreview": [
-      "root>body",
+      "root/body>0",
       "root/mouth>0",
       "root/eye>0",
       "root/armR>0",
@@ -9,6 +9,9 @@
     ],
     "default": [
       "sourcePreview"
+    ],
+    "body0": [
+      "root/body>0"
     ],
     "mouth6": [
       "root/mouth>6"
