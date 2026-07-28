@@ -94,7 +94,7 @@ def test_rejects_csp_psd_structure_mismatch() -> None:
         _validate_conversion_structure(csp, {"nodes": []})
 
 
-def test_v2_cli_requires_character_id_and_rejects_removed_character_root() -> None:
+def test_v3_cli_requires_character_id_and_rejects_removed_character_root() -> None:
     parser = _main_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["build", "alice.clip"])

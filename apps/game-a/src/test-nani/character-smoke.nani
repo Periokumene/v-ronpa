@@ -4,7 +4,7 @@
 @back bg:game-a-academy-hall-fullscreen effect:fade time:0.05
 @char alice pos:50 time:0.3 wait!
 Narrator: CHECKPOINT CHARACTER 00 - default composition.
-@char alice.eye1,mouth1 pos:50 wait!
+@char alice.body0,eye1,mouth1 pos:50 wait!
 Narrator: CHECKPOINT CHARACTER 01 - eye and mouth replacement.
 @char alice.eye3,mouth3,armR3 pos:50 wait!
 Narrator: CHECKPOINT CHARACTER 02 - single arm replacement.

@@ -1,5 +1,5 @@
 {
-  "sourcePath": "alice/root/body",
+  "sourcePath": "alice-kid/root/body/0",
   "drawOrder": 0,
   "sprite": {
     "pivot": {
@@ -10,8 +10,8 @@
   },
   "localTransform": {
     "position": {
-      "x": 335,
-      "y": 1141,
+      "x": 376,
+      "y": 925,
       "z": 0
     },
     "scale": {

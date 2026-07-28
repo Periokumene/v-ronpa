@@ -113,10 +113,10 @@ describe("project asset loading", () => {
       ])
     );
     expect(loaded.index.characterTokens.alice).toEqual(
-      expect.arrayContaining(["default", "sourcePreview", "eye5", "mouth6", "armR5", "armL5"])
+      expect.arrayContaining(["default", "sourcePreview", "body0", "eye5", "mouth6", "armR5", "armL5"])
     );
     expect(loaded.index.characterTokens["alice-kid"]).toEqual(
-      expect.arrayContaining(["default", "effect0", "effect2", "effectOff"])
+      expect.arrayContaining(["default", "body0", "effect0", "effect2", "effectOff"])
     );
   });
 });

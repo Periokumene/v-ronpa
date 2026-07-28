@@ -37,9 +37,10 @@ validation, mechanical token generation, project schema/semantic validation and 
 - `build` can only publish below the tool-owned ignored workspace.
 - Every invocation creates a new run; invalid sources retain archive and diagnostics but no character pack.
 - `list` reports runs; `prune` is dry-run by default and never deletes source archives.
-- The v2 root is fixed at `/root`; `body` is the only required leaf and direct lower-camel groups contain continuous
+- The v3 root is fixed at `/root`; `body` is the only required group and all direct lower-camel groups contain continuous
   numeric variants.
-- Default comes from strict v2 visibility. Lower-camel tokens are mechanical; only `effect` receives an off token.
+- Default comes from strict v3 visibility. `body/0` is required and anchors the character. Lower-camel tokens are
+  mechanical; only `effect` receives an off token.
 - Generated packs are self-contained but are never copied or registered in an app.
 
 ## Regression Requirements
@@ -51,7 +52,7 @@ validation, mechanical token generation, project schema/semantic validation and 
 - Lifecycle boundary: distinct version ids, list, dry-run prune, applied prune and preserved input archive.
 - QA boundary: every runtime group emits a variant sheet whose panel count equals its variant count, including hidden
   effect variants.
-- End to end: vendored MIT fixture converts to a nontrivial PSD; ignored v2 sources build through `/root` and pass project
+- End to end: vendored MIT fixture converts to a nontrivial PSD; ignored v3 sources build through `/root` and pass project
   validation.
 
 ## Required Gates

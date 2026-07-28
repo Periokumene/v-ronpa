@@ -1,10 +1,10 @@
 {
   "groups": {
-    "root": {
+    "root/body": {
       "layers": {
-        "body": {
-          "src": "assets/layers/root/body.png",
-          "metadata": "assets/layers/root/body.json"
+        "0": {
+          "src": "assets/layers/root/body/0.png",
+          "metadata": "assets/layers/root/body/0.json"
         }
       }
     },

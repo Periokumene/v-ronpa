@@ -65,7 +65,7 @@ test("game-a character smoke renders the imported Alice layered states", async (
     "test-results/game-a-alice-transition-end-frame.png"
   ));
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT CHARACTER 01");
-  await expectAliceState(page, "eye1,mouth1");
+  await expectAliceState(page, "body0,eye1,mouth1");
 
   const states = [
     {
