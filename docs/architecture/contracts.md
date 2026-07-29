@@ -8,6 +8,12 @@ part of `ScenarioIR`, RuntimeCommand, RuntimeScript, or saves. Parser/compiler
 API changes require a CCR and must preserve runtime contract snapshots. See
 [Nani Source Diagnostics](nani-source-diagnostics.md).
 
+`NaniCommandDefinition.primaryParam` is optional catalog-owned authoring
+metadata. When present, it must resolve to one declared parameter and means the
+command accepts that parameter in the first positional slot. Editors use the
+same parameter docs and allowed values for named and primary forms; adapters
+must not maintain command-local primary-value tables.
+
 Nani workbench anchors, decision traces, inspection results, and materializer
 outcomes are debug-only types under `app-vn-runtime/debug`; they are not public
 content contracts and are never serialized into SaveData. The workbench does

@@ -108,6 +108,12 @@ export function allowedValueCompletionFacts(commandId: string, paramName: string
   }));
 }
 
+export function primaryValueCompletionFacts(commandId: string): AllowedValueCompletionFact[] {
+  const definition = getNaniCommandDefinition(commandId);
+  if (!definition?.primaryParam) return [];
+  return allowedValueCompletionFacts(definition.id, definition.primaryParam);
+}
+
 function commandDocumentation(definition: NaniCommandDefinition): string {
   const zh = definition.docs?.zh ? `${definition.docs.zh}\n\n` : "";
   const aliases = definition.aliases && definition.aliases.length > 0 ? `\nAliases: ${definition.aliases.join(", ")}` : "";
@@ -160,6 +166,18 @@ export function paramDocumentationFact(commandId: string, paramName: string): Do
   return {
     detail: `${definition.canonicalName} parameter · ${param.type}`,
     documentation: paramDocumentation(param)
+  };
+}
+
+export function primaryDocumentationFact(commandId: string): DocumentationFact | undefined {
+  const definition = getNaniCommandDefinition(commandId);
+  if (!definition?.primaryParam) return undefined;
+  const param = findParam(definition, definition.primaryParam);
+  const fact = paramDocumentationFact(definition.id, definition.primaryParam);
+  if (!param || !fact) return undefined;
+  return {
+    detail: `${definition.canonicalName} ${param.name} parameter · ${param.type}`,
+    documentation: fact.documentation
   };
 }
 

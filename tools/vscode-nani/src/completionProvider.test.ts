@@ -71,6 +71,58 @@ describe("completion provider logic", () => {
     expect(completions.map((completion) => completion.label)).toEqual(["true", "false"]);
   });
 
+  it("discovers every character tone preset without suggesting renderer easing", () => {
+    const primarySource = "@charTone ";
+    const primary = getNaniCompletions(primarySource, { line: 0, character: primarySource.length });
+    expect(primary.slice(0, 7).map((completion) => completion.label)).toEqual([
+      "rain",
+      "fog",
+      "sunset",
+      "night",
+      "alert",
+      "fluorescent",
+      "none"
+    ]);
+    expect(primary.find((completion) => completion.label === "rain")).toMatchObject({
+      insertText: "rain",
+      kind: "value",
+      range: {
+        start: { line: 0, character: primarySource.length },
+        end: { line: 0, character: primarySource.length }
+      }
+    });
+
+    const filteredPrimarySource = "@charTone r";
+    const filteredPrimary = getNaniCompletions(filteredPrimarySource, {
+      line: 0,
+      character: filteredPrimarySource.length
+    });
+    expect(filteredPrimary.map((completion) => completion.label)).toEqual(["rain"]);
+    expect(filteredPrimary[0]?.range).toEqual({
+      start: { line: 0, character: "@charTone ".length },
+      end: { line: 0, character: filteredPrimarySource.length }
+    });
+
+    const valuesSource = "@charTone preset:";
+    const values = getNaniCompletions(valuesSource, { line: 0, character: valuesSource.length });
+    expect(values.map((completion) => completion.label)).toEqual([
+      "rain",
+      "fog",
+      "sunset",
+      "night",
+      "alert",
+      "fluorescent",
+      "none"
+    ]);
+
+    const paramsSource = "@charTone rain ";
+    const params = getNaniCompletions(paramsSource, { line: 0, character: paramsSource.length });
+    expect(params.map((completion) => completion.label)).toEqual(
+      expect.arrayContaining(["amount:", "time:", "wait:", "wait!", "!wait"])
+    );
+    expect(params.map((completion) => completion.label)).not.toContain("easing:");
+  });
+
   it("suggests current file labels for goto primary targets", () => {
     const source = "#Start\n@goto #\n#End";
     const completions = getNaniCompletions(source, { line: 1, character: "@goto #".length });

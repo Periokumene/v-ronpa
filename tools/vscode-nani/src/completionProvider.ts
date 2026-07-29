@@ -1,5 +1,10 @@
 import { collectLabels, getCompletionContext, type NaniPosition, type NaniRange } from "./documentContext";
-import { allowedValueCompletionFacts, commandCompletionFacts, paramCompletionFacts } from "./languageFacts";
+import {
+  allowedValueCompletionFacts,
+  commandCompletionFacts,
+  paramCompletionFacts,
+  primaryValueCompletionFacts
+} from "./languageFacts";
 import { emptyProjectAssetIndex, type NaniProjectAssetIndex } from "./projectAssets";
 import { getNaniResourceCompletions } from "./resourceCompletions";
 import type { NaniDeferredCompletionDocumentation } from "./resourceCompletions";
@@ -110,7 +115,27 @@ export function getNaniCompletions(
       isSnippet: fact.isSnippet,
       sortText: fact.sortText
     }));
-    return [...resourceCompletions, ...paramCompletions];
+    const primaryFacts = context.primaryCandidate
+      ? primaryValueCompletionFacts(context.commandId)
+      : [];
+    const primaryCompletions: NaniCompletion[] = primaryFacts
+      .filter((fact) =>
+        fact.label.toLowerCase().startsWith(context.primaryCandidate?.prefix.toLowerCase() ?? "")
+      )
+      .map((fact) => ({
+        label: fact.label,
+        insertText: fact.insertText,
+        kind: "value",
+        range: context.primaryCandidate?.range ?? context.range,
+        detail: `${fact.detail} · primary`,
+        documentation: fact.documentation,
+        isSnippet: false,
+        sortText: `0-primary-${fact.sortText}`
+      }));
+    if (context.primaryCandidate?.prefix && primaryFacts.length > 0) {
+      return primaryCompletions;
+    }
+    return [...resourceCompletions, ...primaryCompletions, ...paramCompletions];
   }
 
   if (context.kind === "param-value") {

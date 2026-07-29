@@ -5,7 +5,12 @@ import {
   type NaniPosition,
   type NaniRange
 } from "./documentContext";
-import { commandDocumentationFact, inlineDocumentationFact, paramDocumentationFact } from "./languageFacts";
+import {
+  commandDocumentationFact,
+  inlineDocumentationFact,
+  paramDocumentationFact,
+  primaryDocumentationFact
+} from "./languageFacts";
 import { resolveNavigationTarget, type NaniNavigationIndex } from "./navigationAnalysis";
 
 export interface NaniHover {
@@ -70,7 +75,15 @@ function commandLineHover(line: string, position: NaniPosition): NaniHover | und
   const token = tokenAt(line, position.character);
   if (!token || token.start <= commandEnd) return undefined;
   const paramName = paramNameFromToken(token.text);
-  if (!paramName) return undefined;
+  if (!paramName) {
+    const firstArgumentOffset = line.slice(commandEnd).search(/\S/u);
+    const firstArgumentStart = firstArgumentOffset >= 0
+      ? commandEnd + firstArgumentOffset
+      : -1;
+    if (token.start !== firstArgumentStart) return undefined;
+    const fact = primaryDocumentationFact(commandId);
+    return fact ? hover(position.line, token.start, token.end, `${fact.detail} · primary\n\n${fact.documentation}`) : undefined;
+  }
   const fact = paramDocumentationFact(commandId, paramName);
   return fact ? hover(position.line, token.start, token.end, `${fact.detail}\n\n${fact.documentation}`) : undefined;
 }

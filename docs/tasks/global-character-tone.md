@@ -26,6 +26,13 @@ Harness visual acceptance, authoring docs, and regression evidence.
 - Do not add packages, dependencies, lockfile changes, per-character controls,
   hex recipes, automatic weather coupling, shadow lift, or compatibility APIs.
 
+## Dependency Changes
+
+- Allowed: update only the `version` field in
+  `tools/vscode-nani/package.json` for the `0.6.1` extension release.
+- No dependency declaration, root package metadata, or lockfile change is
+  allowed.
+
 ## Allowed Paths
 
 - `packages/contracts/**`
@@ -59,6 +66,7 @@ Harness visual acceptance, authoring docs, and regression evidence.
 ## Public Contracts
 
 - `@charTone [preset|none] amount:<decimal> time:<seconds> wait!`
+- catalog-owned `primaryParam: "preset"` authoring metadata
 - `CharacterTonePresetId`
 - optional `PixiStageSnapshot.characterTone`
 - `character-tone-transition`
@@ -84,6 +92,9 @@ The stage stays v5 and SaveData stays v8. Old data without tone remains valid.
   without state, amount zero/none, no-op, no characters, transition interrupt,
   local label, direct/chained cross-script navigation, restore, and named
   `char → hideChars → char` visibility restoration.
+- Editor paths: command and parameter discovery, primary/named preset
+  completion, primary Hover, exact invalid-preset diagnostics, and no `easing`
+  suggestion.
 - Pixel/topology paths: premultiplied alpha, tone-before-outline, unchanged
   outline/background/DOM, expression crossfade, overdrive finite output.
 
@@ -122,6 +133,9 @@ pnpm validate:baseline
 - The follow-up named-`@char` visibility correction passes the full subsystem
   gate with 517 contract tests, 745 repository tests, both production builds,
   and all 13 Playwright scenarios.
+- VS Code Nani `0.6.1` passes 107 logic tests and 13 real Extension Host tests,
+  including primary/named Tone preset completion, primary Hover, and exact
+  invalid-preset diagnostics.
 - Focused Tone smoke covers all six presets, amount-only updates, overdrive,
   removal, expression replacement, and quick-save/quick-load restoration.
 - Game A Alice screenshots and the required web-game client show character-only

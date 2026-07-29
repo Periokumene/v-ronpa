@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
-import { allowedValueCompletionFacts, commandCompletionFacts, paramCompletionFacts } from "./languageFacts";
+import {
+  allowedValueCompletionFacts,
+  commandCompletionFacts,
+  paramCompletionFacts,
+  primaryDocumentationFact,
+  primaryValueCompletionFacts
+} from "./languageFacts";
 
 describe("language facts", () => {
   it("derives command completions from the shared catalog", () => {
@@ -68,5 +74,37 @@ describe("language facts", () => {
       appearanceExpression: "Default",
       durationMs: 120
     });
+  });
+
+  it("derives character tone command facts entirely from the shared catalog", () => {
+    const command = commandCompletionFacts().find((fact) => fact.label === "charTone");
+    const params = paramCompletionFacts("chartone");
+
+    expect(command?.documentation).toContain("@charTone rain");
+    expect(params.map((fact) => fact.label)).toEqual(
+      expect.arrayContaining(["preset:", "amount:", "time:", "wait:", "wait!", "!wait"])
+    );
+    expect(params.map((fact) => fact.label)).not.toContain("easing:");
+    expect(primaryValueCompletionFacts("chartone").map((fact) => fact.label)).toEqual([
+      "rain",
+      "fog",
+      "sunset",
+      "night",
+      "alert",
+      "fluorescent",
+      "none"
+    ]);
+    expect(primaryDocumentationFact("chartone")?.documentation).toContain(
+      "Allowed: rain, fog, sunset, night, alert, fluorescent, none"
+    );
+    expect(allowedValueCompletionFacts("chartone", "preset").map((fact) => fact.label)).toEqual([
+      "rain",
+      "fog",
+      "sunset",
+      "night",
+      "alert",
+      "fluorescent",
+      "none"
+    ]);
   });
 });

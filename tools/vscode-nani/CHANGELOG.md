@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.1
+
+- Added catalog-driven `@charTone` command, parameter, preset, and diagnostic
+  support.
+- Added primary-value completion for the recommended `@charTone rain` form as
+  well as the existing `preset:rain` named form.
+- Added primary-value hover documentation for code-owned Tone presets and
+  documented the unbounded `amount` multiplier.
+- Documented that a named `@char` defaults to `visible:true`, including after
+  `@hideChars`; explicit `visible:false` remains authoritative.
+- Confirmed CSP v2/v3 lowercase composition tokens, numeric `body0` variants,
+  and additional character packs continue to flow through project-derived
+  resource completion and character previews.
+
 ## 0.6.0
 
 - Added trusted-workspace indexing for production and test `.nani` catalogs declared by the nearest `asset.config.mjs`.

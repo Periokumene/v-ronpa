@@ -36,6 +36,36 @@ describe("hover provider logic", () => {
     expect(glitchFilter?.contents).toContain("淡出移除");
   });
 
+  it("documents character tone amount as an unbounded recommended multiplier", () => {
+    const command = getNaniHover("@charTone rain amount:1", { line: 0, character: 4 });
+    const amount = getNaniHover("@charTone rain amount:1", {
+      line: 0,
+      character: "@charTone rain amou".length
+    });
+    const primary = getNaniHover("@charTone rain amount:1", {
+      line: 0,
+      character: "@charTone ra".length
+    });
+
+    expect(command?.contents).toContain("全部角色");
+    expect(command?.contents).toContain("内部固定缓动");
+    expect(primary?.contents).toContain("preset parameter · string · primary");
+    expect(primary?.contents).toContain("Allowed: rain, fog, sunset, night, alert, fluorescent, none");
+    expect(amount?.contents).toContain("Default: 1");
+    expect(amount?.contents).toContain("Recommended: 0..2 multiplier");
+    expect(amount?.contents).toContain("不设硬上限");
+  });
+
+  it("documents that named char commands show the character by default", () => {
+    const visible = getNaniHover("@char Ema visible:true", {
+      line: 0,
+      character: "@char Ema visib".length
+    });
+
+    expect(visible?.contents).toContain("Default: true");
+    expect(visible?.contents).toContain("省略时显示具名角色");
+  });
+
   it("returns inline command and inline speed docs", () => {
     const command = getNaniHover("Felix: Hello [< speed:0.8]", { line: 0, character: "Felix: Hello [<".length });
     const speed = getNaniHover("Felix: Hello [< speed:0.8]", { line: 0, character: "Felix: Hello [< spe".length });

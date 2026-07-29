@@ -132,6 +132,39 @@ suite("V-Ronpa Nani exact diagnostics", () => {
     assert.deepEqual(vscode.languages.getDiagnostics(document.uri), []);
   });
 
+  test("provides catalog-driven charTone primary completion, hover, and exact diagnostics", async () => {
+    const source = ["@charTone r", "@charTone unknown"].join("\n");
+    const document = await openNaniDocument(source);
+    const completions = await executeCompletions(
+      document.uri,
+      new vscode.Position(0, "@charTone r".length),
+      0
+    );
+    assert.deepEqual(completions.items.map(completionLabel), ["rain"]);
+
+    const hover = await executeHover(
+      document.uri,
+      new vscode.Position(0, "@charTone r".length)
+    );
+    assert.match(hover, /preset parameter · string · primary/u);
+    assert.match(hover, /rain, fog, sunset, night, alert, fluorescent, none/u);
+
+    const invalid = await waitForDiagnostic(
+      document.uri,
+      (candidate) =>
+        candidate.code === "invalid-command-param" &&
+        document.getText(candidate.range) === "unknown"
+    );
+    assert.equal(invalid.source, "nani");
+    assert.equal(invalid.range.start.line, 1);
+    assert.equal(
+      vscode.languages
+        .getDiagnostics(document.uri)
+        .some((candidate) => candidate.code === "unknown-command"),
+      false
+    );
+  });
+
   test("provides live multi-script diagnostics, completion, hover, and definitions", async () => {
     const fixture = await createNavigationFixture();
     const opening = await vscode.workspace.openTextDocument(fixture.openingUri);
@@ -242,7 +275,7 @@ suite("V-Ronpa Nani exact diagnostics", () => {
       (candidate) => candidate.source === "nani-project"
     );
     assert.equal(diagnostic.code, "invalid-project-script-config");
-    assert.match(diagnostic.message, /registered more than once/u);
+    assert.ok(diagnostic.message.includes("registered more than once"));
   });
 
   test("renders a real layered character artifact only on the @char identity hover", async () => {

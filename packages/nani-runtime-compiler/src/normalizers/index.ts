@@ -135,6 +135,28 @@ export function assertCommandNormalizerRegistry(): void {
       }
     }
 
+    if (definition.primaryParam) {
+      const normalizedPrimary = normalizeRegistryName(definition.primaryParam);
+      if (!descriptor.acceptsPrimary) {
+        issues.push(
+          "catalog @" +
+            definition.canonicalName +
+            " declares primaryParam " +
+            definition.primaryParam +
+            " but its descriptor rejects primary values"
+        );
+      }
+      if (!descriptor.consumedParams.map(normalizeRegistryName).includes(normalizedPrimary)) {
+        issues.push(
+          "catalog @" +
+            definition.canonicalName +
+            " primaryParam " +
+            definition.primaryParam +
+            " is not consumed by its descriptor"
+        );
+      }
+    }
+
     if (definition.status !== "implemented") continue;
     const consumedNames = new Set(descriptor.consumedParams.map(normalizeRegistryName));
     for (const spec of definition.params) {

@@ -254,6 +254,7 @@ export interface NaniCommandDefinition {
   execution: NaniCommandExecution;
   supportsChildren: boolean;
   params: NaniCommandParamSpec[];
+  primaryParam?: string;
   aliases?: string[];
   docs?: NaniCommandDocs;
 }
@@ -318,10 +319,26 @@ export const NaniCommandDefinitionSchema = z
     execution: NaniCommandExecutionSchema,
     supportsChildren: z.boolean(),
     params: z.array(NaniCommandParamSpecSchema),
+    primaryParam: z.string().min(1).optional(),
     aliases: z.array(z.string().min(1).regex(/^[a-z0-9:_./<>-]+$/)).optional(),
     docs: NaniCommandDocsSchema.optional()
   })
-  .strict();
+  .strict()
+  .superRefine((definition, ctx) => {
+    if (!definition.primaryParam) return;
+    const normalizedPrimary = normalizeNaniCommandId(definition.primaryParam);
+    const declared = definition.params.some((paramSpec) =>
+      [paramSpec.name, ...(paramSpec.aliases ?? [])]
+        .some((candidate) => normalizeNaniCommandId(candidate) === normalizedPrimary)
+    );
+    if (!declared) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Primary parameter '${definition.primaryParam}' must resolve to a declared command parameter.`,
+        path: ["primaryParam"]
+      });
+    }
+  });
 
 const officialCommandStatuses: Partial<Record<string, NaniCommandStatus>> = {
   arrange: "implemented",
@@ -626,7 +643,8 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
       param("time", "decimal"),
       param("wait", "boolean")
     ]),
-    canonicalName: "charTone"
+    canonicalName: "charTone",
+    primaryParam: "preset"
   },
   official("choice", "choice", choiceParams),
   official("choiceHandler", "choice", [

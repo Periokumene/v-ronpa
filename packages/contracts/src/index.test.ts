@@ -521,6 +521,7 @@ describe("contracts", () => {
     expect(command).toMatchObject({
       id: "chartone",
       canonicalName: "charTone",
+      primaryParam: "preset",
       source: "v-ronpa",
       status: "implemented"
     });
@@ -576,6 +577,12 @@ describe("contracts", () => {
         }
       })
     ).toThrow();
+    expect(() =>
+      NaniCommandDefinitionSchema.parse({
+        ...command,
+        primaryParam: "missing"
+      })
+    ).toThrow(/Primary parameter/u);
   });
 
   it("declares shader snow controls and validates their Pixi weather snapshot fields", () => {

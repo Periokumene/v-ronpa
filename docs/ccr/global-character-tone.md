@@ -25,6 +25,11 @@ default `1` and no maximum. `none` and `amount:0` remove the state. `time` and
 `wait!` use the existing Pixi presentation timing contract. Easing is an
 internal fixed renderer policy and is not a command parameter.
 
+The command catalog declares `primaryParam: "preset"`. This is authoring
+metadata, not an additional runtime field: editor completion and Hover resolve
+`@charTone rain` and `@charTone preset:rain` through the same `preset`
+definition and allowed-value list.
+
 ```ts
 interface PixiCharacterToneSnapshot {
   preset: CharacterTonePresetId;
@@ -69,6 +74,9 @@ valid.
 
 - Contract/compiler tests cover command docs, normalization, preset validation,
   amount boundaries, and old/new snapshot parsing.
+- VS Code logic and Extension Host tests cover both primary/named preset
+  completion, primary Hover, exact invalid-preset diagnostics, and the named
+  `@char` visibility default.
 - Stage/runtime tests cover reducer semantics, script-scope convergence,
   chained navigation, wait tasks, and save/restore.
 - Presenter tests cover filter ordering, transitions, interruption, alpha,

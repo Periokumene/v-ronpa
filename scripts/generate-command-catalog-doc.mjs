@@ -60,12 +60,13 @@ function renderTable(definitions) {
       definition.params.length > 0
         ? definition.params.map((param) => `${param.name}:${param.type}${param.source === "v-ronpa" ? " (V-Ronpa)" : ""}`).join(", ")
         : "none",
+      definition.primaryParam ?? "none",
       definition.supportsChildren ? "yes" : "no",
       definition.status
     ]);
   return [
-    "| Command | Runtime id | Category | Execution | Params | Children | Status |",
-    "|---|---|---|---|---|---|---|",
+    "| Command | Runtime id | Category | Execution | Params | Primary | Children | Status |",
+    "|---|---|---|---|---|---|---|---|",
     ...rows.map((row) => `| ${row.map(escapeTableCell).join(" | ")} |`)
   ].join("\n");
 }

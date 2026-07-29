@@ -19,6 +19,10 @@ export type CompletionContext =
       commandId: string;
       range: NaniRange;
       usedParams: Set<string>;
+      primaryCandidate?: {
+        prefix: string;
+        range: NaniRange;
+      };
     }
   | {
       kind: "param-value";
@@ -232,6 +236,23 @@ function getParamCompletionContext(before: string, line: number): CompletionCont
   const tokenStart = currentTokenStart(before);
   const token = before.slice(tokenStart);
   if (token.includes(":") && !token.startsWith("!")) return undefined;
+  const completedArguments = before.slice(commandMatch[0].length, tokenStart).trim();
+  const primaryCandidate =
+    completedArguments.length === 0 &&
+    !token.includes(":") &&
+    !token.startsWith("!") &&
+    !token.endsWith("!") &&
+    !token.startsWith("{") &&
+    !token.startsWith("\"") &&
+    !token.startsWith("'")
+      ? {
+          prefix: token,
+          range: {
+            start: { line, character: tokenStart },
+            end: { line, character: before.length }
+          }
+        }
+      : undefined;
 
   return {
     kind: "param",
@@ -240,7 +261,8 @@ function getParamCompletionContext(before: string, line: number): CompletionCont
       start: { line, character: tokenStart },
       end: { line, character: before.length }
     },
-    usedParams: collectUsedParams(before.slice(0, tokenStart))
+    usedParams: collectUsedParams(before.slice(0, tokenStart)),
+    ...(primaryCandidate ? { primaryCandidate } : {})
   };
 }
 

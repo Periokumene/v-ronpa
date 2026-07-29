@@ -27,9 +27,16 @@ Examples:
 @hideUI commandBar time:0.2 wait!
 @showUI target:dialog time:0.2 wait!
 @rain power:0.5 wind:-0.2 hue:215 tint:0.55 time:0.4
+@charTone rain amount:1 time:0.3 wait!
 ```
 
 Command and parameter docs, runtime support notes, and stateful Pixi effect semantics are sourced from `@v-ronpa/contracts` when the extension bundle is built. For example, effect hovers explain current `time` interpolation behavior from the shared command catalog instead of maintaining separate VS Code-local docs.
+Both `@charTone ` / `@charTone r` primary-value completion and
+`@charTone preset:` named-value completion expose the six code-owned
+multicolor presets plus `none`. Hovering a primary preset or `amount` shows the
+shared catalog documentation, default, and recommended artistic range.
+Renderer easing is fixed internally and is not offered as an authoring
+parameter.
 
 Normal completion excludes commands whose catalog status is not `implemented` and parameters whose shared `runtimeSupport` is `declared-not-consumed`. This prevents the editor from suggesting options such as `@bgm loop!` or media `wait!` that the current compiler intentionally diagnoses, while preserving compatibility diagnostics for existing scripts.
 
