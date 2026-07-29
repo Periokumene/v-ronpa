@@ -21,12 +21,12 @@ test("Game A traverses, saves, previews, restores, and completes its production 
 
   const workbench = page.getByTestId("vn-devtools-dock");
   await expect(workbench).toBeVisible();
-  await expect.poll(async () => Math.round((await workbench.boundingBox())?.width ?? 0)).toBe(420);
+  await expect.poll(async () => Math.round((await workbench.boundingBox())?.width ?? 0)).toBe(504);
   const scriptPicker = workbench.locator("details.vn-devtools-script-picker");
   await scriptPicker.locator("summary").click();
   await expect(workbench.getByRole("listbox", { name: "VN scripts" })).toBeVisible();
   await expect(workbench.getByRole("option")).toHaveCount(2);
-  await page.screenshot({ path: "test-results/game-a-multi-nani-script-selector-420.png", fullPage: true });
+  await page.screenshot({ path: "test-results/game-a-multi-nani-script-selector-504.png", fullPage: true });
   await workbench.getByRole("option", { name: /chapter-02\.nani/ }).click();
   await expect.poll(async () => (await readSnapshot(page)).workbench.viewedScriptPath)
     .toBe("game-a/chapter-02.nani");

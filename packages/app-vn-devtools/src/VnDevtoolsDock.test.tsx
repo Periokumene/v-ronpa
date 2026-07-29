@@ -11,7 +11,7 @@ import type {
 type TestElement = ReactElement<Record<string, unknown>>;
 
 describe("VnDevtoolsDock", () => {
-  it("renders the six-region IDE shell, full source, Phosphor controls, state tree, and both accessible resizers", () => {
+  it("renders the focused five-region IDE shell, full source, Phosphor controls, state tree, and both accessible resizers", () => {
     const actions = createActions();
     const element = VnDevtoolsDock({ controller: createController(actions) });
 
@@ -21,13 +21,13 @@ describe("VnDevtoolsDock", () => {
     expect(findByTestId(element, "vn-devtools-symbols")).toBeDefined();
     expect(findByTestId(element, "vn-devtools-source-editor")).toBeDefined();
     expect(findByTestId(element, "vn-devtools-bottom-panel")?.props["data-active-panel"]).toBe("state");
-    expect(findByTestId(element, "vn-devtools-status-bar")).toBeDefined();
+    expect(findByTestId(element, "vn-devtools-status-bar")).toBeUndefined();
     expect(findByTestId(element, "vn-devtools-resizer")?.props).toMatchObject({
       role: "separator",
       "aria-orientation": "vertical",
       "aria-valuemin": 320,
       "aria-valuemax": 720,
-      "aria-valuenow": 420,
+      "aria-valuenow": 504,
       tabIndex: 0
     });
     expect(findByTestId(element, "vn-devtools-panel-resizer")?.props).toMatchObject({
@@ -329,7 +329,7 @@ function createController(
     selectedLineId: "line:dialog",
     searchQuery: "",
     collapsed: false,
-    width: 420,
+    width: 504,
     layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
     status: { phase: "ready", message: "Pinned target is stable." },
     diagnostics: [

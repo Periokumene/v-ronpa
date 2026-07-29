@@ -215,13 +215,13 @@ describe("VN devtools session persistence", () => {
     expect(clearVnDevtoolsSessionState(unavailable, "key")).toBe(false);
   });
 
-  it("provides the open 420px first-visit default and can clear a saved session", () => {
+  it("provides the open 504px first-visit default and can clear a saved session", () => {
     const storage = memoryStorage();
     storage.setItem("key", "value");
     expect(createDefaultVnDevtoolsSessionState()).toEqual({
       version: 3,
       collapsed: false,
-      width: 420,
+      width: 504,
       layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 }
     });
     expect(clearVnDevtoolsSessionState(storage, "key")).toBe(true);

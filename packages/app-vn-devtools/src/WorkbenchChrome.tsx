@@ -97,26 +97,6 @@ export function WorkbenchCommandStrip({
   );
 }
 
-export function WorkbenchStatusBar({ controller }: { controller: VnDevtoolsController }) {
-  const current = controller.lines.find((line) => line.current);
-  const pinned = controller.lines.find((line) => line.pinned);
-  const viewedScript = controller.scripts.find((script) => script.viewed);
-  return (
-    <footer className="vn-devtools-status-bar" data-testid="vn-devtools-status-bar" aria-live="polite">
-      <span title={viewedScript?.revision}>
-        {viewedScript ? `rev ${viewedScript.revision.slice(0, 10)}` : "revision unavailable"}
-      </span>
-      <span>current {current ? `Ln ${current.lineNumber}` : "–"}</span>
-      <span>pin {pinned ? `Ln ${pinned.lineNumber}` : "–"}</span>
-      {controller.status.updateId !== undefined && <span>update {controller.status.updateId}</span>}
-      <span className="vn-devtools-status-message" title={controller.status.message}>
-        {controller.status.message ?? statusLabels[controller.status.phase]}
-      </span>
-      <span className="vn-devtools-shortcut-hint">Ctrl+Enter · Ctrl+J</span>
-    </footer>
-  );
-}
-
 function ScriptPicker({ controller }: { controller: VnDevtoolsController }) {
   const viewedIndex = Math.max(0, controller.scripts.findIndex((script) => script.viewed));
 
@@ -137,7 +117,6 @@ function ScriptPicker({ controller }: { controller: VnDevtoolsController }) {
         }}
       >
         <span className="vn-devtools-script-labels">
-          <small>DEV · VN:{controller.entryId}</small>
           <strong>{formatFileLabel(controller.viewedScriptPath)}</strong>
         </span>
         <ArrowDown size={13} weight="bold" aria-hidden="true" />

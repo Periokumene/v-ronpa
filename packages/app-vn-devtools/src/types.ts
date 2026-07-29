@@ -1,6 +1,6 @@
 import type { TextSpan } from "@v-ronpa/nani-parser";
 
-export const VN_DEVTOOLS_DEFAULT_WIDTH = 420;
+export const VN_DEVTOOLS_DEFAULT_WIDTH = 504;
 export const VN_DEVTOOLS_MIN_WIDTH = 320;
 export const VN_DEVTOOLS_MAX_WIDTH = 720;
 export const VN_DEVTOOLS_DEFAULT_PANEL_HEIGHT = 180;

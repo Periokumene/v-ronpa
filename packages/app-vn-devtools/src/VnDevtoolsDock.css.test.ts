@@ -11,15 +11,15 @@ const componentSources = [
 ].map((path) => readFileSync(new URL(path, import.meta.url), "utf8")).join("\n");
 
 describe("Nani Workbench IDE styling contract", () => {
-  it("uses the six-row non-scrolling IDE grid and independent source/panel scroll regions", () => {
-    expect(css).toContain("grid-template-rows: 40px 38px 32px minmax(0, 1fr) auto 24px");
+  it("uses the five-row non-scrolling IDE grid and independent source/panel scroll regions", () => {
+    expect(css).toContain("grid-template-rows: 44px 40px 34px minmax(0, 1fr) auto");
     expect(css).toMatch(/\.vn-devtools-dock \{[\s\S]*overflow: hidden;/u);
     expect(css).toMatch(/\.vn-devtools-source-editor \{[\s\S]*overflow: auto;/u);
     expect(css).toMatch(/\.vn-devtools-panel-content \{[\s\S]*overflow: auto;/u);
     expect(css).toContain("content-visibility: auto");
   });
 
-  it("keeps the 320–720px / 45vw boundary and explicit 420/320 density breakpoints", () => {
+  it("keeps the 320–720px / 45vw boundary and explicit compact density breakpoints", () => {
     expect(css).toContain("45vw");
     expect(css).toContain("@container vn-devtools (max-width: 519px)");
     expect(css).toContain("@container vn-devtools (max-width: 399px)");
@@ -50,6 +50,15 @@ describe("Nani Workbench IDE styling contract", () => {
     for (const legacyGlyph of ["▶", "◆", "⌕", "→"]) {
       expect(componentSources).not.toContain(legacyGlyph);
     }
+  });
+
+  it("uses a restrained warm solid palette without the former bright cyan or glass styling", () => {
+    expect(css).toContain("--vn-devtools-accent: #c08b64");
+    expect(css).toContain("--vn-devtools-bg: #12100e");
+    expect(css).not.toContain("#58d7c7");
+    expect(css).not.toContain("backdrop-filter");
+    expect(componentSources).not.toContain("DEV · VN:");
+    expect(componentSources).not.toContain("WorkbenchStatusBar");
   });
 
   it("fully skins semantic radio and text controls without system motion branches", () => {

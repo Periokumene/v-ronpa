@@ -1,6 +1,6 @@
 import { Code } from "@phosphor-icons/react";
 import type { CSSProperties, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { WorkbenchCommandStrip, WorkbenchFileBar, WorkbenchStatusBar } from "./WorkbenchChrome";
+import { WorkbenchCommandStrip, WorkbenchFileBar } from "./WorkbenchChrome";
 import { WorkbenchSourceView } from "./WorkbenchSourceView";
 import { WorkbenchSymbols } from "./WorkbenchSymbols";
 import { WorkbenchToolPanel } from "./WorkbenchToolPanel";
@@ -98,7 +98,6 @@ export function VnDevtoolsDock({ controller, className }: VnDevtoolsDockProps) {
         {...(findResult.currentMatch ? { currentMatchLineId: findResult.currentMatch.lineId } : {})}
       />
       <WorkbenchToolPanel controller={controller} />
-      <WorkbenchStatusBar controller={controller} />
     </aside>
   );
 }
