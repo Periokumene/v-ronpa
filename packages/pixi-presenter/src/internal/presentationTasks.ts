@@ -1,5 +1,6 @@
 export type PixiPresentationTaskKind =
   | "actor-transition"
+  | "character-tone-transition"
   | "screen-filter-transition"
   | "weather-transition"
   | "flash"

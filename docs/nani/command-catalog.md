@@ -221,6 +221,7 @@ order never implies navigation, and `@end` completes the whole entry.
 | Command | Runtime id | Category | Execution | Params | Children | Status |
 |---|---|---|---|---|---|---|
 | `charenter` | `charenter` | actor | declared-only | character:string, appearanceExpression:string, effect:string | no | stubbed |
+| `charTone` | `chartone` | effect | pixi-presentation | preset:string, amount:decimal, time:decimal, wait:boolean | no | implemented |
 | `end` | `end` | flow | story-control | none | no | implemented |
 | `flash` | `flash` | effect | pixi-presentation | color:string, duration:decimal, wait:boolean | no | implemented |
 | `focus` | `focus` | effect | pixi-presentation | target:string, duration:decimal | no | implemented |
@@ -245,6 +246,9 @@ Shared shorthand:
   by layered `@char`. An omitted `time` on `@char` compiles to the single 120 ms
   character-transition default. Explicit `time` overrides it, `time:0` is
   instantaneous, and initial entrances should declare their intended duration.
+  A named `@char Character` defaults `visible:true`, including when the same
+  actor was previously hidden by `@hideChars`; use explicit `visible:false` to
+  update an actor while keeping it hidden.
   This default does not apply to `@slide`, `@arrange`, or `@hideChars`. Use
   those commands for transform-only changes. `@slide Character.Expression` updates appearance,
   while `@slide Character` is transform-only and does not create a

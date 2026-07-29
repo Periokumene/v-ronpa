@@ -458,6 +458,64 @@ describe("nani runtime compiler", () => {
     expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
   });
 
+  it("normalizes global character tone presets, amount-only updates, and fixed timing params", () => {
+    const result = compileRuntimeScript(parseScenario({
+      sourceText: [
+        "@charTone rain",
+        "@charTone preset:fog amount:1.25 time:0.4 wait!",
+        "@charTone amount:1.5",
+        "@charTone none time:0.3 wait!",
+        "@charTone amount:0"
+      ].join("\n"),
+      scriptPath: "character-tone.nani"
+    }));
+
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
+    expect(result.script.commands.map(({ commandId }) => commandId)).toEqual([
+      "chartone",
+      "chartone",
+      "chartone",
+      "chartone",
+      "chartone"
+    ]);
+    expect(result.script.commands.map(({ params }) => params)).toEqual([
+      { preset: "rain", amount: 1, durationMs: 0, wait: false },
+      { preset: "fog", amount: 1.25, durationMs: 400, wait: true },
+      { amount: 1.5, durationMs: 0, wait: false },
+      { preset: "none", durationMs: 300, wait: true },
+      { amount: 0, durationMs: 0, wait: false }
+    ]);
+    for (const command of result.script.commands) {
+      expect(command.params).not.toHaveProperty("easing");
+    }
+  });
+
+  it("rejects invalid character tone literals and conflicting preset forms", () => {
+    const result = compileRuntimeScript(parseScenario({
+      sourceText: [
+        "@charTone #82abc6",
+        "@charTone unknown",
+        "@charTone rain amount:-1",
+        "@charTone none amount:1",
+        "@charTone rain preset:fog",
+        "@charTone"
+      ].join("\n"),
+      scriptPath: "invalid-character-tone.nani"
+    }));
+
+    expect(result.script.commands).toEqual([]);
+    expect(result.diagnostics.filter(({ severity }) => severity === "error")).toHaveLength(6);
+    expect(diagnosticSummaries(result.diagnostics).map(({ message }) => message)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("preset must be one of"),
+        expect.stringContaining("amount must be a finite non-negative number"),
+        expect.stringContaining("none cannot be combined"),
+        expect.stringContaining("not both"),
+        expect.stringContaining("requires a preset")
+      ])
+    );
+  });
+
   it("compiles rain power and tint showcase commands without exposing internal settings", () => {
     const parsed = parseScenario({
       sourceText: [

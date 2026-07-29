@@ -4,6 +4,7 @@ import type { NaniCommandCategory, NaniCommandSource, NaniCommandStatus, Runtime
 import {
   INNER_BACKGROUND_ID,
   createInitialPixiStageSnapshot,
+  reconcilePixiStageScriptScope,
   reducePixiRuntimeCommand
 } from "@v-ronpa/pixi-stage-model";
 import { createPixiPresenter } from "./index";
@@ -248,6 +249,105 @@ describe("pixi presenter port", () => {
     expect(withCharacter.snapshot).not.toHaveProperty("slots");
     expect(withCharacter.hints).toEqual([]);
     expect(withCharacter.diagnostics).toEqual([]);
+  });
+
+  it("reduces one script-scoped character tone state and one global wait task", () => {
+    const initial = createInitialPixiStageSnapshot();
+    const enabled = reducePixiRuntimeCommand(
+      initial,
+      runtimeCommand("chartone", "effect", {
+        preset: "rain",
+        durationMs: 400,
+        wait: true
+      }, { canonicalName: "charTone" })
+    );
+
+    expect(enabled.snapshot.characterTone).toEqual({
+      preset: "rain",
+      amount: 1,
+      scopeScriptPath: "pixi-presenter-test.nani",
+      transition: { durationMs: 400, wait: true }
+    });
+    expect(enabled.waitTasks).toEqual([{
+      kind: "character-tone-transition",
+      target: "character-tone",
+      revision: enabled.snapshot.revision
+    }]);
+
+    const amountOnly = reducePixiRuntimeCommand(
+      enabled.snapshot,
+      runtimeCommand("chartone", "effect", { amount: 2.5 }, { canonicalName: "charTone" })
+    );
+    expect(amountOnly.snapshot.characterTone).toMatchObject({ preset: "rain", amount: 2.5 });
+
+    const sameTarget = reducePixiRuntimeCommand(
+      amountOnly.snapshot,
+      runtimeCommand("chartone", "effect", { amount: 2.5, durationMs: 500, wait: true }, { canonicalName: "charTone" })
+    );
+    expect(sameTarget).toEqual({ snapshot: amountOnly.snapshot, hints: [], waitTasks: [], diagnostics: [] });
+  });
+
+  it("rejects invalid character tone runtime values without mutating state", () => {
+    const initial = createInitialPixiStageSnapshot();
+    for (const params of [
+      { preset: "unknown" },
+      { amount: 1 },
+      { preset: "rain", amount: Number.POSITIVE_INFINITY },
+      { preset: "rain", amount: -1 },
+      { preset: "none", amount: 1 }
+    ]) {
+      const reduction = reducePixiRuntimeCommand(
+        initial,
+        runtimeCommand("chartone", "effect", params, { canonicalName: "charTone" })
+      );
+      expect(reduction.snapshot).toBe(initial);
+      expect(reduction.diagnostics).toHaveLength(1);
+    }
+  });
+
+  it("removes character tone idempotently and clears it at a script boundary", () => {
+    const enabled = reducePixiRuntimeCommand(
+      createInitialPixiStageSnapshot(),
+      runtimeCommand("chartone", "effect", { preset: "fog" }, { canonicalName: "charTone" })
+    ).snapshot;
+    const removed = reducePixiRuntimeCommand(
+      enabled,
+      runtimeCommand("chartone", "effect", {
+        preset: "none",
+        durationMs: 300,
+        wait: true
+      }, { canonicalName: "charTone" })
+    );
+    expect(removed.snapshot.characterTone).toBeUndefined();
+    expect(removed.hints).toEqual([{
+      type: "character-tone-remove",
+      durationMs: 300,
+      scopeScriptPath: "pixi-presenter-test.nani",
+      wait: true
+    }]);
+    expect(removed.waitTasks).toEqual([{
+      kind: "character-tone-transition",
+      target: "character-tone",
+      revision: removed.snapshot.revision
+    }]);
+
+    const idempotent = reducePixiRuntimeCommand(
+      removed.snapshot,
+      runtimeCommand("chartone", "effect", { amount: 0, durationMs: 300, wait: true }, { canonicalName: "charTone" })
+    );
+    expect(idempotent).toEqual({ snapshot: removed.snapshot, hints: [], waitTasks: [], diagnostics: [] });
+
+    const crossed = reconcilePixiStageScriptScope(
+      { snapshot: enabled, hints: [], waitTasks: [], diagnostics: [] },
+      "game-a/chapter-02.nani"
+    );
+    expect(crossed.snapshot.characterTone).toBeUndefined();
+    expect(crossed.snapshot.revision).toBe(enabled.revision + 1);
+    const local = reconcilePixiStageScriptScope(
+      { snapshot: enabled, hints: [], waitTasks: [], diagnostics: [] },
+      "pixi-presenter-test.nani"
+    );
+    expect(local.snapshot).toBe(enabled);
   });
 
   it("reduces inback into the reserved inner background actor without touching main backgrounds", () => {
@@ -526,6 +626,44 @@ describe("pixi presenter port", () => {
     expect(tinted.charactersById).not.toHaveProperty("*");
     expect(tinted.charactersById.Ren).toMatchObject({ tint: "#ffdc22", pos: [0.24, 0], appearanceExpression: "" });
     expect(tinted.charactersById.Mira).toMatchObject({ tint: "#ffdc22", pos: [0.76, 0], appearanceExpression: "" });
+  });
+
+  it("shows a named character by default after hideChars while preserving explicit visible false", () => {
+    let stage = reducePixiRuntimeCommand(
+      createInitialPixiStageSnapshot(),
+      runtimeCommand("char", "actor", {
+        target: "Ema",
+        appearanceExpression: "Default",
+        pos: [50, 0]
+      })
+    ).snapshot;
+    stage = reducePixiRuntimeCommand(stage, runtimeCommand("hidechars", "actor", {})).snapshot;
+    expect(stage.charactersById.Ema?.visible).toBe(false);
+
+    stage = reducePixiRuntimeCommand(
+      stage,
+      runtimeCommand("char", "actor", {
+        target: "Ema",
+        appearanceExpression: "Pensive1"
+      })
+    ).snapshot;
+    expect(stage.charactersById.Ema).toMatchObject({
+      appearanceExpression: "Pensive1",
+      visible: true
+    });
+
+    stage = reducePixiRuntimeCommand(
+      stage,
+      runtimeCommand("char", "actor", {
+        target: "Ema",
+        appearanceExpression: "Pensive1,ArmR3",
+        visible: false
+      })
+    ).snapshot;
+    expect(stage.charactersById.Ema).toMatchObject({
+      appearanceExpression: "Pensive1,ArmR3",
+      visible: false
+    });
   });
 
   it("stores explicitly targeted background actors without legacy compatibility fields", () => {

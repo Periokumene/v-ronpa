@@ -11,6 +11,7 @@ Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command sh
 @choice "分支2：完整 Pixi 命令视觉验收" goto:#PixiCommandShowcase
 @choice "分支3：真实 textId-音频验证" goto:#VoiceTextIdAudioValidation
 @choice "分支4：首轮富文本标签验收" goto:#RichTextShowcase
+@choice "分支5：全局角色 Tone 验收" goto:#CharacterToneShowcase
 
 #VoiceTextIdAudioValidation
 @back bg:harness effect:fade time:0.15
@@ -59,6 +60,38 @@ Narrator: CHECKPOINT RICH 03 - 上下标 H<sub>2</sub>O / x<sup>2</sup>，以及
 @toast "<mark>CHECKPOINT RICH TOAST</mark> <small>toast 使用同一 renderer，且不进入存档。</small>" appearance:info time:2
 Narrator: CHECKPOINT RICH 05 - font face 英文同字符对比：默认 AaGgQq Font ID 123 / serif <font face='font:serif'>AaGgQq Font ID 123</font>；后者应使用注册 font id，中文不覆盖时可回退默认字体。
 @choice "<b><font color='#ffd166'>富文本 choice</font></b> - 回到入口" goto:#Start
+
+#CharacterToneShowcase
+@set route:"character-tone"
+@back bg:harness effect:fade time:0.15
+@hideChars
+@charTone rain amount:0.5
+Narrator: CHECKPOINT TONE 00 - 无角色时预设 rain amount 0.5；右侧 Tone 应显示 rain@0.5，当前不应给背景或 DOM 对话框着色。
+@char Ema pos:50
+Narrator: CHECKPOINT TONE 01 - 后出现的 Ema 应继承 rain@0.5；白色描边保持纯白。
+@charTone fog amount:1 time:0.2 wait!
+Narrator: CHECKPOINT TONE 02 - fog@1 过渡终态。
+@charTone sunset amount:2 time:0.2 wait!
+Narrator: CHECKPOINT TONE 03 - sunset@2 等于完整实验强度。
+@charTone night amount:1
+Narrator: CHECKPOINT TONE 04 - night@1。
+@charTone alert amount:1.25 time:0.2 wait!
+Narrator: CHECKPOINT TONE 05 - alert@1.25；非自然氛围应明显但线稿和白色描边不变。
+@charTone fluorescent amount:3
+Narrator: CHECKPOINT TONE 06 - fluorescent@3 overdrive；输出应保持有限且人物层次可辨。
+@charTone amount:0.5
+Narrator: CHECKPOINT TONE 07 - amount-only 更新保持 fluorescent preset，强度降至 0.5。
+@charTone rain amount:1 time:0.2 wait!
+Narrator: CHECKPOINT TONE SAVE - 保存此处后切换 preset，再读档应立即恢复 rain@1 目标终态。
+@charTone sunset amount:1.5 time:0.4
+@char Ema.Pensive1,ArmR3 pos:50
+Narrator: CHECKPOINT TONE 08 - preset 动画中 expression crossfade 两侧应共享同一 live tone，不出现色调接缝。
+@charTone none time:0.2 wait!
+Narrator: CHECKPOINT TONE 09 - none 清除终态；Tone 应显示 none。
+@charTone fog amount:1
+@charTone amount:0 time:0.2 wait!
+Narrator: CHECKPOINT TONE 10 - amount:0 清除终态；Tone 应显示 none。
+@choice "返回 Tone 分支入口" goto:#CharacterToneShowcase
 
 #MainInteractionFlow
 @set route:"return"

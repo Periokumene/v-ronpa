@@ -271,6 +271,7 @@ describe("story engine", () => {
       "blur",
       "bokeh",
       "char",
+      "chartone",
       "choice",
       "clearbacklog",
       "clearchoice",

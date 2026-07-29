@@ -1,6 +1,8 @@
 import {
+  CHARACTER_TONE_PRESET_IDS,
   PIXI_INNER_BACKGROUND_ID,
   PIXI_MAIN_BACKGROUND_ID,
+  type CharacterTonePresetId,
   type PixiActorSnapshot,
   type PixiRainCommandParams,
   type PixiStageSnapshot,
@@ -33,6 +35,12 @@ export {
 
 export type PixiStageRenderHint =
   | { type: "flash"; color: string; durationMs: number; wait?: boolean }
+  | {
+      type: "character-tone-remove";
+      durationMs: number;
+      scopeScriptPath: string;
+      wait?: boolean;
+    }
   | { type: "screen-filter-remove"; kind: "bokeh" | "glitch"; durationMs: number; easing?: string; wait?: boolean }
   | { type: "weather-remove"; kind: PixiWeatherKind; durationMs: number; easing?: string; wait?: boolean }
   | {
@@ -146,6 +154,8 @@ export function reducePixiRuntimeCommand(
       return reduceBack(snapshot, command);
     case "char":
       return reduceChar(snapshot, command);
+    case "chartone":
+      return reduceCharacterTone(snapshot, command);
     case "arrange":
       return reduceArrange(snapshot, command);
     case "hidechars":
@@ -238,6 +248,115 @@ export function reducePixiRuntimeCommand(
     default:
       return unsupportedPixiCommand(snapshot, command);
   }
+}
+
+const characterTonePresetIds = new Set<string>(CHARACTER_TONE_PRESET_IDS);
+
+function reduceCharacterTone(
+  snapshot: PixiStageSnapshot,
+  command: RuntimeCommand
+): PixiRuntimeCommandReduction {
+  const requestedPreset = stringParam(command, "preset");
+  const requestedAmount = numberParam(command, "amount");
+  const durationMs = durationMsParam(command, 0);
+  const wait = booleanParam(command, "wait", false);
+  const scopeScriptPath = command.loc.scriptPath;
+
+  if (requestedPreset && requestedPreset !== "none" && !characterTonePresetIds.has(requestedPreset)) {
+    return unsupportedPixiParams(snapshot, command, `unknown character tone preset: ${requestedPreset}`);
+  }
+  if (requestedAmount !== undefined && (!Number.isFinite(requestedAmount) || requestedAmount < 0)) {
+    return unsupportedPixiParams(snapshot, command, "amount must be a finite non-negative number");
+  }
+  if (!Number.isFinite(durationMs) || durationMs < 0) {
+    return unsupportedPixiParams(snapshot, command, "durationMs must be a finite non-negative number");
+  }
+  if (requestedPreset === "none" && requestedAmount !== undefined && requestedAmount > 0) {
+    return unsupportedPixiParams(snapshot, command, "none cannot be combined with a positive amount");
+  }
+
+  const remove = requestedPreset === "none" || requestedAmount === 0;
+  if (remove) {
+    if (!snapshot.characterTone) return emptyReduction(snapshot);
+    const { characterTone: _characterTone, ...withoutTone } = snapshot;
+    const reduction = changedSnapshot(withoutTone);
+    if (durationMs <= 0) return reduction;
+    return {
+      ...withWaitTasks(command, reduction, "character-tone-transition", ["character-tone"]),
+      hints: [{
+        type: "character-tone-remove",
+        durationMs,
+        scopeScriptPath,
+        wait
+      }]
+    };
+  }
+
+  const preset = requestedPreset
+    ? requestedPreset as CharacterTonePresetId
+    : snapshot.characterTone?.preset;
+  if (!preset) {
+    return unsupportedPixiParams(snapshot, command, "a positive amount requires an active preset");
+  }
+  const amount = requestedAmount ?? (requestedPreset ? 1 : snapshot.characterTone?.amount);
+  if (amount === undefined) {
+    return unsupportedPixiParams(snapshot, command, "missing amount and active preset");
+  }
+  if (
+    snapshot.characterTone?.preset === preset &&
+    snapshot.characterTone.amount === amount &&
+    snapshot.characterTone.scopeScriptPath === scopeScriptPath
+  ) {
+    return emptyReduction(snapshot);
+  }
+
+  return withWaitTasks(
+    command,
+    changedSnapshot({
+      ...snapshot,
+      characterTone: {
+        preset,
+        amount,
+        scopeScriptPath,
+        transition: { durationMs, wait }
+      }
+    }),
+    "character-tone-transition",
+    ["character-tone"]
+  );
+}
+
+export function reconcilePixiStageScriptScope(
+  reduction: PixiRuntimeCommandReduction,
+  activeScriptPath: string
+): PixiRuntimeCommandReduction {
+  let snapshot = reduction.snapshot;
+  if (
+    snapshot.characterTone &&
+    snapshot.characterTone.scopeScriptPath !== activeScriptPath
+  ) {
+    const { characterTone: _characterTone, ...withoutTone } = snapshot;
+    snapshot = {
+      ...withoutTone,
+      revision: snapshot.revision + 1
+    };
+  }
+
+  const hints = reduction.hints.filter(
+    (hint) => hint.type !== "character-tone-remove" || hint.scopeScriptPath === activeScriptPath
+  );
+  const hasActiveToneTransition =
+    snapshot.characterTone?.scopeScriptPath === activeScriptPath ||
+    hints.some((hint) => hint.type === "character-tone-remove");
+  const waitTasks = reduction.waitTasks.filter(
+    (task) => task.kind !== "character-tone-transition" || hasActiveToneTransition
+  );
+  return {
+    ...reduction,
+    snapshot,
+    hints,
+    waitTasks
+  };
 }
 
 export function resolvePixiActorTarget(target: string | undefined, stage: PixiStageSnapshot): string[] {
@@ -723,7 +842,7 @@ function buildCharacterActor(
     kind: "character",
     appearanceExpression: stringParam(command, "appearanceExpression") ?? "",
     pose: stringParam(command, "pose") ?? previous?.pose,
-    visible: transform.visible ?? previous?.visible ?? true,
+    visible: transform.visible ?? true,
     alpha: previous?.alpha ?? 1,
     z: previous?.z ?? snapshot.actorOrder.length,
     filters: previous?.filters ?? {},

@@ -56,7 +56,8 @@ The canonical character path is:
   -> ContentManifest and AssetRegistry + generated entry preload plan
   -> Pixi stage readiness (fetch, decode, GPU upload)
   -> synchronous @char expression
-  -> persistent final-character Filter
+  -> optional script-scoped global character Tone Filter
+  -> persistent final-character outline/opacity Filter
 ```
 
 The CSP workspace and run outputs remain tool-owned. Promotion is deliberately manual. The accepted character directory
@@ -114,7 +115,10 @@ root attaches one transition-only isolation Filter before the clock starts. A ra
 transition to its target before starting the next one. Initial appearance and hide/show use the same presentation-owned
 opacity channel rather than attenuating the outline Filter input.
 
-For an enabled actor, every active complete composition owns one WebGL Filter. The Filter sees the composition at full
+For an enabled actor, every active complete composition owns one final-output
+WebGL Filter. When `@charTone` is active, a separate private OKLab Tone Filter
+runs immediately before it over the complete composition; individual layer
+Sprites never receive tone. The final-output Filter sees the composition at full
 coverage, samples the center plus eight neighbor positions, and produces the colored character and white shell atomically.
 Neighbor alpha is the source-over union `1 - Π(1-aᵢ)` and white outer alpha is
 `neighborAlpha × (1-centerAlpha)`. Only after that calculation does the shader multiply the premultiplied result by
@@ -133,8 +137,12 @@ Filter input UVs. This preserves one original sprite texel through viewport resi
 derived from the transformed diagonal extent plus one antialias pixel. Filter instances keep their own transform and opacity
 uniforms while sharing one `GlProgram`.
 
-Steady-state enabled structure is `L + 1 filter`; token transitions are at most `2L + 2 final filters + 1 isolation filter`
-for the declared transition only. The isolation Filter is lazily reused per actor, detached outside transitions, and
+Steady-state enabled structure is `L + 1 final filter + optional 1 tone filter`;
+token transitions are at most
+`2L + 2 final filters + optional 2 tone filters + 1 isolation filter`
+for the declared transition only. Both branches subscribe to the same live
+global tone palette/amount, so expression replacement cannot create a tone
+seam. The isolation Filter is lazily reused per actor, detached outside transitions, and
 destroyed with the presentation; its filter target is pooled and limited to character screen bounds. The outgoing Filter is
 destroyed when the transition settles, without destroying Assets-owned textures. The disabled path uses the same
 prepared-resource, opacity scheduler, and isolated crossfade. It temporarily attaches lightweight whole-composition opacity
@@ -156,6 +164,8 @@ The following alternatives are intentionally forbidden:
 
 Actor alpha is applied by each final composition Filter after outline generation; blur, bokeh, and screen effects continue
 to wrap the isolated completed actor. Neither the outline nor transition isolation Filter is added to the viewport-wide
-actor filter stack. Each composition destroys its Filter, while cached source textures remain Assets-owned. The
+actor filter stack. Tone is likewise never attached to the character layer,
+stage root, background, weather, or DOM surface. Each composition destroys its
+owned Filter instances, while cached source textures remain Assets-owned. The
 implementation supplies GLSL for the existing WebGL path only; WebGPU migration must be coordinated with the other Pixi
 effects rather than adding an outline-only renderer fork.

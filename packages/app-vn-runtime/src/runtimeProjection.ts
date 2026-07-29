@@ -15,7 +15,10 @@ import type {
   RuntimeCommand
 } from "@v-ronpa/contracts";
 import type { VnSessionState } from "@v-ronpa/app-vn-session";
-import type { PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
+import {
+  reconcilePixiStageScriptScope,
+  type PixiStageRenderHint
+} from "@v-ronpa/pixi-stage-model";
 
 /**
  * Stable state produced by one Story instruction plus its presentation fanout.
@@ -67,15 +70,39 @@ export function projectVnRuntimeStep({
   runtimeCommands,
   session
 }: ProjectVnRuntimeStepInput): ProjectVnRuntimeStepResult {
-  const transaction = createVnRuntimePresentationTransaction({
+  const scopedPreviousPixiStage = reconcilePixiStageScriptScope(
+    {
+      snapshot: previousPixiStage,
+      hints: [],
+      waitTasks: [],
+      diagnostics: []
+    },
+    session.script.scriptPath
+  ).snapshot;
+  const unscopedTransaction = createVnRuntimePresentationTransaction({
     nowMs,
     previousMediaState,
-    previousPixiStage,
+    previousPixiStage: scopedPreviousPixiStage,
     previousUiState,
     profile,
     runtimeCommands,
     ...(routeTable ? { routeTable } : {})
   });
+  const scopedPixi = reconcilePixiStageScriptScope(
+    {
+      snapshot: unscopedTransaction.pixiStage,
+      hints: unscopedTransaction.pixiHints,
+      waitTasks: unscopedTransaction.pixiWaitTasks,
+      diagnostics: unscopedTransaction.diagnostics
+    },
+    session.script.scriptPath
+  );
+  const transaction: VnRuntimePresentationTransaction = {
+    ...unscopedTransaction,
+    pixiStage: scopedPixi.snapshot,
+    pixiHints: scopedPixi.hints,
+    pixiWaitTasks: scopedPixi.waitTasks
+  };
   const story = session.story.presentationWait?.channel === "pixi"
     ? {
         ...session.story,

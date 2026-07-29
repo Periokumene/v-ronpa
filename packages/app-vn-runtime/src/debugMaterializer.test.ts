@@ -19,6 +19,7 @@ describe("VN debug inspection and materialization", () => {
       '@set route:"preview"',
       "@back bg:harness effect:fade time:0.2 wait!",
       "@char Ema.Pensive1 pos:50 time:0.1 wait!",
+      "@charTone rain amount:1.25 time:0.1 wait!",
       "@rain power:0.5 wind:-1 hue:215 tint:0.55 time:0.1 wait!",
       "@bgm bgm:harness group:music volume:0.4",
       "@sfx sfx:rain group:rain loop:true volume:0.25",
@@ -38,6 +39,11 @@ describe("VN debug inspection and materialization", () => {
     expect(result.checkpoint.pixiStage).toMatchObject({
       backgroundsById: { [PIXI_MAIN_BACKGROUND_ID]: { appearance: "bg:harness" } },
       charactersById: { Ema: { appearanceExpression: "Pensive1", pos: [0.5, 0] } },
+      characterTone: {
+        preset: "rain",
+        amount: 1.25,
+        scopeScriptPath: "game-a/debug-test.nani"
+      },
       weather: { rain: { commandParams: { power: 0.5, wind: -1, hue: 215, tint: 0.55 } } }
     });
     expect(result.checkpoint.ui.commandBar).toBe(false);
@@ -464,6 +470,7 @@ describe("VN debug inspection and materialization", () => {
         "#Start",
         '@set route:"from-first"',
         "@back bg:harness",
+        "@charTone rain",
         '@choice "Continue" goto:game-a/chapter-02.nani#Start id:continue',
         '@choice "Stay" goto:#Stay id:stay',
         "#Stay",
@@ -514,6 +521,7 @@ describe("VN debug inspection and materialization", () => {
     expect(result.checkpoint.story.variables).toEqual({ route: "from-first" });
     expect(result.checkpoint.story.text?.current?.text).toBe("Arrived.");
     expect(result.checkpoint.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
+    expect(result.checkpoint.pixiStage.characterTone).toBeUndefined();
     expect(result.executedScriptPaths).toEqual([
       "game-a/chapter-01.nani",
       "game-a/chapter-02.nani"

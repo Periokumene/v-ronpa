@@ -154,6 +154,7 @@ export function HarnessShowcaseScenario() {
                 mapId={runtime.navi.activeMapId ?? "none"}
                 mode={flow.mode}
                 pixiBackground={runtime.presentation.pixiStageRuntime.snapshot.backgroundsById.MainBackground?.appearance ?? "none"}
+                pixiCharacterTone={formatPixiCharacterTone(runtime.presentation.pixiStageRuntime.snapshot)}
                 pixiCharacters={formatPixiStageCharacters(runtime.presentation.pixiStageRuntime.snapshot)}
                 pixiRevision={String(runtime.presentation.pixiStageRuntime.snapshot.revision)}
                 pixiTasks={formatPixiPresentationTasks(runtime.presentation.pixiStageRuntime.presentationTasks)}
@@ -336,7 +337,7 @@ function formatPixiStageCharacters(stage: Pick<PixiStageSnapshot, "actorOrder" |
     const actor = stage.charactersById[id];
     if (!actor) return [];
     const pos = actor.pos ? `@${actor.pos[0].toFixed(2)},${actor.pos[1].toFixed(2)}` : "";
-    return [`${actor.id}/${actor.appearanceExpression || "default"}${pos}`];
+    return [`${actor.id}/${actor.appearanceExpression || "default"}${pos}[${actor.visible ? "visible" : "hidden"}]`];
   });
   return entries.length > 0 ? entries.join(", ") : "empty";
 }
@@ -378,6 +379,7 @@ function HarnessShowcaseReadout({
   mapId,
   mode,
   pixiBackground,
+  pixiCharacterTone,
   pixiCharacters,
   pixiRevision,
   pixiTasks,
@@ -404,6 +406,7 @@ function HarnessShowcaseReadout({
   mapId: string;
   mode: string;
   pixiBackground: string;
+  pixiCharacterTone: string;
   pixiCharacters: string;
   pixiRevision: string;
   pixiTasks: string;
@@ -438,6 +441,7 @@ function HarnessShowcaseReadout({
         <Readout label="Route" testId="harness-showcase-route" value={route} />
         <Readout label="Pixi BG" testId="harness-showcase-pixi-background" value={pixiBackground} />
         <Readout label="Pixi Rev" testId="harness-showcase-pixi-revision" value={pixiRevision} />
+        <Readout label="Tone" testId="harness-showcase-character-tone" value={pixiCharacterTone} />
         <Readout label="Pixi Chars" testId="harness-showcase-pixi-characters" value={pixiCharacters} wide />
         <Readout label="Pixi Tasks" testId="harness-showcase-pixi-tasks" value={pixiTasks} wide />
         <Readout label="Trial Segment" testId="harness-showcase-trial-segment" value={trialSegment} wide />
@@ -463,6 +467,11 @@ function formatLatestDiagnostic(diagnostics: HarnessShowcaseRuntimeDiagnostic[])
 
 function countAssetDiagnostics(diagnostics: HarnessShowcaseRuntimeDiagnostic[]): number {
   return diagnostics.filter((diagnostic) => diagnostic.source === "asset").length;
+}
+
+function formatPixiCharacterTone(snapshot: PixiStageSnapshot): string {
+  const tone = snapshot.characterTone;
+  return tone ? `${tone.preset}@${tone.amount}` : "none";
 }
 
 function Readout({ label, testId, value, wide = false }: { label: string; testId: string; value: string; wide?: boolean }) {

@@ -36,6 +36,13 @@ saveable. `createVnSaveCheckpoint()` rejects unstable stops rather than deleting
 transient state. Restore rejects mismatched game, entry, or revision before
 stopping live media or mutating app state.
 
+`PixiStageSnapshot.characterTone` is an optional SaveData-v8-compatible target
+state for `@charTone`. It stores the code-owned preset ID, finite non-negative
+artistic amount, owning `scopeScriptPath`, and terminal transition request.
+Save validation requires the scope path to equal `vn.script.scriptPath`.
+Renderer tween progress and fixed easing remain transient; older v8 saves
+without the optional field restore with tone disabled.
+
 The global inventory, evidence, and character sections remain shared across
 VN/Navi/Trial. A VN-focused game may provide valid empty initial gameplay state.
 

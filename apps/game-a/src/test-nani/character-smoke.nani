@@ -2,6 +2,7 @@
 @showUI dialog
 @showUI commandBar visible:true
 @back bg:game-a-academy-hall-fullscreen effect:fade time:0.05
+@charTone rain
 @char alice pos:50 time:0.3 wait!
 Narrator: CHECKPOINT CHARACTER 00 - default composition.
 @char alice.body0,eye1,mouth1 pos:50 wait!
@@ -10,8 +11,9 @@ Narrator: CHECKPOINT CHARACTER 01 - eye and mouth replacement.
 Narrator: CHECKPOINT CHARACTER 02 - single arm replacement.
 @char alice.eye4,mouth4,armR2,armL4 pos:50 wait!
 Narrator: CHECKPOINT CHARACTER 03 - both arms replacement.
+@charTone sunset amount:1.5 time:0.2 wait!
 @char alice.eye2,mouth2,armR0,armL0 pos:50 wait!
-Narrator: CHECKPOINT CHARACTER 04 - final multilayer composition.
+Narrator: CHECKPOINT CHARACTER 04 - final multilayer composition with sunset tone.
 @choice "完成角色测试" goto:#Complete
 
 #Complete

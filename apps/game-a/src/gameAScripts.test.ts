@@ -27,7 +27,9 @@ describe("game-a nani catalogs", () => {
     const chapter = source("game-a/chapter-02.nani");
     expect(opening.sourceText).toContain("goto:game-a/chapter-02.nani#Start");
     expect(opening.sourceText).not.toContain("#MILKBEGIN");
+    expect(opening.sourceText.indexOf("@charTone rain")).toBeLessThan(opening.sourceText.indexOf("@char alice pos:50"));
     expect(chapter.sourceText).toContain("#Start");
+    expect(chapter.sourceText.startsWith("#Start\n@charTone rain\n")).toBe(true);
     expect(chapter.sourceText).toContain("@stopSfx group:rain fade:0.8");
     expect(chapter.sourceText).toContain("@end");
 

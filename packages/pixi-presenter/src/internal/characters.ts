@@ -18,6 +18,12 @@ import {
   type ResolvedLayeredCharacterLayer
 } from "@v-ronpa/layered-character";
 import { resolvePixiAsset, type PixiAssetResolver, type PixiPresenterDiagnostic } from "./assetResolver";
+import {
+  createCharacterToneFilter,
+  syncCharacterToneFilter,
+  type CharacterToneFilter,
+  type CharacterToneLiveState
+} from "./characterTone";
 
 export interface CharacterSystemOptions {
   width: () => number;
@@ -82,6 +88,7 @@ interface CharacterOpacityState {
 
 interface MountedCharacterComposition extends CharacterCompositionInstance {
   opacity: CharacterOpacityState;
+  tone?: CharacterToneFilter;
   outline?: CharacterOutlineFilter;
   opacityFilter?: CharacterOpacityFilter;
 }
@@ -495,6 +502,7 @@ export class CharacterPresentation {
   private current: MountedCharacterComposition | undefined;
   private activeTransition: { outgoing: MountedCharacterComposition; incoming: MountedCharacterComposition } | undefined;
   private crossfadeIsolation?: CharacterOpacityFilter;
+  private toneLive: CharacterToneLiveState | undefined;
   private destroyed = false;
 
   constructor(actorId: string, private readonly options: CharacterSystemOptions) {
@@ -557,6 +565,12 @@ export class CharacterPresentation {
     for (const instance of this.activeInstances()) this.syncInstanceOpacity(instance);
   }
 
+  setTone(state: CharacterToneLiveState | undefined): void {
+    if (this.destroyed) return;
+    this.toneLive = state;
+    for (const instance of this.activeInstances()) this.syncInstanceTone(instance);
+  }
+
   syncOutlineTransform(): void {
     if (this.destroyed) return;
     for (const instance of this.activeInstances()) {
@@ -594,10 +608,11 @@ export class CharacterPresentation {
       ...instance,
       opacity: { value: 1 }
     };
+    if (this.toneLive) mounted.tone = createCharacterToneFilter(this.toneLive);
     if (this.options.characterOutlineEnabled && instance.sourcePixelStep !== undefined) {
       mounted.outline = createCharacterOutlineFilter();
-      mounted.container.filters = [mounted.outline.filter];
     }
+    this.syncInstanceFilterStack(mounted);
     return mounted;
   }
 
@@ -626,9 +641,23 @@ export class CharacterPresentation {
     this.destroyOpacityFilter(instance);
   }
 
+  private syncInstanceTone(instance: MountedCharacterComposition): void {
+    if (!this.toneLive) {
+      if (!instance.tone) return;
+      instance.tone.filter.destroy();
+      delete instance.tone;
+      this.syncInstanceFilterStack(instance);
+      return;
+    }
+    instance.tone ??= createCharacterToneFilter(this.toneLive);
+    syncCharacterToneFilter(instance.tone, this.toneLive);
+    this.syncInstanceFilterStack(instance);
+  }
+
   private destroyInstance(instance: MountedCharacterComposition | undefined): void {
     if (!instance || instance.container.destroyed) return;
     instance.container.filters = null;
+    instance.tone?.filter.destroy();
     instance.outline?.filter.destroy();
     instance.opacityFilter?.filter.destroy();
     instance.container.removeFromParent();
@@ -666,15 +695,23 @@ export class CharacterPresentation {
     if (instance.opacityFilter) return instance.opacityFilter;
     const opacityFilter = createCharacterOpacityFilter();
     instance.opacityFilter = opacityFilter;
-    instance.container.filters = [opacityFilter.filter];
+    this.syncInstanceFilterStack(instance);
     return opacityFilter;
   }
 
   private destroyOpacityFilter(instance: MountedCharacterComposition): void {
     if (!instance.opacityFilter) return;
-    instance.container.filters = null;
     instance.opacityFilter.filter.destroy();
     delete instance.opacityFilter;
+    this.syncInstanceFilterStack(instance);
+  }
+
+  private syncInstanceFilterStack(instance: MountedCharacterComposition): void {
+    const filters = [
+      instance.tone?.filter,
+      instance.outline?.filter ?? instance.opacityFilter?.filter
+    ].filter((filter): filter is Filter => Boolean(filter));
+    instance.container.filters = filters.length > 0 ? filters : null;
   }
 
   private syncCrossfadeIsolationPadding(): void {

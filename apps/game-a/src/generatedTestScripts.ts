@@ -65,7 +65,7 @@ export const gameATestScriptMetadataByPath = {
       ]
     },
     "game-a/test/character-smoke.nani": {
-      "scriptRevision": "sha256:558bfdcb2d72f3a68a79d70f4d9574a0eaf094389b8a036feeedd81aa49ca07e",
+      "scriptRevision": "sha256:c6bfff20c3c1dfc9bf18f031029a38c89d7401572b0e663cc4942602796b0197",
       "assetRefs": [
         {
           "id": "alice",
@@ -101,8 +101,8 @@ export const gameATestScriptSourcesByPath = {
     },
     "game-a/test/character-smoke.nani": {
       "scriptPath": "game-a/test/character-smoke.nani",
-      "sourceText": "#Start\n@showUI dialog\n@showUI commandBar visible:true\n@back bg:game-a-academy-hall-fullscreen effect:fade time:0.05\n@char alice pos:50 time:0.3 wait!\nNarrator: CHECKPOINT CHARACTER 00 - default composition.\n@char alice.body0,eye1,mouth1 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 01 - eye and mouth replacement.\n@char alice.eye3,mouth3,armR3 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 02 - single arm replacement.\n@char alice.eye4,mouth4,armR2,armL4 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 03 - both arms replacement.\n@char alice.eye2,mouth2,armR0,armL0 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 04 - final multilayer composition.\n@choice \"完成角色测试\" goto:#Complete\n\n#Complete\nNarrator: CHECKPOINT CHARACTER COMPLETE\n@end\n",
-      "scriptRevision": "sha256:558bfdcb2d72f3a68a79d70f4d9574a0eaf094389b8a036feeedd81aa49ca07e"
+      "sourceText": "#Start\n@showUI dialog\n@showUI commandBar visible:true\n@back bg:game-a-academy-hall-fullscreen effect:fade time:0.05\n@charTone rain\n@char alice pos:50 time:0.3 wait!\nNarrator: CHECKPOINT CHARACTER 00 - default composition.\n@char alice.body0,eye1,mouth1 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 01 - eye and mouth replacement.\n@char alice.eye3,mouth3,armR3 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 02 - single arm replacement.\n@char alice.eye4,mouth4,armR2,armL4 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 03 - both arms replacement.\n@charTone sunset amount:1.5 time:0.2 wait!\n@char alice.eye2,mouth2,armR0,armL0 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 04 - final multilayer composition with sunset tone.\n@choice \"完成角色测试\" goto:#Complete\n\n#Complete\nNarrator: CHECKPOINT CHARACTER COMPLETE\n@end\n",
+      "scriptRevision": "sha256:c6bfff20c3c1dfc9bf18f031029a38c89d7401572b0e663cc4942602796b0197"
     }
   } satisfies Record<string, VnRuntimeScriptSource>;
 
@@ -117,8 +117,8 @@ export const gameATestScriptCatalogs = {
     "characterSmoke": [
       {
         "scriptPath": "game-a/test/character-smoke.nani",
-        "sourceText": "#Start\n@showUI dialog\n@showUI commandBar visible:true\n@back bg:game-a-academy-hall-fullscreen effect:fade time:0.05\n@char alice pos:50 time:0.3 wait!\nNarrator: CHECKPOINT CHARACTER 00 - default composition.\n@char alice.body0,eye1,mouth1 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 01 - eye and mouth replacement.\n@char alice.eye3,mouth3,armR3 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 02 - single arm replacement.\n@char alice.eye4,mouth4,armR2,armL4 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 03 - both arms replacement.\n@char alice.eye2,mouth2,armR0,armL0 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 04 - final multilayer composition.\n@choice \"完成角色测试\" goto:#Complete\n\n#Complete\nNarrator: CHECKPOINT CHARACTER COMPLETE\n@end\n",
-        "scriptRevision": "sha256:558bfdcb2d72f3a68a79d70f4d9574a0eaf094389b8a036feeedd81aa49ca07e"
+        "sourceText": "#Start\n@showUI dialog\n@showUI commandBar visible:true\n@back bg:game-a-academy-hall-fullscreen effect:fade time:0.05\n@charTone rain\n@char alice pos:50 time:0.3 wait!\nNarrator: CHECKPOINT CHARACTER 00 - default composition.\n@char alice.body0,eye1,mouth1 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 01 - eye and mouth replacement.\n@char alice.eye3,mouth3,armR3 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 02 - single arm replacement.\n@char alice.eye4,mouth4,armR2,armL4 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 03 - both arms replacement.\n@charTone sunset amount:1.5 time:0.2 wait!\n@char alice.eye2,mouth2,armR0,armL0 pos:50 wait!\nNarrator: CHECKPOINT CHARACTER 04 - final multilayer composition with sunset tone.\n@choice \"完成角色测试\" goto:#Complete\n\n#Complete\nNarrator: CHECKPOINT CHARACTER COMPLETE\n@end\n",
+        "scriptRevision": "sha256:c6bfff20c3c1dfc9bf18f031029a38c89d7401572b0e663cc4942602796b0197"
       }
     ]
   } as const satisfies Record<string, VnRuntimeScriptCatalog>;

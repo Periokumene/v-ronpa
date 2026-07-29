@@ -16,6 +16,7 @@ import {
 import { GodrayFilter, KawaseBlurFilter } from "pixi-filters";
 import type {
   PixiActorSnapshot,
+  PixiCharacterToneSnapshot,
   PixiRainCommandParams,
   PixiStageSnapshot,
   PixiWeatherKind,
@@ -31,6 +32,11 @@ import {
   type CharacterPreparationResult,
   type CharacterPresentation
 } from "./characters";
+import {
+  characterToneTarget,
+  copyCharacterToneState,
+  type CharacterToneLiveState
+} from "./characterTone";
 import { RainShaderRenderer } from "./rain/RainShaderRenderer";
 import { resolveRainSettingsFromCommandParams } from "./rain/settings";
 
@@ -385,6 +391,128 @@ class LiveParamTransition {
   }
 }
 
+class CharacterToneController {
+  private readonly presentations = new Set<CharacterPresentation>();
+  private readonly transition: LiveParamTransition;
+  private live: CharacterToneLiveState | undefined;
+  private target: PixiCharacterToneSnapshot | undefined;
+  private enabled = false;
+
+  constructor(
+    tweens: TweenSystem,
+    private readonly tasks: PresentationTaskController
+  ) {
+    this.transition = new LiveParamTransition(tweens, tasks);
+  }
+
+  register(presentation: CharacterPresentation): void {
+    this.presentations.add(presentation);
+    presentation.setTone(this.enabled ? this.live : undefined);
+  }
+
+  unregister(presentation: CharacterPresentation): void {
+    this.presentations.delete(presentation);
+  }
+
+  reconcile(
+    next: PixiCharacterToneSnapshot | undefined,
+    animate: boolean,
+    revision: number,
+    hints: PixiStageRenderHint[]
+  ): void {
+    if (!next) {
+      this.remove(animate, revision, hints);
+      return;
+    }
+    if (animate && sameCharacterToneSnapshot(this.target, next)) return;
+
+    const targetLive = characterToneTarget(next.preset, next.amount);
+    const scopeChanged = this.target !== undefined && this.target.scopeScriptPath !== next.scopeScriptPath;
+    if (!this.live || !this.enabled || (scopeChanged && animate && next.transition.durationMs > 0)) {
+      this.live = copyCharacterToneState(targetLive);
+      if (animate && next.transition.durationMs > 0) this.live.amount = 0;
+    }
+    this.target = next;
+    const live = this.live;
+    this.transition.start({
+      state: live,
+      to: targetLive,
+      animate,
+      durationMs: next.transition.durationMs,
+      task: {
+        kind: "character-tone-transition",
+        target: "character-tone",
+        revision
+      },
+      onUpdate: () => this.applyLive(true),
+      onComplete: () => this.applyLive(true),
+      onSettle: () => this.applyLive(true),
+      onCancel: () => this.applyLive(this.enabled)
+    });
+  }
+
+  destroy(): void {
+    this.tasks.cancelTarget("character-tone");
+    this.transition.cancel(false);
+    this.disable();
+    this.presentations.clear();
+    this.live = undefined;
+    this.target = undefined;
+  }
+
+  private remove(
+    animate: boolean,
+    revision: number,
+    hints: PixiStageRenderHint[]
+  ): void {
+    const removal = hints.find(
+      (hint): hint is Extract<PixiStageRenderHint, { type: "character-tone-remove" }> =>
+        hint.type === "character-tone-remove"
+    );
+    this.target = undefined;
+    if (!this.live || !this.enabled) {
+      this.tasks.cancelTarget("character-tone");
+      this.transition.cancel(false);
+      this.disable();
+      return;
+    }
+    if (!animate || !removal || removal.durationMs <= 0) {
+      this.tasks.cancelTarget("character-tone");
+      this.transition.cancel(false);
+      this.disable();
+      return;
+    }
+    const live = this.live;
+    this.transition.start({
+      state: live,
+      to: { ...live, amount: 0 },
+      animate: true,
+      durationMs: removal.durationMs,
+      task: {
+        kind: "character-tone-transition",
+        target: "character-tone",
+        revision
+      },
+      onUpdate: () => this.applyLive(true),
+      onComplete: () => this.disable(),
+      onSettle: () => this.disable(),
+      onCancel: () => this.disable()
+    });
+  }
+
+  private applyLive(enabled: boolean): void {
+    this.enabled = enabled && Boolean(this.live);
+    for (const presentation of this.presentations) {
+      presentation.setTone(this.enabled ? this.live : undefined);
+    }
+  }
+
+  private disable(): void {
+    this.enabled = false;
+    for (const presentation of this.presentations) presentation.setTone(undefined);
+  }
+}
+
 export class RootFilterStack {
   private screenFilters: Filter[] = [];
   private transientFilters: Filter[] = [];
@@ -708,6 +836,7 @@ export class ActorSystem {
   private readonly characterLayer = new Container({ label: "characters" });
   private readonly actors = new Map<string, ActorRecord>();
   private readonly characters: CharacterSystem;
+  private readonly characterTone: CharacterToneController;
 
   constructor(
     private readonly options: PixiActorSystemOptions,
@@ -716,6 +845,7 @@ export class ActorSystem {
     private readonly tasks: PresentationTaskController
   ) {
     this.characters = new CharacterSystem(options);
+    this.characterTone = new CharacterToneController(tweens, tasks);
     this.backgroundLayer.zIndex = 0;
     this.innerBackLayer.zIndex = 2;
     this.characterLayer.zIndex = 10;
@@ -723,7 +853,8 @@ export class ActorSystem {
     options.root.addChild(this.backgroundLayer, this.innerBackLayer, this.characterLayer);
   }
 
-  reconcile(snapshot: PixiStageSnapshot, animate: boolean): void {
+  reconcile(snapshot: PixiStageSnapshot, animate: boolean, hints: PixiStageRenderHint[] = []): void {
+    this.characterTone.reconcile(snapshot.characterTone, animate, snapshot.revision, hints);
     const activeIds = new Set([
       ...Object.keys(snapshot.backgroundsById),
       ...Object.keys(snapshot.innerBackgroundsById),
@@ -752,6 +883,7 @@ export class ActorSystem {
 
   destroy(): void {
     this.clear();
+    this.characterTone.destroy();
     this.characters.destroy();
   }
 
@@ -860,7 +992,10 @@ export class ActorSystem {
     if (!record) return;
     this.tasks.cancelTarget(id);
     this.filters.releaseActorFilters(record.container);
-    if (record.layout?.kind === "character") record.layout.presentation.destroy();
+    if (record.layout?.kind === "character") {
+      this.characterTone.unregister(record.layout.presentation);
+      record.layout.presentation.destroy();
+    }
     record.container.removeFromParent();
     record.container.destroy({ children: true });
     this.actors.delete(id);
@@ -926,6 +1061,7 @@ export class ActorSystem {
   private createCharacterPresentation(record: ActorRecord, actorId: string): CharacterPresentation {
     for (const child of record.container.removeChildren()) child.destroy({ children: true });
     const presentation = this.characters.createPresentation(actorId);
+    this.characterTone.register(presentation);
     record.layout = { kind: "character", presentation };
     record.container.addChild(presentation.root);
     return presentation;
@@ -1849,6 +1985,18 @@ function sameVector2(left: [number, number] | undefined, right: [number, number]
 
 function sameActorFilters(left: PixiActorSnapshot["filters"], right: PixiActorSnapshot["filters"]): boolean {
   return Math.abs((left.blur ?? 0) - (right.blur ?? 0)) < 0.0001 && Math.abs((left.bokeh ?? 0) - (right.bokeh ?? 0)) < 0.0001;
+}
+
+function sameCharacterToneSnapshot(
+  left: PixiCharacterToneSnapshot | undefined,
+  right: PixiCharacterToneSnapshot
+): boolean {
+  return Boolean(
+    left &&
+    left.preset === right.preset &&
+    left.amount === right.amount &&
+    left.scopeScriptPath === right.scopeScriptPath
+  );
 }
 
 function fitBackgroundSprite(sprite: Sprite, texture: Texture, width: number, height: number): void {

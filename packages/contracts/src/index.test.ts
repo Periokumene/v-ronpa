@@ -32,6 +32,7 @@ import {
   SaveModeSchema,
   SaveSlotSummarySchema,
   SettingsSnapshotSchema,
+  StoryPresentationWaitTaskSchema,
   StoryRuntimeSnapshotSchema,
   StoryRuntimeWaitSchema,
   StoryTextStateSchema,
@@ -510,6 +511,68 @@ describe("contracts", () => {
             kind: "character",
             appearance: "portrait:ema:neutral"
           }
+        }
+      })
+    ).toThrow();
+  });
+
+  it("validates the optional script-scoped character tone without changing snapshot v5", () => {
+    const command = getNaniCommandDefinition("charTone");
+    expect(command).toMatchObject({
+      id: "chartone",
+      canonicalName: "charTone",
+      source: "v-ronpa",
+      status: "implemented"
+    });
+    expect(command?.params.map((param) => param.name)).toEqual(["preset", "amount", "time", "wait"]);
+    expect(command?.params.some((param) => param.name === "easing")).toBe(false);
+
+    const snapshot = PixiStageSnapshotSchema.parse({
+      version: 5,
+      characterTone: {
+        preset: "rain",
+        amount: 3.25,
+        scopeScriptPath: "game-a/opening.nani",
+        transition: { durationMs: 400, wait: true }
+      }
+    });
+    expect(snapshot).toMatchObject({
+      version: 5,
+      characterTone: {
+        preset: "rain",
+        amount: 3.25,
+        scopeScriptPath: "game-a/opening.nani",
+        transition: { durationMs: 400, wait: true }
+      }
+    });
+    expect(StoryPresentationWaitTaskSchema.parse({
+      kind: "character-tone-transition",
+      target: "character-tone",
+      revision: 1
+    })).toEqual({
+      kind: "character-tone-transition",
+      target: "character-tone",
+      revision: 1
+    });
+    expect(() =>
+      PixiStageSnapshotSchema.parse({
+        version: 5,
+        characterTone: {
+          preset: "unknown",
+          amount: 1,
+          scopeScriptPath: "game-a/opening.nani",
+          transition: { durationMs: 0, wait: false }
+        }
+      })
+    ).toThrow();
+    expect(() =>
+      PixiStageSnapshotSchema.parse({
+        version: 5,
+        characterTone: {
+          preset: "rain",
+          amount: -1,
+          scopeScriptPath: "game-a/opening.nani",
+          transition: { durationMs: 0, wait: false }
         }
       })
     ).toThrow();
@@ -1052,7 +1115,7 @@ describe("contracts", () => {
     const officialCommands = naniCommandCatalog.filter((command) => command.source === "naninovel");
 
     expect(officialCommands).toHaveLength(78);
-    expect(naniCommandCatalog).toHaveLength(85);
+    expect(naniCommandCatalog).toHaveLength(86);
     expect(() => NaniCommandDefinitionSchema.array().parse(naniCommandCatalog)).not.toThrow();
   });
 
@@ -1146,6 +1209,11 @@ describe("contracts", () => {
     expect(getNaniCommandDefinition("char")).toMatchObject({
       status: "implemented",
       execution: "pixi-presentation"
+    });
+    expect(getNaniCommandDefinition("char")?.params.find((paramSpec) => paramSpec.name === "visible")?.docs).toMatchObject({
+      defaultValue: true,
+      runtimeSupport: "consumed",
+      runtimeNoteZh: expect.stringContaining("省略时显示具名角色")
     });
     expect(getNaniCommandDefinition("flash")).toMatchObject({
       source: "v-ronpa",
@@ -1305,7 +1373,13 @@ describe("contracts", () => {
       },
       actorOrder: [PIXI_MAIN_BACKGROUND_ID, "Ema"],
       weather: {},
-      screenFilters: {}
+      screenFilters: {},
+      characterTone: {
+        preset: "rain" as const,
+        amount: 1,
+        scopeScriptPath: "opening.nani",
+        transition: { durationMs: 400, wait: false }
+      }
     };
 
     const save = SaveDataSchema.parse({
@@ -1351,6 +1425,11 @@ describe("contracts", () => {
     expect(save.vn?.pixiStage.innerBackgroundsById).toEqual({});
     expect(save.vn?.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
     expect(save.vn?.pixiStage.charactersById.Ema?.appearanceExpression).toBe("Pensive1,ArmR3");
+    expect(save.vn?.pixiStage.characterTone).toMatchObject({
+      preset: "rain",
+      amount: 1,
+      scopeScriptPath: "opening.nani"
+    });
     expect(save.navi?.substate).toBe("vn2d-overlay");
     expect(save).not.toHaveProperty("summary");
     expect(save).not.toHaveProperty("story");
@@ -1363,6 +1442,15 @@ describe("contracts", () => {
       speaker: "Felix",
       text: "Good."
     });
+    expect(() =>
+      SaveDataSchema.parse({
+        ...save,
+        vn: {
+          ...save.vn,
+          script: { scriptPath: "chapter-02.nani", scriptRevision: "sha256:test" }
+        }
+      })
+    ).toThrow(/scopeScriptPath/u);
 
     expect(
       SaveDataSchema.parse({

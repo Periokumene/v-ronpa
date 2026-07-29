@@ -75,7 +75,7 @@ describe("app VN runtime helpers", () => {
       instructionPointer: 1,
       backlog: [{ speaker: "Felix", text: "Restore me." }]
     };
-    const pixiStage = reducePixiRuntimeCommand(createInitialPixiStageSnapshot(), {
+    const stageWithCharacter = reducePixiRuntimeCommand(createInitialPixiStageSnapshot(), {
       commandId: "char",
       canonicalName: "char",
       category: "actor",
@@ -87,6 +87,15 @@ describe("app VN runtime helpers", () => {
         pos: [0.5, 0]
       },
       loc: { scriptPath: "restore-test.nani", line: 1, column: 1, raw: "@char" }
+    }).snapshot;
+    const pixiStage = reducePixiRuntimeCommand(stageWithCharacter, {
+      commandId: "chartone",
+      canonicalName: "charTone",
+      category: "effect",
+      source: "v-ronpa",
+      status: "implemented",
+      params: { preset: "rain", amount: 1, durationMs: 400, wait: false },
+      loc: { scriptPath: "restore-test.nani", line: 2, column: 1, raw: "@charTone rain" }
     }).snapshot;
 
     const plan = createVnRuntimeRestorePlan({
@@ -114,6 +123,11 @@ describe("app VN runtime helpers", () => {
       hintSequence: 0,
       animate: false,
       presentationTasks: []
+    });
+    expect(plan.pixiStageRuntime.snapshot.characterTone).toMatchObject({
+      preset: "rain",
+      amount: 1,
+      scopeScriptPath: "restore-test.nani"
     });
     expect(plan.diagnostics).toEqual([]);
     expect(plan.uiRuntime.surfaces.toastLayer.targetVisible).toBe(false);

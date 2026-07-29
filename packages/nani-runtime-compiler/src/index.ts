@@ -18,6 +18,7 @@ import { commandNormalizerFor } from "./normalizers/index.ts";
 import type { CommandDiagnosticContext } from "./types";
 import {
   createCommandDiagnostic,
+  diagnoseCharacterToneParams,
   diagnoseExecutionBoundaryParams,
   diagnoseIgnoredPromotedPrimary,
   diagnoseUiTargets,
@@ -175,7 +176,10 @@ function compileCommand(
     );
   }
 
-  const validationDiagnostics = validateCommandAgainstCatalog(bound, definition, diagnosticContext);
+  const validationDiagnostics = [
+    ...validateCommandAgainstCatalog(bound, definition, diagnosticContext),
+    ...diagnoseCharacterToneParams(bound, definition, diagnosticContext)
+  ];
   const commandMigratedDiagnostics = [
     ...diagnoseIgnoredPromotedPrimary(bound, definition, normalizer, diagnosticContext),
     ...diagnoseUiTargets(bound, definition, diagnosticContext)

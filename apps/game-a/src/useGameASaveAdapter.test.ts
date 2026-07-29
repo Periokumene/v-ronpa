@@ -51,6 +51,11 @@ describe("game-a save adapter", () => {
     expect(data).not.toHaveProperty("pixiStage");
     expect(data.vn?.story.backlog).toHaveLength(20);
     expect(data.vn?.story.backlog[0]?.text).toBe("Line 6");
+    expect(data.vn?.pixiStage.characterTone).toMatchObject({
+      preset: "rain",
+      amount: 1,
+      scopeScriptPath: "game-a/chapter-02.nani"
+    });
     expect(story.backlog).toEqual(originalBacklog);
     expect(story.backlog).toHaveLength(25);
   });
@@ -109,7 +114,13 @@ function createPixiStage(): PixiStageSnapshot {
     charactersById: {},
     actorOrder: [],
     weather: {},
-    screenFilters: {}
+    screenFilters: {},
+    characterTone: {
+      preset: "rain",
+      amount: 1,
+      scopeScriptPath: "game-a/chapter-02.nani",
+      transition: { durationMs: 0, wait: false }
+    }
   };
 }
 

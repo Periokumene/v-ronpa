@@ -29,6 +29,11 @@ export const effectNormalizers: Readonly<Record<string, CommandNormalizerDescrip
         ...normalizeTimingParams(command)
       })
   },
+  chartone: {
+    acceptsPrimary: true,
+    consumedParams: ["preset", "amount", "time", "wait"],
+    normalize: normalizeCharacterToneCommand
+  },
   glitch: {
     acceptsPrimary: false,
     consumedParams: ["time", "power", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"],
@@ -87,6 +92,21 @@ export const effectNormalizers: Readonly<Record<string, CommandNormalizerDescrip
       })
   }
 };
+
+function normalizeCharacterToneCommand(command: CommandShape): Record<string, RuntimeValue> {
+  const preset = runtimeCommandValue(command.primary) ?? runtimeParam(command, "preset");
+  const requestedAmount = runtimeParam(command, "amount");
+  return compactParams({
+    preset,
+    amount: requestedAmount ?? (
+      typeof preset === "string" && preset !== "none"
+        ? 1
+        : undefined
+    ),
+    durationMs: durationMsValue(runtimeParam(command, "time")) ?? 0,
+    wait: runtimeParam(command, "wait") ?? false
+  });
+}
 
 function normalizeGlitchCommand(
   command: CommandShape,

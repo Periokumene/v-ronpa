@@ -1,4 +1,5 @@
 import {
+  CHARACTER_TONE_PRESET_IDS,
   RUNTIME_UI_GROUPS,
   type NaniCommandDefinition
 } from "@v-ronpa/contracts";
@@ -219,6 +220,107 @@ export function diagnoseExecutionBoundaryParams(
     ];
   }
   return [];
+}
+
+const characterTonePresetIds = new Set<string>([...CHARACTER_TONE_PRESET_IDS, "none"]);
+
+export function diagnoseCharacterToneParams(
+  bound: BoundCommand,
+  definition: NaniCommandDefinition,
+  context: CommandDiagnosticContext
+): RuntimeCompilerDiagnostic[] {
+  if (definition.id !== "chartone") return [];
+
+  const presetValue = bound.shape.primary ?? getCommandParam(bound.shape, "preset");
+  const amountValue = getCommandParam(bound.shape, "amount");
+  const timeValue = getCommandParam(bound.shape, "time");
+  const preset = staticScalarValue(presetValue);
+  const amount = staticScalarValue(amountValue);
+  const time = staticScalarValue(timeValue);
+  const diagnostics: RuntimeCompilerDiagnostic[] = [];
+
+  if (bound.shape.primary && getCommandParam(bound.shape, "preset")) {
+    diagnostics.push(
+      createArgumentDiagnostic(
+        context,
+        paramOrigin(bound, "preset"),
+        "whole",
+        "invalid-command-param",
+        "@charTone accepts the preset either as its primary value or as preset:, but not both.",
+        "error"
+      )
+    );
+  }
+
+  if (!presetValue && !amountValue) {
+    diagnostics.push(
+      createCommandDiagnostic(
+        context,
+        "invalid-command-param",
+        "@charTone requires a preset, none, or amount.",
+        "error"
+      )
+    );
+  }
+
+  if (preset !== undefined && (typeof preset !== "string" || !characterTonePresetIds.has(preset))) {
+    diagnostics.push(
+      createArgumentDiagnostic(
+        context,
+        bound.origins.primary ?? paramOrigin(bound, "preset"),
+        "value",
+        "invalid-command-param",
+        `@charTone preset must be one of ${[...characterTonePresetIds].join(", ")}.`,
+        "error"
+      )
+    );
+  }
+
+  if (amount !== undefined && (typeof amount !== "number" || !Number.isFinite(amount) || amount < 0)) {
+    diagnostics.push(
+      createArgumentDiagnostic(
+        context,
+        paramOrigin(bound, "amount"),
+        "value",
+        "invalid-command-param",
+        "@charTone amount must be a finite non-negative number.",
+        "error"
+      )
+    );
+  }
+
+  if (time !== undefined && (typeof time !== "number" || !Number.isFinite(time) || time < 0)) {
+    diagnostics.push(
+      createArgumentDiagnostic(
+        context,
+        paramOrigin(bound, "time"),
+        "value",
+        "invalid-command-param",
+        "@charTone time must be a finite non-negative number of seconds.",
+        "error"
+      )
+    );
+  }
+
+  if (preset === "none" && typeof amount === "number" && amount > 0) {
+    diagnostics.push(
+      createArgumentDiagnostic(
+        context,
+        paramOrigin(bound, "amount"),
+        "value",
+        "invalid-command-param",
+        "@charTone none cannot be combined with a positive amount.",
+        "error"
+      )
+    );
+  }
+
+  return diagnostics;
+}
+
+function paramOrigin(bound: BoundCommand, name: string): BoundArgumentOrigin | undefined {
+  const normalized = normalizeParamName(name);
+  return Object.entries(bound.origins.params).find(([candidate]) => normalizeParamName(candidate) === normalized)?.[1];
 }
 
 export function diagnoseIgnoredPromotedPrimary(

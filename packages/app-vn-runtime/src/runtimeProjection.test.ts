@@ -14,6 +14,7 @@ import {
 } from "@v-ronpa/app-vn-dispatch";
 import {
   PIXI_MAIN_BACKGROUND_ID,
+  type RuntimeCommand,
   type SaveableVnState,
   type VnEntryDef,
   type VnRuntimeScriptSource
@@ -197,6 +198,69 @@ describe("projectVnRuntimeStep", () => {
       stageRevision: projected.stable.pixiStage.revision
     });
     expect(projected.transaction.pixiWaitTasks).not.toEqual([]);
+  });
+
+  it("keeps character tone for local progression and clears commands scoped to another script", () => {
+    const stageWithTone = {
+      ...createInitialPixiStageSnapshot(),
+      revision: 1,
+      characterTone: {
+        preset: "rain" as const,
+        amount: 1,
+        scopeScriptPath: "opening.nani",
+        transition: { durationMs: 0, wait: false }
+      }
+    };
+    const opening = createVnSession({ scriptPath: "opening.nani", sourceText: "Narrator: Here." }).session;
+    const retained = projectVnRuntimeStep({
+      active: true,
+      animatePixi: true,
+      nowMs: 0,
+      previousMediaState: createInitialMediaRuntimeState(),
+      previousPixiStage: stageWithTone,
+      previousUiState: createInitialUiRuntimeState(),
+      profile: "vn2d",
+      runtimeCommands: [],
+      session: opening
+    });
+    expect(retained.stable.pixiStage.characterTone).toEqual(stageWithTone.characterTone);
+
+    const chapter = createVnSession({ scriptPath: "chapter-02.nani", sourceText: "Narrator: There." }).session;
+    const crossed = projectVnRuntimeStep({
+      active: true,
+      animatePixi: true,
+      nowMs: 0,
+      previousMediaState: createInitialMediaRuntimeState(),
+      previousPixiStage: stageWithTone,
+      previousUiState: createInitialUiRuntimeState(),
+      profile: "vn2d",
+      runtimeCommands: [],
+      session: chapter
+    });
+    expect(crossed.stable.pixiStage.characterTone).toBeUndefined();
+
+    const intermediateCommand: RuntimeCommand = {
+      commandId: "chartone",
+      canonicalName: "charTone",
+      category: "effect",
+      source: "v-ronpa",
+      status: "implemented",
+      params: { preset: "fog", amount: 1, durationMs: 200, wait: true },
+      loc: { scriptPath: "intermediate.nani", line: 1, column: 1, raw: "@charTone fog" }
+    };
+    const chained = projectVnRuntimeStep({
+      active: true,
+      animatePixi: true,
+      nowMs: 0,
+      previousMediaState: createInitialMediaRuntimeState(),
+      previousPixiStage: createInitialPixiStageSnapshot(),
+      previousUiState: createInitialUiRuntimeState(),
+      profile: "vn2d",
+      runtimeCommands: [intermediateCommand],
+      session: chapter
+    });
+    expect(chained.stable.pixiStage.characterTone).toBeUndefined();
+    expect(chained.transaction.pixiWaitTasks).toEqual([]);
   });
 
   it("keeps toast payloads in live runtime state but excludes them from stable materialization", () => {

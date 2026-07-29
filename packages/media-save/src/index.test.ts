@@ -88,7 +88,13 @@ const baseSave = SaveDataSchema.parse({
       },
       actorOrder: ["MainBackground", "Ema"],
       weather: {},
-      screenFilters: {}
+      screenFilters: {},
+      characterTone: {
+        preset: "rain",
+        amount: 1,
+        scopeScriptPath: "opening.nani",
+        transition: { durationMs: 400, wait: false }
+      }
     },
     media: {
       bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
@@ -130,6 +136,11 @@ describe("media save contracts", () => {
 
   it("validates v6 saves through the strict parse boundary", () => {
     expect(parseSaveData(baseSave)).toEqual(baseSave);
+    expect(parseSaveData(baseSave).vn?.pixiStage.characterTone).toMatchObject({
+      preset: "rain",
+      amount: 1,
+      scopeScriptPath: "opening.nani"
+    });
   });
 
   it("rejects old save versions without migration", () => {

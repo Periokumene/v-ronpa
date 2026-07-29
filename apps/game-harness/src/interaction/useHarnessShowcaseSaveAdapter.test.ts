@@ -38,10 +38,19 @@ describe("harness showcase save adapter", () => {
       inventory: { items: { "gift:coffee": 1 } },
       evidence: { ownedEvidenceIds: ["evidence:keycard"], submittedEvidenceIds: [] }
     };
-    const pixiStage = reducePixiRuntimeCommand(
+    const stageWithBackground = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
       runtimeCommand("back", "scene", { appearance: "bg:harness" })
     ).snapshot;
+    const pixiStage: PixiStageSnapshot = {
+      ...stageWithBackground,
+      characterTone: {
+        preset: "rain",
+        amount: 1,
+        scopeScriptPath: "harness/showcase.nani",
+        transition: { durationMs: 400, wait: false }
+      }
+    };
 
     const save = createHarnessShowcaseSaveData({
       savedAt: "2026-06-20T00:00:00.000Z",
@@ -64,6 +73,11 @@ describe("harness showcase save adapter", () => {
           revision: 1,
           backgroundsById: {
             MainBackground: { appearance: "bg:harness" }
+          },
+          characterTone: {
+            preset: "rain",
+            amount: 1,
+            scopeScriptPath: "harness/showcase.nani"
           }
         }
       },

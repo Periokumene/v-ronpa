@@ -341,6 +341,149 @@ describe("pixi presentation task system integration", () => {
     expect(face.alpha).toBe(0.5);
   });
 
+  it("applies one global tone after complete character composition and before outline", async () => {
+    installCharacterPackFetch();
+    vi.spyOn(Assets, "load").mockImplementation((uri) => Promise.resolve(
+      String(uri).endsWith("/Body.png") ? textureWithSize(200, 400) : textureWithSize(300, 600)
+    ) as never);
+    const { actors, root } = createSystems({
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema"
+            ? { uri: characterPackUri() }
+            : { uri: `/resolved/${input.id}.png` };
+        }
+      }
+    });
+    await actors.preloadCharacters([{ characterId: "Ema", appearanceExpressions: ["Pensive1"] }]);
+    actors.reconcile({
+      ...stageWithActors(backgroundActor({ durationMs: 0 }), [characterActor("Ema", "Pensive1")], 1),
+      characterTone: {
+        preset: "rain",
+        amount: 1,
+        scopeScriptPath: "tone-test.nani",
+        transition: { durationMs: 0, wait: false }
+      }
+    }, false);
+
+    const presentation = findDescendant(root, "final-character-root:Ema", Container);
+    const composition = presentation?.children[0] as Container;
+    expect(composition.filters).toHaveLength(2);
+    expect(filterResourceNames(composition)).toEqual([
+      "characterToneUniforms",
+      "characterOutlineUniforms"
+    ]);
+    expect(characterToneUniforms(composition).uToneAmount).toBe(1);
+    expect(composition.children.every((child) => !child.filters?.length)).toBe(true);
+    expect(findDescendant(root, "characters", Container)?.filters).toBeFalsy();
+    expect(findDescendant(root, "actor:MainBackground", Container)?.filters).toBeFalsy();
+    expect(outlineOpacity(composition)).toBe(1);
+  });
+
+  it("shares the live tone across expression crossfade sides and future characters", async () => {
+    installCharacterPackFetch();
+    vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
+    const { actors, root } = createSystems({
+      assetResolver: {
+        resolve(input) {
+          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        }
+      }
+    });
+    await actors.preloadCharacters([{ characterId: "Ema", appearanceExpressions: ["", "Pensive1"] }]);
+    const toned = {
+      ...stageWithActors(backgroundActor({ durationMs: 0 }), [], 1),
+      characterTone: {
+        preset: "fog" as const,
+        amount: 1.25,
+        scopeScriptPath: "tone-test.nani",
+        transition: { durationMs: 0, wait: false }
+      }
+    };
+    actors.reconcile(toned, false);
+    actors.reconcile({
+      ...toned,
+      revision: 2,
+      charactersById: { Ema: characterActor("Ema", "") },
+      actorOrder: ["MainBackground", "Ema"]
+    }, false);
+    actors.reconcile({
+      ...toned,
+      revision: 3,
+      charactersById: {
+        Ema: {
+          ...characterActor("Ema", "Pensive1"),
+          transition: { durationMs: 200, easing: "linear", lazy: false, wait: true }
+        }
+      },
+      actorOrder: ["MainBackground", "Ema"]
+    }, true);
+
+    const presentation = findDescendant(root, "final-character-root:Ema", Container);
+    expect(presentation?.children).toHaveLength(2);
+    const amounts = presentation?.children.map((child) => characterToneUniforms(child as Container).uToneAmount);
+    expect(amounts).toEqual([1.25, 1.25]);
+    expect(presentation?.children.map((child) => filterResourceNames(child as Container))).toEqual([
+      ["characterToneUniforms", "characterOutlineUniforms"],
+      ["characterToneUniforms", "characterOutlineUniforms"]
+    ]);
+  });
+
+  it("runs one tone task without characters, continues interruption from live values, and cleans removal", () => {
+    const { actors, root, tasks, tweens } = createSystems();
+    actors.reconcile({
+      ...createInitialPixiStageSnapshot(),
+      revision: 1,
+      characterTone: {
+        preset: "rain",
+        amount: 1,
+        scopeScriptPath: "tone-test.nani",
+        transition: { durationMs: 100, wait: true }
+      }
+    }, true);
+    expect(tasks.snapshot()).toMatchObject([{
+      kind: "character-tone-transition",
+      target: "character-tone",
+      revision: 1,
+      status: "running"
+    }]);
+
+    tick(tweens, 50);
+    actors.reconcile({
+      ...createInitialPixiStageSnapshot(),
+      revision: 2,
+      characterTone: {
+        preset: "sunset",
+        amount: 2,
+        scopeScriptPath: "tone-test.nani",
+        transition: { durationMs: 100, wait: true }
+      }
+    }, true);
+    expect(tasks.snapshot()).toMatchObject([{
+      kind: "character-tone-transition",
+      target: "character-tone",
+      revision: 2,
+      status: "running"
+    }]);
+
+    tick(tweens, 110);
+    expect(tasks.snapshot()).toEqual([]);
+    actors.reconcile(
+      { ...createInitialPixiStageSnapshot(), revision: 3 },
+      true,
+      [{ type: "character-tone-remove", durationMs: 100, scopeScriptPath: "tone-test.nani", wait: true }]
+    );
+    expect(tasks.snapshot()).toMatchObject([{
+      kind: "character-tone-transition",
+      target: "character-tone",
+      revision: 3,
+      status: "running"
+    }]);
+    tick(tweens, 110);
+    expect(tasks.snapshot()).toEqual([]);
+    expect(findDescendant(root, "characters", Container)?.filters).toBeFalsy();
+  });
+
   it("deduplicates pack, metadata, textures, and GPU uploads across planned expressions", async () => {
     const fetch = installCharacterPackFetch();
     const bodyTexture = textureWithSize(200, 400);
@@ -1827,7 +1970,9 @@ function createCharacterSystem(
 }
 
 function outlineUniforms(composition: Container): { uStepX: Float32Array; uStepY: Float32Array; uOpacity: number } {
-  const filter = composition.filters?.[0] as Filter & {
+  const filter = composition.filters?.find((candidate) =>
+    "characterOutlineUniforms" in candidate.resources
+  ) as Filter & {
     resources: {
       characterOutlineUniforms: {
         uniforms: { uStepX: Float32Array; uStepY: Float32Array; uOpacity: number };
@@ -1842,7 +1987,10 @@ function outlineOpacity(composition: Container): number {
 }
 
 function finalOpacity(composition: Container): number {
-  const filter = composition.filters?.[0] as Filter & {
+  const filter = composition.filters?.find((candidate) =>
+    "characterOpacityUniforms" in candidate.resources ||
+    "characterOutlineUniforms" in candidate.resources
+  ) as Filter & {
     resources: {
       characterOpacityUniforms?: { uniforms: { uOpacity: number } };
       characterOutlineUniforms?: { uniforms: { uOpacity: number } };
@@ -1851,6 +1999,29 @@ function finalOpacity(composition: Container): number {
   return filter.resources.characterOpacityUniforms?.uniforms.uOpacity
     ?? filter.resources.characterOutlineUniforms?.uniforms.uOpacity
     ?? Number.NaN;
+}
+
+function characterToneUniforms(composition: Container): { uToneAmount: number } {
+  const filter = composition.filters?.find((candidate) =>
+    "characterToneUniforms" in candidate.resources
+  ) as Filter & {
+    resources: {
+      characterToneUniforms: {
+        uniforms: { uToneAmount: number };
+      };
+    };
+  };
+  if (!filter) throw new Error("expected character tone filter");
+  return filter.resources.characterToneUniforms.uniforms;
+}
+
+function filterResourceNames(composition: Container): string[] {
+  return (composition.filters ?? []).flatMap((filter) => {
+    if ("characterToneUniforms" in filter.resources) return ["characterToneUniforms"];
+    if ("characterOutlineUniforms" in filter.resources) return ["characterOutlineUniforms"];
+    if ("characterOpacityUniforms" in filter.resources) return ["characterOpacityUniforms"];
+    return [];
+  });
 }
 
 function premultipliedCrossfadeAlpha(outgoingAlpha: number, incomingAlpha: number, progress: number): number {

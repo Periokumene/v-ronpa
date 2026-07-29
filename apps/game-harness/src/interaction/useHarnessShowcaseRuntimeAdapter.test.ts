@@ -26,6 +26,7 @@ describe("harness showcase runtime adapter glue", () => {
       "back",
       "inback",
       "char",
+      "chartone",
       "arrange",
       "hidechars",
       "slide",
@@ -46,6 +47,19 @@ describe("harness showcase runtime adapter glue", () => {
     ]) {
       expect(commandIds.has(commandId)).toBe(true);
     }
+    const characterToneCommands = compiled.script.commands.filter((command) => command.commandId === "chartone");
+    expect(new Set(characterToneCommands.map((command) => command.params.preset).filter(Boolean))).toEqual(
+      new Set(["rain", "fog", "sunset", "night", "alert", "fluorescent", "none"])
+    );
+    expect(characterToneCommands.map((command) => command.params.amount)).toEqual(
+      expect.arrayContaining([0.5, 1, 1.25, 1.5, 2, 3, 0])
+    );
+    expect(characterToneCommands.some((command) => command.params.preset === undefined && command.params.amount === 0.5)).toBe(true);
+    expect(harnessShowcaseScript.indexOf("@charTone rain amount:0.5")).toBeLessThan(
+      harnessShowcaseScript.indexOf("@char Ema pos:50", harnessShowcaseScript.indexOf("#CharacterToneShowcase"))
+    );
+    expect(harnessShowcaseScript).toContain("CHECKPOINT TONE SAVE");
+    expect(harnessShowcaseScript).toContain("@charTone none time:0.2 wait!");
     expect(
       compiled.script.commands
         .filter((command) => ["bgm", "sfx", "sfxfast", "stopbgm", "stopsfx"].includes(command.commandId))

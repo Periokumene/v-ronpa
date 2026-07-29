@@ -364,6 +364,7 @@ const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
   blur: "pixi-presentation",
   bokeh: "pixi-presentation",
   char: "pixi-presentation",
+  chartone: "pixi-presentation",
   flash: "pixi-presentation",
   focus: "pixi-presentation",
   glitch: "pixi-presentation",
@@ -618,6 +619,15 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
     param("pos", "decimal list"),
     ...actorTransformParams
   ]),
+  {
+    ...vRonpa("chartone", "effect", [
+      param("preset", "string"),
+      param("amount", "decimal"),
+      param("time", "decimal"),
+      param("wait", "boolean")
+    ]),
+    canonicalName: "charTone"
+  },
   official("choice", "choice", choiceParams),
   official("choiceHandler", "choice", [
     param("handlerId", "string"),
@@ -855,6 +865,10 @@ const implementedCommandDocs: Record<string, NaniCommandDocs> = {
   blur: { zh: "对舞台或演员应用模糊效果，通常用于焦点转移或回忆演出；time 会插值 actor/stage blur 强度，power:0 time:x 会淡出后移除 blur。", examples: ["@blur stage power:0.4 time:0.3 wait!", "@blur actorId:MainBackground power:0 time:0.2 wait!"] },
   bokeh: { zh: "应用景深虚化效果，可调焦点、距离和强度；time 会插值 bokeh 强度，power:0 time:x 会淡出 overlay/root blur 后清理。", examples: ["@bokeh focus:Felix power:0.6 time:0.4", "@bokeh power:0 time:0.2 wait!"] },
   char: { zh: "显示或更新角色立绘外观，并可设置位置、表情、转场和动画时长。", examples: ["@char Felix.Happy pos:0.5,0 wait!"] },
+  chartone: {
+    zh: "为当前脚本中的全部角色应用代码级多色环境光预设；amount 是无量纲强度倍率，time 使用内部固定缓动插值，none 或 amount:0 会移除效果。",
+    examples: ["@charTone rain", "@charTone fog amount:1.25 time:0.4 wait!", "@charTone none time:0.3 wait!"]
+  },
   choice: { zh: "添加一个剧情选项，可指定跳转标签、启用状态和选择后的变量表达式。", examples: ['@choice "调查门口" goto:#Door id:door'] },
   clearbacklog: { zh: "清空当前剧情回看记录。", examples: ["@clearBacklog"] },
   clearchoice: { zh: "清除当前待选项；提供 id 时只清除对应选项。", examples: ["@clearChoice id:door"] },
@@ -896,6 +910,7 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   blur: ["actorId", "power", "time", "wait"],
   bokeh: ["focus", "dist", "power", "time", "wait"],
   char: ["idAndAppearance", "id", "pose", "via", "params", "dissolve", "look", "avatar", "pos", "position", "rotation", "scale", "tint", "easing", "time", "lazy", "wait", "visible"],
+  chartone: ["preset", "amount", "time", "wait"],
   choice: ["goto", "id", "enabled", "set"],
   clearbacklog: [],
   clearchoice: ["id"],
@@ -932,6 +947,7 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
 const commonParamDocs: Record<string, NaniCommandParamDocs> = {
   actorId: { zh: "目标演员或舞台对象 ID。", examples: ["Felix", "stage"] },
   additive: { zh: "是否以叠加方式播放或混合。", allowedValues: ["true", "false"] },
+  amount: { zh: "无量纲效果强度倍率。", recommendedRange: { min: 0 }, examples: ["0.5", "1", "2"] },
   affinityDelta: { zh: "角色亲密度变化量，正数增加，负数减少。", defaultValue: 0 },
   allowToggle: { zh: "是否允许玩家切换对应 UI。", allowedValues: ["true", "false"] },
   appearance: { zh: "外观或背景资源 ID。", examples: ["bg:classroom", "Happy"] },
@@ -1001,6 +1017,7 @@ const commonParamDocs: Record<string, NaniCommandParamDocs> = {
   pose: { zh: "角色姿态或表情姿态 ID。" },
   position: { zh: "位置向量。", examples: ["0.5,0", "0.5,0,0"] },
   power: { zh: "效果强度。", recommendedRange: { min: 0, max: 1 } },
+  preset: { zh: "代码级预设名称。" },
   printer: { zh: "文本打印器 ID。", examples: ["default"] },
   printerId: { zh: "文本打印器 ID。", defaultValue: "default", examples: ["default"] },
   quantity: { zh: "物品数量。", defaultValue: 1, recommendedRange: { min: 1 } },
@@ -1041,6 +1058,29 @@ const commonParamDocs: Record<string, NaniCommandParamDocs> = {
 };
 
 const commandParamDocOverrides: Record<string, Record<string, Partial<NaniCommandParamDocs>>> = {
+  char: {
+    visible: {
+      defaultValue: true,
+      runtimeNoteZh: "省略时显示具名角色；仅显式 visible:false 会保持角色隐藏。"
+    }
+  },
+  chartone: {
+    amount: {
+      defaultValue: 1,
+      recommendedRange: {
+        min: 0,
+        max: 2,
+        unit: "multiplier",
+        noteZh: "不设硬上限；0 会移除效果，超过 2 属于 overdrive。"
+      }
+    },
+    preset: {
+      allowedValues: ["rain", "fog", "sunset", "night", "alert", "fluorescent", "none"],
+      examples: ["rain", "sunset", "none"]
+    },
+    time: { defaultValue: 0, recommendedRange: { min: 0, unit: "seconds" } },
+    wait: { defaultValue: false }
+  },
   flash: {
     duration: { defaultValue: 160, recommendedRange: { min: 0, unit: "ms" } },
     wait: { defaultValue: false }
@@ -1589,6 +1629,17 @@ export type WorldMapDef = z.infer<typeof WorldMapDefSchema>;
 export const PixiActorKindSchema = z.enum(["background", "character"]);
 export type PixiActorKind = z.infer<typeof PixiActorKindSchema>;
 
+export const CHARACTER_TONE_PRESET_IDS = [
+  "rain",
+  "fog",
+  "sunset",
+  "night",
+  "alert",
+  "fluorescent"
+] as const;
+export const CharacterTonePresetIdSchema = z.enum(CHARACTER_TONE_PRESET_IDS);
+export type CharacterTonePresetId = z.infer<typeof CharacterTonePresetIdSchema>;
+
 export const PixiVector2Schema = z.tuple([z.number(), z.number()]);
 export type PixiVector2 = z.infer<typeof PixiVector2Schema>;
 
@@ -1742,6 +1793,24 @@ export const PixiScreenFiltersSnapshotSchema = z
   .default({});
 export type PixiScreenFiltersSnapshot = z.infer<typeof PixiScreenFiltersSnapshotSchema>;
 
+export const PixiCharacterToneTransitionSnapshotSchema = z
+  .object({
+    durationMs: z.number().int().nonnegative().default(0),
+    wait: z.boolean().default(false)
+  })
+  .strict();
+export type PixiCharacterToneTransitionSnapshot = z.infer<typeof PixiCharacterToneTransitionSnapshotSchema>;
+
+export const PixiCharacterToneSnapshotSchema = z
+  .object({
+    preset: CharacterTonePresetIdSchema,
+    amount: z.number().finite().nonnegative(),
+    scopeScriptPath: z.string().min(1),
+    transition: PixiCharacterToneTransitionSnapshotSchema
+  })
+  .strict();
+export type PixiCharacterToneSnapshot = z.infer<typeof PixiCharacterToneSnapshotSchema>;
+
 const PixiInnerBackgroundActorMapSchema = z
   .record(IdSchema, PixiActorSnapshotSchema)
   .superRefine((actors, ctx) => {
@@ -1765,7 +1834,8 @@ export const PixiStageSnapshotSchema = z.object({
   charactersById: z.record(IdSchema, PixiActorSnapshotSchema).default({}),
   actorOrder: z.array(IdSchema).default([]),
   weather: PixiWeatherSnapshotMapSchema,
-  screenFilters: PixiScreenFiltersSnapshotSchema
+  screenFilters: PixiScreenFiltersSnapshotSchema,
+  characterTone: PixiCharacterToneSnapshotSchema.optional()
 }).strict();
 export type PixiStageSnapshot = z.infer<typeof PixiStageSnapshotSchema>;
 
@@ -1899,6 +1969,7 @@ export type StoryTextState = z.infer<typeof StoryTextStateSchema>;
 
 export const PixiPresentationTaskKindSchema = z.enum([
   "actor-transition",
+  "character-tone-transition",
   "screen-filter-transition",
   "weather-transition",
   "flash",
@@ -2260,6 +2331,16 @@ export const SaveDataSchema = z
         code: z.ZodIssueCode.custom,
         message: "Trial saves must include trial state.",
         path: ["trial"]
+      });
+    }
+    if (
+      data.vn?.pixiStage.characterTone &&
+      data.vn.pixiStage.characterTone.scopeScriptPath !== data.vn.script.scriptPath
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "VN character tone scope must match the saved script path.",
+        path: ["vn", "pixiStage", "characterTone", "scopeScriptPath"]
       });
     }
   });
