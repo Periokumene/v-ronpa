@@ -1,4 +1,13 @@
 .game-a-shell-with-devtools {
+  --vn-devtools-bg: #12100e;
+  --vn-devtools-surface: #181512;
+  --vn-devtools-surface-raised: #211c18;
+  --vn-devtools-border: #39312b;
+  --vn-devtools-border-strong: #574a40;
+  --vn-devtools-text: #d8d0c6;
+  --vn-devtools-muted: #9b9085;
+  --vn-devtools-accent: #c08b64;
+  --vn-devtools-accent-strong: #dfb18d;
   display: grid;
   width: 100%;
   height: 100%;
@@ -32,6 +41,21 @@
   will-change: transform;
 }
 
+.game-a-dev-viewport-boundary {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  left: 0;
+  box-sizing: border-box;
+  border-block: 1px solid rgb(155 144 133 / 38%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.game-a-dev-viewport-boundary[data-visible="true"] {
+  opacity: 1;
+}
+
 .game-a-dev-viewport-toolbar {
   position: absolute;
   z-index: 30;
@@ -41,12 +65,14 @@
   align-items: center;
   gap: 4px;
   padding: 4px;
-  border: 1px solid rgb(70 81 106 / 82%);
-  border-radius: 7px;
-  background: rgb(11 13 20 / 88%);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 32%);
-  color: #8f9bb2;
-  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", monospace;
+  border: 1px solid var(--vn-devtools-border-strong);
+  border-radius: 5px;
+  background: rgb(24 21 18 / 92%);
+  box-shadow:
+    0 8px 22px rgb(0 0 0 / 42%),
+    inset 0 1px 0 rgb(255 244 232 / 4%);
+  color: var(--vn-devtools-muted);
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace;
   font-size: 9px;
   line-height: 1;
   backdrop-filter: blur(8px);
@@ -63,21 +89,21 @@
   min-height: 24px;
   padding: 0 7px;
   border-color: transparent;
-  border-radius: 4px;
+  border-radius: 3px;
   background: transparent;
-  color: #aab4c7;
+  color: var(--vn-devtools-muted);
   font-family: inherit;
   font-size: 9px;
 }
 
 .game-a-dev-viewport-toolbar button[aria-pressed="true"] {
-  border-color: rgb(88 215 199 / 55%);
-  background: rgb(88 215 199 / 13%);
-  color: #8af4e6;
+  border-color: rgb(192 139 100 / 58%);
+  background: rgb(192 139 100 / 14%);
+  color: var(--vn-devtools-accent-strong);
 }
 
 .game-a-dev-viewport-toolbar button:focus-visible {
-  outline: 2px solid #8af4e6;
+  outline: 2px solid var(--vn-devtools-accent-strong);
   outline-offset: 1px;
 }
 
@@ -96,24 +122,24 @@
 
 .game-a-shell-with-devtools:has(> .vn-devtools-collapsed-button) .game-a-dev-viewport-toolbar {
   right: 43px;
-  border-radius: 7px 0 0 7px;
+  border-radius: 5px 0 0 5px;
 }
 
 .game-a-shell-with-devtools > .vn-devtools-collapsed-button {
   top: 10px;
   right: 10px;
-  border-color: rgb(70 81 106 / 82%);
+  border-color: var(--vn-devtools-border-strong);
   border-left-color: transparent;
-  border-radius: 0 7px 7px 0;
-  background: rgb(11 13 20 / 88%);
+  border-radius: 0 5px 5px 0;
+  background: rgb(24 21 18 / 92%);
   backdrop-filter: blur(8px);
 }
 
 .game-a-shell-with-devtools > .vn-devtools-collapsed-button:hover,
 .game-a-shell-with-devtools > .vn-devtools-collapsed-button:focus-visible {
-  border-color: rgb(70 81 106 / 82%);
+  border-color: var(--vn-devtools-accent);
   border-left-color: transparent;
-  background: rgb(18 24 35 / 94%);
+  background: var(--vn-devtools-surface-raised);
 }
 
 .game-a-shell-with-devtools:has(> .vn-devtools-collapsed-button:hover) .game-a-dev-viewport-toolbar,

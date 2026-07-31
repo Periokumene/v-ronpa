@@ -42,6 +42,11 @@ export function GameADevViewport({ children }: { children: ReactNode }) {
     height: `${layout.logicalHeight}px`,
     transform: `translate3d(${layout.offsetX}px, ${layout.offsetY}px, 0) scale(${layout.scale})`
   } satisfies CSSProperties;
+  const hasVerticalLetterbox = mode === "fidelity" && layout.offsetY > 0;
+  const viewportBoundaryStyle = {
+    top: `${layout.offsetY}px`,
+    height: `${layout.displayHeight}px`
+  } satisfies CSSProperties;
 
   return (
     <div
@@ -56,6 +61,13 @@ export function GameADevViewport({ children }: { children: ReactNode }) {
       <div className="game-a-dev-viewport-stage" data-testid="game-a-dev-viewport-stage" style={stageStyle}>
         {children}
       </div>
+      <div
+        aria-hidden="true"
+        className="game-a-dev-viewport-boundary"
+        data-testid="game-a-dev-viewport-boundary"
+        data-visible={hasVerticalLetterbox ? "true" : "false"}
+        style={viewportBoundaryStyle}
+      />
       <div
         aria-label="Game preview layout"
         className="game-a-dev-viewport-toolbar"

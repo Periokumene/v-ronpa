@@ -66,6 +66,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   });
   expect(initialViewportGeometry.scale).toBeLessThan(1);
   expect(initialViewportGeometry.stageWidth).toBeCloseTo(initialViewportGeometry.cellWidth, 0);
+  await expect(page.getByTestId("game-a-dev-viewport-boundary")).toHaveAttribute("data-visible", "true");
   const storySessionBeforeLayoutChanges = await readDevtoolsStorySession(page);
   await page.screenshot({ path: "test-results/game-a-workbench-expanded.png", fullPage: true });
 
@@ -115,6 +116,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("vn-devtools-collapsed-button")).toBeVisible();
   await expect.poll(async () => (await page.getByTestId("game-a-playfield").boundingBox())?.width ?? 0).toBeGreaterThan(initialPlayfieldWidth);
   await expect.poll(async () => (await readDevViewportGeometry(page)).scale).toBe(1);
+  await expect(page.getByTestId("game-a-dev-viewport-boundary")).toHaveAttribute("data-visible", "false");
   expect(await readDevViewportGeometry(page)).toMatchObject({
     mode: "fidelity",
     logicalWidth: 1280,
@@ -135,6 +137,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   expect(resizedFidelityGeometry.scale).toBeLessThan(initialViewportGeometry.scale);
   await page.getByTestId("game-a-dev-viewport-responsive").click();
   await expect(page.getByTestId("game-a-dev-viewport-responsive")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("game-a-dev-viewport-boundary")).toHaveAttribute("data-visible", "false");
   const responsiveGeometry = await readDevViewportGeometry(page);
   expect(responsiveGeometry).toMatchObject({ mode: "responsive", scale: 1 });
   expect(responsiveGeometry.logicalWidth).toBe(responsiveGeometry.cellWidth);
