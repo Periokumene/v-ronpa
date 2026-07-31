@@ -92,7 +92,7 @@ Give every enabled native Game A button default mouse-hover and activation audio
 Required regression cases:
 
 - Normal path: resolved hover/click cues play with `masterVolume * uiVolume * gain`.
-- Boundary path: disabled, aria-disabled, touch hover, inner-node movement, pre-activation hover, throttled hover, and missing assets do not play.
+- Boundary path: disabled, aria-disabled, touch hover, inner-node movement, throttled hover, and missing assets do not play. Mouse hover always attempts immediate playback without activation gating, queuing, or replay.
 - Override path: semantic cue attributes override defaults; `none` and unknown cues are safe no-ops.
 - Lifecycle path: click stops hover, channel reuse replaces prior playback, and unmount calls `stopAll()`.
 - Persistence/UI path: the SOUND tab patches the existing `uiVolume` setting.
@@ -148,7 +148,7 @@ pnpm validate:baseline
 - Gates: task boundaries, subsystem validation, and `pnpm validate:baseline` pass. Typecheck, assets, boundaries, CCR, cleanup guards, both production builds, and all 7 Playwright tests are green.
 - Browser evidence: `test-results/game-a-settings-sound.png` and `output/game-a-ui-audio-web-client/shot-0.png` were visually inspected; the smoke observes both UI OGG requests, persisted `uiVolume=0.6`, and no console errors.
 - Environment note: a first non-CI subsystem attempt reused a pre-existing Game A dev server without test entries and failed at the old product/smoke-entry mismatch. The isolated `CI=1` subsystem and baseline reruns started fresh servers on dedicated ports and passed.
-- Residual risk: subjective loudness/timbre balance still requires a human listening pass on target speakers/headphones. First hover before browser user activation is intentionally silent; OGG-only delivery follows the current browser baseline.
+- Residual risk: subjective loudness/timbre balance still requires a human listening pass on target speakers/headphones. A pre-activation hover attempts playback immediately, but the browser may reject it under its autoplay policy; the app does not queue or replay that cue. OGG-only delivery follows the current browser baseline.
 
 ## Merge Target
 

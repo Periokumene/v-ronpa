@@ -12,7 +12,7 @@ export type GameAUiAudioPort = Pick<AudioPort, "playSfx" | "stopAll">;
 export interface GameAUiAudioController {
   dispose(): void;
   playClick(cueId: string): void;
-  playHover(cueId: string, input: { hasUserActivation: boolean; now: number }): void;
+  playHover(cueId: string, input: { now: number }): void;
   update(input: { assets: GameAUiAudioAssets; sound: SettingsSoundSnapshot }): void;
 }
 
@@ -63,7 +63,6 @@ export function createGameAUiAudioController({
       clickHandle = audioPort.playSfx(UI_CLICK_CHANNEL_ID, cue.uri, { volume });
     },
     playHover(cueId, input) {
-      if (!input.hasUserActivation) return;
       const cue = resolvedCue(cueId);
       if (!cue) return;
       const volume = volumeFor(cue.gain);
@@ -83,13 +82,11 @@ export function createGameAUiAudioController({
 export function useGameAUiAudio({
   assets,
   audioPortFactory = createHowlerAudioPort,
-  hasUserActivation = browserHasUserActivation,
   now = monotonicNow,
   sound
 }: {
   assets: GameAUiAudioAssets;
   audioPortFactory?: () => GameAUiAudioPort;
-  hasUserActivation?: () => boolean;
   now?: () => number;
   sound: SettingsSoundSnapshot;
 }): GameAUiAudioBindings {
@@ -112,11 +109,10 @@ export function useGameAUiAudio({
       });
       if (!button) return;
       controller.playHover(readGameAButtonCue(button, "hover", assets.defaults.hover), {
-        hasUserActivation: hasUserActivation(),
         now: now()
       });
     },
-    [assets.defaults.hover, controller, hasUserActivation, now]
+    [assets.defaults.hover, controller, now]
   );
 
   const onClickCapture = useCallback<MouseEventHandler<HTMLElement>>(
@@ -181,11 +177,6 @@ function isMovementInsideButton(button: Pick<HTMLButtonElement, "contains">, rel
   } catch {
     return false;
   }
-}
-
-function browserHasUserActivation(): boolean {
-  if (typeof navigator === "undefined") return true;
-  return navigator.userActivation?.hasBeenActive ?? true;
 }
 
 function monotonicNow(): number {

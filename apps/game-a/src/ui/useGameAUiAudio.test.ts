@@ -18,7 +18,7 @@ describe("game-a UI audio", () => {
     sound.uiVolume = 0.5;
     const controller = createGameAUiAudioController({ assets: createAssets(), audioPort: port, sound });
 
-    controller.playHover("hover", { hasUserActivation: true, now: 100 });
+    controller.playHover("hover", { now: 100 });
     controller.playClick("activate");
 
     expect(port.playSfx).toHaveBeenNthCalledWith(1, "ui:hover", "/ui-hover.ogg", { volume: 0.2 });
@@ -34,11 +34,11 @@ describe("game-a UI audio", () => {
       sound: createDefaultSettingsSnapshot().sound
     });
 
-    controller.playHover("hover", { hasUserActivation: true, now: 100 });
-    controller.playHover("hover", { hasUserActivation: true, now: 140 });
+    controller.playHover("hover", { now: 100 });
+    controller.playHover("hover", { now: 140 });
     expect(port.playSfx).toHaveBeenCalledTimes(1);
 
-    controller.playHover("hover", { hasUserActivation: true, now: 160 });
+    controller.playHover("hover", { now: 160 });
     expect(port.handles[0]?.stop).toHaveBeenCalledOnce();
     expect(port.playSfx).toHaveBeenCalledTimes(2);
 
@@ -51,15 +51,17 @@ describe("game-a UI audio", () => {
     expect(port.stopAll).toHaveBeenCalledOnce();
   });
 
-  it("uses live settings and safely ignores muted, unactivated, disabled, and unknown cues", () => {
+  it("attempts hover without an activation precondition and safely ignores muted, disabled, and unknown cues", () => {
     const port = createAudioPort();
     const sound = createDefaultSettingsSnapshot().sound;
     const controller = createGameAUiAudioController({ assets: createAssets(), audioPort: port, sound });
 
-    controller.playHover("hover", { hasUserActivation: false, now: 100 });
-    controller.playHover("none", { hasUserActivation: true, now: 100 });
+    controller.playHover("hover", { now: 100 });
+    expect(port.playSfx).toHaveBeenLastCalledWith("ui:hover", "/ui-hover.ogg", { volume: 0.25 });
+
+    controller.playHover("none", { now: 200 });
     controller.playClick("missing");
-    expect(port.playSfx).not.toHaveBeenCalled();
+    expect(port.playSfx).toHaveBeenCalledTimes(1);
 
     controller.update({ assets: createAssets(), sound: { ...sound, masterVolume: 0.5, uiVolume: 0.4 } });
     controller.playClick("activate");
@@ -67,7 +69,7 @@ describe("game-a UI audio", () => {
 
     controller.update({ assets: createAssets(), sound: { ...sound, muted: true } });
     controller.playClick("activate");
-    expect(port.playSfx).toHaveBeenCalledTimes(1);
+    expect(port.playSfx).toHaveBeenCalledTimes(2);
   });
 
   it("finds enabled native buttons, accepts semantic overrides, and rejects disabled buttons", () => {
