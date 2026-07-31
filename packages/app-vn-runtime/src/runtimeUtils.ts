@@ -1,5 +1,5 @@
 import type { StoryPresentationWaitTask, StoryRuntimeSnapshot } from "@v-ronpa/contracts";
-import { dismissToast, type DialogRevealState, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
+import { dismissToast, type StoryTextRevealState, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
 import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import type { StoryPlayAdvanceSource, StoryPlayPacing, StoryPlayState } from "@v-ronpa/story-play";
 import type { PresentationTaskObservation, VnPixiStageRuntime, VnStoryRuntime } from "./runtimeTypes";
@@ -8,7 +8,7 @@ export const DEFAULT_VN_TOAST_DURATION_MS = 2500;
 
 /** Restarts the visual driver when one completed wait installs another transition in the same React batch. */
 export function vnVisualRuntimeDriverKey(
-  reveal: DialogRevealState | undefined,
+  reveal: StoryTextRevealState | undefined,
   ui: UiRuntimeState
 ): string {
   const revealKey = reveal ? `${reveal.lineKey}:${reveal.status}` : "none";

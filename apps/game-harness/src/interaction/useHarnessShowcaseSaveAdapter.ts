@@ -21,7 +21,7 @@ import type { useHarnessShowcaseRuntimeAdapter } from "./useHarnessShowcaseRunti
 
 type HarnessShowcaseRuntimeAdapter = ReturnType<typeof useHarnessShowcaseRuntimeAdapter>;
 
-export const HARNESS_SHOWCASE_DB = "v-ronpa-harness-showcase-v10";
+export const HARNESS_SHOWCASE_DB = "v-ronpa-harness-showcase-v11";
 export const harnessShowcaseSaveSlotPolicy = createFortyPlusQuickSaveSlotPolicy("harness");
 export const harnessShowcaseManualSaveSlotCount = harnessShowcaseSaveSlotPolicy.manualSlotCount;
 export const harnessShowcaseSaveSlotIds = harnessShowcaseSaveSlotPolicy.manualSlotIds;
@@ -51,7 +51,7 @@ export function createHarnessShowcaseSaveData({
   trial
 }: HarnessShowcaseSaveDataInput): SaveData {
   return SaveDataSchema.parse({
-    version: 8,
+    version: 9,
     gameId: "game-harness",
     savedAt,
     mode,

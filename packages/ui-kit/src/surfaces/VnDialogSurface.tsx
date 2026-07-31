@@ -6,7 +6,7 @@ import type { UiSurfacePresentationLike } from "./types";
 import { resolveVnDialogAppearance, type VnDialogAppearance } from "./vnDialogAppearance";
 import { VN_UI_LAYER_Z_INDEX } from "./vnLayers";
 
-export interface VnDialogDisplaySettings {
+export interface VnStoryTextDisplaySettings {
   textSize: "small" | "medium" | "large";
   textSpeed: number;
 }
@@ -16,7 +16,7 @@ export interface VnDialogSurfaceProps {
   text: string;
   richText?: RichTextDocument;
   appearance?: Partial<VnDialogAppearance>;
-  displaySettings?: VnDialogDisplaySettings;
+  displaySettings?: VnStoryTextDisplaySettings;
   presentation?: UiSurfacePresentationLike;
   state?: VnDialogState;
 }
@@ -26,7 +26,7 @@ export type VnDialogState = "line" | "choices" | "ended";
 const DEFAULT_DISPLAY_SETTINGS = {
   textSize: "medium",
   textSpeed: 0.5
-} as const satisfies VnDialogDisplaySettings;
+} as const satisfies VnStoryTextDisplaySettings;
 
 const TEXT_SPEED_TRANSITION_MS = {
   max: 260,
@@ -91,7 +91,7 @@ export function VnDialogSurface({
 // Dialog shell.
 const rootStyle: CSSProperties = {
   position: "absolute",
-  zIndex: VN_UI_LAYER_Z_INDEX.dialogDisplay,
+  zIndex: VN_UI_LAYER_Z_INDEX.storyTextDisplay,
   left: "clamp(20px, 7vw, 96px)",
   right: "clamp(20px, 7vw, 96px)",
   bottom: 28,
@@ -155,7 +155,7 @@ const textStyle: CSSProperties = {
   whiteSpace: "pre-wrap"
 };
 
-function dialogTextStyle(textSize: VnDialogDisplaySettings["textSize"], textSpeed: number): CSSProperties {
+function dialogTextStyle(textSize: VnStoryTextDisplaySettings["textSize"], textSpeed: number): CSSProperties {
   return {
     ...textStyle,
     fontSize: textSize === "small" ? 15 : textSize === "large" ? 18 : 16,

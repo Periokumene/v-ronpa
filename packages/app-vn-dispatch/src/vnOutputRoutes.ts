@@ -16,6 +16,7 @@ export interface VnOutputRouteContext {
 export const defaultVnOutputRouteTable: VnOutputRouteTable = {
   commands: {
     print: ["debug"],
+    cue: ["ui", "debug"],
     back: ["pixi"],
     charenter: ["debug"],
     shake: ["pixi"],

@@ -46,7 +46,7 @@ Correct materialization means that the same entry, profile, route table, and
 choice/input sequence produce the same saveable checkpoint at the same stable
 position as normal play. The checkpoint contains Story, terminal Pixi, UI
 visibility, BGM intent, and looping-SFX intent. Transient animation, waits,
-hints/tasks, dialog reveal, toasts, one-shots, voice, movies, timers, and playback
+hints/tasks, StoryText reveal, toasts, one-shots, voice, movies, timers, and playback
 cursors are intentionally absent. It follows the same linked catalog endpoints
 and tab-local decision trace across scripts, so a later-file target contains all
 preceding Story/Pixi/UI/media state.

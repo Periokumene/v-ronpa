@@ -31,11 +31,13 @@ describe("UI runtime", () => {
 
   it("uses no-target showUI and hideUI as scoped all-runtime-UI controls", () => {
     const hidden = reduceUiRuntimeCommand(createInitialUiRuntimeState(), runtimeCommand("hideui", "ui", {}));
-    expect(Object.values(hidden.state.surfaces).every((surface) => surface.phase === "hidden")).toBe(true);
+    expect((["dialog", "commandBar", "toastLayer"] as const).every((surface) => hidden.state.surfaces[surface].phase === "hidden")).toBe(true);
+    expect(hidden.state.surfaces.cue.phase).toBe("hidden");
     expect(hidden.diagnostics).toEqual([]);
 
     const shown = reduceUiRuntimeCommand(hidden.state, runtimeCommand("showui", "ui", {}));
-    expect(Object.values(shown.state.surfaces).every((surface) => surface.phase === "shown")).toBe(true);
+    expect((["dialog", "commandBar", "toastLayer"] as const).every((surface) => shown.state.surfaces[surface].phase === "shown")).toBe(true);
+    expect(shown.state.surfaces.cue.phase).toBe("hidden");
     expect(shown.diagnostics).toEqual([]);
   });
 
@@ -69,6 +71,92 @@ describe("UI runtime", () => {
     const complete = advanceUiRuntimeTransitions(midway, 1200);
     expect(complete.surfaces.dialog).toMatchObject({ targetVisible: false, mounted: false, opacity: 0, phase: "hidden" });
     expect(hasActiveUiRuntimeTransitions(complete)).toBe(false);
+  });
+
+  it("shows cue immediately and keeps it mounted through hideCue fade", () => {
+    const shown = reduceUiRuntimeCommand(
+      createInitialUiRuntimeState(),
+      runtimeCommand("cue", "text", { text: "Cue" }),
+      { nowMs: 1000 }
+    ).state;
+    expect(shown.surfaces.cue).toMatchObject({ targetVisible: true, mounted: true, opacity: 1, phase: "shown" });
+    expect(shown.surfaces.dialog.phase).toBe("shown");
+
+    const hiding = reduceUiRuntimeCommand(
+      shown,
+      runtimeCommand("hidecue", "ui", { durationMs: 400, wait: true }),
+      { nowMs: 1000 }
+    ).state;
+    expect(hiding.surfaces.cue).toMatchObject({
+      targetVisible: false,
+      mounted: true,
+      opacity: 1,
+      phase: "hiding",
+      transition: { durationMs: 400, fromOpacity: 1, toOpacity: 0 }
+    });
+    expect(advanceUiRuntimeTransitions(hiding, 1200).surfaces.cue.opacity).toBe(0.5);
+    expect(advanceUiRuntimeTransitions(hiding, 1400).surfaces.cue).toMatchObject({
+      targetVisible: false,
+      mounted: false,
+      opacity: 0,
+      phase: "hidden"
+    });
+  });
+
+  it("settles zero-time and already-hidden hideCue commands without a transition", () => {
+    const hidden = createInitialUiRuntimeState();
+    const alreadyHidden = reduceUiRuntimeCommand(
+      hidden,
+      runtimeCommand("hidecue", "ui", { durationMs: 400, wait: true }),
+      { nowMs: 1000 }
+    ).state;
+    expect(alreadyHidden.surfaces.cue).toMatchObject({ phase: "hidden", mounted: false, opacity: 0 });
+    expect(alreadyHidden.surfaces.cue.transition).toBeUndefined();
+
+    const shown = reduceUiRuntimeCommand(hidden, runtimeCommand("cue", "text", { text: "Cue" }), { nowMs: 1000 }).state;
+    const zeroTime = reduceUiRuntimeCommand(
+      shown,
+      runtimeCommand("hidecue", "ui", { durationMs: 0, wait: true }),
+      { nowMs: 1000 }
+    ).state;
+    expect(zeroTime.surfaces.cue).toMatchObject({ phase: "hidden", mounted: false, opacity: 0 });
+    expect(zeroTime.surfaces.cue.transition).toBeUndefined();
+  });
+
+  it("keeps hideUI isolated from cue and settles cue only through its own wait", () => {
+    const shown = reduceUiRuntimeCommand(createInitialUiRuntimeState(), runtimeCommand("cue", "text", { text: "Cue" })).state;
+    const hiddenUi = reduceUiRuntimeCommand(shown, runtimeCommand("hideui", "ui", {})).state;
+    expect(hiddenUi.surfaces.cue.phase).toBe("shown");
+
+    const hidingCue = reduceUiRuntimeCommand(
+      hiddenUi,
+      runtimeCommand("hidecue", "ui", { durationMs: 400, wait: true }),
+      { nowMs: 1000 }
+    ).state;
+    const settled = settleUiRuntimePresentationWait(hidingCue, {
+      channel: "ui",
+      commandId: "hidecue",
+      commandIndex: 1,
+      durationMs: 400,
+      targets: ["cue"],
+      targetVisible: false
+    });
+    expect(settled.surfaces.cue.phase).toBe("hidden");
+    expect(settled.surfaces.dialog.phase).toBe("hidden");
+  });
+
+  it("converges cue hidden when story current switches to dialog or resets", () => {
+    const shown = reduceUiRuntimeCommand(createInitialUiRuntimeState(), runtimeCommand("cue", "text", { text: "Cue" })).state;
+    const cueStory = storySnapshot({
+      text: { printerId: "default", visible: true, current: { channel: "cue", text: "Cue" } }
+    });
+    expect(deriveUiRuntimeLifecycleState(shown, cueStory).surfaces.cue.phase).toBe("shown");
+
+    const dialogStory = storySnapshot({
+      text: { printerId: "default", visible: true, current: { channel: "dialog", text: "Dialog" } }
+    });
+    expect(deriveUiRuntimeLifecycleState(shown, dialogStory).surfaces.cue.phase).toBe("hidden");
+    expect(deriveUiRuntimeLifecycleState(shown, storySnapshot()).surfaces.cue.phase).toBe("hidden");
   });
 
   it("reverses timed transitions from current opacity", () => {

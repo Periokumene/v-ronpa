@@ -7,6 +7,12 @@ start/reset/checkpoint/restore; and `VnDiagnosticsPort` owns diagnostic
 observation. These four ports are the complete product boundary returned by
 `useVnRuntime()`.
 
+The shell port exposes one StoryText playback authority. `print` and `cue`
+share current text, reveal, Auto/Skip, voice, and bleep state; the current
+record's `channel` selects the Dialog or Cue DOM surface. Public runtime names
+use `StoryTextReveal*`, `storyTextPlayback*`, and `storyTextRevealSettings`.
+The former DialogReveal/dialogPlayback exports do not exist.
+
 The lifecycle port is asynchronous at transactional boundaries. `startStory()`
 and `restoreVnState()` return `Promise<Result>` after catalog validation and
 target presentation preparation. A cross-script navigation holds the existing
@@ -26,6 +32,10 @@ Media handles, restore plans, wait keys, voice gates, timers, operation tickets,
 cross-script navigation coordination, and transaction
 helpers are internal. Canonical BGM/looping-SFX desired state is checkpoint data,
 but live handles, one-shots, voice/bleep gates, movies, cursors, and fades are not.
+UI state owns four `VnUiSurfaceId` surfaces, while `hideUI/showUI` accept only
+the three `RuntimeUiGroup` values and therefore never target Cue. `hideCue`
+uses the existing UI presentation-wait channel rather than adding a new port or
+clock.
 Lifecycle reset is a hard reset of the runtime-exclusive media ports; there is no
 per-call media-retention option. Root exports are explicit, and no compatibility
 re-export exists. See [VN integration](app-vn-integration.md) and

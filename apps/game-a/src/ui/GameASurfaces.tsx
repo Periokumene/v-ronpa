@@ -20,6 +20,7 @@ import type {
   VnChoicesViewModel,
   VnCommandBarActions,
   VnCommandBarViewModel,
+  VnCueViewModel,
   VnDialogViewModel
 } from "@v-ronpa/app-vn-shell";
 import {
@@ -34,7 +35,13 @@ import {
   type SettingsSectionId
 } from "@v-ronpa/app-vn-shell";
 import type { GamePauseSection, GameUiAction, InteractionCapabilitySnapshot } from "@v-ronpa/contracts";
-import { paginateSaveLoadSlotIds, RichTextRenderer, SAVE_LOAD_SLOTS_PER_PAGE, SurfaceFrame } from "@v-ronpa/ui-kit";
+import {
+  paginateSaveLoadSlotIds,
+  RichTextRenderer,
+  SAVE_LOAD_SLOTS_PER_PAGE,
+  SurfaceFrame,
+  VnCueSurface as SharedVnCueSurface
+} from "@v-ronpa/ui-kit";
 import type { GameAUiConfig } from "./gameAUiConfig";
 import type { GameAUiAssets } from "./resolveGameAUiAssets";
 
@@ -57,6 +64,7 @@ export function createGameASurfaces({
 }): GameInteractionShellSurfaces {
   return {
     Dialog: (props) => <GameADialogSurface {...props} assets={assets} config={config} />,
+    Cue: GameACueSurface,
     Choices: GameAChoiceOverlay,
     CommandBar: GameACommandBar,
     Title: (props) => <GameATitleSurface {...props} assets={assets} config={config} vnPreparationPending={vnPreparationPending} />,
@@ -67,6 +75,18 @@ export function createGameASurfaces({
     SaveLoadOverlay: (props) => <GameASaveLoadOverlay {...props} navigation={navigation} />,
     SettingsOverlay: (props) => <GameASettingsOverlay {...props} navigation={navigation} />
   };
+}
+
+export function GameACueSurface({ model }: SurfaceSlotProps<VnCueViewModel>) {
+  return (
+    <SharedVnCueSurface
+      {...(model.authorId ? { author: model.authorId } : {})}
+      text={model.text}
+      {...(model.richText ? { richText: model.richText } : {})}
+      {...(model.display ? { displaySettings: model.display } : {})}
+      presentation={model.presentation}
+    />
+  );
 }
 
 export function GameADialogSurface({

@@ -13,6 +13,7 @@ import type {
   StatementIR,
   TextIR
 } from "@v-ronpa/nani-parser";
+import { resolveNaniSourceRef } from "@v-ronpa/nani-parser";
 import { bindCommand } from "./binding.ts";
 import { commandNormalizerFor } from "./normalizers/index.ts";
 import type { CommandDiagnosticContext } from "./types";
@@ -31,6 +32,9 @@ import {
   plainParamRecord,
   runtimeValue
 } from "./values.ts";
+import { staticScalarValue } from "./values.ts";
+
+const storyTextIdPattern = /^[a-zA-Z0-9_-]+$/u;
 
 export {
   digestRuntimeScriptSemantics,
@@ -70,6 +74,8 @@ export function compileRuntimeScript(document: ParsedScenarioDocument): CompileR
     if (command) commands.push(command);
   }
 
+  diagnostics.push(...diagnoseStoryTextIds(document));
+
   return {
     script: {
       scriptPath: scenario.scriptPath,
@@ -84,6 +90,85 @@ export function compileRuntimeScript(document: ParsedScenarioDocument): CompileR
     },
     diagnostics: [...diagnostics, ...migratedDiagnostics]
   };
+}
+
+function diagnoseStoryTextIds(document: ParsedScenarioDocument): RuntimeCompilerDiagnostic[] {
+  const diagnostics: RuntimeCompilerDiagnostic[] = [];
+  const seen = new Map<string, boolean>();
+
+  for (const [statementIndex, statement] of document.scenario.statements.entries()) {
+    let textId: string | undefined;
+    let span;
+    let explicitCommandTextId = false;
+
+    if (statement.kind === "text" && statement.textId) {
+      textId = statement.textId;
+      span = resolveNaniSourceRef(document.sourceMap, {
+        kind: "text-id",
+        statementIndex,
+        markerIndex: 0,
+        part: "value"
+      });
+    } else if (statement.kind === "command" && (statement.commandId === "print" || statement.commandId === "cue")) {
+      explicitCommandTextId = true;
+      const argumentIndex = statement.args.findIndex(
+        (argument) => argument.kind === "param" && argument.key.toLowerCase() === "textid"
+      );
+      const argument = statement.args[argumentIndex];
+      if (argument?.kind !== "param") continue;
+      const value = staticScalarValue(argument.value);
+      textId = typeof value === "string" ? value : undefined;
+      span = resolveNaniSourceRef(document.sourceMap, {
+        kind: "command-argument",
+        statementIndex,
+        argumentIndex,
+        part: "value"
+      });
+      if (!span) continue;
+      if (!textId) {
+        diagnostics.push({
+          code: "invalid-command-param",
+          message: `@${statement.commandId} textId must be a static non-empty string.`,
+          severity: "error",
+          loc: statement.loc,
+          span
+        });
+        continue;
+      }
+    }
+
+    if (!textId) continue;
+    if (!span) continue;
+    if (!storyTextIdPattern.test(textId)) {
+      diagnostics.push({
+        code: "invalid-command-param",
+        message: `Invalid textId: ${textId}`,
+        severity: "error",
+        loc: statement.loc,
+        span
+      });
+      continue;
+    }
+    const previousWasExplicit = seen.get(textId);
+    if (previousWasExplicit !== undefined) {
+      // Parser diagnostics remain authoritative for normal-line/normal-line
+      // duplicates. Compiler diagnostics bridge either direction whenever an
+      // explicit @print/@cue named parameter participates in the collision.
+      if (explicitCommandTextId || previousWasExplicit) {
+        diagnostics.push({
+          code: "invalid-command-param",
+          message: `Duplicate textId: ${textId}`,
+          severity: "error",
+          loc: statement.loc,
+          span
+        });
+      }
+      continue;
+    }
+    seen.set(textId, explicitCommandTextId);
+  }
+
+  return diagnostics;
 }
 
 function compileStatement(
@@ -231,6 +316,7 @@ function richTextForCommand(
   if (
     command.richTextPrimary &&
     (commandId === "print" ||
+      commandId === "cue" ||
       commandId === "append" ||
       commandId === "choice" ||
       commandId === "toast")
@@ -238,7 +324,7 @@ function richTextForCommand(
     return command.richTextPrimary;
   }
   if (!command.richTextParams) return undefined;
-  if (commandId === "print" || commandId === "append" || commandId === "toast") {
+  if (commandId === "print" || commandId === "cue" || commandId === "append" || commandId === "toast") {
     return command.richTextParams.text;
   }
   if (commandId === "choice") {

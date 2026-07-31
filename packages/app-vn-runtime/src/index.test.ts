@@ -107,7 +107,7 @@ describe("app VN runtime helpers", () => {
       pixiStage,
       script: runtimeScript,
       story: storyRuntimeSnapshot(story),
-      ui: { dialog: true, commandBar: true, toastLayer: false }
+      ui: { dialog: true, commandBar: true, toastLayer: false, cue: false }
     });
 
     expect(plan.storyRuntime.active).toBe(true);
@@ -142,10 +142,16 @@ describe("app VN runtime helpers", () => {
   });
 
   it("restores terminal UI visibility without creating transitions", () => {
-    const runtimeScript = compileScenario("Felix: Restore UI wait.", "restore-ui-wait-test.nani");
+    const runtimeScript = compileScenario('@cue "Restore Cue." author:Narrator', "restore-ui-wait-test.nani");
     const story = {
       ...createInitialStoryState(runtimeScript),
-      instructionPointer: 1
+      instructionPointer: 1,
+      text: {
+        printerId: "default",
+        visible: true,
+        current: { channel: "cue" as const, speaker: "Narrator", text: "Restore Cue." }
+      },
+      backlog: [{ speaker: "Narrator", text: "Restore Cue." }]
     };
 
     const plan = createVnRuntimeRestorePlan({
@@ -154,11 +160,13 @@ describe("app VN runtime helpers", () => {
       pixiStage: createInitialPixiStageSnapshot(),
       script: runtimeScript,
       story: storyRuntimeSnapshot(story),
-      ui: { dialog: false, commandBar: true, toastLayer: true }
+      ui: { dialog: false, commandBar: true, toastLayer: true, cue: true }
     });
 
     expect(plan.uiRuntime.surfaces.dialog.targetVisible).toBe(false);
     expect(plan.uiRuntime.surfaces.commandBar.targetVisible).toBe(true);
+    expect(plan.uiRuntime.surfaces.cue).toMatchObject({ targetVisible: true, mounted: true, opacity: 1, phase: "shown" });
+    expect(plan.storyRuntime.state.text?.current?.channel).toBe("cue");
     expect(Object.values(plan.uiRuntime.surfaces).every((surface) => !surface.transition)).toBe(true);
     expect(plan.diagnostics).toEqual([]);
   });
@@ -326,7 +334,7 @@ describe("app VN runtime helpers", () => {
           },
           volume: 1
         },
-        dialogVisible: true,
+        textVisible: true,
         lineKey: "line:voice",
         pacing: "normal",
         revealStatus: "revealing",
@@ -384,7 +392,7 @@ describe("app VN runtime helpers", () => {
           },
           volume: 0.5
         },
-        dialogVisible: true,
+        textVisible: true,
         lineKey: "line:missing",
         pacing: "normal",
         revealStatus: "revealing",

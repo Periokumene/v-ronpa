@@ -18,7 +18,7 @@ import {
 } from "./useGameASaveAdapter";
 
 describe("game-a save adapter", () => {
-  it("creates v8 save data from the canonical VN checkpoint", () => {
+  it("creates v9 save data from the canonical VN checkpoint", () => {
     const story = createStory(
       Array.from({ length: 25 }, (_, index) => ({
         speaker: "Mira",
@@ -29,7 +29,7 @@ describe("game-a save adapter", () => {
     const data = createGameASaveData({ vn: createVnCheckpoint(story) });
 
     expect(data).toMatchObject({
-      version: 8,
+      version: 9,
       gameId: "game-a",
       mode: "vn",
       vn: {
@@ -61,7 +61,7 @@ describe("game-a save adapter", () => {
   });
 
   it("uses media-save as the sole slot policy authority for manual and quick saves", () => {
-    expect(GAME_A_SAVE_DB_NAME).toBe("v-ronpa-game-a-saves-v10");
+    expect(GAME_A_SAVE_DB_NAME).toBe("v-ronpa-game-a-saves-v11");
     expect(gameASaveSlotPolicy.namespace).toBe("game-a");
     expect(gameASaveSlotIds).toHaveLength(gameAManualSaveSlotCount);
     expect(gameASaveSlotIds.slice(0, 3)).toEqual(["slot:game-a:1", "slot:game-a:2", "slot:game-a:3"]);
@@ -134,6 +134,6 @@ function createVnCheckpoint(story: StoryRuntimeSnapshot): SaveableVnState {
       bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
       loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
     },
-    ui: { dialog: true, commandBar: true, toastLayer: true }
+    ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
   };
 }

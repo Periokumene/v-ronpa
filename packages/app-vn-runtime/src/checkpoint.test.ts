@@ -64,6 +64,6 @@ function checkpoint(story: StoryRuntimeSnapshot) {
       bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
       loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
     },
-    ui: { dialog: true, commandBar: true, toastLayer: true }
+    ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
   });
 }

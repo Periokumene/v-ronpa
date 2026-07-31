@@ -1,16 +1,18 @@
 import {
   RUNTIME_UI_GROUPS,
+  VN_UI_SURFACE_IDS,
   type RichTextDocument,
   type RuntimeCommand,
   type RuntimeUiGroup,
   type RuntimeValue,
   type StoryRuntimeSnapshot,
   type StoryUiPresentationWait,
-  type VnUiCheckpoint
+  type VnUiCheckpoint,
+  type VnUiSurfaceId
 } from "@v-ronpa/contracts";
 
-export { RUNTIME_UI_GROUPS };
-export type { RuntimeUiGroup };
+export { RUNTIME_UI_GROUPS, VN_UI_SURFACE_IDS };
+export type { RuntimeUiGroup, VnUiSurfaceId };
 
 export type UiSurfacePhase = "hidden" | "shown" | "showing" | "hiding";
 
@@ -33,7 +35,7 @@ export interface UiSurfaceState extends UiSurfacePresentation {
   transition?: UiSurfaceTransition;
 }
 
-export type UiSurfaceStateMap = Record<RuntimeUiGroup, UiSurfaceState>;
+export type UiSurfaceStateMap = Record<VnUiSurfaceId, UiSurfaceState>;
 
 export interface RuntimeToast {
   id: string;
@@ -86,7 +88,8 @@ export function createInitialUiRuntimeState(): UiRuntimeState {
     surfaces: {
       dialog: shownSurface(),
       commandBar: shownSurface(),
-      toastLayer: shownSurface()
+      toastLayer: shownSurface(),
+      cue: hiddenSurface()
     },
     toasts: [],
     toastSequence: 0
@@ -97,7 +100,8 @@ export function createVnUiCheckpoint(state: UiRuntimeState): VnUiCheckpoint {
   return {
     dialog: state.surfaces.dialog.targetVisible,
     commandBar: state.surfaces.commandBar.targetVisible,
-    toastLayer: state.surfaces.toastLayer.targetVisible
+    toastLayer: state.surfaces.toastLayer.targetVisible,
+    cue: state.surfaces.cue.targetVisible
   };
 }
 
@@ -106,7 +110,8 @@ export function createUiRuntimeStateFromCheckpoint(checkpoint: VnUiCheckpoint): 
     surfaces: {
       dialog: terminalSurface(checkpoint.dialog),
       commandBar: terminalSurface(checkpoint.commandBar),
-      toastLayer: terminalSurface(checkpoint.toastLayer)
+      toastLayer: terminalSurface(checkpoint.toastLayer),
+      cue: terminalSurface(checkpoint.cue)
     },
     toasts: [],
     toastSequence: 0
@@ -120,6 +125,8 @@ export function reduceUiRuntimeCommand(
 ): UiRuntimeResult {
   if (command.commandId === "showui") return reduceUiVisibilityCommand(state, command, true, options);
   if (command.commandId === "hideui") return reduceUiVisibilityCommand(state, command, false, options);
+  if (command.commandId === "cue") return reduceCueVisibilityCommand(state, command, true, options);
+  if (command.commandId === "hidecue") return reduceCueVisibilityCommand(state, command, false, options);
   if (command.commandId === "toast") return reduceToastCommand(state, command);
   return {
     state,
@@ -151,7 +158,7 @@ export function reduceUiRuntimeCommands(
 export function advanceUiRuntimeTransitions(state: UiRuntimeState, nowMs: number): UiRuntimeState {
   let changed = false;
   const surfaces = { ...state.surfaces };
-  for (const group of RUNTIME_UI_GROUPS) {
+  for (const group of VN_UI_SURFACE_IDS) {
     const current = surfaces[group];
     if (!current.transition) continue;
     const next = advanceUiSurfaceTransition(current, nowMs);
@@ -165,7 +172,7 @@ export function advanceUiRuntimeTransitions(state: UiRuntimeState, nowMs: number
 
 export function settleUiRuntimeTransitions(
   state: UiRuntimeState,
-  targets: readonly RuntimeUiGroup[] = RUNTIME_UI_GROUPS
+  targets: readonly VnUiSurfaceId[] = VN_UI_SURFACE_IDS
 ): UiRuntimeState {
   let changed = false;
   const surfaces = { ...state.surfaces };
@@ -183,7 +190,7 @@ export function settleUiRuntimePresentationWait(state: UiRuntimeState, wait: Sto
 }
 
 export function hasActiveUiRuntimeTransitions(state: UiRuntimeState): boolean {
-  return RUNTIME_UI_GROUPS.some((group) => Boolean(state.surfaces[group].transition));
+  return VN_UI_SURFACE_IDS.some((group) => Boolean(state.surfaces[group].transition));
 }
 
 export function isUiPresentationWait(wait: StoryRuntimeSnapshot["presentationWait"]): wait is StoryUiPresentationWait {
@@ -197,19 +204,22 @@ export function isUiPresentationWaitComplete(state: UiRuntimeState, wait: StoryU
   });
 }
 
-export function selectUiSurfacePresentation(state: UiRuntimeState, group: RuntimeUiGroup): UiSurfacePresentation {
+export function selectUiSurfacePresentation(state: UiRuntimeState, group: VnUiSurfaceId): UiSurfacePresentation {
   const { targetVisible, mounted, opacity, phase } = state.surfaces[group];
   return { targetVisible, mounted, opacity, phase };
 }
 
 export function deriveUiRuntimeLifecycleState(state: UiRuntimeState, story: StoryRuntimeSnapshot): UiRuntimeState {
+  const lifecycleState = story.text?.current?.channel === "cue"
+    ? state
+    : settleUiRuntimeSurfaces(state, ["cue"], false);
   if (story.runtimeWait?.kind !== "input") {
-    const { inputPrompt: _inputPrompt, ...rest } = state;
+    const { inputPrompt: _inputPrompt, ...rest } = lifecycleState;
     void _inputPrompt;
     return rest;
   }
   return {
-    ...state,
+    ...lifecycleState,
     inputPrompt: {
       variableName: story.runtimeWait.variableName,
       valueType: story.runtimeWait.valueType,
@@ -217,6 +227,16 @@ export function deriveUiRuntimeLifecycleState(state: UiRuntimeState, story: Stor
       ...(story.runtimeWait.defaultValue !== undefined ? { defaultValue: story.runtimeWait.defaultValue } : {})
     }
   };
+}
+
+function reduceCueVisibilityCommand(
+  state: UiRuntimeState,
+  command: RuntimeCommand,
+  visible: boolean,
+  { nowMs = 0 }: UiRuntimeCommandOptions
+): UiRuntimeResult {
+  const durationMs = visible ? 0 : Math.max(0, Math.round(numberParam(command, "durationMs") ?? 0));
+  return reduceUiSurfaceTargets(state, ["cue"], visible, durationMs, nowMs);
 }
 
 export function startMovieOverlay(state: UiRuntimeState, overlay: RuntimeMovieOverlay): UiRuntimeState {
@@ -256,11 +276,21 @@ function reduceUiVisibilityCommand(
 
   const visible = command.commandId === "showui" ? booleanParam(command, "visible") ?? defaultVisible : defaultVisible;
   const durationMs = Math.max(0, Math.round(numberParam(command, "durationMs") ?? 0));
+  return reduceUiSurfaceTargets(state, targets.targets, visible, durationMs, nowMs);
+}
+
+function reduceUiSurfaceTargets(
+  state: UiRuntimeState,
+  targets: readonly VnUiSurfaceId[],
+  visible: boolean,
+  durationMs: number,
+  nowMs: number
+): UiRuntimeResult {
   const currentState = advanceUiRuntimeTransitions(state, nowMs);
   let changed = currentState !== state;
   const nextSurfaces = { ...currentState.surfaces };
 
-  for (const group of targets.targets) {
+  for (const group of targets) {
     const current = nextSurfaces[group];
     const next = transitionUiSurface(current, visible, durationMs, nowMs);
     if (next !== current) {
@@ -299,7 +329,7 @@ function reduceToastCommand(state: UiRuntimeState, command: RuntimeCommand): UiR
 
 function settleUiRuntimeSurfaces(
   state: UiRuntimeState,
-  targets: readonly RuntimeUiGroup[],
+  targets: readonly VnUiSurfaceId[],
   targetVisible: boolean
 ): UiRuntimeState {
   let changed = false;

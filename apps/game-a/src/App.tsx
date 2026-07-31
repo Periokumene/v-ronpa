@@ -3,7 +3,7 @@ import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
   VnPixiPresenterHost,
-  settingsToDialogDisplaySettings,
+  settingsToStoryTextDisplaySettings,
   settingsToDialogueBleepRuntimeSettings,
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings,
@@ -65,8 +65,8 @@ export function GameAAppCore({
   const settings = useGameSettingsAdapter({ storageKey: "v-ronpa:game-a:settings:v2" });
   const assetRegistry = useMemo(() => createAssetRegistry(gameAContentManifest), []);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
-  const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
-  const dialogRevealSettings = useMemo(() => ({ textSpeed: dialogDisplay.textSpeed }), [dialogDisplay.textSpeed]);
+  const storyTextDisplay = useMemo(() => settingsToStoryTextDisplaySettings(settings.settings), [settings.settings]);
+  const storyTextRevealSettings = useMemo(() => ({ textSpeed: storyTextDisplay.textSpeed }), [storyTextDisplay.textSpeed]);
   const dialogueBleepSettings = useMemo(() => settingsToDialogueBleepRuntimeSettings(settings.settings), [settings.settings]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
   const startPromiseRef = useRef<Promise<boolean> | undefined>(undefined);
@@ -82,7 +82,7 @@ export function GameAAppCore({
     assetResolver: assetRegistry,
     ...(gameAContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: gameAContentManifest.audio.dialogueBleep } : {}),
     dialogueBleepSettings,
-    dialogRevealSettings,
+    storyTextRevealSettings,
     storyPlayTiming,
     voiceSettings
   });
@@ -162,7 +162,7 @@ export function GameAAppCore({
     <section className="game-a-playfield" data-testid="game-a-playfield">
       <GameInteractionShell
         dialogAppearance={gameAUiConfig.dialog.appearance}
-        dialogDisplay={dialogDisplay}
+        storyTextDisplay={storyTextDisplay}
         flow={flow}
         formatStorySpeaker={displaySpeaker}
         overlayPages={overlayPages}

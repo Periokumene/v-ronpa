@@ -19,17 +19,19 @@ outcomes are debug-only types under `app-vn-runtime/debug`; they are not public
 content contracts and are never serialized into SaveData. The workbench does
 not add syntax, parser/IR shapes, RuntimeCommand variants, or save fields.
 
-## ContentManifest v4 and SaveData v8
+## ContentManifest v4 and SaveData v9
 
 ContentManifest has one accepted version: `4`. A `VnEntryDef` identifies one VN
 experience with `initialScriptPath` and optional `startLabel`; script source and
 revision do not live on the entry. Runtime source is an ordered, path-unique
 `VnRuntimeScriptCatalog` of `{ scriptPath, sourceText, scriptRevision }` records.
 
-SaveData has one accepted version: `8`. It requires top-level `gameId`. A VN
+SaveData has one accepted version: `9`. It requires top-level `gameId`. A VN
 section requires `entryId`, `script: { scriptPath, scriptRevision }`, a `SaveableStorySnapshot`,
 terminal `PixiStageSnapshot`, terminal visibility for `dialog`, `commandBar`, and
-`toastLayer`, plus canonical persistent-media intent. Media intent is keyed by BGM
+`toastLayer`, and `cue`, plus canonical persistent-media intent. The one current
+story-text record carries `channel: "dialog" | "cue"`; backlog entries remain
+presentation-neutral. Media intent is keyed by BGM
 group and looping-SFX tracking key and stores only `sourceRef`, target `volume`,
 and the optional SFX `group`. Tracking keys, source refs, and explicit groups are
 non-empty; volumes are finite numbers. Command reduction normalizes omitted play
@@ -42,22 +44,22 @@ saveable. `createVnSaveCheckpoint()` rejects unstable stops rather than deleting
 transient state. Restore rejects mismatched game, entry, or revision before
 stopping live media or mutating app state.
 
-`PixiStageSnapshot.characterTone` is an optional SaveData-v8-compatible target
+`PixiStageSnapshot.characterTone` is an optional SaveData-v9 target
 state for `@charTone`. It stores the code-owned preset ID, finite non-negative
 artistic amount, owning `scopeScriptPath`, and terminal transition request.
 Save validation requires the scope path to equal `vn.script.scriptPath`.
-Renderer tween progress and fixed easing remain transient; older v8 saves
-without the optional field restore with tone disabled.
+Renderer tween progress and fixed easing remain transient.
 
 The global inventory, evidence, and character sections remain shared across
 VN/Navi/Trial. A VN-focused game may provide valid empty initial gameplay state.
 
-There is no manifest v3 or SaveData v7 migration, legacy database fallback,
+There is no manifest v3 or SaveData v8 migration, legacy database fallback,
 extension bag, or deprecated schema alias. `story` does not duplicate the saved
-script path. Game A and Harness use fresh v10 database namespaces.
+script path. Game A and Harness use fresh v11 database namespaces and do not
+open their v10 databases.
 
 The change record and supersession scope are defined by
-[Game A Multi-Nani Runtime Hard Cut](../ccr/game-a-multi-nani-runtime-hard-cut.md).
+[Cue story text, StoryText API, and SaveData v9 hard cut](../ccr/cue-story-text-hard-cut.md).
 
 ## Flow and overlays
 

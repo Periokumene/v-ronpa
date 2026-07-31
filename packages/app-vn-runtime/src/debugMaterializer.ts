@@ -667,7 +667,7 @@ function createLabelAnchor(script: RuntimeScript, revision: string, label: Label
 }
 
 function stableCommandId(command: RuntimeCommand): string | undefined {
-  const value = command.commandId === "print"
+  const value = (command.commandId === "print" || command.commandId === "cue")
     ? command.params.textId
     : command.commandId === "choice"
       ? command.params.id
@@ -875,7 +875,7 @@ function isChoiceGroupCommand(command: RuntimeCommand | undefined): boolean {
 
 function isObservableStableCommand(command: VnDebugCommandInspection): boolean {
   if (command.previewability === "blocked" || command.previewability === "no-stable-result") return false;
-  return command.command.commandId === "print"
+  return command.command.commandId === "print" || command.command.commandId === "cue"
     || command.command.commandId === "choice"
     || command.command.commandId === "input"
     || command.command.category === "actor"

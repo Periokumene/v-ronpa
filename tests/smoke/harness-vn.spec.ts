@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   advanceMainInteractionShowcase,
   advanceUntilChoices,
@@ -145,3 +145,77 @@ test("harness VN shell, save/load, and main interaction branch", async ({ page }
 
   expect(consoleErrors).toEqual([]);
 });
+
+test("harness renders Cue independently, retains it under choices, and waits for fade-out before Dialog", async ({ page }) => {
+  const consoleErrors = watchUnexpectedConsoleErrors(page);
+  await bootHarness(page);
+  await configureTitleDisplay(page, { textSpeed: "1", textSize: "large" });
+  await startNavi(page);
+  await startStoryOverlay(page);
+  await advanceUntilText(page, "请选择测试路径");
+  await advanceUntilChoices(page);
+  await expect(page.getByTestId("vn-choice-5")).toHaveText("分支6：Cue 演出文本验收");
+  await page.getByTestId("vn-choice-5").click();
+
+  await advanceHarnessUntilSurfaceText(page, "vn-dialog-text", "CHECKPOINT CUE 00");
+  await advanceHarnessUntilSurfaceText(page, "vn-cue-text", "CHECKPOINT CUE 01");
+  const cue = page.getByTestId("vn-cue-surface");
+  await expect(cue).toBeVisible();
+  await expect(cue).toHaveAttribute("aria-label", "演出文本：Narrator");
+  const richRun = cue.locator('[data-rich-text-run=""]');
+  await expect(richRun).toContainText("CHECKPOINT CUE 01");
+  await expect(richRun).toHaveCSS("font-weight", "700");
+  await expect(cue).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(cue).toHaveCSS("border-top-style", "none");
+  await expect(cue).toHaveCSS("box-shadow", "none");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
+  await page.screenshot({ path: "test-results/harness-cue-centered-borderless.png", fullPage: true });
+
+  await advanceHarnessUntilSurfaceText(page, "vn-cue-text", "CHECKPOINT CUE 02");
+  await expect(cue).toHaveAttribute("data-ui-phase", "shown");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
+  await expect(page.getByTestId("vn-command-bar")).toBeVisible();
+  await page.screenshot({ path: "test-results/harness-cue-hide-ui-isolation.png", fullPage: true });
+
+  await advanceHarnessUntilChoices(page);
+  await expect(page.getByTestId("vn-choice-0")).toContainText("CHECKPOINT CUE CHOICE");
+  await expect(cue).toBeVisible();
+  await page.getByTestId("vn-choice-0").click();
+  await expect(cue).toHaveAttribute("data-ui-phase", "hiding");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
+  await page.screenshot({ path: "test-results/harness-cue-fading-before-dialog.png", fullPage: true });
+
+  await expect(cue).toHaveCount(0, { timeout: 5_000 });
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT CUE 03", { timeout: 5_000 });
+  await page.screenshot({ path: "test-results/harness-cue-fade-complete-dialog.png", fullPage: true });
+  expect(consoleErrors).toEqual([]);
+});
+
+async function advanceHarnessUntilSurfaceText(page: Page, testId: string, text: string) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const surface = page.getByTestId(testId);
+    const surfaceText = (await surface.count()) > 0 ? (await surface.textContent()) ?? "" : "";
+    if (surfaceText.includes(text)) return;
+    await advanceHarness(page);
+    await page.waitForTimeout(120);
+  }
+  await expect(page.getByTestId(testId)).toContainText(text);
+}
+
+async function advanceHarnessUntilChoices(page: Page) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if ((await page.getByTestId("vn-choice-overlay").count()) > 0) return;
+    await advanceHarness(page);
+    await page.waitForTimeout(120);
+  }
+  await expect(page.getByTestId("vn-choice-overlay")).toBeVisible();
+}
+
+async function advanceHarness(page: Page) {
+  const hitPlane = page.getByTestId("vn-advance-hit-plane");
+  if (await hitPlane.isVisible()) {
+    await hitPlane.click();
+    return;
+  }
+  await page.getByTestId("harness-showcase-advance").click();
+}

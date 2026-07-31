@@ -1,42 +1,42 @@
 import type { RichTextDocument } from "@v-ronpa/contracts";
 
-export type DialogRevealStatus = "revealing" | "complete";
+export type StoryTextRevealStatus = "revealing" | "complete";
 
-export type DialogRevealEvent =
+export type StoryTextRevealEvent =
   | { type: "reveal-start"; lineKey: string; atMs: number }
   | { type: "reveal-tick"; lineKey: string; atMs: number; unit: string; unitIndex: number; visibleUnitCount: number }
   | { type: "reveal-finish"; lineKey: string; atMs: number };
 
-export interface DialogRevealEventCursor {
+export interface StoryTextRevealEventCursor {
   started: boolean;
   tickUnitCount: number;
   finished: boolean;
 }
 
-export interface DialogRevealState {
+export interface StoryTextRevealState {
   lineKey: string;
   text: string;
   units: string[];
   visibleUnitCount: number;
   startedAtMs: number;
   durationMs: number;
-  status: DialogRevealStatus;
-  eventCursor: DialogRevealEventCursor;
+  status: StoryTextRevealStatus;
+  eventCursor: StoryTextRevealEventCursor;
 }
 
-export interface CreateDialogRevealStateInput {
+export interface CreateStoryTextRevealStateInput {
   lineKey: string;
   text: string;
   startedAtMs: number;
   durationMs: number;
 }
 
-export interface DialogRevealStep {
-  state: DialogRevealState;
-  events: DialogRevealEvent[];
+export interface StoryTextRevealStep {
+  state: StoryTextRevealState;
+  events: StoryTextRevealEvent[];
 }
 
-export interface DialogLinePacingPlanInput {
+export interface StoryTextPacingPlanInput {
   unitCount: number;
   textSpeed: number;
   scriptSpeed?: number;
@@ -45,7 +45,7 @@ export interface DialogLinePacingPlanInput {
   baseUnitDelayMs?: number;
 }
 
-export interface DialogLinePacingPlan {
+export interface StoryTextPacingPlan {
   revealDurationMs: number;
   rawRevealDurationMs: number;
   revealBudgetRatio: number;
@@ -62,13 +62,13 @@ type GraphemeSegmenter = new (
   options?: { granularity: "grapheme" }
 ) => { segment(input: string): Iterable<{ segment: string }> };
 
-export function createDialogRevealState({
+export function createStoryTextRevealState({
   durationMs,
   lineKey,
   startedAtMs,
   text
-}: CreateDialogRevealStateInput): DialogRevealState {
-  const units = segmentDialogRevealUnits(text);
+}: CreateStoryTextRevealStateInput): StoryTextRevealState {
+  const units = segmentStoryTextRevealUnits(text);
   const normalizedDurationMs = Math.max(0, Math.round(durationMs));
   const complete = units.length === 0 || normalizedDurationMs === 0;
   return {
@@ -83,12 +83,12 @@ export function createDialogRevealState({
   };
 }
 
-export function advanceDialogReveal(state: DialogRevealState, nowMs: number): DialogRevealStep {
-  if (state.status === "complete") return emitDialogRevealEvents(state, nowMs, { emitTicks: false });
+export function advanceStoryTextReveal(state: StoryTextRevealState, nowMs: number): StoryTextRevealStep {
+  if (state.status === "complete") return emitStoryTextRevealEvents(state, nowMs, { emitTicks: false });
 
   const visibleUnitCount = nextVisibleUnitCount(state, nowMs);
   const complete = visibleUnitCount >= state.units.length;
-  return emitDialogRevealEvents(
+  return emitStoryTextRevealEvents(
     {
       ...state,
       visibleUnitCount,
@@ -98,8 +98,8 @@ export function advanceDialogReveal(state: DialogRevealState, nowMs: number): Di
   );
 }
 
-export function completeDialogReveal(state: DialogRevealState, nowMs: number): DialogRevealStep {
-  return emitDialogRevealEvents(
+export function completeStoryTextReveal(state: StoryTextRevealState, nowMs: number): StoryTextRevealStep {
+  return emitStoryTextRevealEvents(
     {
       ...state,
       visibleUnitCount: state.units.length,
@@ -110,7 +110,7 @@ export function completeDialogReveal(state: DialogRevealState, nowMs: number): D
   );
 }
 
-export function selectVisibleRevealText(state: DialogRevealState | undefined): string | undefined {
+export function selectVisibleRevealText(state: StoryTextRevealState | undefined): string | undefined {
   if (!state) return undefined;
   if (state.status === "complete") return state.text;
   return state.units.slice(0, state.visibleUnitCount).join("");
@@ -118,7 +118,7 @@ export function selectVisibleRevealText(state: DialogRevealState | undefined): s
 
 export function selectVisibleRevealRichText(
   document: RichTextDocument | undefined,
-  state: DialogRevealState | undefined
+  state: StoryTextRevealState | undefined
 ): RichTextDocument | undefined {
   if (!document) return undefined;
   if (!state) return document;
@@ -138,18 +138,18 @@ export function selectVisibleRevealRichText(
   };
 }
 
-export function countDialogRevealUnits(text: string): number {
-  return segmentDialogRevealUnits(text).length;
+export function countStoryTextRevealUnits(text: string): number {
+  return segmentStoryTextRevealUnits(text).length;
 }
 
-export function createDialogLinePacingPlan({
+export function createStoryTextPacingPlan({
   baseUnitDelayMs = DEFAULT_REVEAL_UNIT_DELAY_MS,
   revealBudgetRatio = DEFAULT_REVEAL_BUDGET_RATIO,
   scriptSpeed = DEFAULT_SCRIPT_SPEED,
   textSpeed,
   totalDelayMs,
   unitCount
-}: DialogLinePacingPlanInput): DialogLinePacingPlan {
+}: StoryTextPacingPlanInput): StoryTextPacingPlan {
   const normalizedUnitCount = Math.max(0, Math.floor(unitCount));
   const normalizedTextSpeed = clamp(textSpeed, 0, 1);
   const normalizedScriptSpeed = scriptSpeed > 0 ? scriptSpeed : DEFAULT_SCRIPT_SPEED;
@@ -167,12 +167,12 @@ export function createDialogLinePacingPlan({
   };
 }
 
-function emitDialogRevealEvents(
-  state: DialogRevealState,
+function emitStoryTextRevealEvents(
+  state: StoryTextRevealState,
   nowMs: number,
   options: { emitTicks?: boolean } = {}
-): DialogRevealStep {
-  const events: DialogRevealEvent[] = [];
+): StoryTextRevealStep {
+  const events: StoryTextRevealEvent[] = [];
   const eventCursor = { ...state.eventCursor };
   const emitTicks = options.emitTicks ?? true;
 
@@ -203,14 +203,14 @@ function emitDialogRevealEvents(
   return { state: { ...state, eventCursor }, events };
 }
 
-function nextVisibleUnitCount(state: DialogRevealState, nowMs: number): number {
+function nextVisibleUnitCount(state: StoryTextRevealState, nowMs: number): number {
   if (state.units.length === 0 || state.durationMs === 0) return state.units.length;
   const elapsedMs = Math.max(0, nowMs - state.startedAtMs);
   if (elapsedMs >= state.durationMs) return state.units.length;
   return Math.min(state.units.length, Math.floor((elapsedMs / state.durationMs) * state.units.length));
 }
 
-function segmentDialogRevealUnits(text: string): string[] {
+function segmentStoryTextRevealUnits(text: string): string[] {
   const Segmenter = (Intl as typeof Intl & { Segmenter?: GraphemeSegmenter }).Segmenter;
   if (!Segmenter) return Array.from(text);
   const segmenter = new Segmenter(undefined, { granularity: "grapheme" });

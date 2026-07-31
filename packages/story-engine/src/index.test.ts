@@ -118,6 +118,7 @@ describe("story engine", () => {
         ],
         "text": {
           "current": {
+            "channel": "dialog",
             "speaker": "Felix",
             "text": "The door was locked.",
           },
@@ -169,6 +170,7 @@ describe("story engine", () => {
 
     expect(result.diagnostics).toEqual([]);
     expect(selectCurrentStoryLine(state)).toEqual({
+      channel: "dialog",
       speaker: "Felix",
       text: "This is the first playable slice. Move, inspect, then choose a route."
     });
@@ -297,10 +299,12 @@ describe("story engine", () => {
       "stopsfx",
       "sun",
       "toast",
+      "cue",
       "end",
       "gameplay",
       "flash",
       "focus",
+      "hidecue",
       "inback",
       "trialkeyword"
     ]);
@@ -457,7 +461,7 @@ describe("story engine", () => {
 
     let state = createInitialStoryState(runtimeScript);
     state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
-    expect(selectCurrentStoryLine(state)).toEqual({ text: "Draft" });
+    expect(selectCurrentStoryLine(state)).toEqual({ channel: "dialog", text: "Draft" });
     expect(state.backlog).toEqual([]);
 
     state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
@@ -467,7 +471,7 @@ describe("story engine", () => {
     expect(selectCurrentStoryLine(state)).toBeUndefined();
 
     state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
-    expect(selectCurrentStoryLine(state)).toEqual({ text: "Fresh" });
+    expect(selectCurrentStoryLine(state)).toEqual({ channel: "dialog", text: "Fresh" });
     expect(state.backlog).toEqual([]);
 
     state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
@@ -475,7 +479,7 @@ describe("story engine", () => {
 
     state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
     expect(state.backlog).toEqual([]);
-    expect(selectCurrentStoryLine(state)).toEqual({ speaker: "Felix", text: "Logged." });
+    expect(selectCurrentStoryLine(state)).toEqual({ channel: "dialog", speaker: "Felix", text: "Logged." });
 
     state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
     expect(state.backlog).toEqual([{ speaker: "Mira", text: "After clear." }]);
@@ -505,6 +509,7 @@ describe("story engine", () => {
 
     state = reduceWithoutDiagnostics(state, { type: "STEP", script: runtimeScript }).state;
     expect(selectCurrentStoryLine(state)).toEqual({
+      channel: "dialog",
       speaker: "Felix",
       text: "Bold marked",
       richText: {
@@ -537,8 +542,63 @@ describe("story engine", () => {
       })
     ]);
     expect(result.state.backlog).toEqual([{ speaker: "Felix", text: "Voiced line." }]);
-    expect(result.state.text?.current).toEqual({ speaker: "Felix", text: "Voiced line." });
+    expect(result.state.text?.current).toEqual({ channel: "dialog", speaker: "Felix", text: "Voiced line." });
     expect(storyRuntimeSnapshot(result.state).backlog).toEqual([{ speaker: "Felix", text: "Voiced line." }]);
+  });
+
+  it("switches one current story text authority between dialog and cue while backlog stays presentation-neutral", () => {
+    const runtimeScript = runtimeScriptFixture("cue-story.nani", [
+      runtimeCommand("print", "text", { speaker: "Felix", text: "Dialog.", autoNext: false }),
+      runtimeCommand("cue", "text", { speaker: "Narrator", text: "Cue", autoNext: false }),
+      runtimeCommand("append", "text", { text: " extended" }),
+      runtimeCommand("choice", "choice", { text: "Continue", goto: "#End" }),
+      runtimeCommand("resettext", "text", {}),
+      runtimeCommand("end", "flow", {})
+    ], { End: 4 });
+
+    let state = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript).state;
+    expect(selectCurrentStoryLine(state)).toEqual({ channel: "dialog", speaker: "Felix", text: "Dialog." });
+
+    const cue = advanceToNextStop(state, runtimeScript);
+    state = cue.state;
+    expect(cue.stopReason).toBe("text");
+    expect(cue.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["cue"]);
+    expect(selectCurrentStoryLine(state)).toEqual({ channel: "cue", speaker: "Narrator", text: "Cue" });
+    expect(state.backlog).toEqual([
+      { speaker: "Felix", text: "Dialog." },
+      { speaker: "Narrator", text: "Cue" }
+    ]);
+
+    const choices = advanceToNextStop(state, runtimeScript);
+    expect(choices.stopReason).toBe("choices");
+    expect(selectCurrentStoryLine(choices.state)).toEqual({
+      channel: "cue",
+      speaker: "Narrator",
+      text: "Cue extended"
+    });
+    expect(choices.state.pendingChoices).toHaveLength(1);
+
+    const reset = stepStoryInstruction({ ...choices.state, pendingChoices: [], instructionPointer: 4 }, runtimeScript);
+    expect(selectCurrentStoryLine(reset.state)).toBeUndefined();
+    expect(reset.state.backlog.at(-1)).toEqual({ speaker: "Narrator", text: "Cue" });
+  });
+
+  it("uses the existing UI wait channel for hideCue", () => {
+    const runtimeScript = runtimeScriptFixture("hide-cue.nani", [
+      runtimeCommand("hidecue", "ui", { durationMs: 400, wait: true }, { canonicalName: "hideCue" }),
+      runtimeCommand("print", "text", { text: "After.", autoNext: false })
+    ]);
+
+    const result = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+    expect(result.stopReason).toBe("presentation-wait");
+    expect(result.state.presentationWait).toEqual({
+      channel: "ui",
+      commandId: "hidecue",
+      commandIndex: 0,
+      durationMs: 400,
+      targets: ["cue"],
+      targetVisible: false
+    });
   });
 
   it("blocks on wait runtimeWait until a matching completion event arrives", () => {
@@ -574,7 +634,7 @@ describe("story engine", () => {
     const completed = reduceWithoutDiagnostics(first.state, { type: "RUNTIME_WAIT_COMPLETE", script: runtimeScript, kind: "pause" });
     const resumed = advanceToNextStop(completed.state, runtimeScript);
     expect(resumed.stopReason).toBe("text");
-    expect(selectCurrentStoryLine(resumed.state)).toEqual({ speaker: "Felix", text: "Resumed." });
+    expect(selectCurrentStoryLine(resumed.state)).toEqual({ channel: "dialog", speaker: "Felix", text: "Resumed." });
   });
 
   it("validates input submissions as the only input completion path", () => {
@@ -638,7 +698,7 @@ describe("story engine", () => {
     const completed = reduceWithoutDiagnostics(result.state, { type: "RUNTIME_WAIT_COMPLETE", script: runtimeScript, kind: "movie" });
     const resumed = advanceToNextStop(completed.state, runtimeScript);
     expect(resumed.stopReason).toBe("text");
-    expect(selectCurrentStoryLine(resumed.state)).toEqual({ speaker: "Felix", text: "After movie." });
+    expect(selectCurrentStoryLine(resumed.state)).toEqual({ channel: "dialog", speaker: "Felix", text: "After movie." });
   });
 
   it("supports choice ids, disabled choices, clearChoice, and choice set expressions", () => {
@@ -710,11 +770,11 @@ describe("story engine", () => {
 
     let result = advanceToNextStop(state, runtimeScript);
     state = result.state;
-    expect(selectCurrentStoryLine(state)).toEqual({ speaker: "Felix", text: "First line." });
+    expect(selectCurrentStoryLine(state)).toEqual({ channel: "dialog", speaker: "Felix", text: "First line." });
 
     result = advanceToNextStop(state, runtimeScript);
     state = result.state;
-    expect(selectCurrentStoryLine(state)).toEqual({ speaker: "Mira", text: "Second line." });
+    expect(selectCurrentStoryLine(state)).toEqual({ channel: "dialog", speaker: "Mira", text: "Second line." });
     expect(state.ended).toBe(false);
   });
 
@@ -731,6 +791,7 @@ describe("story engine", () => {
     expect(state.instructionPointer).toBe(runtimeScript.labels.Classroom);
     expect(state.pendingChoices).toEqual([]);
     expect(selectCurrentStoryLine(state)).toEqual({
+      channel: "dialog",
       speaker: "Felix",
       text: "This is the first playable slice. Move, inspect, then choose a route."
     });
@@ -743,6 +804,7 @@ describe("story engine", () => {
     expect(state.variables.route).toBe("classroom");
     expect(result.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["gameplay", "print"]);
     expect(selectCurrentStoryLine(state)).toEqual({
+      channel: "dialog",
       speaker: "Mira",
       text: "Then the keycard matters after all."
     });
@@ -829,7 +891,7 @@ describe("story engine", () => {
     ]);
 
     const resumed = reduceWithoutDiagnostics(missing.state, { type: "STEP", script: runtimeScript });
-    expect(selectCurrentStoryLine(resumed.state)).toEqual({ speaker: "Mira", text: "After invalid goto." });
+    expect(selectCurrentStoryLine(resumed.state)).toEqual({ channel: "dialog", speaker: "Mira", text: "After invalid goto." });
   });
 
   it("uses the same navigation request for a cross-script choice", () => {

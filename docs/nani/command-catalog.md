@@ -123,9 +123,19 @@ order never implies navigation, and `@end` completes the whole entry.
 - First-pass rich text is carried as `RuntimeCommand.richText` beside ordinary
   string `params.text`. Downstream systems must consume the compiled document
   and must not re-parse markup in StoryEngine, ui-kit, or app save adapters.
+- `@cue "text"` is a normal StoryText stop with named `author`, `speed`,
+  `textId`, and `autoNext` controls. It shares current text, backlog, reveal,
+  Auto/Skip, voice, and bleep behavior with `@print`, but keeps its `cue`
+  command identity and routes the current record to the centered, borderless
+  Cue DOM surface. `@hideCue time:... wait!` fades only that surface and does
+  not clear the current StoryText record.
+- Explicit `@print` and `@cue` parameters do not parse normal-line inline
+  controls such as `[< ...]`, `|#...|`, or `[>]`; those sequences remain literal
+  command text. Named `textId` values use `[A-Za-z0-9_-]+` and participate in
+  the same whole-script duplicate check as normal-line text IDs.
 - `showUI` / `hideUI` are implemented as a V-Ronpa runtime UI subset. Supported
   targets are `dialog`, `commandBar`, and `toastLayer`; no-target commands apply
-  to those three targets only. `time` is normalized to `durationMs`; missing or
+  to those three targets only and never affect Cue. `time` is normalized to `durationMs`; missing or
   zero duration settles immediately. `wait!` creates a UI `presentationWait` only
   when all targets are valid. `hud`, debug/harness UI, shell overlays, and
   lifecycle-owned `inputPrompt` / `movieOverlay` are outside the current
@@ -181,7 +191,7 @@ order never implies navigation, and `@end` completes the whole entry.
 | `look` | `look` | actor | declared-only | enable:boolean, zone:decimal list, speed:decimal list, gravity:boolean | none | no | stubbed |
 | `movie` | `movie` | media | media-output | moviePath:string, time:decimal, block:boolean | none | no | implemented |
 | `openURL` | `openurl` | ui | declared-only | uRL:string, target:string | none | no | stubbed |
-| `print` | `print` | text | story-control | text:string, printer:string, author:string, as:string, speed:decimal, reset:boolean, default:boolean, waitInput:boolean, append:boolean, fadeTime:decimal, wait:boolean | none | no | implemented |
+| `print` | `print` | text | story-control | text:string, printer:string, author:string, as:string, speed:decimal, textId:string (V-Ronpa), autoNext:boolean (V-Ronpa), reset:boolean, default:boolean, waitInput:boolean, append:boolean, fadeTime:decimal, wait:boolean | none | no | implemented |
 | `printer` | `printer` | text | declared-only | idAndAppearance:named string, default:boolean, hideOther:boolean, anchor:boolean, pos:decimal list, id:string, appearance:string, pose:string, via:string, params:decimal list, dissolve:string, visible:boolean, position:decimal list, rotation:decimal list, scale:decimal list, tint:string, easing:string, time:decimal, lazy:boolean, wait:boolean | none | no | stubbed |
 | `processInput` | `processinput` | ui | declared-only | inputEnabled:boolean, set:named boolean list | none | no | stubbed |
 | `purgeRollback` | `purgerollback` | state | declared-only | none | none | no | stubbed |
@@ -226,10 +236,12 @@ order never implies navigation, and `@end` completes the whole entry.
 |---|---|---|---|---|---|---|---|
 | `charenter` | `charenter` | actor | declared-only | character:string, appearanceExpression:string, effect:string | none | no | stubbed |
 | `charTone` | `chartone` | effect | pixi-presentation | preset:string, amount:decimal, time:decimal, wait:boolean | preset | no | implemented |
+| `cue` | `cue` | text | story-control | text:string (V-Ronpa), author:string (V-Ronpa), speed:decimal (V-Ronpa), textId:string (V-Ronpa), autoNext:boolean (V-Ronpa) | text | no | implemented |
 | `end` | `end` | flow | story-control | none | none | no | implemented |
 | `flash` | `flash` | effect | pixi-presentation | color:string, duration:decimal, wait:boolean | none | no | implemented |
 | `focus` | `focus` | effect | pixi-presentation | target:string, duration:decimal | none | no | implemented |
 | `gameplay` | `gameplay` | state | gameplay | type:string, id:string, quantity:integer, item:string, itemId:string, evidence:string, evidenceId:string, character:string, characterId:string, status:string, skill:string, skillId:string, delta:integer, affinityDelta:integer | none | no | implemented |
+| `hideCue` | `hidecue` | ui | ui-output | time:decimal (V-Ronpa), wait:boolean (V-Ronpa) | none | no | implemented |
 | `inback` | `inback` | scene | pixi-presentation | appearanceAndTransition:named string, appearance:string, via:string, effect:string, visible:boolean, easing:string, time:decimal, wait:boolean | none | no | implemented |
 | `trialkeyword` | `trialkeyword` | ui | pixi-presentation | id:string, text:string, speaker:string, evidence:string | none | no | implemented |
 <!-- END GENERATED COMMAND CATALOG -->

@@ -131,7 +131,7 @@ test("a Nani HMR candidate prepares a newly authored Alice expression before pre
       .first();
     await initialTarget.hover();
     await initialTarget.locator(".vn-devtools-preview-button").click();
-    await expect(page.getByTestId("vn-devtools-dock")).toContainText("Stable checkpoint installed");
+    await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT CHARACTER 00");
     const initialRevision = await readWorkbenchRevision(page);
 
     await writeFile(characterSourceFile, updatedSource, "utf8");

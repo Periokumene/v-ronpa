@@ -77,7 +77,7 @@ export interface HarnessShowcaseRuntimeAdapterOptions {
   voiceSettings?: UseVnRuntimeOptions["voiceSettings"];
   dialogueBleepConfig?: DialogueBleepConfig;
   dialogueBleepSettings?: UseVnRuntimeOptions["dialogueBleepSettings"];
-  dialogRevealSettings?: UseVnRuntimeOptions["dialogRevealSettings"];
+  storyTextRevealSettings?: UseVnRuntimeOptions["storyTextRevealSettings"];
   assetResolver?: AssetResolver;
   onEnterTrial?: () => void;
   onEnterNavi?: () => void;
@@ -139,7 +139,7 @@ export function useHarnessShowcaseRuntimeAdapter(
   const runtime = useVnRuntimeWithDebug({
     ...(assetResolver ? { assetResolver } : {}),
     ...(options.audioPort ? { audioPort: options.audioPort } : {}),
-    ...(options.dialogRevealSettings ? { dialogRevealSettings: options.dialogRevealSettings } : {}),
+    ...(options.storyTextRevealSettings ? { storyTextRevealSettings: options.storyTextRevealSettings } : {}),
     ...(options.dialogueBleepConfig ? { dialogueBleepConfig: options.dialogueBleepConfig } : {}),
     ...(options.dialogueBleepSettings ? { dialogueBleepSettings: options.dialogueBleepSettings } : {}),
     entry: runtimeDefinition.entry,

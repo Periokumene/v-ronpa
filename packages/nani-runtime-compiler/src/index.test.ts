@@ -318,6 +318,66 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands[4]).toMatchObject({ commandId: "toast", params: { text: "Saved" } });
   });
 
+  it("compiles cue and explicit print through the shared story text parameter shape", () => {
+    const result = compileRuntimeScript(parseScenario({
+      sourceText: [
+        '@cue "<b>Do not turn around.</b>" author:Narrator speed:0.8 textId:center_001 autoNext!',
+        '@print "Named print" author:Felix speed:1.2 textId:print_001 autoNext!'
+      ].join("\n"),
+      scriptPath: "cue.nani"
+    }));
+
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
+    expect(result.script.commands[0]).toMatchObject({
+      commandId: "cue",
+      canonicalName: "cue",
+      params: {
+        text: "Do not turn around.",
+        speaker: "Narrator",
+        speed: 0.8,
+        textId: "center_001",
+        autoNext: true
+      },
+      richText: { text: "Do not turn around.", runs: [{ start: 0, end: 19, style: { bold: true } }] }
+    });
+    expect(result.script.commands[1]).toMatchObject({
+      commandId: "print",
+      params: { text: "Named print", speaker: "Felix", speed: 1.2, textId: "print_001", autoNext: true }
+    });
+  });
+
+  it("diagnoses cue primary and story text ids at the exact offending spans", () => {
+    const source = [
+      "@cue",
+      "@cue 42",
+      'Felix: Inline|#shared_id|[>]',
+      '@cue "Duplicate" textId:shared_id',
+      '@print "Invalid" textId:"bad id"'
+    ].join("\n");
+    const result = compileRuntimeScript(parseScenario({ sourceText: source, scriptPath: "cue-errors.nani" }));
+    const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(errors.map((diagnostic) => diagnostic.message)).toEqual(expect.arrayContaining([
+      "@cue requires parameter text:string.",
+      "@cue primary parameter expected string.",
+      "Duplicate textId: shared_id",
+      "Invalid textId: bad id"
+    ]));
+    expect(errors.filter((diagnostic) => /textId/u.test(diagnostic.message)).map((diagnostic) =>
+      source.slice(diagnostic.span.start, diagnostic.span.end)
+    )).toEqual(["shared_id", "bad id"]);
+  });
+
+  it("detects a normal-line textId that duplicates an earlier explicit story text command", () => {
+    const source = '@print "Explicit" textId:shared_id\nFelix: Inline|#shared_id|';
+    const result = compileRuntimeScript(parseScenario({ sourceText: source, scriptPath: "explicit-first-id.nani" }));
+    const duplicate = result.diagnostics.find((diagnostic) => diagnostic.message === "Duplicate textId: shared_id");
+
+    expect(duplicate).toBeDefined();
+    expect(source.slice(duplicate!.span.start, duplicate!.span.end)).toBe("shared_id");
+    expect(duplicate?.loc.line).toBe(2);
+  });
+
   it("normalizes visual runtime params without producing downstream command shapes", () => {
     const parsed = parseScenario({
       sourceText: [
@@ -1153,7 +1213,6 @@ describe("nani runtime compiler", () => {
   it("diagnoses catalog-external params without consuming them through legacy normalizer fallbacks", () => {
     const cases = [
       { source: '@append "x" speaker:Felix', absentParam: "speaker" },
-      { source: '@print "x" autoNext:true', absentParam: "autoNext", expectedValue: false },
       { source: "@trialKeyword kw text:x evidenceId:e1", absentParam: "evidenceId" }
     ] as const;
 
@@ -1167,11 +1226,7 @@ describe("nani runtime compiler", () => {
           message: expect.stringContaining("commandCatalog is the authority")
         })
       );
-      if ("expectedValue" in testCase) {
-        expect(result.script.commands[0]?.params[testCase.absentParam]).toBe(testCase.expectedValue);
-      } else {
-        expect(result.script.commands[0]?.params).not.toHaveProperty(testCase.absentParam);
-      }
+      expect(result.script.commands[0]?.params).not.toHaveProperty(testCase.absentParam);
     }
   });
 

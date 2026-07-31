@@ -13,7 +13,7 @@ export function watchUnexpectedConsoleErrors(page: Page): string[] {
 export async function bootHarness(page: Page) {
   await page.addInitScript(() => {
     localStorage.removeItem("v-ronpa:settings:v2");
-    indexedDB.deleteDatabase("v-ronpa-harness-showcase-v10");
+    indexedDB.deleteDatabase("v-ronpa-harness-showcase-v11");
   });
   await page.goto("/");
 

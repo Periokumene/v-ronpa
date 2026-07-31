@@ -19,6 +19,13 @@ transient presentation descriptions. Both live runtime progression and debug
 materialization call it; the workbench does not interpret commands or maintain
 a second reducer.
 
+Story text follows the same projection authority. StoryEngine stores one
+current record with a `dialog` or `cue` channel. Dispatch projects Cue show/hide
+into the shared UI surface map, and the DOM shell routes the record to mutually
+exclusive Dialog and Cue surfaces. Cue stays mounted through its fade so Dialog
+cannot appear before the transition reaches hidden. Choices and commandBar are
+independent overlays. No Pixi/R3F command or second text reducer is involved.
+
 Script-scoped Pixi state is converged inside this projection boundary. The
 stage model compares `scopeScriptPath` with the final session script path both
 before and after command fanout, so local labels retain state while direct or
@@ -39,6 +46,7 @@ easing are not persisted.
 
 A stable checkpoint includes Story, terminal Pixi, terminal UI visibility, BGM,
 and looping-SFX intent. It excludes animation progress, render hints/tasks,
-dialog reveal, toast payloads, timers, one-shot audio, voice, movies, and media
+StoryText reveal, toast payloads, timers, one-shot audio, voice, movies, and media
 cursors. Debug preview settles presentation waits and restores only this stable
-projection.
+projection. Cue checkpoints retain only current content/channel and terminal
+visibility; reveal progress and fade timing are reconstructed as settled state.

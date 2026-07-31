@@ -2,6 +2,7 @@ import type { RuntimeCommand, RuntimeScript, RuntimeValue } from "@v-ronpa/contr
 import {
   advanceToNextStop,
   chooseStoryOption,
+  isStoryTextCommand,
   selectCurrentStoryLine,
   type StoryRuntimeState,
   type StoryStepperResult
@@ -204,11 +205,11 @@ function withoutStopReason(play: StoryPlayState): Omit<StoryPlayState, "lastStop
 }
 
 function createCurrentStop(story: StoryStepperResult, source: StoryPlayAdvanceSource): StoryPlayCurrentStop {
-  const print = latestPrintCommand(story.emittedRuntimeCommands);
-  const text = stringParam(print, "text") ?? selectCurrentStoryLine(story.state)?.text ?? "";
+  const storyText = latestStoryTextCommand(story.emittedRuntimeCommands);
+  const text = stringParam(storyText, "text") ?? selectCurrentStoryLine(story.state)?.text ?? "";
   return {
     source,
-    autoNext: booleanParam(print, "autoNext") ?? false,
+    autoNext: booleanParam(storyText, "autoNext") ?? false,
     visibleCharCount: countVisibleChars(text),
     hasChoices: story.state.pendingChoices.length > 0,
     ended: story.state.ended
@@ -219,10 +220,10 @@ function selectVisibleCharCount(play: StoryPlayState, story: StoryRuntimeState):
   return play.currentStop?.visibleCharCount ?? countVisibleChars(selectCurrentStoryLine(story)?.text ?? "");
 }
 
-function latestPrintCommand(commands: RuntimeCommand[]): RuntimeCommand | undefined {
+function latestStoryTextCommand(commands: RuntimeCommand[]): RuntimeCommand | undefined {
   for (let index = commands.length - 1; index >= 0; index -= 1) {
     const command = commands[index];
-    if (command?.commandId === "print") return command;
+    if (isStoryTextCommand(command)) return command;
   }
   return undefined;
 }

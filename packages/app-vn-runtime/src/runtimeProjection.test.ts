@@ -174,6 +174,109 @@ describe("projectVnRuntimeStep", () => {
     expect(projected.transient.mediaEffects.some((effect) => effect.type === "play-bgm")).toBe(true);
   });
 
+  it("projects cue visibility, hideCue wait, and stable checkpoint terminal state", () => {
+    const boot = createVnSession({
+      scriptPath: "projection-cue.nani",
+      sourceText: [
+        '@cue "<b>Do not turn around.</b>" author:Narrator textId:cue_projection',
+        "@hideCue time:0.4 wait!",
+        'Narrator: Safe now.'
+      ].join("\n")
+    });
+    const cueStep = advanceVnSession(boot.session);
+    const cueProjection = projectVnRuntimeStep({
+      active: true,
+      animatePixi: true,
+      nowMs: 1000,
+      previousMediaState: createInitialMediaRuntimeState(),
+      previousPixiStage: createInitialPixiStageSnapshot(),
+      previousUiState: createInitialUiRuntimeState(),
+      profile: "vn2d",
+      runtimeCommands: cueStep.emittedRuntimeCommands,
+      session: cueStep.session
+    });
+
+    expect(cueProjection.session.story.text?.current).toMatchObject({
+      channel: "cue",
+      speaker: "Narrator",
+      text: "Do not turn around."
+    });
+    expect(cueProjection.runtime.uiState.surfaces.cue).toMatchObject({
+      targetVisible: true,
+      mounted: true,
+      phase: "shown"
+    });
+    expect(createVnUiCheckpoint(cueProjection.stable.uiState).cue).toBe(true);
+
+    const hideStep = advanceVnSession(cueProjection.session);
+    const hideProjection = projectVnRuntimeStep({
+      active: true,
+      animatePixi: true,
+      nowMs: 1000,
+      previousMediaState: cueProjection.stable.mediaState,
+      previousPixiStage: cueProjection.stable.pixiStage,
+      previousUiState: cueProjection.stable.uiState,
+      profile: "vn2d",
+      runtimeCommands: hideStep.emittedRuntimeCommands,
+      session: hideStep.session
+    });
+
+    expect(hideStep.session.story.presentationWait).toMatchObject({ channel: "ui", targets: ["cue"] });
+    expect(hideProjection.runtime.uiState.surfaces.cue).toMatchObject({
+      targetVisible: false,
+      mounted: true,
+      opacity: 1,
+      phase: "hiding"
+    });
+    const settled = settleUiRuntimePresentationWait(
+      hideProjection.runtime.uiState,
+      hideStep.session.story.presentationWait as Extract<NonNullable<typeof hideStep.session.story.presentationWait>, { channel: "ui" }>
+    );
+    expect(settled.surfaces.cue.phase).toBe("hidden");
+    expect(createVnUiCheckpoint(settled).cue).toBe(false);
+    expect(hideProjection.session.story.text?.current?.channel).toBe("cue");
+  });
+
+  it("keeps no-target hideUI isolated from a shown cue", () => {
+    const boot = createVnSession({ scriptPath: "projection-cue-ui.nani", sourceText: '@cue "Cue"' });
+    const cueStep = advanceVnSession(boot.session);
+    const cueProjection = projectVnRuntimeStep({
+      active: true,
+      animatePixi: true,
+      nowMs: 0,
+      previousMediaState: createInitialMediaRuntimeState(),
+      previousPixiStage: createInitialPixiStageSnapshot(),
+      previousUiState: createInitialUiRuntimeState(),
+      profile: "vn2d",
+      runtimeCommands: cueStep.emittedRuntimeCommands,
+      session: cueStep.session
+    });
+    const hideUi: RuntimeCommand = {
+      commandId: "hideui",
+      canonicalName: "hideUI",
+      category: "ui",
+      source: "naninovel",
+      status: "implemented",
+      params: { visible: false, wait: false },
+      loc: { scriptPath: "projection-cue-ui.nani", line: 2, column: 1, raw: "@hideUI" }
+    };
+    const hidden = projectVnRuntimeStep({
+      active: true,
+      animatePixi: true,
+      nowMs: 0,
+      previousMediaState: cueProjection.stable.mediaState,
+      previousPixiStage: cueProjection.stable.pixiStage,
+      previousUiState: cueProjection.stable.uiState,
+      profile: "vn2d",
+      runtimeCommands: [hideUi],
+      session: cueProjection.session
+    });
+
+    expect(hidden.runtime.uiState.surfaces.cue.phase).toBe("shown");
+    expect(hidden.runtime.uiState.surfaces.dialog.phase).toBe("hidden");
+    expect(hidden.runtime.uiState.surfaces.commandBar.phase).toBe("hidden");
+  });
+
   it("records terminal Pixi state while suppressing presentation tasks for settled debug projection", () => {
     const boot = createVnSession({
       scriptPath: "projection-wait.nani",

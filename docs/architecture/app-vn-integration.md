@@ -47,8 +47,11 @@ handles and related refs. Identity rejection happens before cleanup.
 `VnLifecyclePort.resetRuntime()` has no soft-media option.
 
 Game A uses `gameId: game-a`; Harness uses `gameId: game-harness`. Both use one
-AssetRegistry, one Pixi presenter host, the same shared pause sections, and v10
-database namespaces. Game A must not import session, dispatch, presenter, Pixi,
+AssetRegistry, one Pixi presenter host, the same shared pause sections, and v11
+database namespaces. Neither reads or migrates the former v10 namespace. Game A
+mounts Cue only through the standard shell surface slot; its lightweight app
+wrapper delegates to the shared `VnCueSurface`. Game A must not import session,
+dispatch, presenter, Pixi,
 Navi, Trial, Dexie, or Howler packages directly.
 
 Harness-only runtime diagnostics helpers are available from the explicit

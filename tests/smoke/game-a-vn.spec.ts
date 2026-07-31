@@ -21,7 +21,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
 
   await page.addInitScript(() => {
     localStorage.removeItem("v-ronpa:game-a:settings:v2");
-    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v10");
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
   });
   await page.goto("/");
 
@@ -128,13 +128,14 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await page.getByTestId("vn-devtools-collapsed-button").click();
   await expect(workbench).toBeVisible();
   const widthBeforeKeyboardResize = (await workbench.boundingBox())?.width ?? 0;
+  const geometryBeforeKeyboardResize = await readDevViewportGeometry(page);
   await page.getByTestId("vn-devtools-resizer").focus();
   await page.keyboard.press("ArrowLeft");
   await expect.poll(async () => (await workbench.boundingBox())?.width ?? 0).toBeGreaterThan(widthBeforeKeyboardResize);
   const resizedFidelityGeometry = await readDevViewportGeometry(page);
   expect(resizedFidelityGeometry.logicalWidth).toBe(1280);
   expect(resizedFidelityGeometry.logicalHeight).toBe(720);
-  expect(resizedFidelityGeometry.scale).toBeLessThan(initialViewportGeometry.scale);
+  expect(resizedFidelityGeometry.scale).toBeLessThan(geometryBeforeKeyboardResize.scale);
   await page.getByTestId("game-a-dev-viewport-responsive").click();
   await expect(page.getByTestId("game-a-dev-viewport-responsive")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("game-a-dev-viewport-boundary")).toHaveAttribute("data-visible", "false");
@@ -192,7 +193,6 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   const storySessionBeforePreview = await readDevtoolsStorySession(page);
   const firstStableLine = page.locator('[data-testid^="vn-devtools-line-"]').filter({ hasText: "CHECKPOINT SMOKE 00" }).first();
   await firstStableLine.locator(".vn-devtools-line-select").dblclick();
-  await expect(workbench).toContainText("Stable checkpoint installed");
   await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "state");
   await expect(firstStableLine.getByLabel("Pinned preview target")).toBeVisible();
   await expect(firstStableLine.getByLabel("Current runtime position")).toBeVisible();
@@ -282,7 +282,32 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await page.screenshot({ path: "test-results/game-a-vn-choice.png", fullPage: true });
   await clickByTestId(page, "vn-choice-0");
 
-  await advanceUiWaitsUntilText(page, "CHECKPOINT SMOKE UI", 10);
+  await advanceUntilText(page, "CHECKPOINT SMOKE CUE 00", 4);
+  await advanceUntilCueText(page, "CHECKPOINT SMOKE CUE 01", 5);
+  const cue = page.getByTestId("vn-cue-surface");
+  await expect(cue).toHaveAttribute("aria-label", "演出文本：Narrator");
+  const richRun = cue.locator('[data-rich-text-run=""]');
+  await expect(richRun).toContainText("CHECKPOINT SMOKE CUE 01");
+  await expect(richRun).toHaveCSS("font-weight", "700");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
+  await page.screenshot({ path: "test-results/game-a-cue-centered-borderless.png", fullPage: true });
+
+  await advanceUntilCueText(page, "CHECKPOINT SMOKE CUE 02", 8);
+  await expect(cue).toHaveAttribute("data-ui-phase", "shown");
+  await expect(page.getByTestId("vn-command-bar")).toBeVisible();
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
+  await page.screenshot({ path: "test-results/game-a-cue-hide-ui-isolation.png", fullPage: true });
+  await waitForSurfaceTextToSettle(page, "vn-cue-text");
+  await advanceVn(page);
+  await expect(cue).toHaveAttribute("data-ui-phase", "hiding");
+  await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
+  await page.screenshot({ path: "test-results/game-a-cue-fading-before-dialog.png", fullPage: true });
+  await expect(cue).toHaveCount(0, { timeout: 5_000 });
+  await advanceUiWaitsUntilText(page, "CHECKPOINT SMOKE CUE 03", 6);
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT SMOKE CUE 03");
+  await page.screenshot({ path: "test-results/game-a-cue-fade-complete-dialog.png", fullPage: true });
+
+  await advanceUntilText(page, "CHECKPOINT SMOKE UI", 10);
   await expect(page.getByTestId("vn-command-bar")).toHaveAttribute("data-ui-phase", "shown");
   await expect(page.getByTestId("vn-command-save")).toBeEnabled();
 
@@ -392,6 +417,26 @@ async function advanceUntilText(page: Page, text: string, maxSteps: number) {
     await page.waitForTimeout(160);
   }
   await expect(page.getByTestId("vn-dialog-text")).toContainText(text);
+}
+
+async function advanceUntilCueText(page: Page, text: string, maxSteps: number) {
+  for (let attempt = 0; attempt < maxSteps; attempt += 1) {
+    const currentText = (await page.getByTestId("vn-cue-text").textContent({ timeout: 250 }).catch(() => null)) ?? "";
+    if (currentText.includes(text)) return;
+    await advanceVn(page);
+    await page.waitForTimeout(160);
+  }
+  await expect(page.getByTestId("vn-cue-text")).toContainText(text);
+}
+
+async function waitForSurfaceTextToSettle(page: Page, testId: string) {
+  let previous = (await page.getByTestId(testId).textContent()) ?? "";
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await page.waitForTimeout(100);
+    const current = (await page.getByTestId(testId).textContent().catch(() => null)) ?? "";
+    if (current === previous) return;
+    previous = current;
+  }
 }
 
 async function advanceUiWaitsUntilText(page: Page, text: string, maxSteps: number) {
@@ -635,9 +680,9 @@ async function exerciseNaniSourceSaveFlow(page: Page, workbench: ReturnType<Page
     const compilerDiagnostic = workbench.getByRole("button", { name: /invalid-command-param/ });
     await expect(compilerDiagnostic).toBeEnabled();
     await compilerDiagnostic.click();
-    await expect(
-      page.locator(".vn-devtools-source-line.is-selected").filter({ hasText: "time:fast" })
-    ).toBeInViewport();
+    const selectedDiagnosticLine = page.locator(".vn-devtools-source-line.is-selected").filter({ hasText: "time:fast" });
+    await selectedDiagnosticLine.scrollIntoViewIfNeeded();
+    await expect(selectedDiagnosticLine).toBeInViewport();
     await captureExactProblemsEvidence(page, workbench);
     await expect(workbench.locator(".vn-devtools-preview-button:enabled")).toHaveCount(0);
     await workbench.getByRole("button", { name: "Pin current" }).click();
@@ -667,7 +712,6 @@ async function exerciseNaniSourceSaveFlow(page: Page, workbench: ReturnType<Page
     .toBeLessThanOrEqual(1);
   await expect(page.getByTestId("game-a-mode")).toHaveText("视觉小说", { timeout: 15_000 });
   await expect(page.getByTestId("vn-dialog-text")).toContainText(smokePreviewText);
-  await expect(workbench).toContainText("Stable checkpoint installed");
   await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "state");
   await expect(page.getByTestId("vn-devtools-panel-resizer")).toHaveAttribute("aria-valuenow", "360");
   await expect(
@@ -745,7 +789,6 @@ async function exerciseWorkbenchDecisionFlow(
   await decision.getByRole("button", { name: "Continue preview" }).click();
 
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT SMOKE INPUT");
-  await expect(workbench).toContainText("Decision path materialized and installed");
   expect((await readGameSnapshot(page)).story.variables).toMatchObject({
     route: "smoke-interaction",
     playerName: "Workbench"

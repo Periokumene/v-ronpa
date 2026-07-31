@@ -60,6 +60,21 @@ describe("story play", () => {
     });
   });
 
+  it("treats cue as the same auto/skip story text stop", () => {
+    const script = runtimeScript("cue-auto-next.nani", [
+      runtimeCommand("cue", "text", { speaker: "Narrator", text: "Cue now.", autoNext: true })
+    ]);
+    const step = advanceStoryPlay(createInitialStoryPlayState(), {
+      state: createInitialStoryState(script),
+      script,
+      source: "start"
+    });
+
+    expect(step.story.stopReason).toBe("text");
+    expect(step.story.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["cue"]);
+    expect(step.play.currentStop).toMatchObject({ autoNext: true, visibleCharCount: 7 });
+  });
+
   it("stops AUTO/SKIP when manual advance takes over while preserving the story step result", () => {
     const script = runtimeScript("takeover.nani", [
       runtimeCommand("print", "text", { speaker: "Felix", text: "First.", autoNext: false }),

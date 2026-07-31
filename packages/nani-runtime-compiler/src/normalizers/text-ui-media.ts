@@ -1,4 +1,4 @@
-import type { CommandNormalizerDescriptor } from "../types";
+import type { CommandNormalizerDescriptor, CommandShape } from "../types";
 import {
   compactParams,
   durationMsValue,
@@ -9,16 +9,13 @@ import {
 export const textUiMediaNormalizers: Readonly<Record<string, CommandNormalizerDescriptor>> = {
   print: {
     acceptsPrimary: true,
-    consumedParams: ["text", "author", "as", "printer", "speed", "reset"],
-    normalize: (command) =>
-      compactParams({
-        text: runtimeCommandValue(command.primary) ?? runtimeParam(command, "text") ?? "",
-        speaker: runtimeParam(command, "author") ?? runtimeParam(command, "as"),
-        printerId: runtimeParam(command, "printer"),
-        speed: runtimeParam(command, "speed"),
-        reset: runtimeParam(command, "reset"),
-        autoNext: false
-      })
+    consumedParams: ["text", "author", "as", "printer", "speed", "textId", "autoNext", "reset"],
+    normalize: (command) => normalizeStoryTextParams(command, { includePrinter: true, includeReset: true })
+  },
+  cue: {
+    acceptsPrimary: true,
+    consumedParams: ["text", "author", "speed", "textId", "autoNext"],
+    normalize: (command) => normalizeStoryTextParams(command)
   },
   append: {
     acceptsPrimary: true,
@@ -79,6 +76,15 @@ export const textUiMediaNormalizers: Readonly<Record<string, CommandNormalizerDe
       compactParams({
         target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "uINames") ?? runtimeParam(command, "target"),
         visible: false,
+        durationMs: durationMsValue(runtimeParam(command, "time")),
+        wait: runtimeParam(command, "wait") ?? false
+      })
+  },
+  hidecue: {
+    acceptsPrimary: false,
+    consumedParams: ["time", "wait"],
+    normalize: (command) =>
+      compactParams({
         durationMs: durationMsValue(runtimeParam(command, "time")),
         wait: runtimeParam(command, "wait") ?? false
       })
@@ -178,3 +184,18 @@ export const textUiMediaNormalizers: Readonly<Record<string, CommandNormalizerDe
       })
   }
 };
+
+function normalizeStoryTextParams(
+  command: CommandShape,
+  options: { includePrinter?: boolean; includeReset?: boolean } = {}
+) {
+  return compactParams({
+    text: runtimeCommandValue(command.primary) ?? runtimeParam(command, "text") ?? "",
+    speaker: runtimeParam(command, "author") ?? runtimeParam(command, "as"),
+    printerId: options.includePrinter ? runtimeParam(command, "printer") : undefined,
+    speed: runtimeParam(command, "speed"),
+    textId: runtimeParam(command, "textId"),
+    autoNext: runtimeParam(command, "autoNext") ?? false,
+    reset: options.includeReset ? runtimeParam(command, "reset") : undefined
+  });
+}

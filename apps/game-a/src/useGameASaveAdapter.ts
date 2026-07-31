@@ -17,7 +17,7 @@ import {
   type SaveSlotPreview
 } from "@v-ronpa/media-save";
 
-export const GAME_A_SAVE_DB_NAME = "v-ronpa-game-a-saves-v10";
+export const GAME_A_SAVE_DB_NAME = "v-ronpa-game-a-saves-v11";
 export const gameASaveSlotPolicy = createFortyPlusQuickSaveSlotPolicy("game-a", { manualLabelPrefix: "Game A" });
 export const gameAManualSaveSlotCount = gameASaveSlotPolicy.manualSlotCount;
 export const gameASaveSlotIds = gameASaveSlotPolicy.manualSlotIds;
@@ -38,7 +38,7 @@ export interface GameASaveAdapterOptions {
 export function createGameASaveData({ vn }: GameASaveSnapshotInput): SaveData {
   const gameplay = createGameplayState();
   return SaveDataSchema.parse({
-    version: 8,
+    version: 9,
     gameId: "game-a",
     savedAt: new Date().toISOString(),
     mode: "vn",

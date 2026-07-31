@@ -122,10 +122,10 @@ describe("dialogue audio runtime", () => {
 
   it("does not start bleep for skip, hidden, instant, muted, or disabled bleep paths", () => {
     const cases = [
-      { pacing: "skip" as const, dialogVisible: true, revealStatus: "revealing" as const, bleepVolume: 1 },
-      { pacing: "normal" as const, dialogVisible: false, revealStatus: "revealing" as const, bleepVolume: 1 },
-      { pacing: "normal" as const, dialogVisible: true, revealStatus: "complete" as const, bleepVolume: 1 },
-      { pacing: "normal" as const, dialogVisible: true, revealStatus: "revealing" as const, bleepVolume: 0 }
+      { pacing: "skip" as const, textVisible: true, revealStatus: "revealing" as const, bleepVolume: 1 },
+      { pacing: "normal" as const, textVisible: false, revealStatus: "revealing" as const, bleepVolume: 1 },
+      { pacing: "normal" as const, textVisible: true, revealStatus: "complete" as const, bleepVolume: 1 },
+      { pacing: "normal" as const, textVisible: true, revealStatus: "revealing" as const, bleepVolume: 0 }
     ];
 
     for (const item of cases) {
@@ -195,7 +195,7 @@ describe("dialogue audio runtime", () => {
 
   function lineInput({
     bleepVolume = 0.4,
-    dialogVisible = true,
+    textVisible = true,
     lineKey = "line:1",
     pacing = "normal",
     revealStatus = "revealing",
@@ -205,7 +205,7 @@ describe("dialogue audio runtime", () => {
     voiceVolume = 1
   }: {
     bleepVolume?: number;
-    dialogVisible?: boolean;
+    textVisible?: boolean;
     lineKey?: string;
     pacing?: "normal" | "skip";
     revealStatus?: "revealing" | "complete";
@@ -216,7 +216,7 @@ describe("dialogue audio runtime", () => {
   }) {
     return {
       bleep: { config, volume: bleepVolume },
-      dialogVisible,
+      textVisible,
       lineKey,
       pacing,
       revealStatus,

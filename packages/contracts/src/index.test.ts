@@ -35,6 +35,7 @@ import {
   StoryPresentationWaitTaskSchema,
   StoryRuntimeSnapshotSchema,
   StoryRuntimeWaitSchema,
+  StoryTextChannelSchema,
   StoryTextStateSchema,
   createDefaultSettingsSnapshot,
   createSaveSlotSummaryFromSaveData,
@@ -42,6 +43,8 @@ import {
   TrialDefinitionSchema,
   TrialRuntimeStateSchema,
   VnMediaCheckpointSchema,
+  VnUiCheckpointSchema,
+  VnUiSurfaceIdSchema,
   getNaniCommandDefinition,
   naniCommandCatalog
 } from "./index";
@@ -319,7 +322,7 @@ describe("contracts", () => {
         backlog: [{ speaker: "Felix", text: "Old save stays plain." }],
         pendingChoices: [{ text: "Inspect", richText: { text: "Inspect", runs: [{ start: 0, end: 7, style: { italic: true } }] } }],
         text: {
-          current: { speaker: "Felix", text: "Line", richText: { text: "Line", runs: [{ start: 0, end: 4, style: { underline: true } }] } }
+          current: { channel: "dialog", speaker: "Felix", text: "Line", richText: { text: "Line", runs: [{ start: 0, end: 4, style: { underline: true } }] } }
         }
       }).pendingChoices[0]?.richText?.text
     ).toBe("Inspect");
@@ -329,7 +332,7 @@ describe("contracts", () => {
         instructionPointer: 1,
         backlog: [{ text: "Line", richText: { text: "Mismatch", runs: [] } }],
         pendingChoices: [],
-        text: { current: { text: "Line" } }
+        text: { current: { channel: "dialog", text: "Line" } }
       })
     ).toThrow();
   });
@@ -1083,6 +1086,7 @@ describe("contracts", () => {
     expect(
       StoryTextStateSchema.parse({
         current: {
+          channel: "cue",
           speaker: "Mira",
           text: "Current line.",
           richText: { text: "Current line.", runs: [{ start: 0, end: 7, style: { bold: true } }] }
@@ -1092,6 +1096,7 @@ describe("contracts", () => {
       printerId: "default",
       visible: true,
       current: {
+        channel: "cue",
         speaker: "Mira",
         text: "Current line.",
         richText: { text: "Current line.", runs: [{ start: 0, end: 7, style: { bold: true } }] }
@@ -1109,7 +1114,7 @@ describe("contracts", () => {
           moviePath: "video:validation-intro"
         },
         text: {
-          current: { text: "Paused on movie." }
+          current: { channel: "dialog", text: "Paused on movie." }
         }
       })
     ).toMatchObject({
@@ -1122,7 +1127,7 @@ describe("contracts", () => {
     const officialCommands = naniCommandCatalog.filter((command) => command.source === "naninovel");
 
     expect(officialCommands).toHaveLength(78);
-    expect(naniCommandCatalog).toHaveLength(86);
+    expect(naniCommandCatalog).toHaveLength(88);
     expect(() => NaniCommandDefinitionSchema.array().parse(naniCommandCatalog)).not.toThrow();
   });
 
@@ -1253,6 +1258,28 @@ describe("contracts", () => {
       status: "implemented",
       execution: "ui-output"
     });
+    expect(getNaniCommandDefinition("cue")).toMatchObject({
+      canonicalName: "cue",
+      category: "text",
+      source: "v-ronpa",
+      status: "implemented",
+      execution: "story-control",
+      primaryParam: "text"
+    });
+    expect(getNaniCommandDefinition("cue")?.params.map((param) => param.name)).toEqual([
+      "text",
+      "author",
+      "speed",
+      "textId",
+      "autoNext"
+    ]);
+    expect(getNaniCommandDefinition("hideCue")).toMatchObject({
+      canonicalName: "hideCue",
+      category: "ui",
+      source: "v-ronpa",
+      status: "implemented",
+      execution: "ui-output"
+    });
     expect(getNaniCommandDefinition("input")).toMatchObject({
       status: "implemented",
       execution: "story-control"
@@ -1265,6 +1292,18 @@ describe("contracts", () => {
       status: "stubbed",
       execution: "declared-only"
     });
+  });
+
+  it("separates all UI surfaces from the hideUI/showUI runtime group", () => {
+    expect(StoryTextChannelSchema.options).toEqual(["dialog", "cue"]);
+    expect(VnUiSurfaceIdSchema.options).toEqual(["dialog", "commandBar", "toastLayer", "cue"]);
+    expect(VnUiCheckpointSchema.parse({ dialog: true, commandBar: true, toastLayer: true, cue: false })).toEqual({
+      dialog: true,
+      commandBar: true,
+      toastLayer: true,
+      cue: false
+    });
+    expect(() => VnUiCheckpointSchema.parse({ dialog: true, commandBar: true, toastLayer: true })).toThrow();
   });
 
   it("marks migrated V-Ronpa compatibility params without pretending they are official Naninovel params", () => {
@@ -1390,7 +1429,7 @@ describe("contracts", () => {
     };
 
     const save = SaveDataSchema.parse({
-      version: 8,
+      version: 9,
       gameId: "game:test",
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "navi",
@@ -1409,7 +1448,7 @@ describe("contracts", () => {
             "sfx:hum": { sourceRef: "sfx:hum", volume: 0.8 }
           }
         },
-        ui: { dialog: true, commandBar: true, toastLayer: true }
+        ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
       },
       navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
       trial: null,
@@ -1418,7 +1457,7 @@ describe("contracts", () => {
       characters: {}
     });
 
-    expect(save.version).toBe(8);
+    expect(save.version).toBe(9);
     expect(save.vn?.media).toEqual({
       bgmByGroup: {
         music: { sourceRef: "bgm:main", volume: 0.4 },
@@ -1449,6 +1488,28 @@ describe("contracts", () => {
       speaker: "Felix",
       text: "Good."
     });
+    const cueSave = SaveDataSchema.parse({
+      ...save,
+      vn: {
+        ...save.vn!,
+        story: {
+          ...save.vn!.story,
+          text: {
+            printerId: "default",
+            visible: true,
+            current: { channel: "cue", speaker: "Narrator", text: "Do not turn around." }
+          }
+        },
+        ui: { ...save.vn!.ui, cue: true }
+      }
+    });
+    expect(createSaveSlotSummaryFromSaveData("slot:cue", "Cue", cueSave)).toMatchObject({
+      speaker: "Narrator",
+      text: "Do not turn around."
+    });
+    expect(cueSave.vn?.story.text?.current?.channel).toBe("cue");
+    expect(cueSave.vn?.ui.cue).toBe(true);
+    expect(() => SaveDataSchema.parse({ ...cueSave, version: 8 })).toThrow();
     expect(() =>
       SaveDataSchema.parse({
         ...save,
@@ -1461,7 +1522,7 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 8,
+        version: 9,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "vn",
@@ -1471,7 +1532,7 @@ describe("contracts", () => {
           story,
           pixiStage,
           media: { bgmByGroup: {}, loopingSfxByKey: {} },
-          ui: { dialog: true, commandBar: true, toastLayer: true }
+          ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
         },
         navi: null,
         trial: null,
@@ -1483,7 +1544,7 @@ describe("contracts", () => {
 
     expect(() =>
       SaveDataSchema.parse({
-        version: 8,
+        version: 9,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "vn",
@@ -1492,7 +1553,7 @@ describe("contracts", () => {
           script: { scriptPath: "opening.nani", scriptRevision: "sha256:test" },
           story,
           pixiStage,
-          ui: { dialog: true, commandBar: true, toastLayer: true }
+          ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
         },
         navi: null,
         trial: null,
@@ -1504,7 +1565,7 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 8,
+        version: 9,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "navi",
@@ -1521,7 +1582,7 @@ describe("contracts", () => {
         "slot:contracts:navi",
         "Contracts Navi",
         SaveDataSchema.parse({
-          version: 8,
+          version: 9,
           gameId: "game:test",
           savedAt: "2026-06-14T00:00:00.000Z",
           mode: "navi",
@@ -1542,7 +1603,7 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 8,
+        version: 9,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "trial",
@@ -1552,7 +1613,7 @@ describe("contracts", () => {
           story,
           pixiStage,
           media: { bgmByGroup: {}, loopingSfxByKey: {} },
-          ui: { dialog: true, commandBar: true, toastLayer: true }
+          ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
         },
         navi: { substate: "walk", activeMapId: "map:academy-hall", inputLock: "none" },
         trial: { trialId: "trial:case-01", currentSegmentId: "debate:door", presentation: "debate3d" },
@@ -1691,7 +1752,7 @@ describe("contracts", () => {
 
   it("does not persist runtime command streams in save data", () => {
     const save = SaveDataSchema.parse({
-      version: 8,
+      version: 9,
       gameId: "game:test",
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "vn",
@@ -1709,7 +1770,7 @@ describe("contracts", () => {
         },
         pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
         media: { bgmByGroup: {}, loopingSfxByKey: {} },
-        ui: { dialog: true, commandBar: true, toastLayer: true }
+        ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
       },
       navi: null,
       trial: null,
@@ -1732,7 +1793,7 @@ describe("contracts", () => {
       variables: {},
       backlog,
       pendingChoices: [],
-      text: { visible: true, current: { speaker: "Felix", text: "Current line" } },
+      text: { visible: true, current: { channel: "cue", speaker: "Felix", text: "Current line" } },
       ended: false
     });
 

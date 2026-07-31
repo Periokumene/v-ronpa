@@ -34,6 +34,16 @@ describe("VN output routes", () => {
     expect(selectRuntimeCommandsForTarget(commands, "debug")).toEqual([commands[0]]);
   });
 
+  it("keeps cue identity while routing its surface projection and hideCue through UI", () => {
+    const cue = runtimeCommand("cue", "text", { text: "Cue", author: "Narrator" });
+    const hideCue = runtimeCommand("hidecue", "ui", { durationMs: 400, wait: true });
+
+    expect(routeRuntimeCommand(cue)).toEqual(["ui", "debug"]);
+    expect(routeRuntimeCommand(hideCue)).toEqual(["ui"]);
+    expect(selectRuntimeCommandsForTarget([cue, hideCue], "ui")).toEqual([cue, hideCue]);
+    expect(selectRuntimeCommandsForTarget([cue, hideCue], "debug")).toEqual([cue]);
+  });
+
   it("routes promoted media/UI commands by contract execution authority", () => {
     const commands: RuntimeCommand[] = [
       runtimeCommand("bgm", "media", { bgmPath: "bgm:investigation" }, "naninovel", "implemented"),

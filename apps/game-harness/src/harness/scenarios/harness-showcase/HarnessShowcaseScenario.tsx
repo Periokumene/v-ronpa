@@ -3,7 +3,7 @@ import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
   VnPixiPresenterHost,
-  settingsToDialogDisplaySettings,
+  settingsToStoryTextDisplaySettings,
   settingsToDialogueBleepRuntimeSettings,
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings,
@@ -33,8 +33,8 @@ export function HarnessShowcaseScenario() {
   const settings = useGameSettingsAdapter();
   const assetRegistry = useMemo(() => createAssetRegistry(harnessContentManifest), []);
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
-  const dialogDisplay = useMemo(() => settingsToDialogDisplaySettings(settings.settings), [settings.settings]);
-  const dialogRevealSettings = useMemo(() => ({ textSpeed: dialogDisplay.textSpeed }), [dialogDisplay.textSpeed]);
+  const storyTextDisplay = useMemo(() => settingsToStoryTextDisplaySettings(settings.settings), [settings.settings]);
+  const storyTextRevealSettings = useMemo(() => ({ textSpeed: storyTextDisplay.textSpeed }), [storyTextDisplay.textSpeed]);
   const dialogueBleepSettings = useMemo(() => settingsToDialogueBleepRuntimeSettings(settings.settings), [settings.settings]);
   const voiceSettings = useMemo(() => settingsToVoiceRuntimeSettings(settings.settings), [settings.settings]);
   const pixiStage = usePixiStageReadiness();
@@ -44,7 +44,7 @@ export function HarnessShowcaseScenario() {
     assetResolver: assetRegistry,
     ...(harnessContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: harnessContentManifest.audio.dialogueBleep } : {}),
     dialogueBleepSettings,
-    dialogRevealSettings,
+    storyTextRevealSettings,
     storyPlayTiming,
     voiceSettings,
     onEnterTrial: enterTrialMode,
@@ -74,7 +74,7 @@ export function HarnessShowcaseScenario() {
       />
       <section className="playfield" data-testid="playfield">
         <GameInteractionShell
-          dialogDisplay={dialogDisplay}
+          storyTextDisplay={storyTextDisplay}
           flow={flow}
           formatStorySpeaker={displayStorySpeaker}
           host={{ naviSubstate: runtime.navi.substate }}

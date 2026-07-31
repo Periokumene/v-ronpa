@@ -6,7 +6,8 @@
     "game-a-production-catalog": "The accepted multi-Nani hard cut splits the former MILKBEGIN segment into chapter-02 and links it from opening with one static endpoint.",
     "csp-character-v2-alice-hard-cut": "The accepted CSP v2 hard cut replaces Alice assets and updates production/test appearance expressions, generated revisions, and preload plans without compatibility aliases.",
     "csp-character-v3-body-variants-alice-refresh": "The accepted CSP v3 hard cut moves body into the numeric runtime group, adds body0, and updates only the explicit test expression and its generated metadata.",
-    "global-character-tone": "The accepted global character Tone feature adds scripted product and showcase commands, generated revisions, and semantic compiler output without changing asset references."
+    "global-character-tone": "The accepted global character Tone feature adds scripted product and showcase commands, generated revisions, and semantic compiler output without changing asset references.",
+    "cue-story-text-hard-cut": "The accepted Cue hard cut adds Game A and Harness acceptance branches, generated revisions, and canonical parser/compiler semantics without changing asset references."
   },
   "corpora": {
     "game-a-opening": {
@@ -42,13 +43,13 @@
     "game-a-smoke": {
       "sourceFile": "apps/game-a/src/test-nani/smoke.nani",
       "scriptPath": "game-a/test/smoke.nani",
-      "sourceSha256": "c6eff6045ddf1ecd31a0d430aefe40969f698bf77bb5abc5b37255f4fbc816f4",
-      "sourceUtf16Length": 1813,
-      "statementCount": 44,
-      "commandCount": 40,
-      "scenarioIRSha256": "e813534279a3fb6db72b4cb50257b0acb5b45fa4648357edfe4f8e62d9812e42",
+      "sourceSha256": "99b37fe11255866474fce99f5ba92bedaa0d35f5a5a0b674a6e6ef94cf0459a3",
+      "sourceUtf16Length": 2239,
+      "statementCount": 51,
+      "commandCount": 47,
+      "scenarioIRSha256": "cccdffa11c526d1bdb085b1c66fae10c3c62d3aa0c7d7a9f29b36f4cc9289d71",
       "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "runtimeScriptSha256": "b59455d4687e125368ce18f31aa4ea7dc2c0ee096f23ce635fdf1130cbfbf7e2",
+      "runtimeScriptSha256": "089a5c2cd3b241b30c4563f5b1fd8e12b969bc99ff232f45a4717184d07b3c75",
       "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "scenarioAssetsSha256": "975ef31d006a825fc42df7acd462e4275d973a7ab81dbd2bc608da3d7909412a",
       "runtimeAssetsSha256": "bba1f0024bcafcbc36f1782823baeff72b73b68543757006345a3d1e9cb1d988",
@@ -102,13 +103,13 @@
     "harness-showcase": {
       "sourceFile": "apps/game-harness/src/harness/showcase/script.ts",
       "scriptPath": "harness/harness-showcase.nani",
-      "sourceSha256": "e322f6f930434fcfb6fe0ffcf730770e53aafd69c154579457c59275e33e9bb2",
-      "sourceUtf16Length": 14828,
-      "statementCount": 234,
-      "commandCount": 226,
-      "scenarioIRSha256": "2595af6477fd4215e413b2d48ee51a62a3eed22883682f07e0758559693dc670",
+      "sourceSha256": "dfaf816cc6c9230ebda3fa8964821130db817d99cdafef072b5496362a20ae1b",
+      "sourceUtf16Length": 15495,
+      "statementCount": 249,
+      "commandCount": 239,
+      "scenarioIRSha256": "d61f962322f5b101c67e29decf157cb5f433dd4ed98727596140fb2572e9409b",
       "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "runtimeScriptSha256": "7dabab569dfcd3f98e221d1da80f2c775ee2442a6a128f71b8d897c4d23a04eb",
+      "runtimeScriptSha256": "4e0ef0f9c49117442158cabc4b0e8de46a4f5beb0c725a9f3460471008681e9e",
       "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "scenarioAssetsSha256": "e3108b440d549de2be663dcc99213ff3baf2fbb38b4a6a78aa03e1a502eb4544",
       "runtimeAssetsSha256": "d6c5dcbe5de6f3547c6fee3bbfde9bd9ee6f0085b2238ad9b0c3f92eb4e39b6a",
@@ -129,8 +130,8 @@
       "characterPreloadPlanSha256": "cc8e69ce1a115e5c8c821dfdc5812acb5d40528e2adee92bcc4673e6721fb7a5"
     },
     "game-a/test/smoke.nani": {
-      "scriptRevision": "sha256:c0673449a776f61399c429ffa7c9152ea4ae708537bfe89338565b0c3c8cfaa0",
-      "metadataSha256": "218c010159aa7948d45b7e8fecd46ea83461f66c73b107bd7d06fadae4576e41",
+      "scriptRevision": "sha256:7097929cb17e6b153362081acf3d765e9d2fbc47c0a305a16cb41d54cb71a052",
+      "metadataSha256": "96fcf2e4aa2a2a7e3cf2cac2033fa33ac51f565b0f7b477ff7d26d0ac00f9569",
       "assetRefsSha256": "9062aa4fd76228b4f77a7eb745137cf309d711b7b4dd3c9733c4f46fb2f32a8c",
       "characterPreloadPlanSha256": "c333d973b62ff1fb6985414c061cebd4b2b1398dfa645224482cd90552d94781"
     },
@@ -141,8 +142,8 @@
       "characterPreloadPlanSha256": "aa8400754f4a9518bc6edd868c58c02ce7d45e141b4659865dd8f377dbebd1f8"
     },
     "harness/harness-showcase.nani": {
-      "scriptRevision": "sha256:1758d4e9abbf68c9a9b9500092d766dd5db0e4d0e5d42b19c2113a393ecc60c8",
-      "metadataSha256": "9ec7b46092ce7b971a3b5a6fdadd0fe8f92b76ebc26e39180814ec8e169e2dc8",
+      "scriptRevision": "sha256:faf81528627749bb428a7dde03a2aa48f62163030b3adca11042379bf91921aa",
+      "metadataSha256": "42ff22e23e490611f5094424d51a585989684cd5aec1441487023f692c0e5597",
       "assetRefsSha256": "2ce5be61341e80b0dc2c63fa80548301d36b78ba72f7ef35185c171b72a63a5c",
       "characterPreloadPlanSha256": "7b8efb3d0fffba81c10c7a81362b1206c58f0f3ede2ebd5910e5e6467562b440"
     }

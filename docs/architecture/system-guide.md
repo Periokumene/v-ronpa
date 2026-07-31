@@ -12,7 +12,7 @@ interaction state back into the machine.
 
 ## Package ownership
 
-- `contracts`: public schemas, ContentManifest v4, SaveData v8, and `.nani` runtime IR.
+- `contracts`: public schemas, ContentManifest v4, SaveData v9, and `.nani` runtime IR.
 - `nani-parser`: generic `.nani` ScenarioIR plus a required UTF-16 source-map
   sidecar; owns syntax diagnostics and cooked-to-source projection.
 - `nani-runtime-compiler`: command binding, static endpoint/catalog linking, validation, normalization, and
@@ -32,7 +32,9 @@ interaction state back into the machine.
   pause/save/load/settings behavior, the internal document-level web-game
   browser policy, Pixi host, and the shared Pixi script-preparation adapter.
   Paused section slots provide content only;
-  playable dialog, choices, and commands are omitted until resume.
+  playable Dialog/Cue text surfaces, choices, and commands are omitted until
+  resume. Dialog and Cue share one StoryText authority and playback clock but
+  remain separate mutually exclusive DOM surfaces.
 - `pixi-presenter`: Pixi renderer adapter only; it does not interpret runtime commands.
 - `runtime-assets-pixi`: Pixi-owned AssetRegistry fragment only.
 - `navi-director` / `trial-director`: mode-specific state and flow.
@@ -45,6 +47,8 @@ interaction state back into the machine.
 DOM owns text-heavy and accessibility-sensitive UI. Pixi owns VN/trial 2D
 presentation. R3F owns exploration and 3D trial staging. Gameplay and state
 packages cannot depend on any renderer, browser storage, or audio implementation.
+`@cue` is therefore a DOM StoryText presentation channel, not a Pixi effect or
+an app-owned overlay.
 
 See [VN integration](app-vn-integration.md), [presentation](presentation-pipeline.md),
 [assets](asset-pipeline.md), [contracts](contracts.md), and

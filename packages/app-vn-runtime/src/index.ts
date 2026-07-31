@@ -13,7 +13,7 @@ export type {
   VnPresentationPort,
   VnRestoreResult,
   VnRuntimeDefinition,
-  VnRuntimeDialogRevealSettings,
+  VnRuntimeStoryTextRevealSettings,
   VnRuntimeDialogueBleepSettings,
   VnRuntimeShellPort,
   VnRuntimeVoiceSettings,

@@ -54,7 +54,7 @@ const howlerMock = vi.hoisted(() => {
 vi.mock("howler", () => ({ Howl: howlerMock.Howl }));
 
 const baseSave = SaveDataSchema.parse({
-  version: 8 as const,
+  version: 9 as const,
   gameId: "game:test",
   savedAt: "2026-06-14T00:00:00.000Z",
   mode: "navi" as const,
@@ -100,7 +100,7 @@ const baseSave = SaveDataSchema.parse({
       bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
       loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
     },
-    ui: { dialog: true, commandBar: true, toastLayer: true }
+    ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
   },
   navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
   trial: null,
@@ -117,7 +117,7 @@ const currentTextSave = SaveDataSchema.parse({
       ...baseSave.vn!.story,
       text: {
         visible: true,
-        current: { speaker: "Mira", text: "Current save line." }
+        current: { channel: "cue", speaker: "Mira", text: "Current save line." }
       }
     }
   }
@@ -134,7 +134,7 @@ describe("media save contracts", () => {
     vi.useRealTimers();
   });
 
-  it("validates v6 saves through the strict parse boundary", () => {
+  it("validates v9 saves through the strict parse boundary", () => {
     expect(parseSaveData(baseSave)).toEqual(baseSave);
     expect(parseSaveData(baseSave).vn?.pixiStage.characterTone).toMatchObject({
       preset: "rain",
@@ -147,7 +147,7 @@ describe("media save contracts", () => {
     expect(() =>
       parseSaveData({
         ...baseSave,
-        version: 5
+        version: 8
       })
     ).toThrow();
   });

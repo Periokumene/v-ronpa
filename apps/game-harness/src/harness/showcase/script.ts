@@ -12,6 +12,23 @@ Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command sh
 @choice "分支3：真实 textId-音频验证" goto:#VoiceTextIdAudioValidation
 @choice "分支4：首轮富文本标签验收" goto:#RichTextShowcase
 @choice "分支5：全局角色 Tone 验收" goto:#CharacterToneShowcase
+@choice "分支6：Cue 演出文本验收" goto:#CueShowcase
+
+#CueShowcase
+@set route:"cue"
+@showUI dialog
+@showUI commandBar visible:true
+Narrator: CHECKPOINT CUE 00 - 普通 Dialog 可见；下一步应瞬时切换到中央无框 Cue。
+@cue "<b>CHECKPOINT CUE 01 - 中央富文本 Cue。</b>作者不应视觉显示，但无障碍名称、backlog 与音频身份应保留。" author:Narrator speed:0.8 textId:harness_cue_001
+@hideUI dialog time:0.2 wait!
+@cue "CHECKPOINT CUE 02 - hideUI dialog 不得隐藏 Cue；commandBar 仍由自己的 Surface 独立显示。" author:Narrator textId:harness_cue_002
+@choice "CHECKPOINT CUE CHOICE - Cue 应保留为选项底文" goto:#CueChoiceContinue
+
+#CueChoiceContinue
+@hideCue time:0.4 wait!
+@showUI dialog time:0.2 wait!
+Narrator: CHECKPOINT CUE 03 - Cue 已完成淡出，随后普通 Dialog 才出现。
+@end
 
 #VoiceTextIdAudioValidation
 @back bg:harness effect:fade time:0.15

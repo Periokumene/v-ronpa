@@ -49,7 +49,7 @@ const commandAssetKinds: Record<string, string> = {
 };
 const textIdPattern = /\|#([^|]*)\|/gu;
 const textIdValuePattern = /^[a-zA-Z0-9_-]+$/u;
-const richTextCommandIds = new Set(["print", "append", "choice", "toast"]);
+const richTextCommandIds = new Set(["print", "cue", "append", "choice", "toast"]);
 
 interface ParsedCommand {
   readonly command: CommandIR;

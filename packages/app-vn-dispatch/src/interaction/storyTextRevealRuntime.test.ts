@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
-  advanceDialogReveal,
-  completeDialogReveal,
-  createDialogLinePacingPlan,
-  createDialogRevealState,
+  advanceStoryTextReveal,
+  completeStoryTextReveal,
+  createStoryTextPacingPlan,
+  createStoryTextRevealState,
   selectVisibleRevealRichText,
   selectVisibleRevealText
-} from "./dialogRevealRuntime";
+} from "./storyTextRevealRuntime";
 
-describe("dialog reveal runtime", () => {
+describe("story text reveal runtime", () => {
   it("reveals text by grapheme units", () => {
-    const state = createDialogRevealState({
+    const state = createStoryTextRevealState({
       lineKey: "line:grapheme",
       text: "你a\u0301👩‍💻",
       startedAtMs: 1000,
@@ -18,45 +18,45 @@ describe("dialog reveal runtime", () => {
     });
 
     expect(state.units).toEqual(["你", "a\u0301", "👩‍💻"]);
-    const first = advanceDialogReveal(state, 1100);
+    const first = advanceStoryTextReveal(state, 1100);
     expect(selectVisibleRevealText(first.state)).toBe("你");
   });
 
   it("emits reveal lifecycle and tick events without duplicates", () => {
-    const state = createDialogRevealState({
+    const state = createStoryTextRevealState({
       lineKey: "line:events",
       text: "ABC",
       startedAtMs: 0,
       durationMs: 300
     });
 
-    const started = advanceDialogReveal(state, 0);
+    const started = advanceStoryTextReveal(state, 0);
     expect(started.events.map((event) => event.type)).toEqual(["reveal-start"]);
 
-    const ticked = advanceDialogReveal(started.state, 200);
+    const ticked = advanceStoryTextReveal(started.state, 200);
     expect(ticked.events.map((event) => event.type)).toEqual(["reveal-tick", "reveal-tick"]);
     expect(ticked.events).toEqual([
       expect.objectContaining({ type: "reveal-tick", unit: "A", unitIndex: 0, visibleUnitCount: 1 }),
       expect.objectContaining({ type: "reveal-tick", unit: "B", unitIndex: 1, visibleUnitCount: 2 })
     ]);
 
-    const completed = completeDialogReveal(ticked.state, 250);
+    const completed = completeStoryTextReveal(ticked.state, 250);
     expect(completed.events.map((event) => event.type)).toEqual(["reveal-finish"]);
     expect(selectVisibleRevealText(completed.state)).toBe("ABC");
 
-    expect(completeDialogReveal(completed.state, 300).events).toEqual([]);
+    expect(completeStoryTextReveal(completed.state, 300).events).toEqual([]);
   });
 
   it("does not synthesize catch-up tick events when a reveal is completed immediately", () => {
-    const revealing = createDialogRevealState({
+    const revealing = createStoryTextRevealState({
       lineKey: "line:complete",
       text: "ABCDE",
       startedAtMs: 0,
       durationMs: 500
     });
-    const completed = completeDialogReveal(revealing, 100);
-    const instant = advanceDialogReveal(
-      createDialogRevealState({
+    const completed = completeStoryTextReveal(revealing, 100);
+    const instant = advanceStoryTextReveal(
+      createStoryTextRevealState({
         lineKey: "line:instant",
         text: "ABCDE",
         startedAtMs: 0,
@@ -70,17 +70,17 @@ describe("dialog reveal runtime", () => {
   });
 
   it("keeps progress based on absolute elapsed time after no-op early ticks", () => {
-    const state = createDialogRevealState({
+    const state = createStoryTextRevealState({
       lineKey: "line:absolute",
       text: "ABCD",
       startedAtMs: 1000,
       durationMs: 400
     });
 
-    const started = advanceDialogReveal(state, 1000);
-    const early = advanceDialogReveal(started.state, 1010);
-    const later = advanceDialogReveal(early.state, 1200);
-    const finished = advanceDialogReveal(later.state, 1400);
+    const started = advanceStoryTextReveal(state, 1000);
+    const early = advanceStoryTextReveal(started.state, 1010);
+    const later = advanceStoryTextReveal(early.state, 1200);
+    const finished = advanceStoryTextReveal(later.state, 1400);
 
     expect(early.events).toEqual([]);
     expect(selectVisibleRevealText(early.state)).toBe("");
@@ -90,13 +90,13 @@ describe("dialog reveal runtime", () => {
   });
 
   it("clips rich text runs to the visible reveal text", () => {
-    const state = createDialogRevealState({
+    const state = createStoryTextRevealState({
       lineKey: "line:rich",
       text: "Bold mark",
       startedAtMs: 0,
       durationMs: 100
     });
-    const revealed = advanceDialogReveal(state, 50).state;
+    const revealed = advanceStoryTextReveal(state, 50).state;
 
     expect(
       selectVisibleRevealRichText(
@@ -116,7 +116,7 @@ describe("dialog reveal runtime", () => {
   });
 
   it("keeps reveal duration inside the AUTO line budget ratio", () => {
-    const plan = createDialogLinePacingPlan({
+    const plan = createStoryTextPacingPlan({
       unitCount: 100,
       textSpeed: 0.5,
       totalDelayMs: 2000
@@ -128,9 +128,9 @@ describe("dialog reveal runtime", () => {
   });
 
   it("uses print speed as a reveal speed multiplier", () => {
-    const normal = createDialogLinePacingPlan({ unitCount: 10, textSpeed: 0.5 });
-    const faster = createDialogLinePacingPlan({ unitCount: 10, textSpeed: 0.5, scriptSpeed: 2 });
-    const slower = createDialogLinePacingPlan({ unitCount: 10, textSpeed: 0.5, scriptSpeed: 0.5 });
+    const normal = createStoryTextPacingPlan({ unitCount: 10, textSpeed: 0.5 });
+    const faster = createStoryTextPacingPlan({ unitCount: 10, textSpeed: 0.5, scriptSpeed: 2 });
+    const slower = createStoryTextPacingPlan({ unitCount: 10, textSpeed: 0.5, scriptSpeed: 0.5 });
 
     expect(faster.revealDurationMs).toBeLessThan(normal.revealDurationMs);
     expect(slower.revealDurationMs).toBeGreaterThan(normal.revealDurationMs);

@@ -9,7 +9,7 @@ import type {
   VnEntryDef,
   VnRuntimeScriptCatalog
 } from "@v-ronpa/contracts";
-import type { MediaRuntimeState, UiRuntimeState, DialogRevealEvent, DialogRevealState } from "@v-ronpa/app-vn-dispatch";
+import type { MediaRuntimeState, UiRuntimeState, StoryTextRevealEvent, StoryTextRevealState } from "@v-ronpa/app-vn-dispatch";
 import type { PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
 import type { VnRuntimeDiagnostic } from "./runtimeDiagnostics";
 import type {
@@ -56,11 +56,11 @@ export interface VnUiRuntime {
   state: UiRuntimeState;
 }
 
-export interface VnDialogRevealRuntime {
-  state?: DialogRevealState;
+export interface VnStoryTextRevealRuntime {
+  state?: StoryTextRevealState;
   visibleText?: string;
   visibleRichText?: RichTextDocument | undefined;
-  events: DialogRevealEvent[];
+  events: StoryTextRevealEvent[];
   eventSequence: number;
 }
 
@@ -70,7 +70,7 @@ export interface VnRuntimeShellPort {
   attachMovieElement(element: HTMLVideoElement | null): void;
   chooseStory(index: number): void;
   completeMoviePlayback(): void;
-  dialogRevealRuntime: VnDialogRevealRuntime;
+  storyTextRevealRuntime: VnStoryTextRevealRuntime;
   dismissRuntimeToast(toastId: string): void;
   interactionFacts: VnInteractionFacts;
   storyPlayActiveActions: Partial<Record<GameUiAction, boolean>>;
@@ -201,7 +201,7 @@ export interface RestoreVnRuntimeStateInput {
   state: SaveableVnState;
 }
 
-export interface VnRuntimeDialogRevealSettings {
+export interface VnRuntimeStoryTextRevealSettings {
   textSpeed: number;
 }
 

@@ -34,6 +34,13 @@ export const RUNTIME_UI_GROUPS = ["dialog", "commandBar", "toastLayer"] as const
 export const RuntimeUiGroupSchema = z.enum(RUNTIME_UI_GROUPS);
 export type RuntimeUiGroup = z.infer<typeof RuntimeUiGroupSchema>;
 
+export const VN_UI_SURFACE_IDS = [...RUNTIME_UI_GROUPS, "cue"] as const;
+export const VnUiSurfaceIdSchema = z.enum(VN_UI_SURFACE_IDS);
+export type VnUiSurfaceId = z.infer<typeof VnUiSurfaceIdSchema>;
+
+export const StoryTextChannelSchema = z.enum(["dialog", "cue"]);
+export type StoryTextChannel = z.infer<typeof StoryTextChannelSchema>;
+
 export const NaviSubstateSchema = z.enum(["walk", "interacting", "vn2d-overlay", "inventory", "event"]);
 export type NaviSubstate = z.infer<typeof NaviSubstateSchema>;
 
@@ -387,6 +394,7 @@ const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
   glitch: "pixi-presentation",
   glitchfilter: "pixi-presentation",
   hidechars: "pixi-presentation",
+  hidecue: "ui-output",
   inback: "pixi-presentation",
   rain: "pixi-presentation",
   shake: "pixi-presentation",
@@ -395,6 +403,7 @@ const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
   sun: "pixi-presentation",
   choice: "story-control",
   append: "story-control",
+  cue: "story-control",
   clearbacklog: "story-control",
   clearchoice: "story-control",
   end: "story-control",
@@ -707,6 +716,8 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
     param("author", "string"),
     param("as", "string"),
     param("speed", "decimal"),
+    param("textId", "string", false, "v-ronpa"),
+    param("autoNext", "boolean", false, "v-ronpa"),
     param("reset", "boolean"),
     param("default", "boolean"),
     param("waitInput", "boolean"),
@@ -829,6 +840,17 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
   ]),
   official("wait", "flow", [param("waitMode", "string")]),
   official("while", "flow", [param("expression", "string")], true),
+  {
+    ...vRonpa("cue", "text", [
+      param("text", "string", true, "v-ronpa"),
+      param("author", "string", false, "v-ronpa"),
+      param("speed", "decimal", false, "v-ronpa"),
+      param("textId", "string", false, "v-ronpa"),
+      param("autoNext", "boolean", false, "v-ronpa")
+    ]),
+    canonicalName: "cue",
+    primaryParam: "text"
+  },
   vRonpa("end", "flow"),
   vRonpa(
     "gameplay",
@@ -860,6 +882,13 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
   ),
   vRonpa("flash", "effect", [param("color", "string"), param("duration", "decimal"), param("wait", "boolean")]),
   vRonpa("focus", "effect", [param("target", "string"), param("duration", "decimal")]),
+  {
+    ...vRonpa("hidecue", "ui", [
+      param("time", "decimal", false, "v-ronpa"),
+      param("wait", "boolean", false, "v-ronpa")
+    ]),
+    canonicalName: "hideCue"
+  },
   vRonpa("inback", "scene", [
     param("appearanceAndTransition", "named string"),
     param("appearance", "string"),
@@ -888,6 +917,7 @@ const implementedCommandDocs: Record<string, NaniCommandDocs> = {
     examples: ["@charTone rain", "@charTone fog amount:1.25 time:0.4 wait!", "@charTone none time:0.3 wait!"]
   },
   choice: { zh: "添加一个剧情选项，可指定跳转标签、启用状态和选择后的变量表达式。", examples: ['@choice "调查门口" goto:#Door id:door'] },
+  cue: { zh: "在画面中央显示无边框演出文本；它与普通台词共享正文、回看、播放和存档语义。", examples: ['@cue "<b>不要回头。</b>" author:Narrator speed:0.8 textId:center_001 autoNext!'] },
   clearbacklog: { zh: "清空当前剧情回看记录。", examples: ["@clearBacklog"] },
   clearchoice: { zh: "清除当前待选项；提供 id 时只清除对应选项。", examples: ["@clearChoice id:door"] },
   end: { zh: "结束当前脚本执行。", examples: ["@end"] },
@@ -898,6 +928,7 @@ const implementedCommandDocs: Record<string, NaniCommandDocs> = {
   glitchfilter: { zh: "设置持久故障滤镜参数，适合一段场景内持续干扰；time 会插值连续参数，seed 等离散参数在 transition start 切换，power:0 time:x 会淡出移除。", examples: ["@glitchFilter power:0.35 speed:1.2 time:0.25 wait!", "@glitchFilter power:0 time:0.3 wait!"] },
   goto: { zh: "跳转到当前脚本内的本地标签。跨脚本跳转当前 runtime 尚未实现。", examples: ["@goto #Next"] },
   hidechars: { zh: "隐藏当前角色立绘，并可设置动画时间和等待。", examples: ["@hideChars time:0.3 wait!"] },
+  hidecue: { zh: "隐藏中央演出文本 Surface；不会清除当前正文或回看内容。", examples: ["@hideCue time:0.4 wait!"] },
   hideui: { zh: "隐藏 runtime UI 组；未指定目标时隐藏所有 v1 UI 组。", examples: ["@hideUI commandBar time:0.2"] },
   inback: { zh: "切换内层背景，用于对话框、框景或局部背景演出。", examples: ["@inback bg:room effect:fade time:0.2"] },
   input: { zh: "请求玩家输入，并把结果写入剧情变量。", examples: ['@input playerName type:string summary:"你的名字？"'] },
@@ -930,6 +961,7 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   char: ["idAndAppearance", "id", "pose", "via", "params", "dissolve", "look", "avatar", "pos", "position", "rotation", "scale", "tint", "easing", "time", "lazy", "wait", "visible"],
   chartone: ["preset", "amount", "time", "wait"],
   choice: ["goto", "id", "enabled", "set"],
+  cue: ["text", "author", "speed", "textId", "autoNext"],
   clearbacklog: [],
   clearchoice: ["id"],
   end: [],
@@ -940,11 +972,12 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   glitchfilter: ["time", "easing", "power", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"],
   goto: ["path"],
   hidechars: ["time", "lazy", "wait"],
+  hidecue: ["time", "wait"],
   hideui: ["uINames", "target", "time", "wait"],
   inback: ["appearanceAndTransition", "appearance", "via", "effect", "visible", "easing", "time", "wait"],
   input: ["variableName", "type", "summary", "value"],
   movie: ["moviePath", "time", "block"],
-  print: ["text", "speaker", "author", "as", "printer", "speed", "reset"],
+  print: ["text", "speaker", "author", "as", "printer", "speed", "textId", "autoNext", "reset"],
   rain: ["power", "wind", "hue", "tint", "time", "easing", "wait"],
   resettext: ["printerId"],
   set: ["expression"],
@@ -972,6 +1005,7 @@ const commonParamDocs: Record<string, NaniCommandParamDocs> = {
   appearanceAndTransition: { zh: "主参数形式的外观和可选转场，通常写作资源 ID 或 `资源.转场`。" },
   append: { zh: "是否追加到当前文本而不是重置文本。", allowedValues: ["true", "false"] },
   as: { zh: "文本说话人的别名参数，等价于 author/speaker 的运行含义。" },
+  autoNext: { zh: "文本显示完成后是否自动推进。", defaultValue: false, allowedValues: ["true", "false"] },
   author: { zh: "文本说话人 ID。", examples: ["Felix", "Narrator"] },
   avatar: { zh: "角色头像或头像外观 ID。" },
   bgmPath: { zh: "背景音乐资源 ID 或路径。", examples: ["bgm:main"] },
@@ -1057,6 +1091,7 @@ const commonParamDocs: Record<string, NaniCommandParamDocs> = {
   sway: { zh: "雪花横向摆动强度。", recommendedRange: { min: 0, max: 1 } },
   target: { zh: "目标 UI、舞台或演员 ID。", examples: ["dialog", "commandBar", "stage"] },
   text: { zh: "显示文本内容。" },
+  textId: { zh: "正文文本的稳定 ID；全脚本内必须唯一。", examples: ["center_001"] },
   time: { zh: "命令动画、媒体或 UI 过渡时间。", recommendedRange: { min: 0, unit: "seconds" } },
   tint: { zh: "着色强度或颜色值，语义取决于命令。", recommendedRange: { min: 0, max: 2 } },
   to: { zh: "动画目标位置，通常是二维坐标列表。", examples: ["0.5,0"] },
@@ -1111,8 +1146,17 @@ const commandParamDocOverrides: Record<string, Record<string, Partial<NaniComman
     type: { defaultValue: "string", allowedValues: ["string", "number", "boolean"] }
   },
   print: {
+    autoNext: { defaultValue: false },
     reset: { defaultValue: false },
     speed: { recommendedRange: { min: 0, max: 2, noteZh: "0 表示立即显示；建议 0.5 到 1.5 之间微调。" } }
+  },
+  cue: {
+    autoNext: { defaultValue: false },
+    speed: { recommendedRange: { min: 0, max: 2, noteZh: "0 表示立即显示；建议 0.5 到 1.5 之间微调。" } }
+  },
+  hidecue: {
+    time: { defaultValue: 0, recommendedRange: { min: 0, unit: "seconds" } },
+    wait: { defaultValue: false }
   },
   showui: {
     visible: { defaultValue: true },
@@ -1970,13 +2014,15 @@ export const StoryRuntimeWaitSchema = z.discriminatedUnion("kind", [
 ]);
 export type StoryRuntimeWait = z.infer<typeof StoryRuntimeWaitSchema>;
 
-const StoryTextCurrentSchema = z.object({
+export const StoryTextCurrentSchema = z.object({
+  channel: StoryTextChannelSchema,
   speaker: z.string().optional(),
   text: z.string(),
   richText: RichTextDocumentSchema.optional()
 }).superRefine((line, ctx) => {
   addRichTextPlainTextConsistencyIssue(ctx, line.richText, line.text, ["richText", "text"]);
 });
+export type StoryTextCurrent = z.infer<typeof StoryTextCurrentSchema>;
 
 export const StoryTextStateSchema = z.object({
   printerId: z.string().default("default"),
@@ -2019,7 +2065,7 @@ export const StoryUiPresentationWaitSchema = z.object({
   commandId: z.string().min(1),
   commandIndex: z.number().int().nonnegative().optional(),
   durationMs: z.number().int().nonnegative(),
-  targets: z.array(RuntimeUiGroupSchema).min(1),
+  targets: z.array(VnUiSurfaceIdSchema).min(1),
   targetVisible: z.boolean()
 });
 export type StoryUiPresentationWait = z.infer<typeof StoryUiPresentationWaitSchema>;
@@ -2268,7 +2314,8 @@ export const VnUiCheckpointSchema = z
   .object({
     dialog: z.boolean(),
     commandBar: z.boolean(),
-    toastLayer: z.boolean()
+    toastLayer: z.boolean(),
+    cue: z.boolean()
   })
   .strict();
 export type VnUiCheckpoint = z.infer<typeof VnUiCheckpointSchema>;
@@ -2317,7 +2364,7 @@ export type SaveableVnState = z.infer<typeof SaveableVnStateSchema>;
 
 export const SaveDataSchema = z
   .object({
-    version: z.literal(8),
+    version: z.literal(9),
     gameId: IdSchema,
     savedAt: z.string(),
     mode: SaveModeSchema,

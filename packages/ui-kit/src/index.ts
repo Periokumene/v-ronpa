@@ -33,6 +33,7 @@ export {
 export { ScenarioTabs } from "./surfaces/ScenarioTabs";
 export { SurfaceFrame } from "./surfaces/SurfaceFrame";
 export { VnChoiceOverlay } from "./surfaces/VnChoiceOverlay";
+export { VnCueSurface } from "./surfaces/VnCueSurface";
 export { VnDialogSurface } from "./surfaces/VnDialogSurface";
 export { DEFAULT_VN_DIALOG_APPEARANCE, resolveVnDialogAppearance } from "./surfaces/vnDialogAppearance";
 export type {
@@ -53,5 +54,6 @@ export type {
   RuntimeToastView
 } from "./surfaces/RuntimeUiSurfaces";
 export type { VnChoiceOverlayProps } from "./surfaces/VnChoiceOverlay";
-export type { VnDialogDisplaySettings, VnDialogState, VnDialogSurfaceProps } from "./surfaces/VnDialogSurface";
+export type { VnCueSurfaceProps } from "./surfaces/VnCueSurface";
+export type { VnStoryTextDisplaySettings, VnDialogState, VnDialogSurfaceProps } from "./surfaces/VnDialogSurface";
 export type { VnDialogAppearance } from "./surfaces/vnDialogAppearance";

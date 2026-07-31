@@ -38,7 +38,7 @@ export interface GameFlowShellAdapter {
   send(event: { type: string; [key: string]: unknown }): void;
 }
 
-export interface VnDialogDisplaySettings {
+export interface VnStoryTextDisplaySettings {
   textSize: "small" | "medium" | "large";
   textSpeed: number;
 }
@@ -80,7 +80,16 @@ export interface VnDialogViewModel {
   text: string;
   richText?: RichTextDocument | undefined;
   state: VnDialogState;
-  display?: VnDialogDisplaySettings | undefined;
+  display?: VnStoryTextDisplaySettings | undefined;
+}
+
+export interface VnCueViewModel {
+  visible: boolean;
+  presentation: UiSurfacePresentation;
+  authorId?: string | undefined;
+  text: string;
+  richText?: RichTextDocument | undefined;
+  display?: VnStoryTextDisplaySettings | undefined;
 }
 
 export interface VnChoicesViewModel {
@@ -224,6 +233,7 @@ export interface GameInteractionOverlayActions {
 
 export interface GameInteractionShellViewModels {
   dialog?: VnDialogViewModel | undefined;
+  cue?: VnCueViewModel | undefined;
   choices?: VnChoicesViewModel | undefined;
   commandBar?: VnCommandBarViewModel | undefined;
   title?: TitleViewModel | undefined;
@@ -247,6 +257,7 @@ export interface GameInteractionOverlayViewModelInputs {
 
 export interface GameInteractionShellSurfaces {
   Dialog: SurfaceSlotComponent<VnDialogViewModel>;
+  Cue: SurfaceSlotComponent<VnCueViewModel>;
   Choices: SurfaceSlotComponent<VnChoicesViewModel, VnChoicesActions>;
   CommandBar: SurfaceSlotComponent<VnCommandBarViewModel, VnCommandBarActions>;
   Title: SurfaceSlotComponent<TitleViewModel, TitleActions>;
@@ -261,7 +272,7 @@ export interface GameInteractionShellSurfaces {
 export interface CreateGameInteractionShellViewModelsInput {
   commandAvailability?: GameCommandAvailability | undefined;
   dialogAppearance?: Partial<VnDialogAppearance> | undefined;
-  dialogDisplay?: VnDialogDisplaySettings | undefined;
+  storyTextDisplay?: VnStoryTextDisplaySettings | undefined;
   flow: Pick<GameFlowShellAdapter, "activeOverlay" | "pauseSection" | "capabilities" | "mode">;
   formatStorySpeaker?: ((speaker: string) => string) | undefined;
   overlayModels?: GameInteractionOverlayViewModelInputs | undefined;
@@ -284,7 +295,7 @@ const COMMAND_BAR_COMMANDS: Array<{ action: GameUiAction; label: string; testId:
 export function createGameInteractionShellViewModels({
   commandAvailability,
   dialogAppearance,
-  dialogDisplay,
+  storyTextDisplay,
   flow,
   formatStorySpeaker,
   overlayModels,
@@ -293,12 +304,19 @@ export function createGameInteractionShellViewModels({
   title = "V-Ronpa"
 }: CreateGameInteractionShellViewModelsInput): GameInteractionShellViewModels {
   const dialogPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "dialog");
+  const cuePresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "cue");
   const commandBarPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "commandBar");
   const toastLayerPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "toastLayer");
   const showPlayableUi = flow.mode !== "title" && flow.mode !== "paused";
-  const showDialog = runtime.storyRuntime.active && showPlayableUi && dialogPresentation.mounted;
-  const currentLine =
-    showDialog ? selectCurrentStoryLine(runtime.storyRuntime.state) : undefined;
+  const currentLine = runtime.storyRuntime.active
+    ? selectCurrentStoryLine(runtime.storyRuntime.state)
+    : undefined;
+  const showCue = runtime.storyRuntime.active && showPlayableUi && cuePresentation.mounted && currentLine?.channel === "cue";
+  const showDialog = runtime.storyRuntime.active &&
+    showPlayableUi &&
+    dialogPresentation.mounted &&
+    !(currentLine?.channel === "cue" && cuePresentation.mounted);
+  const dialogLine = currentLine?.channel === "dialog" ? currentLine : undefined;
   const storyHasChoices = runtime.storyRuntime.state.pendingChoices.length > 0;
   const dialogState: VnDialogState = runtime.storyRuntime.state.ended ? "ended" : storyHasChoices ? "choices" : "line";
   const showChoices =
@@ -316,16 +334,30 @@ export function createGameInteractionShellViewModels({
             visible: true,
             presentation: dialogPresentation,
             appearance: resolveVnDialogAppearance(dialogAppearance),
-            ...(currentLine?.speaker ? { speakerId: currentLine.speaker } : {}),
-            ...(currentLine?.speaker
-              ? { speakerLabel: formatStorySpeaker ? formatStorySpeaker(currentLine.speaker) : currentLine.speaker }
+            ...(dialogLine?.speaker ? { speakerId: dialogLine.speaker } : {}),
+            ...(dialogLine?.speaker
+              ? { speakerLabel: formatStorySpeaker ? formatStorySpeaker(dialogLine.speaker) : dialogLine.speaker }
               : {}),
-            text: runtime.dialogRevealRuntime.visibleText ?? currentLine?.text ?? "",
-            ...(runtime.dialogRevealRuntime.visibleRichText ?? currentLine?.richText
-              ? { richText: runtime.dialogRevealRuntime.visibleRichText ?? currentLine?.richText }
+            text: dialogLine ? runtime.storyTextRevealRuntime.visibleText ?? dialogLine.text : "",
+            ...(dialogLine && (runtime.storyTextRevealRuntime.visibleRichText ?? dialogLine.richText)
+              ? { richText: runtime.storyTextRevealRuntime.visibleRichText ?? dialogLine.richText }
               : {}),
             state: dialogState,
-            ...(dialogDisplay ? { display: dialogDisplay } : {})
+            ...(storyTextDisplay ? { display: storyTextDisplay } : {})
+          }
+        }
+      : {}),
+    ...(showCue
+      ? {
+          cue: {
+            visible: true,
+            presentation: cuePresentation,
+            ...(currentLine.speaker ? { authorId: currentLine.speaker } : {}),
+            text: runtime.storyTextRevealRuntime.visibleText ?? currentLine.text,
+            ...(runtime.storyTextRevealRuntime.visibleRichText ?? currentLine.richText
+              ? { richText: runtime.storyTextRevealRuntime.visibleRichText ?? currentLine.richText }
+              : {}),
+            ...(storyTextDisplay ? { display: storyTextDisplay } : {})
           }
         }
       : {}),

@@ -15,6 +15,13 @@ Narrator: CHECKPOINT SMOKE 00 - test-only VN entry is active.|#smoke_preview_00|
 @set route:"smoke-interaction"
 @rain power:0
 @hideChars
+Narrator: CHECKPOINT SMOKE CUE 00 - dialog before cue.
+@cue "<b>CHECKPOINT SMOKE CUE 01</b> - centered borderless story text." author:Narrator speed:0.8 textId:game_a_cue_001
+@hideUI dialog time:0.05 wait!
+@cue "CHECKPOINT SMOKE CUE 02 - hideUI dialog does not affect cue." author:Narrator textId:game_a_cue_002
+@hideCue time:0.4 wait!
+@showUI dialog time:0.05 wait!
+Narrator: CHECKPOINT SMOKE CUE 03 - dialog after cue fade.
 @hideUI dialog time:0.05 wait!
 @hideUI commandBar time:0.05 wait!
 @showUI dialog time:0.05 wait!

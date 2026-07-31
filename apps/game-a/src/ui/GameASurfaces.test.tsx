@@ -9,6 +9,7 @@ import type {
   TitleViewModel,
   VnChoicesViewModel,
   VnCommandBarViewModel,
+  VnCueViewModel,
   VnDialogViewModel
 } from "@v-ronpa/app-vn-shell";
 import { createDefaultSettingsSnapshot, type GameOverlayKind, type GamePauseSection } from "@v-ronpa/contracts";
@@ -17,6 +18,7 @@ import { gameAContentManifest } from "../contentManifest";
 import {
   createGameASurfaces,
   GameACommandBar,
+  GameACueSurface,
   GameADialogSurface,
   GameASettingsContent,
   type GameASettingsTab,
@@ -34,6 +36,7 @@ describe("game-a interaction surfaces", () => {
       "BacklogOverlay",
       "Choices",
       "CommandBar",
+      "Cue",
       "Dialog",
       "InputPrompt",
       "PauseSurface",
@@ -179,6 +182,31 @@ describe("game-a interaction surfaces", () => {
       "--game-a-dialog-background-opacity": 0.92
     });
     expect(root?.props).toMatchObject({ "data-dialog-background-opacity": "0.92" });
+  });
+
+  it("delegates Cue to the shared canonical borderless surface", () => {
+    const model: VnCueViewModel = {
+      visible: true,
+      authorId: "Narrator",
+      text: "Do not turn around.",
+      richText: { text: "Do not turn around.", runs: [{ start: 0, end: 19, style: { bold: true } }] },
+      display: { textSize: "large", textSpeed: 0.8 },
+      presentation: { targetVisible: false, mounted: true, opacity: 0.5, phase: "hiding" }
+    };
+    const element = GameACueSurface({ actions: {}, model });
+    const root = findElementByTestId(element, "vn-cue-surface");
+
+    expect(root?.props).toMatchObject({
+      "aria-label": "演出文本：Narrator",
+      "data-text-size": "large",
+      "data-ui-phase": "hiding"
+    });
+    expect((root?.props as { style?: Record<string, unknown> }).style).toMatchObject({
+      border: 0,
+      background: "none",
+      pointerEvents: "none",
+      opacity: 0.5
+    });
   });
 
   it("renders a reference-style floating speaker plate while keeping state text screen-reader only", () => {

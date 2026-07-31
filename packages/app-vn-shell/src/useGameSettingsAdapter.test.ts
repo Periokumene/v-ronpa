@@ -8,7 +8,7 @@ import {
   createMemorySettingsStorage,
   initializeGameSettings,
   loadGameSettings,
-  settingsToDialogDisplaySettings,
+  settingsToStoryTextDisplaySettings,
   settingsToDialogueBleepRuntimeSettings,
   settingsToStoryPlayTimingPolicy,
   settingsToVoiceRuntimeSettings
@@ -146,7 +146,7 @@ describe("game settings adapter helpers", () => {
   it("derives narrow runtime settings without exposing the whole snapshot", () => {
     const defaults = createDefaultSettingsSnapshot();
     expect(settingsToStoryPlayTimingPolicy(defaults)).toEqual(defaultStoryPlayTimingPolicy);
-    expect(settingsToDialogDisplaySettings(defaults)).toEqual({
+    expect(settingsToStoryTextDisplaySettings(defaults)).toEqual({
       textSize: "medium",
       textSpeed: 0.5
     });

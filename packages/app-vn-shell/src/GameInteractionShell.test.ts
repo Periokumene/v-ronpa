@@ -71,7 +71,7 @@ describe("GameInteractionShell view models", () => {
 
     const models = createGameInteractionShellViewModels({
       dialogAppearance: { backgroundOpacity: 0.5 },
-      dialogDisplay: { textSize: "large", textSpeed: 0.75 },
+      storyTextDisplay: { textSize: "large", textSpeed: 0.75 },
       flow,
       formatStorySpeaker: (speaker) => `Speaker ${speaker}`,
       runtime
@@ -157,6 +157,50 @@ describe("GameInteractionShell view models", () => {
       presentation: { targetVisible: false, mounted: true, opacity: 0.4, phase: "hiding" }
     });
     expect(models.commandBar).toBeUndefined();
+  });
+
+  it("routes one story text current to cue and suppresses dialog until cue fade is unmounted", () => {
+    const choice: StoryChoiceOption = { id: "continue", text: "Continue", enabled: true };
+    const fadingCue = createRuntime({
+      channel: "cue",
+      pendingChoices: [choice],
+      visibleText: "Cue partial",
+      uiRuntimeState: uiRuntimeStateWithSurfaces({
+        cue: {
+          targetVisible: false,
+          mounted: true,
+          opacity: 0.4,
+          phase: "hiding",
+          transition: { startedAtMs: 1000, durationMs: 400, fromOpacity: 1, toOpacity: 0, targetVisible: false }
+        }
+      })
+    });
+
+    const fading = createGameInteractionShellViewModels({
+      flow: createFlow({ mode: "vn" }),
+      storyTextDisplay: { textSize: "large", textSpeed: 0.75 },
+      runtime: fadingCue
+    });
+    expect(fading.dialog).toBeUndefined();
+    expect(fading.cue).toMatchObject({
+      visible: true,
+      authorId: "Mira",
+      text: "Cue partial",
+      display: { textSize: "large", textSpeed: 0.75 },
+      presentation: { mounted: true, opacity: 0.4, phase: "hiding" }
+    });
+    expect(fading.choices).toMatchObject({ choices: [choice] });
+    expect(fading.commandBar).toMatchObject({ visible: true });
+
+    const hiddenCue = createRuntime({
+      channel: "cue",
+      uiRuntimeState: uiRuntimeStateWithSurfaces({
+        cue: { targetVisible: false, mounted: false, opacity: 0, phase: "hidden" }
+      })
+    });
+    const hidden = createGameInteractionShellViewModels({ flow: createFlow({ mode: "vn" }), runtime: hiddenCue });
+    expect(hidden.cue).toBeUndefined();
+    expect(hidden.dialog).toMatchObject({ visible: true, text: "" });
   });
 
   it("omits playable dialog, choices, and command surfaces while paused without changing runtime state", () => {
@@ -380,6 +424,7 @@ function createNoopSurfaces(): GameInteractionShellSurfaces {
     BacklogOverlay: () => null,
     Choices: () => null,
     CommandBar: () => null,
+    Cue: () => null,
     Dialog: () => null,
     InputPrompt: () => null,
     PauseSurface: ({ children }) => children,
@@ -392,6 +437,7 @@ function createNoopSurfaces(): GameInteractionShellSurfaces {
 
 function createRuntime({
   backlogText,
+  channel = "dialog",
   hasCurrentLine = true,
   inputPrompt,
   pendingChoices = [],
@@ -400,6 +446,7 @@ function createRuntime({
   visibleText
 }: {
   backlogText?: string;
+  channel?: "dialog" | "cue";
   hasCurrentLine?: boolean;
   inputPrompt?: VnRuntimeShellPort["uiRuntime"]["state"]["inputPrompt"];
   pendingChoices?: StoryChoiceOption[];
@@ -417,7 +464,7 @@ function createRuntime({
     attachMovieElement: () => undefined,
     chooseStory: () => undefined,
     completeMoviePlayback: () => undefined,
-    dialogRevealRuntime: { events: [], eventSequence: 0, ...(visibleText ? { visibleText } : {}) },
+    storyTextRevealRuntime: { events: [], eventSequence: 0, ...(visibleText ? { visibleText } : {}) },
     dismissRuntimeToast: () => undefined,
     interactionFacts: {
       inputLock: "dialog",
@@ -437,7 +484,7 @@ function createRuntime({
         backlog: backlogText ? [{ speaker: "Mira", text: backlogText }] : [],
         pendingChoices,
         ...(hasCurrentLine
-          ? { text: { printerId: "main", visible: true, current: { speaker: "Mira", text: "Partial line" } } }
+          ? { text: { printerId: "main", visible: true, current: { channel, speaker: "Mira", text: "Partial line" } } }
           : {}),
         ended: false
       }

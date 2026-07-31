@@ -47,13 +47,29 @@ export function validateCommandAgainstCatalog(
 
   for (const spec of definition.params) {
     if (spec.name === "params") continue;
-    if (spec.required && getCommandParam(command, spec.name) === undefined) {
+    const isPrimarySpec = definition.primaryParam &&
+      normalizeParamName(definition.primaryParam) === normalizeParamName(spec.name);
+    const value = getCommandParam(command, spec.name) ?? (isPrimarySpec ? command.primary : undefined);
+    if (spec.required && value === undefined) {
       diagnostics.push(
         createCommandDiagnostic(
           context,
           "invalid-command-param",
           "@" + definition.canonicalName + " requires parameter " + spec.name + ":" + spec.type + ".",
           "error"
+        )
+      );
+    }
+    if (value !== undefined && isPrimarySpec && command.primary && !isCompatibleCommandValue(command.primary, spec.type)) {
+      diagnostics.push(
+        createArgumentDiagnostic(
+          context,
+          bound.origins.primary,
+          "value",
+          "invalid-command-param",
+          "@" + definition.canonicalName + " primary parameter expected " + spec.type + ".",
+          "error",
+          firstIncompatibleListItemIndex(command.primary, spec.type)
         )
       );
     }

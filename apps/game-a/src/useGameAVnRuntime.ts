@@ -9,7 +9,7 @@ import type { SaveData } from "@v-ronpa/contracts";
 export type UseGameAVnRuntimeOptions = Pick<
   UseVnRuntimeOptions,
   | "assetResolver"
-  | "dialogRevealSettings"
+  | "storyTextRevealSettings"
   | "dialogueBleepConfig"
   | "dialogueBleepSettings"
   | "prepareScriptPresentation"

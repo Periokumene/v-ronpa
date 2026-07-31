@@ -12,6 +12,7 @@ import {
   TitleSurface,
   VnChoiceOverlay,
   VnCommandBar,
+  VnCueSurface,
   VnDialogSurface
 } from "@v-ronpa/ui-kit";
 import {
@@ -41,8 +42,9 @@ import {
   type VnChoicesViewModel,
   type VnCommandBarActions,
   type VnCommandBarViewModel,
+  type VnCueViewModel,
   type VnDialogAppearance,
-  type VnDialogDisplaySettings,
+  type VnStoryTextDisplaySettings,
   type VnDialogViewModel
 } from "./GameInteractionViewModels";
 import { VN_PAUSE_SECTIONS } from "./vnShellActions";
@@ -96,7 +98,7 @@ export function shouldRenderVnAdvanceHitPlane({
 export function GameInteractionShell({
   children,
   dialogAppearance,
-  dialogDisplay,
+  storyTextDisplay,
   flow,
   formatStorySpeaker,
   host,
@@ -106,7 +108,7 @@ export function GameInteractionShell({
 }: {
   children: ReactNode;
   dialogAppearance?: Partial<VnDialogAppearance>;
-  dialogDisplay?: VnDialogDisplaySettings;
+  storyTextDisplay?: VnStoryTextDisplaySettings;
   flow: GameFlowShellAdapter;
   formatStorySpeaker?: (speaker: string) => string;
   host?: { naviSubstate?: NaviSubstate | undefined };
@@ -159,7 +161,7 @@ export function GameInteractionShell({
   const models = createGameInteractionShellViewModels({
     ...(commandAvailability ? { commandAvailability } : {}),
     ...(dialogAppearance ? { dialogAppearance } : {}),
-    ...(dialogDisplay ? { dialogDisplay } : {}),
+    ...(storyTextDisplay ? { storyTextDisplay } : {}),
     flow,
     host,
     ...(formatStorySpeaker ? { formatStorySpeaker } : {}),
@@ -183,6 +185,7 @@ export function GameInteractionShell({
       {children}
       {showAdvanceHitPlane ? <VnAdvanceHitPlane onAdvance={() => runtime.advanceStory("manual")} /> : null}
       {models.dialog ? <resolvedSurfaces.Dialog model={models.dialog} actions={{}} /> : null}
+      {models.cue ? <resolvedSurfaces.Cue model={models.cue} actions={{}} /> : null}
       {models.choices ? (
         <resolvedSurfaces.Choices
           model={models.choices}
@@ -306,6 +309,7 @@ export function renderGameInteractionPauseSurface({
 
 export const defaultGameInteractionShellSurfaces: GameInteractionShellSurfaces = {
   Dialog: DefaultDialogSurface,
+  Cue: DefaultCueSurface,
   Choices: DefaultChoicesSurface,
   CommandBar: DefaultCommandBarSurface,
   Title: DefaultTitleSurface,
@@ -333,6 +337,18 @@ function DefaultDialogSurface({ model }: SurfaceSlotProps<VnDialogViewModel>) {
       {...(model.display ? { displaySettings: model.display } : {})}
       presentation={model.presentation}
       state={model.state}
+    />
+  );
+}
+
+function DefaultCueSurface({ model }: SurfaceSlotProps<VnCueViewModel>) {
+  return (
+    <VnCueSurface
+      {...(model.authorId ? { author: model.authorId } : {})}
+      text={model.text}
+      {...(model.richText ? { richText: model.richText } : {})}
+      {...(model.display ? { displaySettings: model.display } : {})}
+      presentation={model.presentation}
     />
   );
 }

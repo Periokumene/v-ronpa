@@ -225,6 +225,7 @@ describe("nani parser", () => {
     const result = parseScenario({
       sourceText: [
         '@print "Visible marker|#print_marker|"',
+        '@cue "Visible marker|#cue_marker|"',
         '@append "Visible marker|#append_marker|"',
         '@toast "Visible marker|#toast_marker|"'
       ].join("\n"),
@@ -232,16 +233,20 @@ describe("nani parser", () => {
     });
 
     expect(result.diagnostics).toEqual([]);
-    expect(result.scenario.statements.map((statement) => statement.kind)).toEqual(["command", "command", "command"]);
+    expect(result.scenario.statements.map((statement) => statement.kind)).toEqual(["command", "command", "command", "command"]);
     expect((result.scenario.statements[0] as CommandIR).primary).toEqual({
       type: "string",
       value: "Visible marker|#print_marker|"
     });
     expect((result.scenario.statements[1] as CommandIR).primary).toEqual({
       type: "string",
-      value: "Visible marker|#append_marker|"
+      value: "Visible marker|#cue_marker|"
     });
     expect((result.scenario.statements[2] as CommandIR).primary).toEqual({
+      type: "string",
+      value: "Visible marker|#append_marker|"
+    });
+    expect((result.scenario.statements[3] as CommandIR).primary).toEqual({
       type: "string",
       value: "Visible marker|#toast_marker|"
     });
@@ -251,6 +256,7 @@ describe("nani parser", () => {
     const result = parseScenario({
       sourceText: [
         'Felix: <b>Bold</b> and <font color="#ff5577" size="+1" face="font:serif">danger</font><br>next &lt;tag&gt;[>]',
+        '@cue "<b>Do not turn around.</b>"',
         '@choice "<mark>Inspect</mark>" goto:#Inspect',
         '@toast "<small>Saved&nbsp;now</small>"',
         "#Inspect"
@@ -258,8 +264,9 @@ describe("nani parser", () => {
       scriptPath: "rich-text.nani"
     });
     const line = result.scenario.statements[0] as TextIR;
-    const choice = result.scenario.statements[1] as CommandIR;
-    const toast = result.scenario.statements[2] as CommandIR;
+    const cue = result.scenario.statements[1] as CommandIR;
+    const choice = result.scenario.statements[2] as CommandIR;
+    const toast = result.scenario.statements[3] as CommandIR;
 
     expect(result.diagnostics).toEqual([]);
     expect(line.richText).toMatchObject({
@@ -268,6 +275,10 @@ describe("nani parser", () => {
         { start: 0, end: 4, style: { bold: true } },
         { start: 9, end: 15, style: { color: "#ff5577", sizeScale: 1.125, fontId: "font:serif" } }
       ]
+    });
+    expect(cue.richTextPrimary).toMatchObject({
+      text: "Do not turn around.",
+      runs: [{ start: 0, end: 19, style: { bold: true } }]
     });
     expect(choice.richTextPrimary).toMatchObject({
       text: "Inspect",

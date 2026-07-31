@@ -34,7 +34,7 @@ describe("VN debug inspection and materialization", () => {
     if (result.status !== "ready") return;
     expect(result.checkpoint.story).toMatchObject({
       variables: { route: "preview" },
-      text: { current: { speaker: "Felix", text: "Stable preview." } }
+      text: { current: { channel: "dialog", speaker: "Felix", text: "Stable preview." } }
     });
     expect(result.checkpoint.pixiStage).toMatchObject({
       backgroundsById: { [PIXI_MAIN_BACKGROUND_ID]: { appearance: "bg:harness" } },
@@ -49,6 +49,24 @@ describe("VN debug inspection and materialization", () => {
     expect(result.checkpoint.ui.commandBar).toBe(false);
     expect(result.checkpoint.media.bgmByGroup.music).toEqual({ sourceRef: "bgm:harness", volume: 0.4 });
     expect(result.checkpoint.media.loopingSfxByKey.rain).toEqual({ sourceRef: "sfx:rain", group: "rain", volume: 0.25 });
+  });
+
+  it("treats cue as a stable StoryText target with terminal Cue visibility", async () => {
+    const inspection = await inspectVnDebugScript(entry([
+      "#Start",
+      '@cue "<b>Stable Cue.</b>" author:Narrator textId:cue_preview'
+    ].join("\n")));
+    const target = inspection.commands.find((command) => command.anchor.stableId === "cue:cue_preview")!.anchor;
+    const result = await materializeVnDebugTarget({ entry: inspection.entry, inspection, target });
+
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.checkpoint.story.text?.current).toMatchObject({
+      channel: "cue",
+      speaker: "Narrator",
+      text: "Stable Cue."
+    });
+    expect(result.checkpoint.ui).toMatchObject({ cue: true });
   });
 
   it("stops at a complete choice group, and requests a decision only when traversing beyond it", async () => {

@@ -22,7 +22,7 @@ export interface DialogueAudioBleepSettings {
 
 export interface PlanDialogueLineAudioInput {
   bleep: DialogueAudioBleepSettings;
-  dialogVisible: boolean;
+  textVisible: boolean;
   lineKey: string;
   pacing: DialogueAudioPacing;
   revealStatus: DialogueAudioRevealStatus;
@@ -106,7 +106,7 @@ function planDialogueBleepStart(
   state: DialogueAudioRuntimeState,
   input: PlanDialogueLineAudioInput
 ): Pick<DialogueAudioRuntimeStep, "state" | "effects"> {
-  if (input.pacing === "skip" || !input.dialogVisible || input.revealStatus !== "revealing" || input.bleep.volume <= 0) {
+  if (input.pacing === "skip" || !input.textVisible || input.revealStatus !== "revealing" || input.bleep.volume <= 0) {
     return { state, effects: [] };
   }
 

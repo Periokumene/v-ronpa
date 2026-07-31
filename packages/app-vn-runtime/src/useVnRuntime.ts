@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AssetResolver } from "@v-ronpa/asset-registry";
 import {
-  advanceDialogReveal,
+  advanceStoryTextReveal,
   advanceUiRuntimeTransitions,
   clearMovieOverlay,
-  completeDialogReveal,
-  countDialogRevealUnits,
-  createDialogLinePacingPlan,
-  createDialogPlaybackSchedulePlan,
-  createDialogRevealState,
+  completeStoryTextReveal,
+  countStoryTextRevealUnits,
+  createStoryTextPacingPlan,
+  createStoryTextPlaybackSchedulePlan,
+  createStoryTextRevealState,
   createInitialMediaRuntimeState,
   createInitialUiRuntimeState,
   createVnMediaCheckpoint,
@@ -20,17 +20,17 @@ import {
   isUiPresentationWaitComplete,
   planDialogueLineAudio,
   reduceDialogueAudioLifecycle,
-  selectDialogPlaybackAdvanceGate,
-  selectDialogPlaybackAdvanceRequest,
+  selectStoryTextPlaybackAdvanceGate,
+  selectStoryTextPlaybackAdvanceRequest,
   selectVisibleRevealRichText,
   selectVisibleRevealText,
-  shouldDriveDialogReveal,
+  shouldDriveStoryTextReveal,
   startMovieOverlay,
   settleUiRuntimePresentationWait,
   settleUiRuntimeTransitions,
-  type DialogPlaybackScheduleSource,
-  type DialogRevealEvent,
-  type DialogRevealState,
+  type StoryTextPlaybackScheduleSource,
+  type StoryTextRevealEvent,
+  type StoryTextRevealState,
   type DialogueAudioLifecycleSignal,
   type DialogueAudioRuntimeState,
   type MediaRuntimeEffect,
@@ -71,7 +71,12 @@ import {
   type AudioPort,
   type VideoPort
 } from "@v-ronpa/media-save";
-import { selectCurrentStoryLine, type StoryStepperDiagnostic, type StoryStepperResult } from "@v-ronpa/story-engine";
+import {
+  isStoryTextCommand,
+  selectCurrentStoryLine,
+  type StoryStepperDiagnostic,
+  type StoryStepperResult
+} from "@v-ronpa/story-engine";
 import {
   selectStoryPlaySchedule,
   type StoryPlayAdvanceSource,
@@ -108,13 +113,13 @@ import {
   type VnRuntimeOperation
 } from "./runtimeOperations";
 import type {
-  VnDialogRevealRuntime,
+  VnStoryTextRevealRuntime,
   VnInteractionFacts,
   VnMediaRuntime,
   PresentationTaskObservation,
   VnPixiStageRuntime,
   VnRuntimeDialogueBleepSettings,
-  VnRuntimeDialogRevealSettings,
+  VnRuntimeStoryTextRevealSettings,
   PrepareVnScriptPresentation,
   VnRestoreResult,
   RestoreVnRuntimeStateInput,
@@ -148,10 +153,10 @@ import {
 
 const DEFAULT_VOICE_SETTINGS: VnRuntimeVoiceSettings = { locale: "zh", volume: 1 };
 const DEFAULT_DIALOGUE_BLEEP_SETTINGS: VnRuntimeDialogueBleepSettings = { volume: 1 };
-const DEFAULT_DIALOG_REVEAL_SETTINGS: VnRuntimeDialogRevealSettings = {
+const DEFAULT_STORY_TEXT_REVEAL_SETTINGS: VnRuntimeStoryTextRevealSettings = {
   textSpeed: createDefaultSettingsSnapshot().display.textSpeed
 };
-const MAX_DIALOG_REVEAL_EVENTS = 50;
+const MAX_STORY_TEXT_REVEAL_EVENTS = 50;
 
 export interface UseVnRuntimeOptions extends VnRuntimeDefinition {
   gameId: string;
@@ -166,7 +171,7 @@ export interface UseVnRuntimeOptions extends VnRuntimeDefinition {
   voiceSettings?: VnRuntimeVoiceSettings;
   dialogueBleepConfig?: DialogueBleepConfig;
   dialogueBleepSettings?: VnRuntimeDialogueBleepSettings;
-  dialogRevealSettings?: VnRuntimeDialogRevealSettings;
+  storyTextRevealSettings?: VnRuntimeStoryTextRevealSettings;
   onGameplayEvents?: (events: GameplayEvent[]) => void;
   onRuntimeStatus?: (status: { action: string; outcome: string }) => void;
   onStoryEnd?: (action: "story:end") => void;
@@ -201,7 +206,7 @@ type CoordinateVnSessionStepResult =
   | { ok: true; session: VnSessionState }
   | { ok: false; cancelled: boolean; code: string; message: string };
 
-interface CommitDialogRevealResult {
+interface CommitStoryTextRevealResult {
   diagnostics: VnRuntimeDiagnostic[];
   effects: MediaRuntimeEffect[];
   hasVoiceBoundary: boolean;
@@ -210,7 +215,7 @@ interface CommitDialogRevealResult {
 export function useVnRuntime({
   assetResolver,
   audioPort: configuredAudioPort,
-  dialogRevealSettings = DEFAULT_DIALOG_REVEAL_SETTINGS,
+  storyTextRevealSettings = DEFAULT_STORY_TEXT_REVEAL_SETTINGS,
   dialogueBleepConfig,
   dialogueBleepSettings = DEFAULT_DIALOGUE_BLEEP_SETTINGS,
   catalog,
@@ -264,7 +269,7 @@ export function useVnRuntime({
   const [pixiStageRuntime, setPixiStageRuntime] = useState<VnPixiStageRuntime>(() => createInitialVnPixiStageRuntime());
   const [mediaRuntime, setMediaRuntime] = useState<VnMediaRuntime>(() => ({ state: createInitialMediaRuntimeState() }));
   const [uiRuntime, setUiRuntime] = useState<VnUiRuntime>(() => ({ state: createInitialUiRuntimeState() }));
-  const [dialogRevealRuntime, setDialogRevealRuntime] = useState<VnDialogRevealRuntime>(() => ({
+  const [storyTextRevealRuntime, setStoryTextRevealRuntime] = useState<VnStoryTextRevealRuntime>(() => ({
     events: [],
     eventSequence: 0
   }));
@@ -277,7 +282,7 @@ export function useVnRuntime({
   const pixiStageRuntimeRef = useRef(pixiStageRuntime);
   const mediaRuntimeRef = useRef(mediaRuntime);
   const uiRuntimeRef = useRef(uiRuntime);
-  const dialogRevealRuntimeRef = useRef(dialogRevealRuntime);
+  const storyTextRevealRuntimeRef = useRef(storyTextRevealRuntime);
   const dialogueAudioRuntimeRef = useRef<DialogueAudioRuntimeState>({});
   const mediaHandlesRef = useRef<VnRuntimeMediaHandleStore>(createInitialVnRuntimeMediaHandleStore());
   const pendingMoviePlaybackRef = useRef<{ sourceRef: string; uri: string } | undefined>(undefined);
@@ -342,8 +347,8 @@ export function useVnRuntime({
   }, [uiRuntime]);
 
   useEffect(() => {
-    dialogRevealRuntimeRef.current = dialogRevealRuntime;
-  }, [dialogRevealRuntime]);
+    storyTextRevealRuntimeRef.current = storyTextRevealRuntime;
+  }, [storyTextRevealRuntime]);
 
   useEffect(() => {
     storyPlayHostRef.current = { active: session.active, schedule: storyPlaySchedule };
@@ -388,9 +393,9 @@ export function useVnRuntime({
 
   useEffect(() => {
     if (!session.active) return;
-    const plan = createDialogPlaybackSchedulePlan({
+    const plan = createStoryTextPlaybackSchedulePlan({
       schedule: storyPlaySchedule,
-      reveal: dialogRevealRuntimeRef.current.state,
+      reveal: storyTextRevealRuntimeRef.current.state,
       nowMs: readVnRuntimeNowMs()
     });
     if (plan.type === "idle") return;
@@ -400,25 +405,25 @@ export function useVnRuntime({
     const timeout = window.setTimeout(() => {
       const currentHost = storyPlayHostRef.current;
       if (!currentHost.active || currentHost.schedule !== scheduled) return;
-      requestDialogPlaybackScheduleAdvance(source);
+      requestStoryTextPlaybackScheduleAdvance(source);
     }, plan.delayMs);
     return () => window.clearTimeout(timeout);
-  }, [dialogRevealRuntime.state?.lineKey, dialogRevealRuntime.state?.status, session.active, storyPlaySchedule]);
+  }, [storyTextRevealRuntime.state?.lineKey, storyTextRevealRuntime.state?.status, session.active, storyPlaySchedule]);
 
   const shouldDriveVisualRuntime =
-    shouldDriveDialogReveal({ active: session.active, reveal: dialogRevealRuntime.state }) ||
+    shouldDriveStoryTextReveal({ active: session.active, reveal: storyTextRevealRuntime.state }) ||
     hasActiveUiRuntimeTransitions(uiRuntime.state);
-  const visualRuntimeDriverKey = vnVisualRuntimeDriverKey(dialogRevealRuntime.state, uiRuntime.state);
+  const visualRuntimeDriverKey = vnVisualRuntimeDriverKey(storyTextRevealRuntime.state, uiRuntime.state);
 
   useEffect(() => {
     if (!shouldDriveVisualRuntime) return;
     let frame = 0;
     const tick = () => {
       const nowMs = readVnRuntimeNowMs();
-      advanceActiveDialogReveal(nowMs);
+      advanceActiveStoryTextReveal(nowMs);
       advanceActiveUiRuntimeTransitions(nowMs);
       if (
-        shouldDriveDialogReveal({ active: sessionRef.current.active, reveal: dialogRevealRuntimeRef.current.state }) ||
+        shouldDriveStoryTextReveal({ active: sessionRef.current.active, reveal: storyTextRevealRuntimeRef.current.state }) ||
         hasActiveUiRuntimeTransitions(uiRuntimeRef.current.state)
       ) {
         frame = window.requestAnimationFrame(tick);
@@ -532,10 +537,10 @@ export function useVnRuntime({
     setUiRuntime(resolved);
   }
 
-  function setDialogRevealRuntimeNow(next: VnDialogRevealRuntime | ((current: VnDialogRevealRuntime) => VnDialogRevealRuntime)) {
-    const resolved = typeof next === "function" ? next(dialogRevealRuntimeRef.current) : next;
-    dialogRevealRuntimeRef.current = resolved;
-    setDialogRevealRuntime(resolved);
+  function setStoryTextRevealRuntimeNow(next: VnStoryTextRevealRuntime | ((current: VnStoryTextRevealRuntime) => VnStoryTextRevealRuntime)) {
+    const resolved = typeof next === "function" ? next(storyTextRevealRuntimeRef.current) : next;
+    storyTextRevealRuntimeRef.current = resolved;
+    setStoryTextRevealRuntime(resolved);
   }
 
   function getVoiceAutoAdvanceGateController(): VnVoiceAutoAdvanceGateController {
@@ -577,20 +582,20 @@ export function useVnRuntime({
     dialogueAudioRuntimeRef.current = {};
   }
 
-  function requestDialogPlaybackScheduleAdvance(source: DialogPlaybackScheduleSource): boolean {
-    const revealGate = selectDialogPlaybackAdvanceGate({ source, reveal: dialogRevealRuntimeRef.current.state });
+  function requestStoryTextPlaybackScheduleAdvance(source: StoryTextPlaybackScheduleSource): boolean {
+    const revealGate = selectStoryTextPlaybackAdvanceGate({ source, reveal: storyTextRevealRuntimeRef.current.state });
     const voiceReady = revealGate.ready ? getVoiceAutoAdvanceGateController().request(source) : false;
-    const request = selectDialogPlaybackAdvanceRequest({ revealGate, voiceReady });
+    const request = selectStoryTextPlaybackAdvanceRequest({ revealGate, voiceReady });
     if (request.type === "blocked") return false;
     advanceStory(request.source);
     return true;
   }
 
-  function appendDialogRevealEvents(state: DialogRevealState, events: DialogRevealEvent[]) {
+  function appendStoryTextRevealEvents(state: StoryTextRevealState, events: StoryTextRevealEvent[]) {
     const richText = selectCurrentStoryLine(sessionRef.current.story)?.richText;
-    setDialogRevealRuntimeNow((current) => ({
+    setStoryTextRevealRuntimeNow((current) => ({
       state,
-      events: events.length > 0 ? [...current.events, ...events].slice(-MAX_DIALOG_REVEAL_EVENTS) : current.events,
+      events: events.length > 0 ? [...current.events, ...events].slice(-MAX_STORY_TEXT_REVEAL_EVENTS) : current.events,
       eventSequence: current.eventSequence + events.length,
       visibleText: selectVisibleRevealText(state) ?? state.text,
       visibleRichText: selectVisibleRevealRichText(richText, state)
@@ -600,10 +605,10 @@ export function useVnRuntime({
     }
   }
 
-  function advanceActiveDialogReveal(nowMs = readVnRuntimeNowMs()) {
-    const reveal = dialogRevealRuntimeRef.current.state;
+  function advanceActiveStoryTextReveal(nowMs = readVnRuntimeNowMs()) {
+    const reveal = storyTextRevealRuntimeRef.current.state;
     if (!reveal || reveal.status === "complete") return;
-    const step = advanceDialogReveal(reveal, nowMs);
+    const step = advanceStoryTextReveal(reveal, nowMs);
     if (
       step.events.length === 0 &&
       step.state.status === reveal.status &&
@@ -611,7 +616,7 @@ export function useVnRuntime({
     ) {
       return;
     }
-    appendDialogRevealEvents(step.state, step.events);
+    appendStoryTextRevealEvents(step.state, step.events);
   }
 
   function advanceActiveUiRuntimeTransitions(nowMs: number) {
@@ -629,17 +634,17 @@ export function useVnRuntime({
     if (isUiPresentationWaitComplete(uiRuntimeRef.current.state, wait)) completePresentationWaitAndAdvance(source);
   }
 
-  function completeActiveDialogReveal(): boolean {
-    const reveal = dialogRevealRuntimeRef.current.state;
+  function completeActiveStoryTextReveal(): boolean {
+    const reveal = storyTextRevealRuntimeRef.current.state;
     if (!reveal || reveal.status === "complete") return false;
-    const step = completeDialogReveal(reveal, readVnRuntimeNowMs());
-    appendDialogRevealEvents(step.state, step.events);
+    const step = completeStoryTextReveal(reveal, readVnRuntimeNowMs());
+    appendStoryTextRevealEvents(step.state, step.events);
     return true;
   }
 
-  function clearDialogRevealRuntime(reason = "dialog-reveal:clear") {
+  function clearStoryTextRevealRuntime(reason = "story-text-reveal:clear") {
     applyDialogueAudioLifecycleSignal({ type: "clear", reason });
-    setDialogRevealRuntimeNow({ events: [], eventSequence: 0 });
+    setStoryTextRevealRuntimeNow({ events: [], eventSequence: 0 });
   }
 
   function applyDialogueAudioLifecycleSignal(signal: DialogueAudioLifecycleSignal) {
@@ -670,7 +675,7 @@ export function useVnRuntime({
 
   function resetRuntimeState() {
     cancelStoryPlayHostSchedule();
-    clearDialogRevealRuntime();
+    clearStoryTextRevealRuntime();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     const nextBoot = compiledCatalogRef.current.recordsByPath.get(entry.initialScriptPath)?.bootSession ?? bootSession;
@@ -718,7 +723,7 @@ export function useVnRuntime({
     const coordinated = await coordinateVnSessionStep({
       beforeCommit: () => {
         cancelStoryPlayHostSchedule();
-        clearDialogRevealRuntime();
+        clearStoryTextRevealRuntime();
         observedWaitTasksRef.current = undefined;
         completingWaitKeyRef.current = undefined;
         disposeRuntimeMedia();
@@ -843,16 +848,16 @@ export function useVnRuntime({
     const current = sessionRef.current;
     if (!current.active) return;
 
-    if (dialogRevealRuntimeRef.current.state?.status === "revealing") {
+    if (storyTextRevealRuntimeRef.current.state?.status === "revealing") {
       if (source === "manual") {
         cancelStoryPlayHostSchedule();
         setSessionNow((latest) => stopVnSessionAutomation(latest, "manual-takeover"));
-        completeActiveDialogReveal();
-        onRuntimeStatus?.({ action: "dialog:reveal-complete", outcome: "line-complete" });
+        completeActiveStoryTextReveal();
+        onRuntimeStatus?.({ action: "story-text:reveal-complete", outcome: "line-complete" });
       } else if (source === "skip") {
         cancelStoryPlayHostSchedule();
         clearVoiceAutoAdvanceGate({ stopVoice: true });
-        completeActiveDialogReveal();
+        completeActiveStoryTextReveal();
         onRuntimeStatus?.({ action: "story:skip", outcome: "line-complete" });
       }
       return;
@@ -972,8 +977,8 @@ export function useVnRuntime({
     const wasSkip = sessionRef.current.play.mode === "skip";
     if (wasSkip) cancelStoryPlayHostSchedule();
     clearVoiceAutoAdvanceGate({ stopVoice: true });
-    if (!wasSkip && dialogRevealRuntimeRef.current.state?.status === "revealing") {
-      completeActiveDialogReveal();
+    if (!wasSkip && storyTextRevealRuntimeRef.current.state?.status === "revealing") {
+      completeActiveStoryTextReveal();
     }
     setSessionNow((current) => toggleVnSessionSkip(current));
     onRuntimeStatus?.({ action: "story:skip", outcome: wasSkip ? "manual" : "skip" });
@@ -1038,7 +1043,7 @@ export function useVnRuntime({
       return { ok: false, code: "presentation-prepare-failed", message: prepared.message };
     }
     cancelStoryPlayHostSchedule();
-    clearDialogRevealRuntime();
+    clearStoryTextRevealRuntime();
     observedWaitTasksRef.current = undefined;
     completingWaitKeyRef.current = undefined;
     const plan = createVnRuntimeRestorePlan({
@@ -1113,9 +1118,11 @@ export function useVnRuntime({
     if (projection.transient.gameplayEvents.length > 0) onGameplayEvents?.(projection.transient.gameplayEvents);
     const sessionForCommit = projection.session;
     const nextStoryState = sessionForCommit.story;
-    const dialogueAudio = commitDialogRevealForStoryStep({
+    const currentStoryText = selectCurrentStoryLine(nextStoryState);
+    const storyTextSurface = currentStoryText?.channel === "cue" ? "cue" : "dialog";
+    const dialogueAudio = commitStoryTextRevealForStoryStep({
       active,
-      dialogVisible: transaction.uiState.surfaces.dialog.targetVisible,
+      textVisible: transaction.uiState.surfaces[storyTextSurface].targetVisible,
       pacing,
       runtimeCommands,
       storyPlayState: sessionForCommit.play,
@@ -1185,31 +1192,31 @@ export function useVnRuntime({
     void source;
   }
 
-  function commitDialogRevealForStoryStep({
+  function commitStoryTextRevealForStoryStep({
     active,
-    dialogVisible,
+    textVisible,
     pacing,
     runtimeCommands,
     storyPlayState,
     storyState
   }: {
     active: boolean;
-    dialogVisible: boolean;
+    textVisible: boolean;
     pacing: StoryPlayPacing;
     runtimeCommands: RuntimeCommand[];
     storyPlayState: StoryPlayState;
     storyState: StoryRuntimeSnapshot;
-  }): CommitDialogRevealResult {
-    const print = latestPrintCommand(runtimeCommands);
-    if (!active || !print) {
-      const reveal = dialogRevealRuntimeRef.current.state;
+  }): CommitStoryTextRevealResult {
+    const storyTextCommand = latestStoryTextCommand(runtimeCommands);
+    if (!active || !storyTextCommand) {
+      const reveal = storyTextRevealRuntimeRef.current.state;
       const currentLine = selectCurrentStoryLine(storyState);
-      if (runtimeCommands.length > 0 || (reveal && currentLine?.text !== reveal.text)) clearDialogRevealRuntime();
+      if (runtimeCommands.length > 0 || (reveal && currentLine?.text !== reveal.text)) clearStoryTextRevealRuntime();
       return { diagnostics: [], effects: [], hasVoiceBoundary: false };
     }
 
     const currentLine = selectCurrentStoryLine(storyState);
-    const text = currentLine?.text ?? stringRuntimeParam(print, "text") ?? "";
+    const text = currentLine?.text ?? stringRuntimeParam(storyTextCommand, "text") ?? "";
     const nowMs = readVnRuntimeNowMs();
     const schedule = selectStoryPlaySchedule(storyPlayState, storyState, {
       active,
@@ -1220,29 +1227,29 @@ export function useVnRuntime({
       schedule.type === "wait" && (schedule.source === "auto" || schedule.source === "auto-next")
         ? schedule.delayMs
         : undefined;
-    const scriptSpeed = numberRuntimeParam(print, "speed");
-    const plan = createDialogLinePacingPlan({
-      unitCount: countDialogRevealUnits(text),
-      textSpeed: dialogRevealSettings.textSpeed,
+    const scriptSpeed = numberRuntimeParam(storyTextCommand, "speed");
+    const plan = createStoryTextPacingPlan({
+      unitCount: countStoryTextRevealUnits(text),
+      textSpeed: storyTextRevealSettings.textSpeed,
       ...(scriptSpeed !== undefined ? { scriptSpeed } : {}),
       ...(totalDelayMs !== undefined ? { totalDelayMs } : {})
     });
-    const created = createDialogRevealState({
-      lineKey: createDialogRevealLineKey(storyState, print),
+    const created = createStoryTextRevealState({
+      lineKey: createStoryTextRevealLineKey(storyState, storyTextCommand),
       text,
       startedAtMs: nowMs,
-      durationMs: pacing === "skip" || !dialogVisible ? 0 : plan.revealDurationMs
+      durationMs: pacing === "skip" || !textVisible ? 0 : plan.revealDurationMs
     });
-    const step = advanceDialogReveal(created, nowMs);
-    const speakerId = currentLine?.speaker ?? stringRuntimeParam(print, "speaker");
-    setDialogRevealRuntimeNow((current) => ({
+    const step = advanceStoryTextReveal(created, nowMs);
+    const speakerId = currentLine?.speaker ?? stringRuntimeParam(storyTextCommand, "speaker");
+    setStoryTextRevealRuntimeNow((current) => ({
       state: step.state,
-      events: [...current.events, ...step.events].slice(-MAX_DIALOG_REVEAL_EVENTS),
+      events: [...current.events, ...step.events].slice(-MAX_STORY_TEXT_REVEAL_EVENTS),
       eventSequence: current.eventSequence + step.events.length,
       visibleText: selectVisibleRevealText(step.state) ?? step.state.text,
       visibleRichText: selectVisibleRevealRichText(currentLine?.richText, step.state)
     }));
-    const textId = stringRuntimeParam(print, "textId");
+    const textId = stringRuntimeParam(storyTextCommand, "textId");
     const voiceAvailability = resolveVnDialogueVoiceAssetAvailability({
       ...(textId ? { textId } : {}),
       voiceSettings,
@@ -1253,7 +1260,7 @@ export function useVnRuntime({
         volume: dialogueBleepSettings.volume,
         ...(dialogueBleepConfig ? { config: dialogueBleepConfig } : {})
       },
-      dialogVisible,
+      textVisible,
       lineKey: step.state.lineKey,
       pacing,
       revealStatus: step.state.status,
@@ -1437,7 +1444,7 @@ export function useVnRuntime({
       attachMovieElement,
       chooseStory,
       completeMoviePlayback,
-      dialogRevealRuntime,
+      storyTextRevealRuntime,
       dismissRuntimeToast,
       interactionFacts,
       storyPlayActiveActions,
@@ -1466,15 +1473,15 @@ export function useVnRuntime({
   };
 }
 
-function latestPrintCommand(commands: RuntimeCommand[]): RuntimeCommand | undefined {
+function latestStoryTextCommand(commands: RuntimeCommand[]): RuntimeCommand | undefined {
   for (let index = commands.length - 1; index >= 0; index -= 1) {
     const command = commands[index];
-    if (command?.commandId === "print") return command;
+    if (isStoryTextCommand(command)) return command;
   }
   return undefined;
 }
 
-function createDialogRevealLineKey(storyState: StoryRuntimeSnapshot, command: RuntimeCommand): string {
+function createStoryTextRevealLineKey(storyState: StoryRuntimeSnapshot, command: RuntimeCommand): string {
   const loc = command.loc;
   const source = loc ? `${loc.scriptPath}:${loc.line}:${loc.column}` : `${storyState.currentScriptPath}:${storyState.instructionPointer}`;
   return `${source}:${storyState.backlog.length}`;

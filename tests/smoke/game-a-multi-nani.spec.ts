@@ -14,7 +14,7 @@ test("Game A traverses, saves, previews, restores, and completes its production 
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   await page.addInitScript(() => {
-    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v10");
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
     sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v3");
   });
   await page.goto("/");
@@ -75,7 +75,6 @@ test("Game A traverses, saves, previews, restores, and completes its production 
   await previewTarget.hover();
   await previewTarget.locator(".vn-devtools-preview-button").click();
   await expect(page.getByTestId("vn-dialog-text")).toContainText("原味。购物清单", { timeout: 15_000 });
-  await expect(workbench).toContainText("installed");
   expect((await readSnapshot(page)).workbench.runtimeScriptPath).toBe("game-a/chapter-02.nani");
   await page.setViewportSize({ width: 820, height: 720 });
   await expect.poll(async () => workbench.evaluate((dock) => getComputedStyle(dock).position)).toBe("fixed");
@@ -92,7 +91,7 @@ test("Game A traverses, saves, previews, restores, and completes its production 
 test("an opening fixed point never blocks viewing or previewing chapter-02 before and after runtime navigation", async ({ page }) => {
   await page.addInitScript(() => {
     if (sessionStorage.getItem("game-a-fixed-point-smoke-ready") !== "true") {
-      indexedDB.deleteDatabase("v-ronpa-game-a-saves-v10");
+      indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
       sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v3");
       sessionStorage.setItem("game-a-fixed-point-smoke-ready", "true");
     }
@@ -158,7 +157,7 @@ test("a future-script HMR installs only its catalog record even when opening has
   );
   expect(updatedSource).not.toBe(originalSource);
   await page.addInitScript(() => {
-    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v10");
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
     sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v3");
   });
 

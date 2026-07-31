@@ -4,6 +4,7 @@ import type {
   RuntimeScript,
   RuntimeValue,
   RichTextDocument,
+  StoryTextChannel,
   StoryBacklogEntry,
   StoryChoiceOption,
   StoryRuntimeSnapshot,
@@ -56,6 +57,7 @@ export interface AdvanceToNextStopOptions {
 }
 
 export interface CurrentStoryLine {
+  channel: StoryTextChannel;
   speaker?: string;
   text: string;
   richText?: RichTextDocument;
@@ -102,6 +104,10 @@ const CONTROL_COMMAND_IDS = new Set([
   "showprinter",
   "wait"
 ]);
+
+export function isStoryTextCommand(command: Pick<RuntimeCommand, "commandId"> | undefined): boolean {
+  return command?.commandId === "print" || command?.commandId === "cue";
+}
 
 export function createInitialStoryState(script: Pick<RuntimeScript, "scriptPath">): StoryRuntimeState {
   return {
@@ -213,7 +219,7 @@ export function advanceToNextStop(
       return { state: nextState, diagnostics, emittedRuntimeCommands, stopReason: "runtime-wait" };
     }
 
-    if (command.commandId === "print" || nextState.ended) {
+    if (isStoryTextCommand(command) || nextState.ended) {
       return { state: nextState, diagnostics, emittedRuntimeCommands, stopReason: nextState.ended ? "ended" : "text" };
     }
 
@@ -339,9 +345,9 @@ export function chooseStoryOption(state: StoryRuntimeState, script: RuntimeScrip
 }
 
 export function selectCurrentStoryLine(state: StoryRuntimeState): CurrentStoryLine | undefined {
-  const latest = state.text?.current ?? state.backlog.at(-1);
-  if (!latest) return undefined;
-  return compactStoryTextLine(latest);
+  const current = state.text?.current;
+  if (!current) return undefined;
+  return compactStoryTextLine(current);
 }
 
 export function storyReducer(state: StoryRuntimeState, event: StoryEvent): StoryStepperResult {
@@ -478,7 +484,9 @@ function executeCommand(
 
   switch (command.commandId) {
     case "print":
-      return { state: executePrint(advancedState, resolved.command), diagnostics: [], emittedRuntimeCommands: [resolved.command] };
+      return { state: executeStoryText(advancedState, resolved.command, "dialog"), diagnostics: [], emittedRuntimeCommands: [resolved.command] };
+    case "cue":
+      return { state: executeStoryText(advancedState, resolved.command, "cue"), diagnostics: [], emittedRuntimeCommands: [resolved.command] };
     case "append":
       return { state: executeAppend(advancedState, resolved.command), diagnostics: [], emittedRuntimeCommands: [] };
     case "resettext":
@@ -524,6 +532,7 @@ function executeCommand(
 
 function shouldWaitForPresentation(command: RuntimeCommand): boolean {
   if (scalarParam(command, "wait") !== true) return false;
+  if (command.commandId === "hidecue") return true;
   if (command.commandId === "showui" || command.commandId === "hideui") return hasValidRuntimeUiTargets(command);
   return command.category === "actor" || command.category === "scene" || command.category === "effect";
 }
@@ -537,6 +546,16 @@ function presentationWaitDurationMs(command: RuntimeCommand): number {
 
 function createPresentationWait(commandIndex: number, command: RuntimeCommand): NonNullable<StoryRuntimeState["presentationWait"]> {
   const durationMs = presentationWaitDurationMs(command);
+  if (command.commandId === "hidecue") {
+    return {
+      channel: "ui",
+      commandId: command.commandId,
+      commandIndex,
+      durationMs,
+      targets: ["cue"],
+      targetVisible: false
+    };
+  }
   if (command.commandId === "showui" || command.commandId === "hideui") {
     return {
       channel: "ui",
@@ -613,13 +632,17 @@ function resolveRuntimeValue(
     : { value: evaluated.value };
 }
 
-function executePrint(state: StoryRuntimeState, command: RuntimeCommand): StoryRuntimeState {
+function executeStoryText(
+  state: StoryRuntimeState,
+  command: RuntimeCommand,
+  channel: StoryTextChannel
+): StoryRuntimeState {
   const text = stringParam(command, "text") ?? "";
   const speaker = stringParam(command, "speaker");
   const printerId = stringParam(command, "printerId") ?? state.text?.printerId ?? "default";
   const richText = command.richText ? cloneRichText(command.richText) : undefined;
-  const current = compactStoryTextLine({ speaker, text, richText });
-  const backlogEntry: BacklogEntry = current;
+  const current = compactStoryTextLine({ channel, speaker, text, richText });
+  const backlogEntry: BacklogEntry = compactBacklogEntry(current);
 
   return {
     ...state,
@@ -635,6 +658,7 @@ function executePrint(state: StoryRuntimeState, command: RuntimeCommand): StoryR
 function executeAppend(state: StoryRuntimeState, command: RuntimeCommand): StoryRuntimeState {
   const text = stringParam(command, "text") ?? "";
   const current = state.text?.current;
+  const channel = current?.channel ?? "dialog";
   const speaker = current?.speaker ?? stringParam(command, "speaker");
   const nextText = `${current?.text ?? ""}${text}`;
   const richText = appendRichText(current?.richText, current?.text ?? "", command.richText, text);
@@ -643,7 +667,7 @@ function executeAppend(state: StoryRuntimeState, command: RuntimeCommand): Story
     text: {
       printerId: stringParam(command, "printerId") ?? state.text?.printerId ?? "default",
       visible: state.text?.visible ?? true,
-      current: compactStoryTextLine({ speaker, text: nextText, richText })
+      current: compactStoryTextLine({ channel, speaker, text: nextText, richText })
     }
   };
 }
@@ -877,24 +901,35 @@ function cloneTextState(text: NonNullable<StoryRuntimeState["text"]>): NonNullab
   };
 }
 
-function compactStoryTextLine(line: { speaker?: string | undefined; text: string; richText?: RichTextDocument | undefined }): {
+function compactStoryTextLine(line: { channel: StoryTextChannel; speaker?: string | undefined; text: string; richText?: RichTextDocument | undefined }): {
+  channel: StoryTextChannel;
   speaker?: string;
   text: string;
   richText?: RichTextDocument;
 } {
   return {
+    channel: line.channel,
     ...(line.speaker ? { speaker: line.speaker } : {}),
     text: line.text,
     ...(line.richText ? { richText: cloneRichText(line.richText) } : {})
   };
 }
 
-function cloneStoryTextLine(line: { speaker?: string | undefined; text: string; richText?: RichTextDocument | undefined }): {
+function cloneStoryTextLine(line: { channel: StoryTextChannel; speaker?: string | undefined; text: string; richText?: RichTextDocument | undefined }): {
+  channel: StoryTextChannel;
   speaker?: string;
   text: string;
   richText?: RichTextDocument;
 } {
   return compactStoryTextLine(line);
+}
+
+function compactBacklogEntry(line: CurrentStoryLine): BacklogEntry {
+  return {
+    ...(line.speaker ? { speaker: line.speaker } : {}),
+    text: line.text,
+    ...(line.richText ? { richText: cloneRichText(line.richText) } : {})
+  };
 }
 
 function cloneRichText(document: RichTextDocument): RichTextDocument {
