@@ -230,37 +230,113 @@
 }
 
 .game-a-title-surface {
+  --game-a-title-menu-color: rgba(226, 226, 222, 0.68);
+  --game-a-title-menu-color-active: rgba(255, 255, 250, 0.98);
   position: absolute;
   z-index: 18;
   inset: 0;
   display: grid;
-  align-items: center;
-  padding: clamp(24px, 8cqw, 96px);
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
   background: #000;
   pointer-events: auto;
 }
 
-.game-a-title-panel {
+.game-a-title-artboard {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  height: min(100cqh, calc(100cqw * 9 / 16));
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  container-type: size;
+  isolation: isolate;
+}
+
+.game-a-title-background {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+.game-a-title-menu {
+  position: absolute;
+  z-index: 1;
+  left: 4.6875cqw;
+  bottom: 10.3333cqh;
   display: grid;
-  gap: 12px;
-  width: min(320px, 100%);
+  gap: 1.3889cqh;
+  width: 23.4375cqw;
 }
 
-.game-a-title-kicker {
-  color: #c9b56b;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
+.game-a-title-menu-button {
+  display: grid;
+  grid-template-columns: 1em minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 5cqh;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  background: transparent;
+  color: var(--game-a-title-menu-color);
+  font-family: var(--game-a-ui-rich-font);
+  font-size: 1.875cqw;
+  font-weight: 400;
+  line-height: 1;
+  text-align: left;
+  text-shadow:
+    0 0 1px rgba(255, 255, 255, 0.3),
+    1px 1px 0 rgba(0, 0, 0, 0.82);
+  transition:
+    color 120ms ease-out,
+    text-shadow 120ms ease-out;
 }
 
-.game-a-title-panel h1 {
-  margin: 0 0 14px;
-  color: #fbfcf6;
-  font-size: clamp(42px, 8cqw, 82px);
-  line-height: 0.95;
+.game-a-title-menu-prefix {
+  width: 1em;
+  opacity: 0;
+  color: inherit;
+  transition: opacity 100ms ease-out;
 }
 
-.game-a-title-panel button,
+.game-a-title-menu-label {
+  display: block;
+  min-width: 0;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.game-a-title-menu-button:hover:not(:disabled),
+.game-a-title-menu-button:focus-visible:not(:disabled) {
+  border-color: transparent;
+  color: var(--game-a-title-menu-color-active);
+  outline: none;
+  text-shadow:
+    0 0 1px rgba(255, 255, 255, 0.72),
+    0 0 8px rgba(245, 244, 229, 0.38),
+    1px 1px 0 rgba(0, 0, 0, 0.88);
+}
+
+.game-a-title-menu-button:hover:not(:disabled) .game-a-title-menu-prefix,
+.game-a-title-menu-button:focus-visible:not(:disabled) .game-a-title-menu-prefix {
+  opacity: 1;
+}
+
+.game-a-title-menu-button:disabled {
+  cursor: wait;
+  opacity: 0.38;
+}
+
 .game-a-pause-actions button {
   justify-content: flex-start;
   min-height: 44px;

@@ -59,7 +59,7 @@ export function createGameASurfaces({
     Dialog: (props) => <GameADialogSurface {...props} assets={assets} config={config} />,
     Choices: GameAChoiceOverlay,
     CommandBar: GameACommandBar,
-    Title: (props) => <GameATitleSurface {...props} config={config} vnPreparationPending={vnPreparationPending} />,
+    Title: (props) => <GameATitleSurface {...props} assets={assets} config={config} vnPreparationPending={vnPreparationPending} />,
     ToastLayer: GameAToastLayer,
     InputPrompt: GameAInputPrompt,
     PauseSurface: GameAPauseSurface,
@@ -190,25 +190,83 @@ function formatSaveLoadOverlayTitle(mode: SaveLoadOverlayViewModel["mode"], cont
 
 function GameATitleSurface({
   actions,
+  assets,
   config,
   model,
   vnPreparationPending
-}: SurfaceSlotProps<TitleViewModel, TitleActions> & { config: GameAUiConfig; vnPreparationPending: boolean }) {
+}: SurfaceSlotProps<TitleViewModel, TitleActions> & {
+  assets: GameAUiAssets;
+  config: GameAUiConfig;
+  vnPreparationPending: boolean;
+}) {
   if (!model.visible) return null;
   return (
-    <section aria-label="标题菜单" data-testid="title-surface" className="game-a-title-surface">
-      <div className="game-a-title-panel">
-        <span className="game-a-title-kicker">视觉小说框架</span>
-        <h1>{config.title.title}</h1>
-        <button data-testid="title-new-game" disabled={!model.capabilities.canStartNewGame || vnPreparationPending} onClick={() => actions.dispatch("new-game")} type="button">
-          {vnPreparationPending ? "角色资源准备中…" : "开始游戏"}
-        </button>
-        <button data-testid="title-load" disabled={!model.capabilities.canLoad} onClick={() => actions.dispatch("open-load")} type="button">
-          读取
-        </button>
-        <button data-testid="title-settings" disabled={!model.capabilities.canOpenSettings} onClick={() => actions.dispatch("open-settings")} type="button">
-          设置
-        </button>
+    <section
+      aria-label="标题菜单"
+      className="game-a-title-surface"
+      data-background={assets.titleBackgroundUri ? "resolved" : "fallback"}
+      data-testid="title-surface"
+    >
+      <div className="game-a-title-artboard" data-testid="title-artboard">
+        {assets.titleBackgroundUri ? (
+          <img
+            alt=""
+            aria-hidden="true"
+            className="game-a-title-background"
+            data-testid="title-background"
+            draggable={false}
+            fetchPriority="high"
+            src={assets.titleBackgroundUri}
+          />
+        ) : null}
+        <h1 className="game-a-screen-reader-only">{config.title.title}</h1>
+        <nav aria-label="主菜单" className="game-a-title-menu" data-testid="title-menu">
+          <button
+            {...(vnPreparationPending
+              ? { "aria-busy": true, "aria-label": "开始故事（角色资源准备中）" }
+              : {})}
+            className="game-a-title-menu-button"
+            data-testid="title-new-game"
+            disabled={!model.capabilities.canStartNewGame || vnPreparationPending}
+            onClick={() => actions.dispatch("new-game")}
+            type="button"
+          >
+            <span aria-hidden="true" className="game-a-title-menu-prefix">&gt;</span>
+            <span className="game-a-title-menu-label">开始故事</span>
+          </button>
+          <button
+            className="game-a-title-menu-button"
+            data-testid="title-load"
+            disabled={!model.capabilities.canLoad}
+            onClick={() => actions.dispatch("open-load")}
+            type="button"
+          >
+            <span aria-hidden="true" className="game-a-title-menu-prefix">&gt;</span>
+            <span className="game-a-title-menu-label">读取存档</span>
+          </button>
+          <button
+            className="game-a-title-menu-button"
+            data-testid="title-settings"
+            disabled={!model.capabilities.canOpenSettings}
+            onClick={() => actions.dispatch("open-settings")}
+            type="button"
+          >
+            <span aria-hidden="true" className="game-a-title-menu-prefix">&gt;</span>
+            <span className="game-a-title-menu-label">运行设置</span>
+          </button>
+          <button className="game-a-title-menu-button" data-placeholder="true" data-testid="title-gallery" type="button">
+            <span aria-hidden="true" className="game-a-title-menu-prefix">&gt;</span>
+            <span className="game-a-title-menu-label">图鉴回忆</span>
+          </button>
+          <button className="game-a-title-menu-button" data-placeholder="true" data-testid="title-media" type="button">
+            <span aria-hidden="true" className="game-a-title-menu-prefix">&gt;</span>
+            <span className="game-a-title-menu-label">媒体社群</span>
+          </button>
+          <button className="game-a-title-menu-button" data-placeholder="true" data-testid="title-exit" type="button">
+            <span aria-hidden="true" className="game-a-title-menu-prefix">&gt;</span>
+            <span className="game-a-title-menu-label">离开这里</span>
+          </button>
+        </nav>
       </div>
     </section>
   );

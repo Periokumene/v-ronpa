@@ -84,6 +84,19 @@ export const gameARuntimeAssets = [
       ]
     },
     {
+      "id": "bg:title",
+      "kind": "background",
+      "optimizedUri": "/game-a/backgrounds/title.png",
+      "format": "png",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "game-a",
+        "vn"
+      ]
+    },
+    {
       "id": "bgm:dead-fish-riffle",
       "kind": "bgm",
       "optimizedUri": "/game-a/media/bgm/dead-fish-riffle.mp3",

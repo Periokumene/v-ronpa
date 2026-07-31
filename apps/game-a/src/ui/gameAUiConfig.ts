@@ -24,7 +24,8 @@ export const gameAUiConfig = {
     hoverThrottleMs: 60
   },
   title: {
-    title: "Game A"
+    title: "白昼梦游行 Daydream Parade",
+    backgroundAssetId: "bg:title"
   }
 } as const;
 

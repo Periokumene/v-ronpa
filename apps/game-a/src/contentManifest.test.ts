@@ -33,6 +33,7 @@ describe("game-a content manifest", () => {
       )
     ).toBe(true);
     expect(gameAContentManifest.assets).toEqual([
+      { id: "bg:title", kind: "background", tags: ["game-a", "ui", "title"] },
       { id: "sfx:ui-hover-default", kind: "sfx", tags: ["game-a", "ui"] },
       { id: "sfx:ui-click-default", kind: "sfx", tags: ["game-a", "ui"] }
     ]);
@@ -53,6 +54,7 @@ describe("game-a content manifest", () => {
       "/game-a/backgrounds/game-a-snow-outskirts-frame.png"
     );
     expect(registry.url({ id: "bg:home-outside", kind: "background" })).toBe("/game-a/backgrounds/home-outside.png");
+    expect(registry.url({ id: "bg:title", kind: "background" })).toBe("/game-a/backgrounds/title.png");
     expect(registry.url({ id: "bgm:dead-fish-riffle", kind: "bgm" })).toBe(
       "/game-a/media/bgm/dead-fish-riffle.mp3"
     );

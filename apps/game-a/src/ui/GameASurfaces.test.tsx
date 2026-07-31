@@ -6,6 +6,7 @@ import type {
   BacklogOverlayViewModel,
   SaveLoadOverlayViewModel,
   SettingsOverlayViewModel,
+  TitleViewModel,
   VnChoicesViewModel,
   VnCommandBarViewModel,
   VnDialogViewModel
@@ -41,6 +42,112 @@ describe("game-a interaction surfaces", () => {
       "Title",
       "ToastLayer"
     ]);
+  });
+
+  it("renders the resolved title art with six ordered menu entries and preserves existing action dispatch", () => {
+    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
+    const surfaces = createGameASurfaces({
+      assets,
+      config: gameAUiConfig,
+      navigation: createNavigation({}),
+      vnPreparationPending: false
+    });
+    const dispatch = vi.fn();
+    const TitleSurface = surfaces.Title;
+    const element = <TitleSurface actions={{ dispatch }} model={createTitleModel()} />;
+    const root = findElementByTestId(element, "title-surface");
+    const background = findElementByTestId(element, "title-background");
+    const entryTestIds = [
+      "title-new-game",
+      "title-load",
+      "title-settings",
+      "title-gallery",
+      "title-media",
+      "title-exit"
+    ];
+
+    expect(assets.titleBackgroundUri).toBe("/game-a/backgrounds/title.png");
+    expect(root?.props).toMatchObject({ "data-background": "resolved", className: "game-a-title-surface" });
+    expect(background?.props).toMatchObject({
+      alt: "",
+      "aria-hidden": "true",
+      className: "game-a-title-background",
+      src: "/game-a/backgrounds/title.png"
+    });
+    expect(entryTestIds.map((testId) => titleEntryLabel(findElementByTestId(element, testId)))).toEqual([
+      "开始故事",
+      "读取存档",
+      "运行设置",
+      "图鉴回忆",
+      "媒体社群",
+      "离开这里"
+    ]);
+
+    clickElement(findElementByTestId(element, "title-new-game"));
+    clickElement(findElementByTestId(element, "title-load"));
+    clickElement(findElementByTestId(element, "title-settings"));
+    expect(dispatch).toHaveBeenNthCalledWith(1, "new-game");
+    expect(dispatch).toHaveBeenNthCalledWith(2, "open-load");
+    expect(dispatch).toHaveBeenNthCalledWith(3, "open-settings");
+
+    for (const testId of ["title-gallery", "title-media", "title-exit"]) {
+      const entry = findElementByTestId(element, testId);
+      expect(entry?.props).toMatchObject({ "data-placeholder": "true", type: "button" });
+      expect((entry?.props as { onClick?: unknown }).onClick).toBeUndefined();
+      clickElement(entry);
+    }
+    expect(dispatch).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps the start label stable and exposes busy state while VN presentation prepares", () => {
+    const surfaces = createGameASurfaces({
+      assets: resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig),
+      config: gameAUiConfig,
+      navigation: createNavigation({}),
+      vnPreparationPending: true
+    });
+    const TitleSurface = surfaces.Title;
+    const element = <TitleSurface actions={{ dispatch: vi.fn() }} model={createTitleModel()} />;
+    const start = findElementByTestId(element, "title-new-game");
+
+    expect(start?.props).toMatchObject({
+      "aria-busy": true,
+      "aria-label": "开始故事（角色资源准备中）",
+      disabled: true
+    });
+    expect(titleEntryLabel(start)).toBe("开始故事");
+  });
+
+  it("reports a missing title background while keeping the black title fallback operable", () => {
+    const registry = createAssetRegistry(gameAContentManifest);
+    const missingTitleResolver: AssetResolver = {
+      resolve: (input) => input.id === gameAUiConfig.title.backgroundAssetId ? {
+        diagnostic: {
+          code: "asset-missing",
+          severity: "error",
+          id: input.id,
+          ...(input.kind ? { kind: input.kind } : {}),
+          message: "missing title background"
+        }
+      } : registry.resolve(input)
+    };
+    const assets = resolveGameAUiAssets(missingTitleResolver, gameAUiConfig);
+    const surfaces = createGameASurfaces({
+      assets,
+      config: gameAUiConfig,
+      navigation: createNavigation({}),
+      vnPreparationPending: false
+    });
+    const TitleSurface = surfaces.Title;
+    const element = <TitleSurface actions={{ dispatch: vi.fn() }} model={createTitleModel()} />;
+
+    expect(assets.titleBackgroundUri).toBeUndefined();
+    expect(assets.diagnostics).toMatchObject([
+      { code: "asset-missing", id: "bg:title", kind: "background" }
+    ]);
+    expect(findElementByTestId(element, "title-surface")?.props).toMatchObject({ "data-background": "fallback" });
+    expect(findElementByTestId(element, "title-background")).toBeUndefined();
+    expect(findElementByTestId(element, "title-new-game")).toBeDefined();
   });
 
   it("resolves the configured dialog frame asset while keeping the dialog frame CSS-only", () => {
@@ -489,6 +596,24 @@ function createDialogModel(): VnDialogViewModel {
   };
 }
 
+function createTitleModel(): TitleViewModel {
+  return {
+    visible: true,
+    title: "Game A",
+    capabilities: {
+      canStartNewGame: true,
+      canSave: false,
+      canLoad: true,
+      canOpenSettings: true,
+      canOpenBacklog: false,
+      canOpenPause: false,
+      canAuto: false,
+      canSkip: false,
+      canReturnTitle: false
+    }
+  };
+}
+
 function createChoiceModel(choices: VnChoicesViewModel["choices"] = [{ text: "继续调查", enabled: true }]): VnChoicesViewModel {
   return {
     visible: true,
@@ -663,6 +788,16 @@ function findElementByTestId(node: ReactNode, testId: string): ReactElement | un
     if (props["data-testid"] === testId) match = current;
   });
   return match;
+}
+
+function titleEntryLabel(entry: ReactElement | undefined): string | undefined {
+  const label = findElementByClassName(entry, "game-a-title-menu-label");
+  const children = (label?.props as { children?: unknown } | undefined)?.children;
+  return typeof children === "string" ? children : undefined;
+}
+
+function clickElement(element: ReactElement | undefined) {
+  (element?.props as { onClick?: () => void } | undefined)?.onClick?.();
 }
 
 function triggerEscapeCapture(element: ReactElement | undefined) {

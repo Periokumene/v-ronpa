@@ -23,7 +23,9 @@ test("game-a test character entry stays on title until planned textures are uplo
 
   await expect(page.getByTestId("game-a-mode")).toHaveText("标题");
   await expect(page.getByTestId("title-new-game")).toBeDisabled();
-  await expect(page.getByTestId("title-new-game")).toHaveText("角色资源准备中…");
+  await expect(page.getByTestId("title-new-game")).toContainText("开始故事");
+  await expect(page.getByTestId("title-new-game")).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByTestId("title-new-game")).toHaveAttribute("aria-label", "开始故事（角色资源准备中）");
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-preparation", "preparing");
 
   await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-character-preparation", "ready", { timeout: 15_000 });

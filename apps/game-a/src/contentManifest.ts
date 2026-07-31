@@ -28,6 +28,7 @@ export const gameAVnEntry = {
 const gameAContentManifestInput = {
   version: 4,
   assets: [
+    { id: "bg:title", kind: "background" as const, tags: ["game-a", "ui", "title"] },
     { id: "sfx:ui-hover-default", kind: "sfx" as const, tags: ["game-a", "ui"] },
     { id: "sfx:ui-click-default", kind: "sfx" as const, tags: ["game-a", "ui"] }
   ],

@@ -17,6 +17,7 @@ export interface GameAUiAudioAssets {
 
 export interface GameAUiAssets {
   dialogFrameUri?: string | undefined;
+  titleBackgroundUri?: string | undefined;
   diagnostics: AssetRegistryDiagnostic[];
   uiAudio: GameAUiAudioAssets;
 }
@@ -27,6 +28,8 @@ export function resolveGameAUiAssets(
 ): GameAUiAssets {
   const dialogFrame = assetResolver.resolve({ id: config.dialog.frameAssetId, kind: "texture" });
   const diagnostics = dialogFrame.diagnostic ? [dialogFrame.diagnostic] : [];
+  const titleBackground = assetResolver.resolve({ id: config.title.backgroundAssetId, kind: "background" });
+  if (titleBackground.diagnostic) diagnostics.push(titleBackground.diagnostic);
   const cues: Record<string, GameAUiAudioCueAsset> = {};
   for (const [cueId, cue] of Object.entries(config.uiAudio.cues)) {
     const resolved = assetResolver.resolve({ id: cue.sourceRef, kind: "sfx" });
@@ -35,6 +38,7 @@ export function resolveGameAUiAssets(
   }
   return {
     ...(dialogFrame.uri ? { dialogFrameUri: dialogFrame.uri } : {}),
+    ...(titleBackground.uri ? { titleBackgroundUri: titleBackground.uri } : {}),
     diagnostics,
     uiAudio: {
       cues,
