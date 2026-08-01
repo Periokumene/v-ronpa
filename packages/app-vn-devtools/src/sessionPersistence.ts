@@ -9,10 +9,11 @@ import {
 import type {
   VnDebugChoiceDecision,
   VnDebugInputDecision,
+  VnDebugMaterializationMode,
   VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
 
-export const VN_DEVTOOLS_SESSION_VERSION = 3 as const;
+export const VN_DEVTOOLS_SESSION_VERSION = 4 as const;
 
 export interface VnDevtoolsStorageLike {
   getItem: (key: string) => string | null;
@@ -26,6 +27,7 @@ export interface VnDevtoolsPersistedSessionState {
   collapsed: boolean;
   width: number;
   layout: VnDevtoolsLayoutState;
+  materializationMode: VnDebugMaterializationMode;
   viewedScriptPath?: string;
   pinnedTarget?: VnDebugTargetAnchor;
   decisions?: readonly VnDevtoolsPersistedDecision[];
@@ -44,13 +46,14 @@ export function loadVnDevtoolsSessionState(
     if (!isRecord(value) || value.version !== VN_DEVTOOLS_SESSION_VERSION) return undefined;
     if (typeof value.collapsed !== "boolean" || typeof value.width !== "number") return undefined;
     const layout = canonicalizeLayout(value.layout);
-    if (layout === undefined) return undefined;
+    if (layout === undefined || !isVnDebugMaterializationMode(value.materializationMode)) return undefined;
 
     const state: VnDevtoolsPersistedSessionState = {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: value.collapsed,
       width: clampVnDevtoolsWidth(value.width),
-      layout
+      layout,
+      materializationMode: value.materializationMode
     };
     const pinnedTarget = canonicalizeTargetAnchor(value.pinnedTarget);
     if (typeof value.viewedScriptPath === "string" && value.viewedScriptPath) {
@@ -78,7 +81,8 @@ export function saveVnDevtoolsSessionState(
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: state.collapsed,
       width: clampVnDevtoolsWidth(state.width),
-      layout: canonicalizeLayout(state.layout) ?? createDefaultVnDevtoolsLayoutState()
+      layout: canonicalizeLayout(state.layout) ?? createDefaultVnDevtoolsLayoutState(),
+      materializationMode: state.materializationMode
     };
     const pinnedTarget = canonicalizeTargetAnchor(state.pinnedTarget);
     if (state.viewedScriptPath) normalized.viewedScriptPath = state.viewedScriptPath;
@@ -109,7 +113,8 @@ export function createDefaultVnDevtoolsSessionState(): VnDevtoolsPersistedSessio
     version: VN_DEVTOOLS_SESSION_VERSION,
     collapsed: false,
     width: VN_DEVTOOLS_DEFAULT_WIDTH,
-    layout: createDefaultVnDevtoolsLayoutState()
+    layout: createDefaultVnDevtoolsLayoutState(),
+    materializationMode: "fast-current-script"
   };
 }
 
@@ -141,6 +146,10 @@ function canonicalizeLayout(value: unknown): VnDevtoolsLayoutState | undefined {
 
 function isVnDevtoolsPanelId(value: unknown): value is VnDevtoolsPanelId {
   return value === "problems" || value === "state";
+}
+
+function isVnDebugMaterializationMode(value: unknown): value is VnDebugMaterializationMode {
+  return value === "fast-current-script" || value === "canonical-entry";
 }
 
 function canonicalizePersistedDecision(value: unknown): VnDevtoolsPersistedDecision | undefined {

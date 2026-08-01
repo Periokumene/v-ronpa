@@ -3,6 +3,7 @@ import {
   inspectVnDebugScript,
   materializeVnDebugTarget,
   type VnDebugDecisionTrace,
+  type VnDebugMaterializationMode,
   type VnDebugScriptInspection,
   type VnDebugMaterializationResult,
   type VnDebugTargetAnchor
@@ -25,17 +26,19 @@ export type PreparedVnDevtoolsInitialCandidate =
       kind: "materialize-pinned-target";
       inspection: VnDebugScriptInspection;
       expectedRevision: string;
+      catalogVerified: boolean;
       result: VnDebugMaterializationResult;
     }
-  | { kind: "adopt-for-next-start"; inspection: VnDebugScriptInspection; expectedRevision: string }
-  | { kind: "require-preview-target"; inspection: VnDebugScriptInspection; expectedRevision: string }
-  | { kind: "ready"; inspection: VnDebugScriptInspection; expectedRevision: string };
+  | { kind: "adopt-for-next-start"; inspection: VnDebugScriptInspection; expectedRevision: string; catalogVerified: true }
+  | { kind: "require-preview-target"; inspection: VnDebugScriptInspection; expectedRevision: string; catalogVerified: boolean }
+  | { kind: "ready"; inspection: VnDebugScriptInspection; expectedRevision: string; catalogVerified: boolean };
 
 export interface PrepareVnDevtoolsInitialCandidateInput {
   activeCandidate: VnDevtoolsScriptCandidate;
   candidate: NaniDevtoolsViteInitialCandidate;
   pinnedTarget?: VnDebugTargetAnchor;
   decisions?: VnDebugDecisionTrace;
+  materializationMode?: VnDebugMaterializationMode;
   vnActive: boolean;
   signal?: AbortSignal;
 }
@@ -48,6 +51,7 @@ export async function prepareVnDevtoolsInitialCandidate({
   activeCandidate,
   candidate,
   decisions = EMPTY_VN_DEBUG_DECISION_TRACE,
+  materializationMode = "canonical-entry",
   pinnedTarget,
   signal,
   vnActive
@@ -74,6 +78,30 @@ export async function prepareVnDevtoolsInitialCandidate({
   if (inspection.revision !== candidate.serverRevision) {
     return { kind: "retain-read-only", inspection, reason: "revision-mismatch" };
   }
+  const expectedRevision = candidate.serverRevision;
+  if (pinnedTarget && materializationMode === "fast-current-script") {
+    const result = await materializeVnDebugTarget({
+      mode: materializationMode,
+      entry: inspection.entry,
+      inspection,
+      target: pinnedTarget,
+      decisions,
+      expectedRevision,
+      ...(signal ? { signal } : {})
+    });
+    throwIfAborted(signal);
+    return { kind: "materialize-pinned-target", inspection, expectedRevision, catalogVerified: false, result };
+  }
+  if (
+    !pinnedTarget
+    && expectedRevision === activeCandidate.source.scriptRevision
+    && materializationMode === "fast-current-script"
+  ) {
+    return { kind: "ready", inspection, expectedRevision, catalogVerified: false };
+  }
+  if (!pinnedTarget && vnActive && materializationMode === "fast-current-script") {
+    return { kind: "require-preview-target", inspection, expectedRevision, catalogVerified: false };
+  }
   const catalogValidation = await validateVnDevtoolsCandidateCatalog(candidateCatalog);
   throwIfAborted(signal);
   if (!catalogValidation.ok) {
@@ -84,10 +112,9 @@ export async function prepareVnDevtoolsInitialCandidate({
       message: catalogValidation.message
     };
   }
-
-  const expectedRevision = candidate.serverRevision;
   if (pinnedTarget) {
     const result = await materializeVnDebugTarget({
+      mode: "canonical-entry",
       entry: inspection.entry,
       catalog: candidateCatalog.catalog,
       inspection,
@@ -97,14 +124,14 @@ export async function prepareVnDevtoolsInitialCandidate({
       ...(signal ? { signal } : {})
     });
     throwIfAborted(signal);
-    return { kind: "materialize-pinned-target", inspection, expectedRevision, result };
+    return { kind: "materialize-pinned-target", inspection, expectedRevision, catalogVerified: true, result };
   }
   if (expectedRevision !== activeCandidate.source.scriptRevision) {
     return vnActive
-      ? { kind: "require-preview-target", inspection, expectedRevision }
-      : { kind: "adopt-for-next-start", inspection, expectedRevision };
+      ? { kind: "require-preview-target", inspection, expectedRevision, catalogVerified: true }
+      : { kind: "adopt-for-next-start", inspection, expectedRevision, catalogVerified: true };
   }
-  return { kind: "ready", inspection, expectedRevision };
+  return { kind: "ready", inspection, expectedRevision, catalogVerified: true };
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {

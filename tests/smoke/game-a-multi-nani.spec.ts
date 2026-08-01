@@ -8,6 +8,78 @@ const chapterSourceFile = fileURLToPath(
 
 test.setTimeout(240_000);
 
+test("FastDebug previews the current script cold, switches without mutating the scene, and preserves Entry mode", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("game-a-fast-debug-smoke-ready") !== "true") {
+      indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
+      sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v4");
+      sessionStorage.setItem("game-a-fast-debug-smoke-ready", "true");
+    }
+  });
+  await page.goto("/");
+
+  const workbench = page.getByTestId("vn-devtools-dock");
+  const toggle = workbench.getByTestId("vn-devtools-fast-debug-toggle");
+  await expect(workbench).toBeVisible();
+  await expect.poll(async () => (await readSnapshot(page)).workbench.phase).toBe("ready");
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(toggle).toContainText("FAST");
+  await toggle.click();
+  await expect.poll(async () => (await readSnapshot(page)).workbench.phase).toBe("ready");
+  expect((await readSnapshot(page)).workbench.previewableLineCount).toBeGreaterThan(0);
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+  const scriptPicker = workbench.locator("details.vn-devtools-script-picker");
+  await scriptPicker.locator("summary").click();
+  await workbench.getByRole("option", { name: /chapter-02\.nani/ }).click();
+  const target = workbench.locator('[data-testid^="vn-devtools-line-"]')
+    .filter({ hasText: "原味。购物清单" })
+    .first();
+  await expect(target.locator(".vn-devtools-preview-button")).toBeEnabled();
+  await target.locator(".vn-devtools-preview-button").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("原味。购物清单", { timeout: 15_000 });
+  const fast = await readSnapshot(page);
+  expect(fast.workbench).toMatchObject({
+    materializationMode: "fast-current-script",
+    runtimeScriptPath: "game-a/chapter-02.nani"
+  });
+  expect(fast.stableCheckpoint?.media.bgmByGroup).toEqual({});
+  expect(fast.stableCheckpoint?.media.loopingSfxByKey).toEqual({});
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(toggle).toContainText("ENTRY");
+  const afterSwitch = await readSnapshot(page);
+  expect(afterSwitch.story.text).toBe(fast.story.text);
+  expect(afterSwitch.stableCheckpoint?.media).toEqual(fast.stableCheckpoint?.media);
+  expect(afterSwitch.workbench.pinned).toBe(false);
+  const switchedSession = await page.evaluate(() => JSON.parse(
+    sessionStorage.getItem("v-ronpa:game-a:nani-devtools:v4") ?? "null"
+  ) as { pinnedTarget?: unknown; decisions?: unknown[] });
+  expect(switchedSession.pinnedTarget).toBeUndefined();
+  expect(switchedSession.decisions).toEqual([]);
+
+  await target.locator(".vn-devtools-preview-button").click();
+  await expect.poll(async () => (await readSnapshot(page)).workbench.phase).toBe("ready");
+  const canonical = await readSnapshot(page);
+  expect(canonical.workbench.materializationMode).toBe("canonical-entry");
+  expect(canonical.stableCheckpoint?.media.bgmByGroup.music?.sourceRef).toBe("bgm:dead-fish-riffle");
+  expect(canonical.stableCheckpoint?.media.loopingSfxByKey.rain?.sourceRef).toBe("sfx:gentle-rain-loop");
+  await page.screenshot({ path: "test-results/game-a-fast-debug-entry-mode.png", fullPage: true });
+
+  await page.reload();
+  await expect(workbench).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  expect((await readSnapshot(page)).workbench.materializationMode).toBe("canonical-entry");
+  expect(consoleErrors).toEqual([]);
+});
+
 test("Game A traverses, saves, previews, restores, and completes its production multi-Nani entry", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
@@ -15,7 +87,7 @@ test("Game A traverses, saves, previews, restores, and completes its production 
   });
   await page.addInitScript(() => {
     indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
-    sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v3");
+    sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v4");
   });
   await page.goto("/");
 
@@ -92,7 +164,7 @@ test("an opening fixed point never blocks viewing or previewing chapter-02 befor
   await page.addInitScript(() => {
     if (sessionStorage.getItem("game-a-fixed-point-smoke-ready") !== "true") {
       indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
-      sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v3");
+      sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v4");
       sessionStorage.setItem("game-a-fixed-point-smoke-ready", "true");
     }
   });
@@ -102,7 +174,7 @@ test("an opening fixed point never blocks viewing or previewing chapter-02 befor
   await expect(workbench).toBeVisible();
   await expect.poll(async () => (await readSnapshot(page)).workbench.phase).toBe("ready");
   const openingChoice = workbench.locator('[data-testid^="vn-devtools-line-"]')
-    .filter({ hasText: "吃下我" })
+    .filter({ hasText: "最喜欢雨天了" })
     .first();
   await expect(openingChoice.locator(".vn-devtools-preview-button")).toBeEnabled();
   await openingChoice.locator(".vn-devtools-preview-button").click();
@@ -158,7 +230,7 @@ test("a future-script HMR installs only its catalog record even when opening has
   expect(updatedSource).not.toBe(originalSource);
   await page.addInitScript(() => {
     indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
-    sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v3");
+    sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v4");
   });
 
   try {
@@ -172,7 +244,7 @@ test("a future-script HMR installs only its catalog record even when opening has
     await expect(page.getByTestId("title-new-game")).toBeEnabled();
     await clickByTestId(page, "title-new-game");
     const openingTarget = workbench.locator('[data-testid^="vn-devtools-line-"]')
-      .filter({ hasText: "吃下我" })
+      .filter({ hasText: "最喜欢雨天了" })
       .first();
     await openingTarget.hover();
     await openingTarget.locator(".vn-devtools-preview-button").click();
@@ -203,18 +275,12 @@ test("a future-script HMR installs only its catalog record even when opening has
 });
 
 async function advanceProductionStoryToFinalOpeningChoice(page: Page): Promise<void> {
-  await expect.poll(async () => (await readSnapshot(page)).story.choices.length).toBeGreaterThan(0);
   for (let attempt = 0; attempt < 120; attempt += 1) {
     const snapshot = await readSnapshot(page);
     const choices = snapshot.story.choices;
     if (choices.length > 0) {
       if (choices[0]?.includes("陪我去买牛奶吧")) return;
       await clickByTestId(page, "vn-choice-0");
-      await page.waitForTimeout(120);
-      continue;
-    }
-    if (snapshot.story.text?.includes("不打算再给我逃跑的机会")) {
-      await advanceVn(page);
       await page.waitForTimeout(120);
       continue;
     }
@@ -256,6 +322,9 @@ interface GameASnapshot {
     lineCount: number;
     previewableLineCount: number;
     blockedLineCount: number;
+    pinned: boolean;
+    materializationMode: "fast-current-script" | "canonical-entry";
+    materializationModeLocked: boolean;
   };
   pixi: {
     revision: number;

@@ -37,12 +37,22 @@ leakage.
 ## One execution authority
 
 Inspection parses and compiles the current source and computes its canonical
-semantic revision. Materialization starts at the entry's authored initial script/start label,
-uses `stepVnSessionInstruction()` for Story behavior, and sends each result
-through the same `projectVnRuntimeStep()` used by the live runtime. It never
-mutates React state, renderers, media handles, saves, or browser storage.
+semantic revision. Every call selects one explicit materialization mode:
 
-Correct materialization means that the same entry, profile, route table, and
+- `fast-current-script` is the Devtools default. It cold-starts Story, Pixi, UI,
+  and media from the viewed script, using the entry `startLabel` only for the
+  entry initial script and pointer `0` otherwise. Local labels, choices, and
+  inputs retain normal session behavior. Cross-script navigation returns
+  `fast-cross-script-navigation` without a partial checkpoint.
+- `canonical-entry` retains authored-path replay from the entry initial script
+  and `startLabel`, including complete-catalog links and tab-local decisions.
+
+Both modes use `stepVnSessionInstruction()` and the live runtime's
+`projectVnRuntimeStep()`. Only boot and navigation policy differ; there is no
+second interpreter. Materialization never mutates React state, renderers, media
+handles, saves, or browser storage.
+
+Canonical materialization means that the same entry, profile, route table, and
 choice/input sequence produce the same saveable checkpoint at the same stable
 position as normal play. The checkpoint contains Story, terminal Pixi, UI
 visibility, BGM intent, and looping-SFX intent. Transient animation, waits,
@@ -87,14 +97,17 @@ catalog is the last-known-good runtime input, not a second source authority: a
 newer saved `.nani` may legitimately differ from it on first load. The Vite
 bridge invalidates its virtual snapshot before awaiting HMR inspection, closing
 the save/refresh race, while Node's semantic revision, the browser's independent
-semantic revision, and a full-catalog link pass jointly authorize that saved
-candidate. Every HMR candidate
+semantic revision, and current-script diagnostics establish `verified-local`
+authority for FastDebug calculation. Canonical calculation and every adoption
+still require complete catalog validation. Every HMR candidate
 carries a monotonic update ID, current source, diagnostics, and a server revision.
 Parser/compiler diagnostics carry their original half-open UTF-16 `TextSpan`
 through the Vite protocol; bridge failures without a source token remain
 location-free rather than receiving a guessed span.
 The browser independently inspects the exact same source; a digest disagreement
-or any broken catalog endpoint blocks the candidate. Receiving an update synchronously freezes the
+blocks all calculation. A broken catalog endpoint may still permit isolated Fast
+calculation, but the shared host transaction validates the full catalog again and
+rejects installation without changing the active scene. Receiving an update synchronously freezes the
 old source's Preview authority even before React paints its read-only state, so a
 consumed update ID cannot be stolen by a stale click.
 
@@ -122,6 +135,9 @@ only that catalog record for a future goto. Candidate revision authentication
 always applies to the updated record, even when the fixed-point target belongs
 to another script. A semantic no-op update remaps a fixed anchor only when the
 anchor belongs to that record; fixed points in other scripts are unaffected.
+After a FastDebug install, only that result's current-script
+`executedScriptPaths` participates in fixed-point HMR impact; entry/upstream
+paths from the scene that existed before the Fast restore do not trigger replay.
 
 One pure per-script authority coordinator owns installed candidate identities,
 expected host identities, inspection/status/diagnostic caches, Preview
@@ -173,7 +189,7 @@ revision + current + pin + update + message status bar
 The file bar exposes an accessible, keyboard-operated script listbox. The
 controller keeps `viewedScriptPath` separate from the runtime's
 `currentScriptPath`; selecting a file changes only inspection state and records
-the viewed path in the v3 tab session.
+the viewed path in the v4 tab session.
 
 The source is always the main stage and always keeps every authored line in its
 original order. IDE Find matches source characters, labels, command metadata,
@@ -217,10 +233,18 @@ after the host has accepted a checkpoint; and Resolve decision while Branch
 needs focus. The host-acceptance boundary is therefore visible and never
 pretends that an accepted restore can be rolled back.
 
-Layout persistence is schema v3 and is a hard cut: older values are ignored rather
+The command strip also owns an always-visible `FastDebug` button with native
+`aria-pressed` semantics and an explicit `FAST`/`ENTRY` label. Switching mode
+cancels pre-acceptance debug work, clears the fixed point and decision trace, and
+changes only the next Preview. It is disabled after host acceptance until the
+restore settles; switching never resets or restores the current game scene.
+
+Layout persistence is schema v4 and is a hard cut: v3 and older values are ignored rather
 than migrated. A tab stores only collapsed state, Dock width, viewed script path, bottom-panel open
 state, persisted State/Problems page, clamped `120–360px` panel height, fixed
-anchor, and temporary decision trace. Search, current match, selected line,
+anchor, temporary decision trace, and the selected materialization mode. The
+first v4 session defaults to FastDebug; later refreshes retain the last mode.
+Search, current match, selected line,
 Symbols/Find popovers, source, diagnostics, and checkpoints are never persisted.
 Selection rematches through its stable anchor when source mapping changes; when
 that is impossible it falls back to current, pinned, then the first previewable
@@ -228,7 +252,7 @@ line, never the old line number.
 
 The Dock uses Phosphor icons and the existing dark VN tooling palette. Container
 queries change command density at 520px and 400px without changing the width
-contract: the default remains 420px, the range remains 320–720px, and desktop
+contract: the default remains 504px, the range remains 320–720px, and desktop
 width remains capped at 45vw. Below 900px it remains an overlay.
 
 The internal descriptor registry is deliberately not a public plugin API.

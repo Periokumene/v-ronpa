@@ -18,7 +18,7 @@ import type { SaveableVnState } from "@v-ronpa/contracts";
 import type { GameAStoryDefinition } from "../gameAScripts";
 import initialNaniCandidates from "virtual:v-ronpa-nani-devtools-initial";
 
-const SESSION_KEY = "v-ronpa:game-a:nani-devtools:v3";
+const SESSION_KEY = "v-ronpa:game-a:nani-devtools:v4";
 
 const gameANaniUpdateSource: VnDevtoolsSourceUpdateSource | undefined = import.meta.hot
   ? {
@@ -88,6 +88,8 @@ export function GameANaniDevtools({
           updateId: current.controller.status.updateId ?? null,
           collapsed: current.controller.collapsed,
           pinned: current.controller.lines.some((line) => line.pinned),
+          materializationMode: current.controller.materializationMode,
+          materializationModeLocked: current.controller.materializationModeLocked,
           viewedScriptPath: current.controller.viewedScriptPath,
           runtimeScriptPath: current.controller.runtimeScriptPath,
           revision: current.controller.scripts.find((script) => script.viewed)?.revision ?? null,

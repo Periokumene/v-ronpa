@@ -357,6 +357,24 @@
   color: var(--vn-devtools-accent-strong);
 }
 
+.vn-devtools-command-strip .vn-devtools-fast-debug-toggle {
+  min-width: 76px;
+  border: 1px solid var(--vn-devtools-border-strong);
+  background: rgb(255 244 232 / 3%);
+  color: var(--vn-devtools-muted);
+}
+
+.vn-devtools-command-strip .vn-devtools-fast-debug-toggle[aria-pressed="true"] {
+  border-color: rgb(192 139 100 / 55%);
+  background: rgb(192 139 100 / 12%);
+  color: var(--vn-devtools-accent-strong);
+}
+
+.vn-devtools-fast-debug-toggle strong {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
 .vn-devtools-command-divider {
   width: 1px;
   height: 18px;
@@ -1231,6 +1249,15 @@
     width: 28px;
     min-width: 28px;
     padding: 0;
+  }
+
+  .vn-devtools-command-strip .vn-devtools-fast-debug-toggle {
+    min-width: 48px;
+    padding: 0 5px;
+  }
+
+  .vn-devtools-fast-debug-name {
+    display: none;
   }
 
   .vn-devtools-file-status .vn-devtools-degraded-label,

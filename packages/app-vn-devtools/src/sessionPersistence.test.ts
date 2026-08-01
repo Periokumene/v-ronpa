@@ -29,6 +29,7 @@ describe("VN devtools session persistence", () => {
     const stateWithExtras = {
       collapsed: true,
       width: 999,
+      materializationMode: "canonical-entry" as const,
       layout: {
         bottomPanelOpen: false,
         activePanel: "problems" as const,
@@ -62,6 +63,7 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: true,
       width: 720,
+      materializationMode: "canonical-entry",
       layout: {
         bottomPanelOpen: false,
         activePanel: "problems",
@@ -99,6 +101,7 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      materializationMode: "fast-current-script",
       layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
       transientRootState: "must-not-load",
       pinnedTarget: { ...anchor, sourceCommand: "must-not-load" },
@@ -127,6 +130,7 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      materializationMode: "fast-current-script",
       layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
       pinnedTarget: anchor,
       decisions: [
@@ -147,6 +151,7 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      materializationMode: "fast-current-script",
       layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
       pinnedTarget: { textId: "not-an-anchor" },
       decisions: [{ choiceId: "not-a-decision" }]
@@ -155,6 +160,7 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      materializationMode: "fast-current-script",
       layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
       pinnedTarget: {
         kind: "command",
@@ -169,12 +175,14 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      materializationMode: "fast-current-script",
       layout: { bottomPanelOpen: true, activePanel: "branch", bottomPanelHeight: 180 }
     }));
     storage.setItem("invalid-layout", JSON.stringify({
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      materializationMode: "fast-current-script",
       layout: { bottomPanelOpen: "yes", activePanel: "state", bottomPanelHeight: 180 }
     }));
     expect(loadVnDevtoolsSessionState(storage, "old")).toBeUndefined();
@@ -183,6 +191,7 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      materializationMode: "fast-current-script",
       layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
       decisions: []
     });
@@ -190,6 +199,7 @@ describe("VN devtools session persistence", () => {
       version: VN_DEVTOOLS_SESSION_VERSION,
       collapsed: false,
       width: 420,
+      materializationMode: "fast-current-script",
       layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 }
     });
     expect(loadVnDevtoolsSessionState(storage, "invalid-panel")).toBeUndefined();
@@ -210,6 +220,7 @@ describe("VN devtools session persistence", () => {
     expect(saveVnDevtoolsSessionState(unavailable, "key", {
       collapsed: false,
       width: 420,
+      materializationMode: "fast-current-script",
       layout: createDefaultVnDevtoolsLayoutState()
     })).toBe(false);
     expect(clearVnDevtoolsSessionState(unavailable, "key")).toBe(false);
@@ -219,13 +230,27 @@ describe("VN devtools session persistence", () => {
     const storage = memoryStorage();
     storage.setItem("key", "value");
     expect(createDefaultVnDevtoolsSessionState()).toEqual({
-      version: 3,
+      version: 4,
       collapsed: false,
       width: 504,
-      layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 }
+      layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
+      materializationMode: "fast-current-script"
     });
     expect(clearVnDevtoolsSessionState(storage, "key")).toBe(true);
     expect(storage.getItem("key")).toBeNull();
+  });
+
+  it("ignores the v3 session instead of migrating pins or decisions", () => {
+    const storage = memoryStorage();
+    storage.setItem("v3", JSON.stringify({
+      version: 3,
+      collapsed: true,
+      width: 420,
+      layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
+      pinnedTarget: { kind: "command" }
+    }));
+
+    expect(loadVnDevtoolsSessionState(storage, "v3")).toBeUndefined();
   });
 });
 

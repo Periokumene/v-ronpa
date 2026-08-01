@@ -186,6 +186,32 @@ describe("Nani devtools initial candidate handshake", () => {
       reason: "catalog-link-error",
       message: expect.stringContaining("#Start")
     });
+
+    const fast = await prepareVnDevtoolsInitialCandidate({
+      activeCandidate,
+      candidate: {
+        entryId: runtimeEntry.id,
+        scriptPath: brokenChapter.source.scriptPath,
+        sourceText: brokenChapter.source.sourceText,
+        serverRevision: brokenChapter.revision,
+        diagnostics: []
+      },
+      pinnedTarget: brokenChapter.commands[0]!.anchor,
+      materializationMode: "fast-current-script",
+      vnActive: true
+    });
+    expect(fast).toMatchObject({
+      kind: "materialize-pinned-target",
+      catalogVerified: false,
+      result: {
+        status: "ready",
+        provenance: {
+          mode: "fast-current-script",
+          originScriptPath: "game-a/chapter-02.nani"
+        },
+        executedScriptPaths: ["game-a/chapter-02.nani"]
+      }
+    });
   });
 });
 

@@ -119,12 +119,21 @@ export interface VnDebugDecisionTrace {
 
 export const EMPTY_VN_DEBUG_DECISION_TRACE: VnDebugDecisionTrace = { choices: [], inputs: [] };
 
+export type VnDebugMaterializationMode = "fast-current-script" | "canonical-entry";
+
+export interface VnDebugMaterializationProvenance {
+  mode: VnDebugMaterializationMode;
+  originScriptPath: string;
+  originInstructionPointer: number;
+}
+
 interface VnDebugMaterializationBase {
   inspection: VnDebugScriptInspection;
   diagnostics: VnRuntimeDiagnostic[];
   executedInstructions: number;
   executedScriptPaths: string[];
   degraded: boolean;
+  provenance: VnDebugMaterializationProvenance;
   target: VnDebugTargetAnchor;
   lastStableAnchor?: VnDebugTargetAnchor;
 }
@@ -169,12 +178,17 @@ export type VnDebugMaterializationBlockedCode =
   | "loop-detected"
   | "instruction-limit"
   | "catalog-link-error"
+  | "fast-cross-script-navigation"
   | "unstable-checkpoint";
 
 export interface VnDebugMaterializationBlocked extends VnDebugMaterializationBase {
   status: "blocked";
   code: VnDebugMaterializationBlockedCode;
   message: string;
+  navigation?: {
+    sourceScriptPath: string;
+    endpoint: string;
+  };
 }
 
 export type VnDebugMaterializationResult =
@@ -182,19 +196,33 @@ export type VnDebugMaterializationResult =
   | VnDebugMaterializationDecisionRequired
   | VnDebugMaterializationBlocked;
 
-export interface MaterializeVnDebugTargetInput {
+interface MaterializeVnDebugTargetBaseInput {
   entry: VnEntryDef;
-  catalog: VnRuntimeScriptCatalog;
   target: VnDebugTargetAnchor;
   decisions?: VnDebugDecisionTrace;
   expectedRevision?: string;
-  inspection?: VnDebugScriptInspection;
   maxInstructions?: number;
   nowMs?: number;
   profile?: VnRuntimeProfile;
   routeTable?: VnOutputRouteTable;
   signal?: AbortSignal;
 }
+
+export interface MaterializeVnDebugFastTargetInput extends MaterializeVnDebugTargetBaseInput {
+  mode: "fast-current-script";
+  inspection: VnDebugScriptInspection;
+  catalog?: never;
+}
+
+export interface MaterializeVnDebugCanonicalTargetInput extends MaterializeVnDebugTargetBaseInput {
+  mode: "canonical-entry";
+  catalog: VnRuntimeScriptCatalog;
+  inspection?: VnDebugScriptInspection;
+}
+
+export type MaterializeVnDebugTargetInput =
+  | MaterializeVnDebugFastTargetInput
+  | MaterializeVnDebugCanonicalTargetInput;
 
 export async function inspectVnDebugScript(
   entry: VnEntryDef,
@@ -265,30 +293,43 @@ export async function inspectVnDebugScript(
   };
 }
 
-export async function materializeVnDebugTarget({
-  catalog,
-  decisions = EMPTY_VN_DEBUG_DECISION_TRACE,
-  entry,
-  expectedRevision,
-  inspection: providedInspection,
-  maxInstructions = DEFAULT_VN_DEBUG_MAX_INSTRUCTIONS,
-  nowMs = 0,
-  profile,
-  routeTable,
-  signal,
-  target
-}: MaterializeVnDebugTargetInput): Promise<VnDebugMaterializationResult> {
-  const inspections = await Promise.all(catalog.map((source) => inspectVnDebugScript(entry, source)));
+export async function materializeVnDebugTarget(
+  input: MaterializeVnDebugTargetInput
+): Promise<VnDebugMaterializationResult> {
+  const {
+    decisions = EMPTY_VN_DEBUG_DECISION_TRACE,
+    entry,
+    expectedRevision,
+    maxInstructions = DEFAULT_VN_DEBUG_MAX_INSTRUCTIONS,
+    mode,
+    nowMs = 0,
+    profile,
+    routeTable,
+    signal,
+    target
+  } = input;
+  const providedInspection = input.inspection;
+  const inspections: VnDebugScriptInspection[] = mode === "fast-current-script"
+    ? [input.inspection]
+    : await Promise.all(input.catalog.map((source) => inspectVnDebugScript(entry, source)));
   const inspectionsByPath = new Map(inspections.map((candidate) => [candidate.source.scriptPath, candidate]));
   if (providedInspection) inspectionsByPath.set(providedInspection.source.scriptPath, providedInspection);
-  const inspection = inspectionsByPath.get(target.scriptPath) ?? providedInspection ?? inspections[0];
+  const inspection = mode === "fast-current-script"
+    ? providedInspection
+    : inspectionsByPath.get(target.scriptPath) ?? providedInspection ?? inspections[0];
   if (!inspection) throw new Error("The VN debug catalog is empty.");
+  let provenance: VnDebugMaterializationProvenance = {
+    mode,
+    originScriptPath: inspection.source.scriptPath,
+    originInstructionPointer: 0
+  };
   const base = () => ({
     inspection,
     diagnostics,
     executedInstructions,
     executedScriptPaths: [...new Set(executedScriptPaths)],
     degraded,
+    provenance,
     target,
     ...(lastStableAnchor ? { lastStableAnchor } : {})
   });
@@ -301,20 +342,22 @@ export async function materializeVnDebugTarget({
   let lastStableAnchor: VnDebugTargetAnchor | undefined;
 
   if (signal?.aborted) throw abortError();
-  const linked = linkRuntimeScriptCatalog(entry, inspections.map((candidate) => candidate.script));
-  if (linked.diagnostics.length > 0) {
-    return blocked(base(), "catalog-link-error", linked.diagnostics[0]!.message);
-  }
-  const invalidCatalogScript = inspections.find((candidate) => !candidate.canMaterialize);
-  if (invalidCatalogScript) {
-    return blocked(
-      base(),
-      "invalid-source",
-      `The candidate catalog script '${invalidCatalogScript.source.scriptPath}' contains parser or compiler errors.`
-    );
-  }
-  if (providedInspection && !catalog.some((source) => sameDebugScriptSource(source, providedInspection.source))) {
-    return blocked(base(), "invalid-source", "The supplied inspection does not belong to the requested runtime entry source.");
+  if (mode === "canonical-entry") {
+    const linked = linkRuntimeScriptCatalog(entry, inspections.map((candidate) => candidate.script));
+    if (linked.diagnostics.length > 0) {
+      return blocked(base(), "catalog-link-error", linked.diagnostics[0]!.message);
+    }
+    const invalidCatalogScript = inspections.find((candidate) => !candidate.canMaterialize);
+    if (invalidCatalogScript) {
+      return blocked(
+        base(),
+        "invalid-source",
+        `The candidate catalog script '${invalidCatalogScript.source.scriptPath}' contains parser or compiler errors.`
+      );
+    }
+    if (providedInspection && !input.catalog.some((source) => sameDebugScriptSource(source, providedInspection.source))) {
+      return blocked(base(), "invalid-source", "The supplied inspection does not belong to the requested runtime entry source.");
+    }
   }
   if (!inspection.canMaterialize) {
     return blocked(base(), "invalid-source", "The candidate source contains parser, compiler, or start-label errors.");
@@ -345,18 +388,27 @@ export async function materializeVnDebugTarget({
     return blocked(base(), "no-stable-result", targetCommand.previewReason ?? "The command has no stable checkpoint result.");
   }
 
-  const initialInspection = inspectionsByPath.get(entry.initialScriptPath);
-  if (!initialInspection) {
+  const originInspection = mode === "fast-current-script"
+    ? inspection
+    : inspectionsByPath.get(entry.initialScriptPath);
+  if (!originInspection) {
     return blocked(base(), "invalid-source", `The entry initial script '${entry.initialScriptPath}' is not in the debug catalog.`);
   }
   const boot = createVnSession({
-    scriptPath: initialInspection.source.scriptPath,
-    sourceText: initialInspection.source.sourceText,
-    ...(entry.startLabel ? { startLabel: entry.startLabel } : {})
+    scriptPath: originInspection.source.scriptPath,
+    sourceText: originInspection.source.sourceText,
+    ...(originInspection.source.scriptPath === entry.initialScriptPath && entry.startLabel
+      ? { startLabel: entry.startLabel }
+      : {})
   });
   let session = boot.session;
-  let currentInspection = initialInspection;
-  executedScriptPaths = [initialInspection.source.scriptPath];
+  let currentInspection = originInspection;
+  executedScriptPaths = [originInspection.source.scriptPath];
+  provenance = {
+    mode,
+    originScriptPath: originInspection.source.scriptPath,
+    originInstructionPointer: boot.session.story.instructionPointer
+  };
   let pixiStage = createInitialPixiStageSnapshot();
   let mediaState = createInitialMediaRuntimeState();
   let uiState = createInitialUiRuntimeState();
@@ -459,6 +511,13 @@ export async function materializeVnDebugTarget({
         return blocked(base(), "decision-invalid", "The selected choice is no longer enabled or valid.");
       }
       if (resolved.storyStep.navigationRequest) {
+        if (mode === "fast-current-script") {
+          return fastNavigationBlocked(
+            base(),
+            currentInspection.source.scriptPath,
+            resolved.storyStep.navigationRequest.endpoint
+          );
+        }
         navigationCount += 1;
         if (navigationCount > 32) return blocked(base(), "loop-detected", "Debug navigation exceeded 32 cross-script transitions.");
         const navigation = switchDebugNavigation(
@@ -537,6 +596,13 @@ export async function materializeVnDebugTarget({
     if (commandIsTarget && command.commandId === "choice") targetChoiceSeen = true;
 
     if (step.storyStep.navigationRequest) {
+      if (mode === "fast-current-script") {
+        return fastNavigationBlocked(
+          base(),
+          currentInspection.source.scriptPath,
+          step.storyStep.navigationRequest.endpoint
+        );
+      }
       navigationCount += 1;
       if (navigationCount > 32) return blocked(base(), "loop-detected", "Debug navigation exceeded 32 cross-script transitions.");
       const navigation = switchDebugNavigation(
@@ -846,6 +912,20 @@ function blocked(
   message: string
 ): VnDebugMaterializationBlocked {
   return { ...base, status: "blocked", code, message };
+}
+
+function fastNavigationBlocked(
+  base: Omit<VnDebugMaterializationBase, "status">,
+  sourceScriptPath: string,
+  endpoint: string
+): VnDebugMaterializationBlocked {
+  return {
+    ...base,
+    status: "blocked",
+    code: "fast-cross-script-navigation",
+    message: `FastDebug stopped at cross-script navigation '${endpoint}' from '${sourceScriptPath}'. Switch to Entry mode to replay authored upstream state.`,
+    navigation: { sourceScriptPath, endpoint }
+  };
 }
 
 function requireInputDecision(

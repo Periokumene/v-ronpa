@@ -432,6 +432,7 @@ describe("projectVnRuntimeStep", () => {
     });
     const target = inspection.commands.find((command) => command.anchor.stableId === "print:parity_line")!.anchor;
     const materialized = await materializeVnDebugTarget({
+      mode: "canonical-entry",
       entry: inspection.entry,
       catalog: [inspection.source],
       inspection,
@@ -477,6 +478,7 @@ describe("projectVnRuntimeStep", () => {
 
       const live = projectLiveCheckpointThroughCommand(inspection, stopCommand.anchor.commandIndex);
       const materialized = await materializeVnDebugTarget({
+        mode: "canonical-entry",
         entry: inspection.entry,
         catalog: [inspection.source],
         inspection,

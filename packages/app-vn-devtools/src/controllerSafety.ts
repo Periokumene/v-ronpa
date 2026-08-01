@@ -1,5 +1,6 @@
 import {
   type VnDebugDecisionTrace,
+  type VnDebugMaterializationMode,
   type VnDebugScriptInspection,
   type VnDebugMaterializationDecisionRequired,
   type VnDebugTargetAnchor
@@ -9,8 +10,8 @@ import type { VnDevtoolsScriptCandidate } from "./scriptCandidate";
 
 /**
  * The Dock always displays the newest saved source, including a rejected
- * candidate. Only an explicitly installable display may cross the
- * materialization boundary.
+ * candidate. Local verification may authorize FastDebug calculation; only a
+ * catalog-verified display represents a source already proven installable.
  */
 export type VnDevtoolsInspectionDisplay =
   | {
@@ -18,7 +19,12 @@ export type VnDevtoolsInspectionDisplay =
     inspection: VnDebugScriptInspection;
   }
   | {
-    access: "installable";
+    access: "verified-local";
+    inspection: VnDebugScriptInspection;
+    expectedRevision?: string;
+  }
+  | {
+    access: "catalog-verified";
     inspection: VnDebugScriptInspection;
     expectedRevision?: string;
   };
@@ -49,28 +55,41 @@ export function createReadOnlyVnDevtoolsInspectionDisplay(
   return { access: "read-only", inspection };
 }
 
-export function createInstallableVnDevtoolsInspectionDisplay(
+export function createVerifiedLocalVnDevtoolsInspectionDisplay(
   inspection: VnDebugScriptInspection,
   expectedRevision?: string
 ): VnDevtoolsInspectionDisplay {
   return {
-    access: "installable",
+    access: "verified-local",
+    inspection,
+    ...(expectedRevision ? { expectedRevision } : {})
+  };
+}
+
+export function createCatalogVerifiedVnDevtoolsInspectionDisplay(
+  inspection: VnDebugScriptInspection,
+  expectedRevision?: string
+): VnDevtoolsInspectionDisplay {
+  return {
+    access: "catalog-verified",
     inspection,
     ...(expectedRevision ? { expectedRevision } : {})
   };
 }
 
 export function canMaterializeVnDevtoolsInspection(
-  display: VnDevtoolsInspectionDisplay | undefined
-): display is Extract<VnDevtoolsInspectionDisplay, { access: "installable" }> {
-  return display?.access === "installable";
+  display: VnDevtoolsInspectionDisplay | undefined,
+  mode: VnDebugMaterializationMode
+): display is Exclude<VnDevtoolsInspectionDisplay, { access: "read-only" }> {
+  return display?.access === "catalog-verified"
+    || (mode === "fast-current-script" && display?.access === "verified-local");
 }
 
 export function canPinCurrentVnDevtoolsInspection(
   display: VnDevtoolsInspectionDisplay | undefined,
   installedEntry: VnDevtoolsScriptCandidate
 ): boolean {
-  return canMaterializeVnDevtoolsInspection(display)
+  return display?.access === "catalog-verified"
     && vnDebugScriptIdentity(display.inspection) === vnDebugScriptIdentity(installedEntry);
 }
 
