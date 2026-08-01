@@ -76,6 +76,25 @@ export function WorkbenchCommandStrip({
         <primary.Icon size={15} weight="fill" aria-hidden="true" />
         <span>{primary.label}</span>
       </button>
+      <button
+        type="button"
+        className="vn-devtools-fast-debug-toggle"
+        aria-label="FastDebug"
+        aria-pressed={controller.materializationMode === "fast-current-script"}
+        title={controller.materializationMode === "fast-current-script"
+          ? "FastDebug is on: preview from the current script"
+          : "Entry mode is on: replay from the canonical entry"}
+        disabled={controller.materializationModeLocked}
+        data-testid="vn-devtools-fast-debug-toggle"
+        onClick={() => controller.actions.setMaterializationMode(
+          controller.materializationMode === "fast-current-script"
+            ? "canonical-entry"
+            : "fast-current-script"
+        )}
+      >
+        <span className="vn-devtools-fast-debug-name">FastDebug</span>
+        <strong>{controller.materializationMode === "fast-current-script" ? "FAST" : "ENTRY"}</strong>
+      </button>
       <span className="vn-devtools-command-divider" aria-hidden="true" />
       <ToolButton label="Pin current" onClick={controller.actions.pinCurrent} Icon={PushPin} />
       <ToolButton label="Clear fixed point" onClick={controller.actions.unpin} Icon={XCircle} />

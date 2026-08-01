@@ -1,4 +1,5 @@
 import type { TextSpan } from "@v-ronpa/nani-parser";
+import type { VnDebugMaterializationMode } from "@v-ronpa/app-vn-runtime/debug";
 
 export const VN_DEVTOOLS_DEFAULT_WIDTH = 504;
 export const VN_DEVTOOLS_MIN_WIDTH = 320;
@@ -133,6 +134,7 @@ export interface VnDevtoolsActions {
   cancelDecision: () => void;
   cancelCandidate: () => void;
   copyLocation: (location: VnDevtoolsSourceLocation) => void;
+  setMaterializationMode: (mode: VnDebugMaterializationMode) => void;
 }
 
 export interface VnDevtoolsScriptItem {
@@ -155,6 +157,8 @@ export interface VnDevtoolsController {
   width: number;
   layout: VnDevtoolsLayoutState;
   status: VnDevtoolsStatus;
+  materializationMode: VnDebugMaterializationMode;
+  materializationModeLocked: boolean;
   diagnostics: readonly VnDevtoolsDiagnostic[];
   summaries: VnDevtoolsRuntimeSummaries;
   decision?: VnDevtoolsDecision;

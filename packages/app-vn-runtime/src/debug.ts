@@ -12,6 +12,8 @@ export {
 } from "./debugMaterializer";
 export type {
   MaterializeVnDebugTargetInput,
+  MaterializeVnDebugCanonicalTargetInput,
+  MaterializeVnDebugFastTargetInput,
   VnDebugChoiceDecision,
   VnDebugChoiceRequest,
   VnDebugCommandInspection,
@@ -23,6 +25,8 @@ export type {
   VnDebugMaterializationBlocked,
   VnDebugMaterializationBlockedCode,
   VnDebugMaterializationDecisionRequired,
+  VnDebugMaterializationMode,
+  VnDebugMaterializationProvenance,
   VnDebugMaterializationReady,
   VnDebugMaterializationResult,
   VnDebugPreviewability,

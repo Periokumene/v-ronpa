@@ -4,6 +4,7 @@ import {
   materializeVnDebugTarget,
   resolveVnDebugAnchor,
   type VnDebugDecisionTrace,
+  type VnDebugMaterializationMode,
   type VnDebugScriptInspection,
   type VnDebugMaterializationResult,
   type VnDebugTargetAnchor
@@ -27,21 +28,24 @@ export type PreparedVnDevtoolsCandidateUpdate =
     kind: "refresh-source-mapping";
     inspection: VnDebugScriptInspection;
     expectedRevision: string;
+    catalogVerified: true;
     remappedTarget?: VnDebugTargetAnchor;
   }
   | {
     kind: "materialize-pinned-target";
     inspection: VnDebugScriptInspection;
     expectedRevision: string;
+    catalogVerified: boolean;
     result: VnDebugMaterializationResult;
   }
   | {
       kind: "adopt-catalog";
       inspection: VnDebugScriptInspection;
       expectedRevision: string;
+      catalogVerified: true;
       impact: "next-start" | "future-navigation";
     }
-  | { kind: "require-preview-target"; inspection: VnDebugScriptInspection; expectedRevision: string };
+  | { kind: "require-preview-target"; inspection: VnDebugScriptInspection; expectedRevision: string; catalogVerified: boolean };
 
 export type VnDevtoolsScriptUpdateImpact = "next-start" | "future-navigation" | "executed-session";
 
@@ -51,6 +55,7 @@ export interface PrepareVnDevtoolsCandidateUpdateInput {
   pinnedTarget?: VnDebugTargetAnchor;
   decisions?: VnDebugDecisionTrace;
   impact: VnDevtoolsScriptUpdateImpact;
+  materializationMode?: VnDebugMaterializationMode;
   signal?: AbortSignal;
 }
 
@@ -80,6 +85,7 @@ export async function prepareVnDevtoolsCandidateUpdate({
   activeCandidate,
   decisions = EMPTY_VN_DEBUG_DECISION_TRACE,
   impact,
+  materializationMode = "canonical-entry",
   pinnedTarget,
   signal,
   update
@@ -113,6 +119,23 @@ export async function prepareVnDevtoolsCandidateUpdate({
   if (!expectedRevision) {
     return { kind: "retain-last-known-good", inspection, reason: "invalid-source" };
   }
+  if (plan.kind === "materialize-pinned-target" && materializationMode === "fast-current-script") {
+    if (!replayTarget) return { kind: "retain-last-known-good", inspection, reason: "invalid-source" };
+    const result = await materializeVnDebugTarget({
+      mode: materializationMode,
+      entry: inspection.entry,
+      inspection,
+      target: replayTarget,
+      decisions,
+      expectedRevision,
+      ...(signal ? { signal } : {})
+    });
+    throwIfAborted(signal);
+    return { kind: plan.kind, inspection, expectedRevision, catalogVerified: false, result };
+  }
+  if (plan.kind === "require-preview-target" && materializationMode === "fast-current-script") {
+    return { kind: plan.kind, inspection, expectedRevision, catalogVerified: false };
+  }
   const catalogValidation = await validateVnDevtoolsCandidateCatalog(candidateCatalog);
   throwIfAborted(signal);
   if (!catalogValidation.ok) {
@@ -133,6 +156,7 @@ export async function prepareVnDevtoolsCandidateUpdate({
       kind: plan.kind,
       inspection,
       expectedRevision,
+      catalogVerified: true,
       ...(remappedTarget ? { remappedTarget } : {})
     };
   }
@@ -141,6 +165,7 @@ export async function prepareVnDevtoolsCandidateUpdate({
       return { kind: "retain-last-known-good", inspection, reason: "invalid-source" };
     }
     const result = await materializeVnDebugTarget({
+      mode: "canonical-entry",
       entry: inspection.entry,
       catalog: candidateCatalog.catalog,
       inspection,
@@ -150,17 +175,18 @@ export async function prepareVnDevtoolsCandidateUpdate({
       ...(signal ? { signal } : {})
     });
     throwIfAborted(signal);
-    return { kind: plan.kind, inspection, expectedRevision, result };
+    return { kind: plan.kind, inspection, expectedRevision, catalogVerified: true, result };
   }
   if (plan.kind === "adopt-for-next-start") {
     return {
       kind: "adopt-catalog",
       inspection,
       expectedRevision,
+      catalogVerified: true,
       impact: impact === "executed-session" ? "next-start" : impact
     };
   }
-  return { kind: "require-preview-target", inspection, expectedRevision };
+  return { kind: "require-preview-target", inspection, expectedRevision, catalogVerified: true };
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {

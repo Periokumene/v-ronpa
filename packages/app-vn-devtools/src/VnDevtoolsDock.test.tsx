@@ -110,6 +110,32 @@ describe("VnDevtoolsDock", () => {
     expect(actions.previewLine).toHaveBeenCalledWith("line:dialog");
   });
 
+  it("exposes an accessible always-visible FastDebug mode switch", () => {
+    const actions = createActions();
+    const fast = VnDevtoolsDock({ controller: createController(actions) });
+    const fastToggle = findByTestId(fast, "vn-devtools-fast-debug-toggle");
+
+    expect(fastToggle?.props).toMatchObject({
+      "aria-label": "FastDebug",
+      "aria-pressed": true,
+      disabled: false
+    });
+    expect(collectText(fastToggle).join(" ")).toContain("FAST");
+    (fastToggle?.props as { onClick: () => void }).onClick();
+    expect(actions.setMaterializationMode).toHaveBeenCalledWith("canonical-entry");
+
+    const entryMode = VnDevtoolsDock({
+      controller: createController(actions, {
+        materializationMode: "canonical-entry",
+        materializationModeLocked: true
+      })
+    });
+    expect(findByTestId(entryMode, "vn-devtools-fast-debug-toggle")?.props).toMatchObject({
+      "aria-pressed": false,
+      disabled: true
+    });
+  });
+
   it("exposes a keyboard-operated multi-script listbox without changing runtime state", async () => {
     const actions = createActions();
     const element = VnDevtoolsDock({
@@ -332,6 +358,8 @@ function createController(
     width: 504,
     layout: { bottomPanelOpen: true, activePanel: "state", bottomPanelHeight: 180 },
     status: { phase: "ready", message: "Pinned target is stable." },
+    materializationMode: "fast-current-script",
+    materializationModeLocked: false,
     diagnostics: [
       {
         id: "missing-portrait",
@@ -368,7 +396,8 @@ function createActions(): VnDevtoolsActions {
     submitDecision: vi.fn<(submission: VnDevtoolsDecisionSubmission) => void>(),
     cancelDecision: vi.fn<() => void>(),
     cancelCandidate: vi.fn<() => void>(),
-    copyLocation: vi.fn<(location: VnDevtoolsSourceLocation) => void>()
+    copyLocation: vi.fn<(location: VnDevtoolsSourceLocation) => void>(),
+    setMaterializationMode: vi.fn<VnDevtoolsActions["setMaterializationMode"]>()
   };
 }
 

@@ -9,7 +9,7 @@ import {
   materializeVnDebugTarget as materializeDebugTarget,
   type VnDebugChoiceRequest,
   type VnDebugInputRequest,
-  type MaterializeVnDebugTargetInput
+  type MaterializeVnDebugCanonicalTargetInput
 } from "./debugMaterializer";
 
 describe("VN debug inspection and materialization", () => {
@@ -472,6 +472,134 @@ describe("VN debug inspection and materialization", () => {
     expect(result.checkpoint.story.variables.enabled).toBe(false);
   });
 
+  it("cold-starts a non-entry script at pointer zero without inspecting or replaying upstream state", async () => {
+    const runtimeEntry: VnEntryDef = {
+      id: "vn:debug-fast-non-entry",
+      title: "Fast non-entry",
+      initialScriptPath: "game-a/opening.nani",
+      startLabel: "Start",
+      profile: "vn2d",
+      assetRefs: []
+    };
+    const chapter = await inspectDebugScriptImpl(runtimeEntry, {
+      scriptPath: "game-a/chapter-02.nani",
+      scriptRevision: "pending",
+      sourceText: [
+        '@set local:"chapter-only"',
+        "#Start",
+        "Narrator: Fast target.|#fast_target|"
+      ].join("\n")
+    });
+    const target = chapter.commands.find((command) => command.anchor.stableId === "print:fast_target")!.anchor;
+
+    const result = await materializeDebugTarget({
+      mode: "fast-current-script",
+      entry: runtimeEntry,
+      inspection: chapter,
+      target
+    });
+
+    expect(result).toMatchObject({
+      status: "ready",
+      provenance: {
+        mode: "fast-current-script",
+        originScriptPath: "game-a/chapter-02.nani",
+        originInstructionPointer: 0
+      },
+      executedScriptPaths: ["game-a/chapter-02.nani"],
+      checkpoint: {
+        story: { variables: { local: "chapter-only" } }
+      }
+    });
+  });
+
+  it("honors the configured start label when FastDebug targets the entry script", async () => {
+    const inspection = await inspectVnDebugScript(entry([
+      '@set skipped:"before-start"',
+      "#Start",
+      '@set started:"at-entry-label"',
+      "Narrator: Entry target.|#entry_fast_target|"
+    ].join("\n")));
+    const target = inspection.commands.find((command) => command.anchor.stableId === "print:entry_fast_target")!.anchor;
+
+    const result = await materializeDebugTarget({
+      mode: "fast-current-script",
+      entry: inspection.entry,
+      inspection,
+      target
+    });
+
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.provenance).toEqual({
+      mode: "fast-current-script",
+      originScriptPath: inspection.source.scriptPath,
+      originInstructionPointer: inspection.script.labels.Start
+    });
+    expect(result.checkpoint.story.variables).toEqual({ started: "at-entry-label" });
+  });
+
+  it("allows local choice navigation but blocks the first cross-script navigation in FastDebug", async () => {
+    const runtimeEntry: VnEntryDef = {
+      id: "vn:debug-fast-navigation",
+      title: "Fast navigation",
+      initialScriptPath: "game-a/opening.nani",
+      startLabel: "Start",
+      profile: "vn2d",
+      assetRefs: []
+    };
+    const chapter = await inspectDebugScriptImpl(runtimeEntry, {
+      scriptPath: "game-a/chapter-02.nani",
+      scriptRevision: "pending",
+      sourceText: [
+        '@choice "Local" goto:#Local id:local',
+        '@choice "Stay" goto:#Stay id:stay',
+        "#Local",
+        '@set local:true',
+        "@goto game-a/chapter-03.nani#Start",
+        "Narrator: Unreachable.|#unreachable|",
+        "#Stay",
+        "Narrator: Stayed."
+      ].join("\n")
+    });
+    const target = chapter.commands.find((command) => command.anchor.stableId === "print:unreachable")!.anchor;
+    const requested = await materializeDebugTarget({
+      mode: "fast-current-script",
+      entry: runtimeEntry,
+      inspection: chapter,
+      target
+    });
+    expect(requested.status).toBe("decision-required");
+    if (requested.status !== "decision-required" || requested.decision.kind !== "choice") return;
+
+    const result = await materializeDebugTarget({
+      mode: "fast-current-script",
+      entry: runtimeEntry,
+      inspection: chapter,
+      target,
+      decisions: {
+        inputs: [],
+        choices: [{
+          anchor: requested.decision.anchor,
+          choiceId: "local",
+          text: "Local",
+          goto: "#Local"
+        }]
+      }
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      code: "fast-cross-script-navigation",
+      executedScriptPaths: ["game-a/chapter-02.nani"],
+      navigation: {
+        sourceScriptPath: "game-a/chapter-02.nani",
+        endpoint: "game-a/chapter-03.nani#Start"
+      }
+    });
+    expect("checkpoint" in result).toBe(false);
+  });
+
   it("replays from the entry start through a cross-script choice into the target anchor", async () => {
     const runtimeEntry: VnEntryDef = {
       id: "vn:debug-multi",
@@ -506,6 +634,7 @@ describe("VN debug inspection and materialization", () => {
     const target = second.commands.find((command) => command.anchor.stableId === "print:arrived")!.anchor;
 
     const requested = await materializeDebugTarget({
+      mode: "canonical-entry",
       entry: runtimeEntry,
       catalog,
       inspection: second,
@@ -515,6 +644,7 @@ describe("VN debug inspection and materialization", () => {
     if (requested.status !== "decision-required" || requested.decision.kind !== "choice") return;
 
     const result = await materializeDebugTarget({
+      mode: "canonical-entry",
       entry: runtimeEntry,
       catalog,
       inspection: second,
@@ -544,6 +674,11 @@ describe("VN debug inspection and materialization", () => {
       "game-a/chapter-01.nani",
       "game-a/chapter-02.nani"
     ]);
+    expect(result.provenance).toEqual({
+      mode: "canonical-entry",
+      originScriptPath: "game-a/chapter-01.nani",
+      originInstructionPointer: first.script.labels.Start
+    });
   });
 
   it("authenticates the updated catalog record instead of the cross-script fixed-point target", async () => {
@@ -572,6 +707,7 @@ describe("VN debug inspection and materialization", () => {
     const target = chapter.commands.find((command) => command.anchor.stableId === "print:target")!.anchor;
 
     const result = await materializeDebugTarget({
+      mode: "canonical-entry",
       entry: runtimeEntry,
       catalog: [opening.source, chapter.source],
       inspection: opening,
@@ -617,12 +753,12 @@ function inspectVnDebugScript(value: DebugTestScript) {
 }
 
 function materializeVnDebugTarget(
-  input: Omit<MaterializeVnDebugTargetInput, "catalog" | "entry"> & {
+  input: Omit<MaterializeVnDebugCanonicalTargetInput, "catalog" | "entry" | "mode"> & {
     entry: VnEntryDef | DebugTestScript;
   }
 ) {
   const testEntry = "source" in input.entry ? input.entry : undefined;
   const runtimeEntry: VnEntryDef = testEntry?.entry ?? input.entry as VnEntryDef;
   const catalog = testEntry ? [testEntry.source] : [input.inspection!.source];
-  return materializeDebugTarget({ ...input, entry: runtimeEntry, catalog });
+  return materializeDebugTarget({ ...input, mode: "canonical-entry", entry: runtimeEntry, catalog });
 }

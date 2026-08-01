@@ -13,6 +13,8 @@ import {
   type VnDebugChoiceDecision,
   type VnDebugScriptInspection,
   type VnDebugInputDecision,
+  type VnDebugMaterializationMode,
+  type VnDebugMaterializationProvenance,
   type VnDebugMaterializationResult,
   type VnDebugMaterializationDecisionRequired,
   type VnDebugTargetAnchor
@@ -48,8 +50,9 @@ import {
   canMaterializeVnDevtoolsInspection,
   canPinCurrentVnDevtoolsInspection,
   canReauthorizeVnDevtoolsInspection,
-  createInstallableVnDevtoolsInspectionDisplay,
+  createCatalogVerifiedVnDevtoolsInspectionDisplay,
   createReadOnlyVnDevtoolsInspectionDisplay,
+  createVerifiedLocalVnDevtoolsInspectionDisplay,
   resolveCurrentVnDevtoolsAnchor,
   vnDebugAnchorIdentity,
   vnDebugAnchorsEqual,
@@ -77,6 +80,7 @@ import type {
 import {
   candidateFromVnDebugInspection,
   createVnDevtoolsScriptCandidate,
+  validateVnDevtoolsCandidateCatalog,
   type VnDevtoolsScriptCandidate
 } from "./scriptCandidate";
 import { createVnDevtoolsScriptAuthorityCoordinator } from "./scriptAuthorityCoordinator";
@@ -115,6 +119,7 @@ interface PendingDecisionContext {
   result: VnDebugMaterializationDecisionRequired;
   inspection: VnDebugScriptInspection;
   target: VnDebugTargetAnchor;
+  mode: VnDebugMaterializationMode;
   expectedRevision?: string;
 }
 
@@ -131,6 +136,7 @@ interface VnDevtoolsSessionSnapshot {
   collapsed: boolean;
   width: number;
   layout: VnDevtoolsLayoutState;
+  materializationMode: VnDebugMaterializationMode;
   pinnedTarget?: VnDebugTargetAnchor;
   decisions: VnDebugDecisionTrace;
   viewedScriptPath: string;
@@ -168,6 +174,7 @@ export function useVnDevtoolsController({
   const [collapsed, setCollapsed] = useState(initialSession.collapsed);
   const [width, setWidth] = useState(initialSession.width);
   const [layout, setLayout] = useState(initialSession.layout);
+  const [materializationMode, setMaterializationMode] = useState(initialSession.materializationMode);
   const [viewedScriptPath, setViewedScriptPath] = useState(
     initialSession.viewedScriptPath && catalog.some((source) => source.scriptPath === initialSession.viewedScriptPath)
       ? initialSession.viewedScriptPath
@@ -209,6 +216,12 @@ export function useVnDevtoolsController({
   storySessionRef.current = runtime.presentation.storySession;
   const installedMaterializationProvenanceRef = useRef<{
     storySession: number;
+    mode: VnDebugMaterializationMode;
+    executedScriptPaths: readonly string[];
+  } | undefined>(undefined);
+  const [lastMaterialization, setLastMaterialization] = useState<{
+    provenance: VnDebugMaterializationProvenance;
+    executedInstructions: number;
     executedScriptPaths: readonly string[];
   } | undefined>(undefined);
   const latestTasksRef = useRef(createVnDevtoolsLatestTaskController());
@@ -230,6 +243,7 @@ export function useVnDevtoolsController({
     collapsed: initialSession.collapsed,
     width: initialSession.width,
     layout: initialSession.layout,
+    materializationMode: initialSession.materializationMode,
     viewedScriptPath,
     ...(initialSession.pinnedTarget ? { pinnedTarget: initialSession.pinnedTarget } : {}),
     decisions: restoreDecisions(initialSession.decisions)
@@ -238,6 +252,7 @@ export function useVnDevtoolsController({
     collapsed,
     width,
     layout,
+    materializationMode,
     viewedScriptPath,
     ...(pinnedTarget ? { pinnedTarget } : {}),
     decisions
@@ -247,6 +262,7 @@ export function useVnDevtoolsController({
     collapsed?: boolean;
     width?: number;
     layout?: Partial<VnDevtoolsLayoutState>;
+    materializationMode?: VnDebugMaterializationMode;
     pinnedTarget?: VnDebugTargetAnchor | null;
     decisions?: VnDebugDecisionTrace;
     viewedScriptPath?: string;
@@ -262,6 +278,7 @@ export function useVnDevtoolsController({
       collapsed: next?.collapsed ?? current.collapsed,
       width: next?.width ?? current.width,
       layout: nextLayout,
+      materializationMode: next?.materializationMode ?? current.materializationMode,
       viewedScriptPath: next?.viewedScriptPath ?? current.viewedScriptPath,
       ...(nextPinnedTarget ? { pinnedTarget: nextPinnedTarget } : {}),
       decisions: next?.decisions ?? current.decisions
@@ -271,6 +288,7 @@ export function useVnDevtoolsController({
       collapsed: snapshot.collapsed,
       width: snapshot.width,
       layout: snapshot.layout,
+      materializationMode: snapshot.materializationMode,
       viewedScriptPath: snapshot.viewedScriptPath,
       ...(nextPinnedTarget ? { pinnedTarget: nextPinnedTarget } : {}),
       decisions: [...snapshot.decisions.choices, ...snapshot.decisions.inputs]
@@ -385,10 +403,16 @@ export function useVnDevtoolsController({
     if (acceptedFixedPoint) fixedPointCoordinatorRef.current!.complete(acceptedFixedPoint, result.checkpoint);
     installedMaterializationProvenanceRef.current = {
       storySession: storySessionRef.current,
+      mode: result.provenance.mode,
       executedScriptPaths: result.executedScriptPaths
     };
+    setLastMaterialization({
+      provenance: result.provenance,
+      executedInstructions: result.executedInstructions,
+      executedScriptPaths: result.executedScriptPaths
+    });
     if (!task.isCurrent()) return;
-    const installedDisplay = createInstallableVnDevtoolsInspectionDisplay(candidateInspection, expectedRevision);
+    const installedDisplay = createCatalogVerifiedVnDevtoolsInspectionDisplay(candidateInspection, expectedRevision);
     const nextStatus: VnDevtoolsStatus = {
       phase: "ready",
       message,
@@ -429,6 +453,7 @@ export function useVnDevtoolsController({
         result,
         inspection: candidateInspection,
         target: result.target,
+        mode: result.provenance.mode,
         ...(expectedRevision ? { expectedRevision } : {})
       });
       setStatus({
@@ -474,19 +499,28 @@ export function useVnDevtoolsController({
     setPendingDecision(undefined);
     setStatus({
       phase: "materializing",
-      message: "Replaying from the canonical entry without side effects.",
+      message: materializationMode === "fast-current-script"
+        ? "Replaying only the current Nani script from a cold debug state."
+        : "Replaying from the canonical entry without side effects.",
       cancellable: true,
       ...(updateId !== undefined ? { updateId } : {})
     });
-    const result = await materializeVnDebugTarget({
+    const common = {
       entry: candidateInspection.entry,
-      catalog: candidateFromVnDebugInspection(entry, candidateInspection).catalog,
       inspection: candidateInspection,
       target,
       decisions: sessionSnapshotRef.current.decisions,
       ...(expectedRevision ? { expectedRevision } : {}),
       signal: task.signal
-    }).catch((error: unknown) => {
+    };
+    const materialization = materializationMode === "fast-current-script"
+      ? materializeVnDebugTarget({ mode: materializationMode, ...common })
+      : materializeVnDebugTarget({
+          mode: materializationMode,
+          ...common,
+          catalog: candidateFromVnDebugInspection(entry, candidateInspection).catalog
+        });
+    const result = await materialization.catch((error: unknown) => {
       if (error instanceof Error && error.name === "AbortError") return undefined;
       throw error;
     });
@@ -498,16 +532,61 @@ export function useVnDevtoolsController({
       ...(expectedRevision ? { expectedRevision } : {}),
       ...(updateId !== undefined ? { updateId } : {})
     });
-  }, [entry, handleMaterializationResult]);
+  }, [entry, handleMaterializationResult, materializationMode]);
 
   useEffect(() => {
     const identity = scriptCandidateIdentity(entry);
     if (scriptAuthority.observeHost(entry.source.scriptPath, identity)) return;
     if (scriptAuthority.installedIdentity(entry.source.scriptPath) === identity) return;
     const task = latestTasksRef.current.begin();
-    const persistedTarget = persistedTargetRestoreCompletedRef.current
+    const persistedTargetCandidate = persistedTargetRestoreCompletedRef.current
       ? undefined
       : initialSession.pinnedTarget;
+    const crossViewedFastTarget = materializationMode === "fast-current-script"
+      && persistedTargetCandidate?.scriptPath !== entry.source.scriptPath
+      ? persistedTargetCandidate
+      : undefined;
+    const persistedTarget = crossViewedFastTarget ? undefined : persistedTargetCandidate;
+    const restoreCrossViewedFastTarget = async (): Promise<boolean> => {
+      if (!crossViewedFastTarget) return false;
+      const targetCandidate = createVnDevtoolsScriptCandidate(
+        entryDefinition,
+        catalog,
+        crossViewedFastTarget.scriptPath
+      );
+      if (!targetCandidate) {
+        setStatus({ phase: "blocked", message: "The persisted FastDebug target script is no longer in the catalog." });
+        return true;
+      }
+      const targetInitialCandidate = initialCandidates?.find((candidate) =>
+        candidate.entryId === entryDefinition.id && candidate.scriptPath === crossViewedFastTarget.scriptPath);
+      const targetSource = targetInitialCandidate
+        ? {
+            ...targetCandidate.source,
+            sourceText: targetInitialCandidate.sourceText,
+            scriptRevision: targetInitialCandidate.serverRevision ?? targetCandidate.source.scriptRevision
+          }
+        : targetCandidate.source;
+      const targetInspection = await inspectVnDebugScript(entryDefinition, targetSource);
+      if (
+        !targetInspection.canMaterialize
+        || (targetInitialCandidate?.serverRevision
+          ? targetInspection.revision !== targetInitialCandidate.serverRevision
+          : !targetInspection.declaredRevisionMatches)
+      ) {
+        setStatus({
+          phase: "blocked",
+          message: "The persisted FastDebug target source could not be authenticated after refresh."
+        });
+        return true;
+      }
+      await runMaterialization({
+        candidateInspection: targetInspection,
+        target: crossViewedFastTarget,
+        expectedRevision: targetInspection.revision
+      });
+      return true;
+    };
     scriptAuthority.freezePreview(entry.source.scriptPath);
     setInspectionDisplay((current) => current
       ? createReadOnlyVnDevtoolsInspectionDisplay(current.inspection)
@@ -521,6 +600,7 @@ export function useVnDevtoolsController({
         candidate: initialCandidate,
         ...(persistedTarget ? { pinnedTarget: persistedTarget } : {}),
         decisions: sessionSnapshotRef.current.decisions,
+        materializationMode,
         vnActive,
         signal: task.signal
       }).then(async (prepared) => {
@@ -544,14 +624,14 @@ export function useVnDevtoolsController({
           });
           setInspectionDisplay(display);
           setStatus(nextStatus);
+          if (await restoreCrossViewedFastTarget()) return;
           return;
         }
         if (prepared.kind === "materialize-pinned-target") {
           scriptAuthority.authorizePreview(entry.source.scriptPath);
-          setInspectionDisplay(createInstallableVnDevtoolsInspectionDisplay(
-            prepared.inspection,
-            prepared.expectedRevision
-          ));
+          setInspectionDisplay(prepared.catalogVerified
+            ? createCatalogVerifiedVnDevtoolsInspectionDisplay(prepared.inspection, prepared.expectedRevision)
+            : createVerifiedLocalVnDevtoolsInspectionDisplay(prepared.inspection, prepared.expectedRevision));
           await handleMaterializationResult({
             candidateInspection: prepared.inspection,
             expectedRevision: prepared.expectedRevision,
@@ -581,7 +661,7 @@ export function useVnDevtoolsController({
           }
           scriptAuthority.install(candidate.source.scriptPath, candidateIdentity);
           scriptAuthority.authorizePreview(candidate.source.scriptPath);
-          const display = createInstallableVnDevtoolsInspectionDisplay(
+          const display = createCatalogVerifiedVnDevtoolsInspectionDisplay(
             prepared.inspection,
             prepared.expectedRevision
           );
@@ -597,13 +677,13 @@ export function useVnDevtoolsController({
           });
           setInspectionDisplay(display);
           setStatus(nextStatus);
+          if (await restoreCrossViewedFastTarget()) return;
           return;
         }
         scriptAuthority.authorizePreview(entry.source.scriptPath);
-        const display = createInstallableVnDevtoolsInspectionDisplay(
-          prepared.inspection,
-          prepared.expectedRevision
-        );
+        const display = prepared.catalogVerified
+          ? createCatalogVerifiedVnDevtoolsInspectionDisplay(prepared.inspection, prepared.expectedRevision)
+          : createVerifiedLocalVnDevtoolsInspectionDisplay(prepared.inspection, prepared.expectedRevision);
         const nextStatus: VnDevtoolsStatus = prepared.kind === "require-preview-target"
           ? {
               phase: "blocked",
@@ -622,6 +702,7 @@ export function useVnDevtoolsController({
         });
         setInspectionDisplay(display);
         setStatus(nextStatus);
+        if (await restoreCrossViewedFastTarget()) return;
       }).catch((error: unknown) => {
         if (error instanceof Error && error.name === "AbortError") return;
         if (!task.isCurrent()) return;
@@ -655,8 +736,9 @@ export function useVnDevtoolsController({
       scriptAuthority.install(entry.source.scriptPath, identity);
       scriptAuthority.authorizePreview(entry.source.scriptPath, nextInspection.canMaterialize);
       setInspectionDisplay(nextInspection.canMaterialize
-        ? createInstallableVnDevtoolsInspectionDisplay(nextInspection)
+        ? createCatalogVerifiedVnDevtoolsInspectionDisplay(nextInspection)
         : createReadOnlyVnDevtoolsInspectionDisplay(nextInspection));
+      if (await restoreCrossViewedFastTarget()) return;
       if (persistedTarget) {
         void runMaterialization({ candidateInspection: nextInspection, target: persistedTarget });
         return;
@@ -710,7 +792,7 @@ export function useVnDevtoolsController({
         degraded: nextInspection.degraded
       });
     });
-  }, [entry, handleMaterializationResult, initialCandidate, initialSession.pinnedTarget, runMaterialization, scriptAuthority, updateSource, vnActive]);
+  }, [catalog, entry, entryDefinition, handleMaterializationResult, initialCandidate, initialCandidates, initialSession.pinnedTarget, materializationMode, runMaterialization, scriptAuthority, updateSource, vnActive]);
 
   const handleSourceUpdate = useCallback((update: NaniDevtoolsViteUpdate) => {
       const updateCandidate = createVnDevtoolsScriptCandidate(entryDefinition, catalog, update.scriptPath);
@@ -746,13 +828,16 @@ export function useVnDevtoolsController({
       const fixedTarget = armedTargetRef.current;
       const installedProvenance = installedMaterializationProvenanceRef.current;
       const executedScriptPaths = installedProvenance?.storySession === runtime.presentation.storySession
-        ? [...runtime.shell.storyRuntime.executedScriptPaths, ...installedProvenance.executedScriptPaths]
+        ? installedProvenance.mode === "fast-current-script"
+          ? installedProvenance.executedScriptPaths
+          : [...runtime.shell.storyRuntime.executedScriptPaths, ...installedProvenance.executedScriptPaths]
         : runtime.shell.storyRuntime.executedScriptPaths;
       void prepareVnDevtoolsCandidateUpdate({
         activeCandidate: updateCandidate,
         update,
         ...(fixedTarget ? { pinnedTarget: fixedTarget } : {}),
         decisions: sessionSnapshotRef.current.decisions,
+        materializationMode,
         impact: classifyVnDevtoolsScriptUpdateImpact({
           executedScriptPaths,
           runtimeScriptPath: runtime.shell.storyRuntime.state.currentScriptPath,
@@ -787,10 +872,9 @@ export function useVnDevtoolsController({
           }
           return;
         }
-        const candidateDisplay = createInstallableVnDevtoolsInspectionDisplay(
-          prepared.inspection,
-          prepared.expectedRevision
-        );
+        const candidateDisplay = prepared.catalogVerified
+          ? createCatalogVerifiedVnDevtoolsInspectionDisplay(prepared.inspection, prepared.expectedRevision)
+          : createVerifiedLocalVnDevtoolsInspectionDisplay(prepared.inspection, prepared.expectedRevision);
         if (isUpdateViewed()) {
           scriptAuthority.authorizePreview(update.scriptPath);
           setInspectionDisplay(candidateDisplay);
@@ -915,7 +999,7 @@ export function useVnDevtoolsController({
         };
         if (update.scriptPath === scriptAuthority.viewedScriptPath()) setStatus(nextStatus);
       });
-  }, [catalog, collapsed, entryDefinition, handleMaterializationResult, runtime.presentation.storySession, runtime.shell.storyRuntime.executedScriptPaths, runtime.shell.storyRuntime.state.currentScriptPath, scriptAuthority, vnActive]);
+  }, [catalog, collapsed, entryDefinition, handleMaterializationResult, materializationMode, runtime.presentation.storySession, runtime.shell.storyRuntime.executedScriptPaths, runtime.shell.storyRuntime.state.currentScriptPath, scriptAuthority, vnActive]);
   const handleSourceUpdateRef = useRef(handleSourceUpdate);
   handleSourceUpdateRef.current = handleSourceUpdate;
 
@@ -936,7 +1020,7 @@ export function useVnDevtoolsController({
   const lineModel = useMemo(
     () => createLineModel(
       inspection,
-      canMaterializeVnDevtoolsInspection(inspectionDisplay),
+      canMaterializeVnDevtoolsInspection(inspectionDisplay, materializationMode),
       Boolean(
         inspection
         && inspection.source.scriptPath === runtime.shell.storyRuntime.state.currentScriptPath
@@ -947,10 +1031,13 @@ export function useVnDevtoolsController({
       pinnedTarget,
       diagnostics
     ),
-    [diagnostics, entry, inspection, inspectionDisplay?.access, pinnedTarget, runtime.shell.storyRuntime.active, runtime.shell.storyRuntime.state.currentScriptPath, runtime.shell.storyRuntime.state.instructionPointer]
+    [diagnostics, entry, inspection, inspectionDisplay?.access, materializationMode, pinnedTarget, runtime.shell.storyRuntime.active, runtime.shell.storyRuntime.state.currentScriptPath, runtime.shell.storyRuntime.state.instructionPointer]
   );
   const decision = useMemo(() => pendingDecision ? toDockDecision(pendingDecision.result) : undefined, [pendingDecision]);
-  const summaries = useMemo(() => createSummaries(runtime, lastCheckpoint), [lastCheckpoint, runtime]);
+  const summaries = useMemo(
+    () => createSummaries(runtime, lastCheckpoint, materializationMode, lastMaterialization),
+    [lastCheckpoint, lastMaterialization, materializationMode, runtime]
+  );
   const effectiveStatus = useMemo(
     () => applyVnDevtoolsRuntimeDegradation(status, runtime.diagnostics.runtimeDiagnostics),
     [runtime.diagnostics.runtimeDiagnostics, status]
@@ -981,7 +1068,11 @@ export function useVnDevtoolsController({
 
   const previewLine = useCallback((lineId: string) => {
     updateLayout({ bottomPanelOpen: true, activePanel: "state" });
-    if (!scriptAuthority.canPreview(entry.source.scriptPath) || !inspection || !canMaterializeVnDevtoolsInspection(inspectionDisplay)) {
+    if (
+      !scriptAuthority.canPreview(entry.source.scriptPath)
+      || !inspection
+      || !canMaterializeVnDevtoolsInspection(inspectionDisplay, materializationMode)
+    ) {
       setStatus({
         phase: "blocked",
         message: "The displayed source was rejected and is available for diagnostics only. Save a verified candidate before previewing it."
@@ -995,7 +1086,7 @@ export function useVnDevtoolsController({
       target,
       ...(inspectionDisplay.expectedRevision ? { expectedRevision: inspectionDisplay.expectedRevision } : {})
     });
-  }, [entry.source.scriptPath, inspection, inspectionDisplay, lineModel.anchorByLineId, runMaterialization, scriptAuthority, updateLayout]);
+  }, [entry.source.scriptPath, inspection, inspectionDisplay, lineModel.anchorByLineId, materializationMode, runMaterialization, scriptAuthority, updateLayout]);
 
   const submitDecision = useCallback((submission: VnDevtoolsDecisionSubmission) => {
     if (!pendingDecision) return;
@@ -1011,15 +1102,22 @@ export function useVnDevtoolsController({
       message: "Continuing with the selected temporary decision.",
       cancellable: true
     });
-    void materializeVnDebugTarget({
+    const common = {
       entry: context.inspection.entry,
-      catalog: candidateFromVnDebugInspection(entry, context.inspection).catalog,
       inspection: context.inspection,
       target: context.target,
       decisions: next,
       ...(context.expectedRevision ? { expectedRevision: context.expectedRevision } : {}),
       signal: task.signal
-    }).then(async (result) => {
+    };
+    const materialization = context.mode === "fast-current-script"
+      ? materializeVnDebugTarget({ mode: context.mode, ...common })
+      : materializeVnDebugTarget({
+          mode: context.mode,
+          ...common,
+          catalog: candidateFromVnDebugInspection(entry, context.inspection).catalog
+        });
+    void materialization.then(async (result) => {
       if (!task.isCurrent()) return;
       if (result.status === "decision-required") {
         setPendingDecision({ ...context, result });
@@ -1068,6 +1166,8 @@ export function useVnDevtoolsController({
     width,
     layout,
     status: effectiveStatus,
+    materializationMode,
+    materializationModeLocked: hostCommitInFlightRef.current !== undefined,
     diagnostics,
     summaries,
     ...(decision ? { decision } : {}),
@@ -1084,7 +1184,10 @@ export function useVnDevtoolsController({
           if (selectedCandidate) {
             scriptAuthority.install(scriptPath, scriptCandidateIdentity(selectedCandidate));
           }
-          scriptAuthority.authorizePreview(scriptPath, cached.display.access === "installable");
+          scriptAuthority.authorizePreview(
+            scriptPath,
+            canMaterializeVnDevtoolsInspection(cached.display, materializationMode)
+          );
           setInspectionDisplay(cached.display);
           setBridgeDiagnostics(cached.diagnostics);
           setStatus(cached.status);
@@ -1158,6 +1261,80 @@ export function useVnDevtoolsController({
       },
       updateLayout,
       search: setSearchQuery,
+      setMaterializationMode(nextMode) {
+        if (nextMode === materializationMode) return;
+        if (hostCommitInFlightRef.current !== undefined) {
+          setStatus({
+            phase: "blocked",
+            message: "The accepted host restore must finish before changing debug modes."
+          });
+          return;
+        }
+        latestTasksRef.current.cancel();
+        scriptAuthority.cancelTasks();
+        installedMaterializationProvenanceRef.current = undefined;
+        setPendingDecision(undefined);
+        setDecisions(EMPTY_VN_DEBUG_DECISION_TRACE);
+        fixedPointCoordinatorRef.current!.replace(undefined, undefined);
+        setMaterializationMode(nextMode);
+        const previewAllowed = canMaterializeVnDevtoolsInspection(inspectionDisplay, nextMode);
+        scriptAuthority.authorizePreview(entry.source.scriptPath, previewAllowed);
+        persistSession({
+          materializationMode: nextMode,
+          pinnedTarget: null,
+          decisions: EMPTY_VN_DEBUG_DECISION_TRACE
+        });
+        setStatus({
+          phase: "ready",
+          message: nextMode === "fast-current-script"
+            ? "FastDebug enabled. The next Preview will cold-start from the current script."
+            : "Entry mode enabled. The next Preview will replay from the canonical entry."
+        });
+        if (nextMode === "canonical-entry" && inspectionDisplay?.access === "verified-local") {
+          const task = latestTasksRef.current.begin();
+          scriptAuthority.freezePreview(entry.source.scriptPath);
+          setStatus({
+            phase: "inspecting",
+            message: "Validating the complete catalog for Entry replay.",
+            cancellable: true
+          });
+          const candidate = candidateFromVnDebugInspection(entry, inspectionDisplay.inspection);
+          void validateVnDevtoolsCandidateCatalog(candidate).then((validation) => {
+            if (!task.isCurrent()) return;
+            if (!validation.ok) {
+              setStatus({
+                phase: validation.code === "revision-mismatch" ? "blocked" : "error",
+                message: `Entry replay remains unavailable (${validation.message})`
+              });
+              return;
+            }
+            const verified = createCatalogVerifiedVnDevtoolsInspectionDisplay(
+              inspectionDisplay.inspection,
+              inspectionDisplay.expectedRevision
+            );
+            const nextStatus: VnDevtoolsStatus = {
+              phase: "ready",
+              message: "Entry mode enabled and the complete catalog is verified."
+            };
+            scriptAuthority.authorizePreview(entry.source.scriptPath);
+            scriptAuthority.cache(entry.source.scriptPath, {
+              display: verified,
+              diagnostics: bridgeDiagnostics,
+              status: nextStatus
+            });
+            setInspectionDisplay(verified);
+            setStatus(nextStatus);
+          }).catch((error: unknown) => {
+            if (!task.isCurrent()) return;
+            setStatus({
+              phase: "error",
+              message: error instanceof Error
+                ? `Entry catalog validation failed (${error.message}).`
+                : "Entry catalog validation failed."
+            });
+          });
+        }
+      },
       submitDecision,
       cancelDecision() {
         const restoreStillSettling = hostCommitInFlightRef.current !== undefined;
@@ -1177,7 +1354,7 @@ export function useVnDevtoolsController({
         const reauthorizeInstalledSource = canReauthorizeVnDevtoolsInspection(inspectionDisplay, entry);
         scriptAuthority.authorizePreview(entry.source.scriptPath, reauthorizeInstalledSource);
         if (reauthorizeInstalledSource && inspection) {
-          setInspectionDisplay(createInstallableVnDevtoolsInspectionDisplay(inspection));
+          setInspectionDisplay(createCatalogVerifiedVnDevtoolsInspectionDisplay(inspection));
         }
         setStatus({
           phase: "blocked",
@@ -1372,7 +1549,13 @@ function initialCandidateFailureMessage(
 
 function createSummaries(
   runtime: VnDevtoolsRuntimeObservation,
-  lastCheckpoint: SaveableVnState | undefined
+  lastCheckpoint: SaveableVnState | undefined,
+  materializationMode: VnDebugMaterializationMode,
+  lastMaterialization: {
+    provenance: VnDebugMaterializationProvenance;
+    executedInstructions: number;
+    executedScriptPaths: readonly string[];
+  } | undefined
 ): VnDevtoolsRuntimeSummaries {
   const story = runtime.shell.storyRuntime.state;
   const pixi = runtime.presentation.pixiStageRuntime.snapshot;
@@ -1380,6 +1563,15 @@ function createSummaries(
   const stableCheckpoint = checkpoint.ok ? checkpoint.value : lastCheckpoint;
   return {
     story: [
+      {
+        label: "preview mode",
+        value: materializationMode === "fast-current-script" ? "FAST" : "ENTRY",
+        tone: "accent"
+      },
+      { label: "installed origin", value: lastMaterialization?.provenance.originScriptPath ?? null },
+      { label: "origin pointer", value: lastMaterialization?.provenance.originInstructionPointer ?? null },
+      { label: "executed instructions", value: lastMaterialization?.executedInstructions ?? null },
+      { label: "executed scripts", value: lastMaterialization?.executedScriptPaths.join(", ") ?? null },
       { label: "pointer", value: story.instructionPointer },
       { label: "variables", value: Object.keys(story.variables).length },
       { label: "choices", value: story.pendingChoices.length },

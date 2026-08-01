@@ -12,8 +12,9 @@ import {
   canPinCurrentVnDevtoolsInspection,
   canReauthorizeVnDevtoolsInspection,
   createVnDevtoolsPreviewAuthorization,
-  createInstallableVnDevtoolsInspectionDisplay,
+  createCatalogVerifiedVnDevtoolsInspectionDisplay,
   createReadOnlyVnDevtoolsInspectionDisplay,
+  createVerifiedLocalVnDevtoolsInspectionDisplay,
   resolveCurrentVnDevtoolsAnchor,
   vnDebugAnchorIdentity
 } from "./controllerSafety";
@@ -36,20 +37,29 @@ describe("VN devtools controller safety", () => {
     const candidate = { entry, source, catalog: [source] };
     const inspection = { entry, source, canMaterialize: true } as unknown as VnDebugScriptInspection;
     const rejected = createReadOnlyVnDevtoolsInspectionDisplay(inspection);
-    const accepted = createInstallableVnDevtoolsInspectionDisplay(inspection, "sha256:verified");
+    const local = createVerifiedLocalVnDevtoolsInspectionDisplay(inspection, "sha256:verified");
+    const accepted = createCatalogVerifiedVnDevtoolsInspectionDisplay(inspection, "sha256:verified");
 
     expect(rejected).toEqual({
       access: "read-only",
       inspection
     });
     expect(accepted).toEqual({
-      access: "installable",
+      access: "catalog-verified",
       inspection,
       expectedRevision: "sha256:verified"
     });
-    expect(canMaterializeVnDevtoolsInspection(rejected)).toBe(false);
+    expect(local).toEqual({
+      access: "verified-local",
+      inspection,
+      expectedRevision: "sha256:verified"
+    });
+    expect(canMaterializeVnDevtoolsInspection(rejected, "fast-current-script")).toBe(false);
     expect(canPinCurrentVnDevtoolsInspection(rejected, candidate)).toBe(false);
-    expect(canMaterializeVnDevtoolsInspection(accepted)).toBe(true);
+    expect(canMaterializeVnDevtoolsInspection(local, "fast-current-script")).toBe(true);
+    expect(canMaterializeVnDevtoolsInspection(local, "canonical-entry")).toBe(false);
+    expect(canPinCurrentVnDevtoolsInspection(local, candidate)).toBe(false);
+    expect(canMaterializeVnDevtoolsInspection(accepted, "canonical-entry")).toBe(true);
     expect(canPinCurrentVnDevtoolsInspection(accepted, candidate)).toBe(true);
     expect(canReauthorizeVnDevtoolsInspection(rejected, candidate)).toBe(true);
     expect(canReauthorizeVnDevtoolsInspection(rejected, {
