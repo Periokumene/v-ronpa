@@ -404,7 +404,11 @@ describe("projectVnRuntimeStep", () => {
       scriptPath: "projection-parity.nani",
       sourceText,
     });
-    const inspection = await inspectVnDebugScript(declaredEntry, source);
+    const inspection = await inspectVnDebugScript(
+      declaredEntry,
+      source,
+      "allow-recoverable-command-errors"
+    );
     const boot = createVnSession({ scriptPath: source.scriptPath, sourceText, startLabel: "Start" });
     const advanced = advanceVnSession(boot.session);
     const projected = projectVnRuntimeStep({
@@ -433,6 +437,7 @@ describe("projectVnRuntimeStep", () => {
     const target = inspection.commands.find((command) => command.anchor.stableId === "print:parity_line")!.anchor;
     const materialized = await materializeVnDebugTarget({
       mode: "canonical-entry",
+      sourceDiagnosticPolicy: "allow-recoverable-command-errors",
       entry: inspection.entry,
       catalog: [inspection.source],
       inspection,
@@ -464,7 +469,11 @@ describe("projectVnRuntimeStep", () => {
         scriptPath: "projection-stable-target-parity.nani",
         sourceText
       });
-      const inspection = await inspectVnDebugScript(fixture.entry, fixture.source);
+      const inspection = await inspectVnDebugScript(
+        fixture.entry,
+        fixture.source,
+        "allow-recoverable-command-errors"
+      );
       const stopCommand = inspection.commands.find(
         ({ command }) => command.canonicalName === stopCanonicalName
       );
@@ -479,6 +488,7 @@ describe("projectVnRuntimeStep", () => {
       const live = projectLiveCheckpointThroughCommand(inspection, stopCommand.anchor.commandIndex);
       const materialized = await materializeVnDebugTarget({
         mode: "canonical-entry",
+        sourceDiagnosticPolicy: "allow-recoverable-command-errors",
         entry: inspection.entry,
         catalog: [inspection.source],
         inspection,

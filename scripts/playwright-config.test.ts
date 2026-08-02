@@ -26,8 +26,8 @@ describe("Playwright smoke isolation", () => {
 
     expect(webServers).toHaveLength(4);
     expect(webServers.every((server) => server?.reuseExistingServer === false)).toBe(true);
-    expect(webServers.some((server) => server?.command.includes("--mode game-a-smoke"))).toBe(true);
-    expect(webServers.some((server) => server?.command.includes("--mode game-a-character-smoke"))).toBe(true);
+    expect(webServers.some((server) => server?.command.includes("--mode game-a-test-smoke"))).toBe(true);
+    expect(webServers.some((server) => server?.command.includes("--mode game-a-test-character"))).toBe(true);
     expect(webServers.some((server) => server?.command.endsWith("dev --host 127.0.0.1"))).toBe(true);
     expect(new Set(webServers.map((server) => server?.url)).size).toBe(4);
   });

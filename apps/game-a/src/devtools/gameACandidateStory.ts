@@ -19,6 +19,7 @@ export function decorateGameACandidateStory({
   return {
     entry: candidate.entry,
     catalog: stabilizeVnDevtoolsScriptCatalog(activeDefinition.catalog, candidate.catalog),
+    sourceDiagnosticPolicy: candidate.sourceDiagnosticPolicy,
     characterPreloadPlanByScriptPath: {
       ...activeDefinition.characterPreloadPlanByScriptPath,
       [candidate.source.scriptPath]: stabilizeLayeredCharacterPreloadPlan(installedPlan, candidatePlan)

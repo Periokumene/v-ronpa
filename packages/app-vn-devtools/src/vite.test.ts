@@ -1,285 +1,187 @@
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import type { NaniProjectConfig } from "@v-ronpa/nani-project";
 import {
-  NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID,
+  NANI_DEVTOOLS_VITE_CATALOG_DIRTY_EVENT,
+  NANI_DEVTOOLS_VITE_SNAPSHOT_MODULE_ID,
   NANI_DEVTOOLS_VITE_UPDATE_EVENT,
   createNaniDevtoolsVitePlugin,
-  type NaniDevtoolsViteUpdate
+  type NaniDevtoolsViteSnapshot
 } from "./vite";
 
-describe("Nani devtools Vite source bridge", () => {
-  it("serves a Node-authored initial source candidate and omits it from production builds", async () => {
-    const plugin = createNaniDevtoolsVitePlugin({
-      root: process.cwd(),
-      entries: [{
-        sourceFile: "apps/game-a/src/nani/opening.nani",
-        scriptPath: "game-a/opening.nani",
-        entryId: "vn:game-a-opening"
-      }]
-    });
-    callConfigResolved(plugin.configResolved, "serve");
-    const resolvedId = callResolveId(plugin.resolveId, NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID);
-    const moduleSource = await callLoad(plugin.load, resolvedId);
-    const candidates = parseDefaultExport(moduleSource);
+const project: NaniProjectConfig = {
+  scopes: {
+    production: { sourceRoot: "nani", scriptRoot: "game" },
+    development: { sourceRoot: "nani-dev", scriptRoot: "game/dev" }
+  },
+  mainEntry: {
+    id: "vn:main",
+    scope: "production",
+    initialScriptPath: "game/opening.nani",
+    startLabel: "Start"
+  },
+  testEntries: {},
+  voiceLocales: []
+};
 
-    expect(candidates).toEqual([
-      expect.objectContaining({
-        entryId: "vn:game-a-opening",
-        scriptPath: "game-a/opening.nani",
-        sourceText: expect.stringContaining("#Start"),
-        serverRevision: expect.stringMatching(/^sha256:[a-f0-9]{64}$/u),
-        diagnostics: expect.any(Array)
-      })
+describe("Nani devtools Vite snapshot bridge", () => {
+  it("serves a complete production+development snapshot and omits it from builds", async () => {
+    const root = await fixtureRoot();
+    await mkdir(join(root, "nani"), { recursive: true });
+    await mkdir(join(root, "nani-dev", "drafts"), { recursive: true });
+    await writeFile(join(root, "nani", "opening.nani"), "#Start\nNarrator: Open.|#open|");
+    await writeFile(join(root, "nani-dev", "drafts", "one.nani"), "Narrator: Draft.");
+    const plugin = createNaniDevtoolsVitePlugin({
+      project,
+      entry: project.mainEntry,
+      scopes: ["production", "development"],
+      root
+    });
+    callConfigResolved(plugin, "serve");
+    const resolved = callResolveId(plugin, NANI_DEVTOOLS_VITE_SNAPSHOT_MODULE_ID);
+    const snapshot = parseDefaultExport(await callLoad(plugin, resolved));
+
+    expect(snapshot.generation).toBe(1);
+    expect(snapshot.entry).toMatchObject({ id: "vn:main", initialScriptPath: "game/opening.nani" });
+    expect(snapshot.scripts.map((script) => [script.scope, script.scriptPath])).toEqual([
+      ["development", "game/dev/drafts/one.nani"],
+      ["production", "game/opening.nani"]
     ]);
 
-    callConfigResolved(plugin.configResolved, "build");
-    expect(await callLoad(plugin.load, resolvedId)).toBe("export default [];");
+    callConfigResolved(plugin, "build");
+    expect(await callLoad(plugin, resolved)).toBe("export default null;");
   });
 
-  it("emits compiled candidate source and monotonic server revisions without reloading", async () => {
-    const plugin = createNaniDevtoolsVitePlugin({
-      root: "/workspace",
-      entries: [{ sourceFile: "apps/game-a/src/nani/opening.nani", scriptPath: "game-a/opening.nani", entryId: "opening" }]
-    });
-    const send = vi.fn();
-    const handleHotUpdate = expectHotUpdateHandler(plugin.handleHotUpdate);
-
-    const firstResult = await handleHotUpdate({
-      file: "/workspace/apps/game-a/src/nani/opening.nani",
-      read: async () => "#Start\nnar: Hello.",
-      server: { ws: { send } }
-    });
-    const secondResult = await handleHotUpdate({
-      file: "/workspace/apps/game-a/src/nani/opening.nani",
-      read: async () => "#Start\nnar: Changed.",
-      server: { ws: { send } }
-    });
-
-    expect(firstResult).toEqual([]);
-    expect(secondResult).toEqual([]);
-    expect(send).toHaveBeenCalledTimes(2);
-    const firstPayload = customUpdate(send.mock.calls[0]?.[0]);
-    const secondPayload = customUpdate(send.mock.calls[1]?.[0]);
-    expect(firstPayload).toMatchObject({
-      updateId: 1,
-      entryId: "opening",
-      scriptPath: "game-a/opening.nani",
-      sourceText: "#Start\nnar: Hello.",
-      diagnostics: []
-    });
-    expect(firstPayload.serverRevision).toMatch(/^sha256:[a-f0-9]{64}$/u);
-    expect(secondPayload.updateId).toBe(2);
-    expect(secondPayload.serverRevision).toMatch(/^sha256:[a-f0-9]{64}$/u);
-    expect(secondPayload.serverRevision).not.toBe(firstPayload.serverRevision);
-    expect(send.mock.calls[0]?.[0]).not.toMatchObject({ type: "full-reload" });
-  });
-
-  it("returns diagnostics and a null revision for an invalid candidate while retaining the source", async () => {
-    const plugin = createNaniDevtoolsVitePlugin({
-      root: "/workspace",
-      entries: [{ sourceFile: "opening.nani", scriptPath: "game-a/opening.nani", entryId: "opening" }]
-    });
-    const send = vi.fn();
-    const result = await expectHotUpdateHandler(plugin.handleHotUpdate)({
-      file: "/workspace/opening.nani",
-      read: async () => "#Start\n#Start",
-      server: { ws: { send } }
-    });
-
-    expect(result).toEqual([]);
-    const payload = customUpdate(send.mock.calls[0]?.[0]);
-    expect(payload.sourceText).toBe("#Start\n#Start");
-    expect(payload.serverRevision).toBeNull();
-    expect(payload.diagnostics).toEqual([
-      expect.objectContaining({ source: "parser", severity: "error", lineNumber: 2, message: "Duplicate label: Start" })
-    ]);
-    expect(payload.diagnostics[0]?.span).toEqual(expect.objectContaining({
-      start: expect.any(Number),
-      end: expect.any(Number)
-    }));
-    expect(payload.sourceText.slice(
-      payload.diagnostics[0]!.span!.start,
-      payload.diagnostics[0]!.span!.end
-    )).toBe("Start");
-  });
-
-  it("locates compiler parameter errors on their authored source line", async () => {
-    const plugin = createNaniDevtoolsVitePlugin({
-      root: "/workspace",
-      entries: [{ sourceFile: "opening.nani", scriptPath: "game-a/opening.nani", entryId: "opening" }]
-    });
-    const send = vi.fn();
-    await expectHotUpdateHandler(plugin.handleHotUpdate)({
-      file: "/workspace/opening.nani",
-      read: async () => "#Start\nNarrator: Before.\n@back bg:main time:fast",
-      server: { ws: { send } }
-    });
-
-    const payload = customUpdate(send.mock.calls[0]?.[0]);
-    expect(payload.diagnostics).toEqual([
-      expect.objectContaining({
-        source: "compiler",
-        code: "invalid-command-param",
+  it("keeps recoverable command errors runnable and parser errors source-only", async () => {
+    const recoverableRoot = await fixtureRoot();
+    await mkdir(join(recoverableRoot, "nani"), { recursive: true });
+    await writeFile(join(recoverableRoot, "nani", "opening.nani"), [
+      "#Start",
+      "Narrator: Before.",
+      "@notACommand",
+      "Narrator: After."
+    ].join("\n"));
+    const recoverable = await loadSnapshot(recoverableRoot);
+    expect(recoverable.scripts[0]).toMatchObject({
+      executionDisposition: "runnable",
+      diagnostics: [expect.objectContaining({
+        code: "unknown-command",
         severity: "error",
-        lineNumber: 3,
-        columnNumber: 1
-      })
-    ]);
-    expect(payload.sourceText.slice(
-      payload.diagnostics[0]!.span!.start,
-      payload.diagnostics[0]!.span!.end
-    )).toBe("fast");
+        disposition: "recoverable"
+      })]
+    });
+
+    const fatalRoot = await fixtureRoot();
+    await mkdir(join(fatalRoot, "nani"), { recursive: true });
+    await writeFile(join(fatalRoot, "nani", "opening.nani"), "#Start\n#Start");
+    const fatal = await loadSnapshot(fatalRoot);
+    expect(fatal.scripts[0]).toMatchObject({
+      executionDisposition: "fatal",
+      diagnostics: [expect.objectContaining({ code: "duplicate-label", disposition: "fatal" })]
+    });
   });
 
-  it("assigns invocation-order ids even when asynchronous reads finish out of order", async () => {
+  it("rejects recoverable command errors during a strict production build", async () => {
+    const root = await fixtureRoot();
+    await mkdir(join(root, "nani"), { recursive: true });
+    await writeFile(join(root, "nani", "opening.nani"), "#Start\n@notACommand");
     const plugin = createNaniDevtoolsVitePlugin({
-      root: "/workspace",
-      entries: [{ sourceFile: "opening.nani", scriptPath: "game-a/opening.nani", entryId: "opening" }]
+      project,
+      entry: project.mainEntry,
+      scopes: ["production"],
+      root
     });
-    const send = vi.fn();
-    let finishFirst!: (source: string) => void;
-    const firstRead = new Promise<string>((resolve) => {
-      finishFirst = resolve;
-    });
-    const handleHotUpdate = expectHotUpdateHandler(plugin.handleHotUpdate);
-    const first = handleHotUpdate({
-      file: "/workspace/opening.nani",
-      read: () => firstRead,
-      server: { ws: { send } }
-    });
-    const second = handleHotUpdate({
-      file: "/workspace/opening.nani",
-      read: async () => "#Start\nNarrator: Newest.",
-      server: { ws: { send } }
-    });
-    await second;
-    finishFirst("#Start\nNarrator: Older.");
-    await first;
+    callConfigResolved(plugin, "build");
 
-    expect(customUpdate(send.mock.calls[0]?.[0]).updateId).toBe(2);
-    expect(customUpdate(send.mock.calls[1]?.[0]).updateId).toBe(1);
+    await expect(callBuildStart(plugin)).rejects.toThrow(/Unknown \.nani command/u);
   });
 
-  it("invalidates the initial snapshot after a source save without consuming an HMR update id", async () => {
+  it("emits monotonic source updates for edits and a catalog-dirty event for adds", async () => {
+    const root = await fixtureRoot();
+    await mkdir(join(root, "nani"), { recursive: true });
+    const opening = join(root, "nani", "opening.nani");
+    await writeFile(opening, "#Start\nNarrator: Open.");
     const plugin = createNaniDevtoolsVitePlugin({
-      root: "/workspace",
-      entries: [{ sourceFile: "opening.nani", scriptPath: "game-a/opening.nani", entryId: "opening" }]
+      project,
+      entry: project.mainEntry,
+      scopes: ["production"],
+      root
     });
-    const resolvedId = callResolveId(plugin.resolveId, NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID);
-    const initialModule = { id: resolvedId };
-    const invalidateModule = vi.fn();
+    callConfigResolved(plugin, "serve");
+    const handlers = new Map<string, (file: string) => void>();
     const send = vi.fn();
-    let finishRead!: () => void;
-    const update = expectHotUpdateHandler(plugin.handleHotUpdate)({
-      file: "/workspace/opening.nani",
-      read: async () => {
-        await new Promise<void>((resolve) => {
-          finishRead = resolve;
-        });
-        return "#Start\nNarrator: Saved.";
-      },
-      server: {
-        ws: { send },
-        moduleGraph: {
-          getModuleById: vi.fn(() => initialModule),
-          invalidateModule
-        }
-      }
+    const moduleGraph = { getModuleById: vi.fn(), invalidateModule: vi.fn() };
+    callConfigureServer(plugin, {
+      watcher: { on: (event: string, handler: (file: string) => void) => handlers.set(event, handler) },
+      ws: { send },
+      moduleGraph
     });
-
-    expect(invalidateModule).toHaveBeenCalledWith(initialModule);
-    expect(send).not.toHaveBeenCalled();
-    finishRead();
-    await update;
-    expect(customUpdate(send.mock.calls[0]?.[0]).updateId).toBe(1);
-  });
-
-  it("ignores every file outside the configured .nani allow-list", async () => {
-    const plugin = createNaniDevtoolsVitePlugin({
-      root: "/workspace",
-      entries: [{ sourceFile: "opening.nani", scriptPath: "game-a/opening.nani", entryId: "opening" }]
+    await callLoad(plugin, callResolveId(plugin, NANI_DEVTOOLS_VITE_SNAPSHOT_MODULE_ID));
+    await writeFile(opening, "#Start\nNarrator: Changed.");
+    await callHotUpdate(plugin, {
+      file: opening,
+      read: async () => "#Start\nNarrator: Changed.",
+      server: { ws: { send }, moduleGraph }
     });
-    const send = vi.fn();
-    const read = vi.fn(async () => "#Other");
-    const result = await expectHotUpdateHandler(plugin.handleHotUpdate)({
-      file: "/workspace/other.nani",
-      read,
-      server: { ws: { send } }
-    });
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      event: NANI_DEVTOOLS_VITE_UPDATE_EVENT,
+      data: expect.objectContaining({ updateId: 1, executionDisposition: "runnable" })
+    }));
 
-    expect(result).toBeUndefined();
-    expect(read).not.toHaveBeenCalled();
-    expect(send).not.toHaveBeenCalled();
-  });
-
-  it("rejects non-Nani and duplicate source configuration up front", () => {
-    expect(() =>
-      createNaniDevtoolsVitePlugin({ entries: [{ sourceFile: "opening.ts", scriptPath: "opening.nani", entryId: "opening" }] })
-    ).toThrow("must end with .nani");
-    expect(() =>
-      createNaniDevtoolsVitePlugin({
-        root: "/workspace",
-        entries: [
-          { sourceFile: "opening.nani", scriptPath: "opening.nani", entryId: "opening" },
-          { sourceFile: "./opening.nani", scriptPath: "other.nani", entryId: "other" }
-        ]
-      })
-    ).toThrow("configured more than once");
+    const added = join(root, "nani", "added.nani");
+    handlers.get("add")?.(added);
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      event: NANI_DEVTOOLS_VITE_CATALOG_DIRTY_EVENT,
+      data: expect.objectContaining({ reason: "add" })
+    }));
   });
 });
 
-interface TestHotUpdateContext {
-  file: string;
-  read: () => Promise<string>;
-  server: {
-    ws: { send: (payload: unknown) => void };
-    moduleGraph?: {
-      getModuleById: (id: string) => unknown;
-      invalidateModule: (module: unknown) => void;
-    };
-  };
+async function loadSnapshot(root: string): Promise<NaniDevtoolsViteSnapshot> {
+  const plugin = createNaniDevtoolsVitePlugin({
+    project,
+    entry: project.mainEntry,
+    scopes: ["production"],
+    root
+  });
+  callConfigResolved(plugin, "serve");
+  return parseDefaultExport(await callLoad(plugin, callResolveId(plugin, NANI_DEVTOOLS_VITE_SNAPSHOT_MODULE_ID)));
 }
 
-function expectHotUpdateHandler(handler: unknown): (context: TestHotUpdateContext) => Promise<unknown> {
-  expect(typeof handler).toBe("function");
-  const hotUpdate = handler as (context: TestHotUpdateContext & {
-    server: TestHotUpdateContext["server"] & { moduleGraph: NonNullable<TestHotUpdateContext["server"]["moduleGraph"]> };
-  }) => Promise<unknown>;
-  return (context) => hotUpdate({
-    ...context,
-    server: {
-      ...context.server,
-      moduleGraph: context.server.moduleGraph ?? {
-        getModuleById: () => undefined,
-        invalidateModule: () => undefined
-      }
+async function fixtureRoot(): Promise<string> {
+  return mkdtemp(join(tmpdir(), "v-ronpa-vite-nani-"));
+}
+
+function callConfigResolved(plugin: ReturnType<typeof createNaniDevtoolsVitePlugin>, command: "serve" | "build") {
+  (plugin.configResolved as (config: { command: string }) => void)?.({ command });
+}
+
+function callResolveId(plugin: ReturnType<typeof createNaniDevtoolsVitePlugin>, id: string): string {
+  return (plugin.resolveId as (id: string) => string | undefined)?.(id) ?? id;
+}
+
+async function callLoad(plugin: ReturnType<typeof createNaniDevtoolsVitePlugin>, id: string): Promise<string> {
+  return await (plugin.load as (id: string) => string | Promise<string> | undefined)?.(id) ?? "";
+}
+
+function callConfigureServer(plugin: ReturnType<typeof createNaniDevtoolsVitePlugin>, server: unknown) {
+  (plugin.configureServer as (server: unknown) => void)?.(server);
+}
+
+async function callHotUpdate(plugin: ReturnType<typeof createNaniDevtoolsVitePlugin>, context: unknown) {
+  return (plugin.handleHotUpdate as (context: unknown) => unknown)?.(context);
+}
+
+async function callBuildStart(plugin: ReturnType<typeof createNaniDevtoolsVitePlugin>) {
+  return (plugin.buildStart as (this: { error: (message: string) => never }) => unknown)?.call({
+    error(message: string): never {
+      throw new Error(message);
     }
   });
 }
 
-function customUpdate(payload: unknown): NaniDevtoolsViteUpdate {
-  expect(payload).toMatchObject({ type: "custom", event: NANI_DEVTOOLS_VITE_UPDATE_EVENT });
-  return (payload as { data: NaniDevtoolsViteUpdate }).data;
-}
-
-function callConfigResolved(hook: unknown, command: "serve" | "build"): void {
-  expect(typeof hook).toBe("function");
-  (hook as (config: { command: "serve" | "build" }) => void)({ command });
-}
-
-function callResolveId(hook: unknown, id: string): string {
-  expect(typeof hook).toBe("function");
-  const resolved = (hook as (value: string) => unknown)(id);
-  expect(typeof resolved).toBe("string");
-  return resolved as string;
-}
-
-async function callLoad(hook: unknown, id: string): Promise<string> {
-  expect(typeof hook).toBe("function");
-  const source = await (hook as (value: string) => string | Promise<string>)(id);
-  expect(typeof source).toBe("string");
-  return source;
-}
-
-function parseDefaultExport(source: string): unknown {
+function parseDefaultExport(source: string): NaniDevtoolsViteSnapshot {
   return JSON.parse(source.replace(/^export default /u, "").replace(/;$/u, ""));
 }

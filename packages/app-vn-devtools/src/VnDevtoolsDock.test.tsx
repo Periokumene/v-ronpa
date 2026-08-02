@@ -136,6 +136,36 @@ describe("VnDevtoolsDock", () => {
     });
   });
 
+  it("shows recovered state and freezes preview until a dirty catalog is refreshed", () => {
+    const actions = createActions();
+    const element = VnDevtoolsDock({
+      controller: createController(actions, {
+        catalogDirty: true,
+        status: { phase: "ready", degraded: true, recovered: true }
+      })
+    });
+
+    expect(collectText(findByTestId(element, "vn-devtools-file-bar")).join(" "))
+      .toContain("Recovered / Degraded");
+    const dirty = findByTestId(element, "vn-devtools-catalog-dirty");
+    expect(collectText(dirty).join(" ")).toContain("Refresh to rescan");
+    expect(findByTestId(element, "vn-devtools-primary-action")?.props.disabled).toBe(true);
+    (findButtonContaining(dirty, "Refresh")?.props as { onClick: () => void }).onClick();
+    expect(actions.refreshCatalog).toHaveBeenCalledOnce();
+  });
+
+  it("keeps advisory degradation distinct from recovered compiler errors", () => {
+    const element = VnDevtoolsDock({
+      controller: createController(createActions(), {
+        status: { phase: "ready", degraded: true }
+      })
+    });
+
+    const statusText = collectText(findByTestId(element, "vn-devtools-file-bar")).join(" ");
+    expect(statusText).toContain("Degraded");
+    expect(statusText).not.toContain("Recovered / Degraded");
+  });
+
   it("exposes a keyboard-operated multi-script listbox without changing runtime state", async () => {
     const actions = createActions();
     const element = VnDevtoolsDock({
@@ -144,12 +174,16 @@ describe("VnDevtoolsDock", () => {
           {
             scriptPath: "game-a/opening.nani",
             revision: "sha256:opening",
+            scope: "production",
+            executionDisposition: "runnable",
             viewed: true,
             runtime: true
           },
           {
             scriptPath: "game-a/chapter-02.nani",
             revision: "sha256:chapter-02",
+            scope: "development",
+            executionDisposition: "runnable",
             viewed: false,
             runtime: false,
             hasUpdateBadge: true
@@ -328,6 +362,8 @@ function createController(
     scripts: [{
       scriptPath: "game-a/opening.nani",
       revision: "sha256:1234567890abcdef",
+      scope: "production",
+      executionDisposition: "runnable",
       viewed: true,
       runtime: true
     }],
@@ -360,6 +396,7 @@ function createController(
     status: { phase: "ready", message: "Pinned target is stable." },
     materializationMode: "fast-current-script",
     materializationModeLocked: false,
+    catalogDirty: false,
     diagnostics: [
       {
         id: "missing-portrait",
@@ -397,7 +434,8 @@ function createActions(): VnDevtoolsActions {
     cancelDecision: vi.fn<() => void>(),
     cancelCandidate: vi.fn<() => void>(),
     copyLocation: vi.fn<(location: VnDevtoolsSourceLocation) => void>(),
-    setMaterializationMode: vi.fn<VnDevtoolsActions["setMaterializationMode"]>()
+    setMaterializationMode: vi.fn<VnDevtoolsActions["setMaterializationMode"]>(),
+    refreshCatalog: vi.fn<() => void>()
   };
 }
 

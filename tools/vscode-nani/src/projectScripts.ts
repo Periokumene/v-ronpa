@@ -1,27 +1,36 @@
-import { existsSync, statSync } from "node:fs";
-import { extname, isAbsolute, relative, resolve } from "node:path";
+import { statSync } from "node:fs";
+import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { parseStaticNaniEndpoint } from "@v-ronpa/nani-parser";
+import {
+  discoverNaniProjectScripts,
+  NaniProjectDiscoveryError,
+  type NaniEntryConfig,
+  type NaniProjectConfig,
+  type NaniScope
+} from "@v-ronpa/nani-project";
 import { findNaniProjectRoot } from "./projectAssetLoader";
 
 export interface NaniScriptRegistration {
+  readonly scope: NaniScope;
   readonly sourcePath: string;
   readonly scriptPath: string;
 }
 
 export interface NaniScriptCatalogContext {
   readonly configPath: string;
-  readonly catalogId: "production" | `test:${string}`;
+  readonly catalogId: "development" | "test";
   readonly entry: {
     readonly initialScriptPath: string;
     readonly startLabel?: string;
   };
+  readonly entries: readonly NaniEntryConfig[];
   readonly scripts: readonly NaniScriptRegistration[];
 }
 
 export interface NaniProjectScriptConfig {
   readonly configPath: string;
   readonly catalogs: readonly NaniScriptCatalogContext[];
+  readonly scopeRoots: readonly string[];
   readonly errors: readonly string[];
   readonly warnings: readonly string[];
 }
@@ -34,163 +43,65 @@ export async function loadProjectScriptConfig(
   importConfig: ProjectScriptConfigImporter = importProjectConfig
 ): Promise<NaniProjectScriptConfig> {
   const projectRoot = findNaniProjectRoot(configPath, workspaceRoot);
-  const moduleValue = record(await importConfig(configPath), "Asset config module must export an object.");
-  const config = record(moduleValue.default, "Asset config module must have a default object export.");
-  const candidates: Array<{
-    catalogId: NaniScriptCatalogContext["catalogId"];
-    value: Record<string, unknown>;
-  }> = [];
-  if (config.scripts !== undefined || config.entry !== undefined) {
-    candidates.push({ catalogId: "production", value: config });
-  }
-  if (config.testCatalogs !== undefined) {
-    const testCatalogs = record(config.testCatalogs, "testCatalogs must be an object.");
-    for (const name of Object.keys(testCatalogs).sort()) {
-      candidates.push({
-        catalogId: `test:${name}`,
-        value: record(testCatalogs[name], `testCatalogs.${name} must be an object.`)
+  try {
+    const moduleValue = record(await importConfig(configPath), "Asset config module must export an object.");
+    const assetConfig = record(moduleValue.default, "Asset config module must have a default object export.");
+    const naniProject = parseNaniProjectConfig(assetConfig.naniProject);
+    const discovered = await discoverNaniProjectScripts(naniProject, { projectRoot });
+    const registrations = discovered.map((script) => ({
+      scope: script.scope,
+      sourcePath: script.sourcePath,
+      scriptPath: script.scriptPath
+    }));
+    const catalogs: NaniScriptCatalogContext[] = [];
+    const developmentScripts = registrations.filter((script) =>
+      script.scope === "production" || script.scope === "development"
+    );
+    if (developmentScripts.length > 0) {
+      catalogs.push({
+        configPath,
+        catalogId: "development",
+        entry: entryLocator(naniProject.mainEntry),
+        entries: [naniProject.mainEntry],
+        scripts: developmentScripts
       });
     }
-  }
-
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  const catalogs: NaniScriptCatalogContext[] = [];
-  const physicalOwners = new Map<
-    string,
-    Array<{
-      catalogId: NaniScriptCatalogContext["catalogId"];
-      scriptPath: string;
-    }>
-  >();
-
-  for (const candidate of candidates) {
-    const parsed = parseCatalog(candidate.catalogId, candidate.value, configPath, projectRoot, workspaceRoot);
-    errors.push(...parsed.errors);
-    warnings.push(...parsed.warnings);
-    if (!parsed.catalog) continue;
-    catalogs.push(parsed.catalog);
-    for (const script of parsed.catalog.scripts) {
-      const owners = physicalOwners.get(script.sourcePath) ?? [];
-      owners.push({ catalogId: candidate.catalogId, scriptPath: script.scriptPath });
-      physicalOwners.set(script.sourcePath, owners);
+    const testScripts = registrations.filter((script) => script.scope === "test");
+    const testEntries = Object.values(naniProject.testEntries);
+    if (testScripts.length > 0 && testEntries.length > 0) {
+      catalogs.push({
+        configPath,
+        catalogId: "test",
+        entry: entryLocator(testEntries[0]!),
+        entries: testEntries,
+        scripts: testScripts
+      });
     }
-  }
-
-  const conflictingCatalogs = new Set<NaniScriptCatalogContext["catalogId"]>();
-  for (const [sourcePath, owners] of physicalOwners) {
-    if (owners.length < 2) continue;
-    for (const owner of owners) conflictingCatalogs.add(owner.catalogId);
-    errors.push(
-      `Nani source '${sourcePath}' is registered more than once (${owners
-        .map((owner) => `${owner.catalogId}:${owner.scriptPath}`)
-        .join(", ")}).`
-    );
-  }
-
-  return {
-    configPath,
-    catalogs: catalogs.filter((catalog) => !conflictingCatalogs.has(catalog.catalogId)),
-    errors,
-    warnings
-  };
-}
-
-function parseCatalog(
-  catalogId: NaniScriptCatalogContext["catalogId"],
-  value: Record<string, unknown>,
-  configPath: string,
-  projectRoot: string,
-  workspaceRoot: string
-): {
-  catalog?: NaniScriptCatalogContext;
-  errors: string[];
-  warnings: string[];
-} {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  const entries = array(value.scripts, `${catalogId}.scripts must be an array.`, errors);
-  if (!entries) return { errors, warnings };
-  const entryValue = optionalRecord(value.entry, `${catalogId}.entry must be an object.`, errors);
-  if (!entryValue) {
-    errors.push(`${catalogId}.entry is required when scripts are registered.`);
-    return { errors, warnings };
-  }
-  const initialScriptPath = requiredString(
-    entryValue.initialScriptPath,
-    `${catalogId}.entry.initialScriptPath`,
-    errors
-  );
-  const startLabel = optionalString(
-    entryValue.startLabel,
-    `${catalogId}.entry.startLabel`,
-    errors
-  );
-  const scripts: NaniScriptRegistration[] = [];
-  const logicalPaths = new Set<string>();
-  let unsupported = false;
-
-  for (const [index, rawEntry] of entries.entries()) {
-    const prefix = `${catalogId}.scripts[${index}]`;
-    const entry = optionalRecord(rawEntry, `${prefix} must be an object.`, errors);
-    if (!entry) continue;
-    const sourceFile = requiredString(entry.sourceFile, `${prefix}.sourceFile`, errors);
-    const scriptPath = requiredString(entry.scriptPath, `${prefix}.scriptPath`, errors);
-    if (!sourceFile || !scriptPath) continue;
-    if (entry.sourceFormat !== undefined || extname(sourceFile).toLowerCase() !== ".nani") {
-      unsupported = true;
-      continue;
-    }
-    const endpoint = parseStaticNaniEndpoint(scriptPath, scriptPath);
-    if (!endpoint.ok || scriptPath.includes("#")) {
-      errors.push(`${prefix}.scriptPath '${scriptPath}' is not a valid logical .nani path.`);
-      continue;
-    }
-    if (logicalPaths.has(scriptPath)) {
-      errors.push(`${catalogId} registers logical script path '${scriptPath}' more than once.`);
-      continue;
-    }
-    logicalPaths.add(scriptPath);
-    const sourcePath = isAbsolute(sourceFile)
-      ? resolve(sourceFile)
-      : resolve(projectRoot, sourceFile);
-    if (!isWithin(workspaceRoot, sourcePath)) {
-      errors.push(`${prefix}.sourceFile resolves outside the trusted workspace: '${sourcePath}'.`);
-      continue;
-    }
-    if (!existsSync(sourcePath)) {
-      errors.push(`${prefix}.sourceFile does not exist: '${sourcePath}'.`);
-      continue;
-    }
-    scripts.push({ sourcePath, scriptPath });
-  }
-
-  if (unsupported) {
-    warnings.push(
-      `${catalogId} contains non-.nani or sourceFormat-backed scripts and is not indexed by VS Code Nani 0.6.0.`
-    );
-    return { errors, warnings };
-  }
-  if (!initialScriptPath) return { errors, warnings };
-  if (!logicalPaths.has(initialScriptPath)) {
-    errors.push(
-      `${catalogId}.entry.initialScriptPath '${initialScriptPath}' is not registered in that catalog.`
-    );
-  }
-  if (errors.length > 0) return { errors, warnings };
-  return {
-    catalog: {
+    const errors = catalogs.flatMap((catalog) => catalog.entries.flatMap((entry) =>
+      catalog.scripts.some((script) => script.scriptPath === entry.initialScriptPath)
+        ? []
+        : [`Entry '${entry.id}' initial script '${entry.initialScriptPath}' is missing from the ${catalog.catalogId} catalog.`]
+    ));
+    return {
       configPath,
-      catalogId,
-      entry: {
-        initialScriptPath,
-        ...(startLabel ? { startLabel } : {})
-      },
-      scripts
-    },
-    errors,
-    warnings
-  };
+      catalogs,
+      scopeRoots: Object.values(naniProject.scopes).flatMap((scope) =>
+        scope ? [resolve(projectRoot, scope.sourceRoot)] : []
+      ),
+      errors,
+      warnings: []
+    };
+  } catch (error) {
+    return {
+      configPath,
+      catalogs: [],
+      scopeRoots: [],
+      errors: error instanceof NaniProjectDiscoveryError
+        ? error.diagnostics.map((diagnostic) => diagnostic.message)
+        : [error instanceof Error ? error.message : String(error)],
+      warnings: []
+    };
+  }
 }
 
 async function importProjectConfig(configPath: string): Promise<unknown> {
@@ -199,22 +110,53 @@ async function importProjectConfig(configPath: string): Promise<unknown> {
   return import(url.href);
 }
 
-function array(value: unknown, message: string, errors: string[]): unknown[] | undefined {
-  if (Array.isArray(value)) return value;
-  errors.push(message);
-  return undefined;
+function parseNaniProjectConfig(value: unknown): NaniProjectConfig {
+  const project = record(value, "asset.config.mjs must declare naniProject.");
+  const scopesValue = record(project.scopes, "naniProject.scopes must be an object.");
+  const scopes: NaniProjectConfig["scopes"] = {};
+  for (const scope of ["production", "development", "test"] as const) {
+    if (scopesValue[scope] === undefined) continue;
+    const scopeValue = record(scopesValue[scope], `naniProject.scopes.${scope} must be an object.`);
+    scopes[scope] = {
+      sourceRoot: stringValue(scopeValue.sourceRoot, `naniProject.scopes.${scope}.sourceRoot`),
+      scriptRoot: stringValue(scopeValue.scriptRoot, `naniProject.scopes.${scope}.scriptRoot`)
+    };
+  }
+  const testEntriesValue = record(project.testEntries, "naniProject.testEntries must be an object.");
+  const testEntries = Object.fromEntries(Object.entries(testEntriesValue).map(([name, entry]) => [
+    name,
+    parseEntry(entry, "test", `naniProject.testEntries.${name}`)
+  ]));
+  if (!Array.isArray(project.voiceLocales) || !project.voiceLocales.every((item) => typeof item === "string")) {
+    throw new Error("naniProject.voiceLocales must be a string array.");
+  }
+  return {
+    scopes,
+    mainEntry: parseEntry(project.mainEntry, "production", "naniProject.mainEntry"),
+    testEntries,
+    voiceLocales: project.voiceLocales
+  };
 }
 
-function optionalRecord(
-  value: unknown,
-  message: string,
-  errors: string[]
-): Record<string, unknown> | undefined {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  errors.push(message);
-  return undefined;
+function parseEntry(value: unknown, scope: "production" | "test", name: string): NaniEntryConfig {
+  const entry = record(value, `${name} must be an object.`);
+  if (entry.scope !== scope) throw new Error(`${name}.scope must be '${scope}'.`);
+  const startLabel = entry.startLabel === undefined
+    ? undefined
+    : stringValue(entry.startLabel, `${name}.startLabel`);
+  return {
+    id: stringValue(entry.id, `${name}.id`),
+    scope,
+    initialScriptPath: stringValue(entry.initialScriptPath, `${name}.initialScriptPath`),
+    ...(startLabel ? { startLabel } : {})
+  };
+}
+
+function entryLocator(entry: NaniEntryConfig) {
+  return {
+    initialScriptPath: entry.initialScriptPath,
+    ...(entry.startLabel ? { startLabel: entry.startLabel } : {})
+  };
 }
 
 function record(value: unknown, message: string): Record<string, unknown> {
@@ -222,18 +164,7 @@ function record(value: unknown, message: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function requiredString(value: unknown, name: string, errors: string[]): string | undefined {
-  if (typeof value === "string" && value.length > 0) return value;
-  errors.push(`${name} must be a non-empty string.`);
-  return undefined;
-}
-
-function optionalString(value: unknown, name: string, errors: string[]): string | undefined {
-  if (value === undefined) return undefined;
-  return requiredString(value, name, errors);
-}
-
-function isWithin(parent: string, child: string): boolean {
-  const rel = relative(resolve(parent), resolve(child));
-  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+function stringValue(value: unknown, name: string): string {
+  if (typeof value !== "string" || value.length === 0) throw new Error(`${name} must be a non-empty string.`);
+  return value;
 }

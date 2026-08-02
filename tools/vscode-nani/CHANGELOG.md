@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Hard-cut catalog membership to recursive `naniProject.scopes` discovery via
+  the shared `@v-ronpa/nani-project` package.
+- Added automatic managed-root `.nani` watching, production+development
+  navigation with development-only target warnings, and one isolated shared
+  test catalog with multiple explicit entries.
+- Removed per-file registration and non-`.nani` project-source fallback.
+
 ## 0.6.1
 
 - Added catalog-driven `@charTone` command, parameter, preset, and diagnostic
@@ -21,7 +30,7 @@
 - Added staged local-label, logical-script-path, and target-label completion for `@goto` and `@choice goto:`.
 - Added resolved endpoint hover, local and cross-script Go to Definition, and dedicated TextMate scopes for logical paths and label fragments.
 - Added `nani-project` Problems for invalid or conflicting script registration.
-- Kept untrusted, unconfigured, unregistered, and non-`.nani` source-format catalogs on the existing single-file fallback.
+- Kept untrusted, unconfigured, and unmanaged files on the existing single-file fallback.
 - Kept `v-ronpa-nani.refreshProjectAssets` as the stable manual refresh command while extending it to invalidate script catalogs.
 
 No V-Ronpa contracts, runtime/gameplay logic, asset generation rules, root dependency metadata, or lockfile are changed by this release.

@@ -3,10 +3,12 @@ import type { ContentManifestInput } from "@v-ronpa/contracts";
 import {
   gameAFontFaces,
   gameARuntimeAssetFragments,
-  gameARuntimeAssets,
+  gameARuntimeAssets
+} from "./generatedRuntimeAssets";
+import {
   gameAVnEntryLocator,
   gameAScriptMetadataByPath
-} from "./generatedAssets";
+} from "./generatedNaniProduction";
 
 const GAME_A_MAIN_BACKGROUND_ID = "bg:game-a-academy-hall-fullscreen";
 const GAME_A_INNER_BACKGROUND_ID = "bg:game-a-snow-outskirts-frame";

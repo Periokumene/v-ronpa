@@ -66,6 +66,7 @@ export interface VnDevtoolsStatus {
   message?: string;
   updateId?: number;
   degraded?: boolean;
+  recovered?: boolean;
   cancellable?: boolean;
 }
 
@@ -135,11 +136,14 @@ export interface VnDevtoolsActions {
   cancelCandidate: () => void;
   copyLocation: (location: VnDevtoolsSourceLocation) => void;
   setMaterializationMode: (mode: VnDebugMaterializationMode) => void;
+  refreshCatalog: () => void;
 }
 
 export interface VnDevtoolsScriptItem {
   scriptPath: string;
   revision: string;
+  scope: "production" | "development" | "test";
+  executionDisposition: "runnable" | "fatal";
   viewed: boolean;
   runtime: boolean;
   hasUpdateBadge?: boolean;
@@ -163,6 +167,7 @@ export interface VnDevtoolsController {
   summaries: VnDevtoolsRuntimeSummaries;
   decision?: VnDevtoolsDecision;
   hasUpdateBadge?: boolean;
+  catalogDirty: boolean;
   actions: VnDevtoolsActions;
 }
 

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { inspectVnDebugScript, type VnDebugDecisionTrace } from "@v-ronpa/app-vn-runtime/debug";
+import {
+  inspectVnDebugScript as inspectVnDebugScriptRaw,
+  type VnDebugDecisionTrace
+} from "@v-ronpa/app-vn-runtime/debug";
 import type { VnEntryDef, VnRuntimeScriptSource } from "@v-ronpa/contracts";
 import {
   classifyVnDevtoolsScriptUpdateImpact,
@@ -90,7 +93,8 @@ describe("Nani devtools candidate update preparation", () => {
     const activeCandidate: VnDevtoolsScriptCandidate = {
       entry: runtimeEntry,
       catalog: [opening.source, chapter.source],
-      source: opening.source
+      source: opening.source,
+      sourceDiagnosticPolicy: "allow-recoverable-command-errors"
     };
     const fixedTarget = chapter.commands[0]!.anchor;
     const sourceText = "#Start\n; reformatted comment\n@goto game-a/chapter-02.nani#Start";
@@ -100,9 +104,11 @@ describe("Nani devtools candidate update preparation", () => {
       update: {
         updateId: 1,
         entryId: runtimeEntry.id,
+        scope: "production",
         scriptPath: opening.source.scriptPath,
         sourceText,
         serverRevision: opening.revision,
+        executionDisposition: "runnable",
         diagnostics: []
       },
       pinnedTarget: fixedTarget,
@@ -182,7 +188,8 @@ describe("Nani devtools candidate update preparation", () => {
     const activeCandidate: VnDevtoolsScriptCandidate = {
       entry: runtimeEntry,
       catalog: [activeOpening.source, chapter.source],
-      source: activeOpening.source
+      source: activeOpening.source,
+      sourceDiagnosticPolicy: "allow-recoverable-command-errors"
     };
     const changedSource = "#Start\n@set route:\"new\"\n@goto game-a/chapter-02.nani#Start";
     const changedOpening = await inspectVnDebugScript(runtimeEntry, {
@@ -195,9 +202,11 @@ describe("Nani devtools candidate update preparation", () => {
       update: {
         updateId: 1,
         entryId: runtimeEntry.id,
+        scope: "production",
         scriptPath: activeOpening.source.scriptPath,
         sourceText: changedSource,
         serverRevision: changedOpening.revision,
+        executionDisposition: "runnable",
         diagnostics: []
       },
       pinnedTarget: chapter.commands[0]!.anchor,
@@ -237,7 +246,8 @@ describe("Nani devtools candidate update preparation", () => {
     const activeCandidate: VnDevtoolsScriptCandidate = {
       entry: runtimeEntry,
       catalog: [opening.source, chapter.source],
-      source: chapter.source
+      source: chapter.source,
+      sourceDiagnosticPolicy: "allow-recoverable-command-errors"
     };
     const changedSource = "#Other\nNarrator: Broken.";
     const changedChapter = await inspectVnDebugScript(runtimeEntry, {
@@ -250,9 +260,11 @@ describe("Nani devtools candidate update preparation", () => {
       update: {
         updateId: 1,
         entryId: runtimeEntry.id,
+        scope: "production",
         scriptPath: chapter.source.scriptPath,
         sourceText: changedSource,
         serverRevision: changedChapter.revision,
+        executionDisposition: "runnable",
         diagnostics: []
       },
       impact: "next-start"
@@ -334,16 +346,27 @@ async function canonicalEntry(sourceText: string): Promise<VnDevtoolsScriptCandi
     sourceText
   };
   const inspection = await inspectVnDebugScript(entry, declared);
-  return { entry, source: inspection.source, catalog: [inspection.source] };
+  return {
+    entry,
+    source: inspection.source,
+    catalog: [inspection.source],
+    sourceDiagnosticPolicy: "allow-recoverable-command-errors"
+  };
+}
+
+function inspectVnDebugScript(entry: VnEntryDef, source: VnRuntimeScriptSource) {
+  return inspectVnDebugScriptRaw(entry, source, "allow-recoverable-command-errors");
 }
 
 function update(sourceText: string, serverRevision: string | null): NaniDevtoolsViteUpdate {
   return {
     updateId: 1,
     entryId: "opening",
+    scope: "production",
     scriptPath: "game-a/opening.nani",
     sourceText,
     serverRevision,
+    executionDisposition: serverRevision ? "runnable" : "fatal",
     diagnostics: []
   };
 }

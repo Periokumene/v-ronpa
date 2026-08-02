@@ -6,8 +6,13 @@ import {
   collectGameARuntimeAssets,
   collectHarnessFontFaces,
   collectHarnessRuntimeAssets,
-  generateGameATestScriptMetadataModule,
+  analyzeGameANaniProduction,
+  analyzeGameANaniTests,
+  analyzeHarnessNaniProduction,
+  generateGameANaniProductionModule,
+  generateGameANaniTestsModule,
   generateGameARuntimeAssetsModule,
+  generateHarnessNaniProductionModule,
   generateHarnessRuntimeAssetsModule
 } from "./generate-assets.mjs";
 import gameAAssetConfig from "../apps/game-a/asset.config.mjs";
@@ -26,9 +31,11 @@ const { resolveLayeredCharacterLayerRefs, resolveLayeredCharacterSourcePixelScal
   pathToFileURL(join(repoRoot, "packages/layered-character/src/index.ts")).href
 );
 const { pixiRuntimeAssetFragment } = await import(pathToFileURL(join(repoRoot, "packages/runtime-assets-pixi/src/index.ts")).href);
-const harnessGeneratedPath = join(repoRoot, "apps/game-harness/src/harness/generatedAssets.ts");
-const gameAGeneratedPath = join(repoRoot, "apps/game-a/src/generatedAssets.ts");
-const gameATestScriptsGeneratedPath = join(repoRoot, "apps/game-a/src/generatedTestScripts.ts");
+const harnessRuntimeGeneratedPath = join(repoRoot, "apps/game-harness/src/harness/generatedRuntimeAssets.ts");
+const harnessNaniGeneratedPath = join(repoRoot, "apps/game-harness/src/harness/generatedNaniProduction.ts");
+const gameARuntimeGeneratedPath = join(repoRoot, "apps/game-a/src/generatedRuntimeAssets.ts");
+const gameANaniGeneratedPath = join(repoRoot, "apps/game-a/src/generatedNaniProduction.ts");
+const gameATestNaniGeneratedPath = join(repoRoot, "apps/game-a/src/generatedNaniTests.ts");
 const gameAContentManifestPath = join(repoRoot, "apps/game-a/src/contentManifest.ts");
 const bleepAssetsRoot = join(repoRoot, "apps/game-harness/public/harness/media/bleep");
 const voiceAssetsRoot = join(repoRoot, "apps/game-harness/public/harness/media/voice");
@@ -37,7 +44,7 @@ const gameAVoiceAssetsRoot = join(repoRoot, "apps/game-a/public/game-a/media/voi
 const gameAFontAssetsRoot = join(repoRoot, "apps/game-a/public/game-a/fonts");
 const sourceRoots = ["apps/game-a/src", "apps/game-harness/src", "packages", "scripts"].map((path) => join(repoRoot, path));
 const harnessReferenceFiles = [
-  join(repoRoot, "apps/game-harness/src/harness/showcase/script.ts"),
+  join(repoRoot, "apps/game-harness/src/nani/harness-showcase.nani"),
   join(repoRoot, "apps/game-harness/src/harness/showcase/items.ts"),
   join(repoRoot, "apps/game-harness/src/harness/showcase/maps.ts"),
   join(repoRoot, "docs/nani/basic-p1-example.md"),
@@ -46,7 +53,7 @@ const harnessReferenceFiles = [
 const gameAReferenceFiles = [
   gameAContentManifestPath,
   ...fixtureNaniFiles(join(repoRoot, "apps/game-a/src/nani")),
-  ...fixtureNaniFiles(join(repoRoot, "apps/game-a/src/test-nani"))
+  ...fixtureNaniFiles(join(repoRoot, "apps/game-a/src/nani-test"))
 ];
 const hardcodedAssetPattern = /(["'`])(?:\/harness\/|\/game-a\/|\.\/assets\/|\.\.\/assets\/|https?:\/\/|data:image\/|blob:)[^"'`]*\.(?:json|png|webp|avif|ktx2|woff2?|ttf|otf|ogg|mp3|mp4|webm|gltf|glb)\1/u;
 const assetIdPattern = /\b(?:bg|bgm|sfx|bleep|voice|video|model|texture|fx):[a-zA-Z0-9:_./-]+/gu;
@@ -55,9 +62,11 @@ const bleepAssetIdPattern = /^[a-zA-Z0-9_-]+$/u;
 const voiceTextIdPattern = /^[a-zA-Z0-9_-]+$/u;
 const characterPackCommandPattern = /^\s*@(char|slide)\s+([^\s]+)/gmu;
 const allowedHardcodedFiles = new Set([
-  "apps/game-harness/src/harness/generatedAssets.ts",
-  "apps/game-a/src/generatedAssets.ts",
-  "apps/game-a/src/generatedTestScripts.ts",
+  "apps/game-harness/src/harness/generatedRuntimeAssets.ts",
+  "apps/game-harness/src/harness/generatedNaniProduction.ts",
+  "apps/game-a/src/generatedRuntimeAssets.ts",
+  "apps/game-a/src/generatedNaniProduction.ts",
+  "apps/game-a/src/generatedNaniTests.ts",
   "packages/runtime-assets-pixi/src/index.ts",
   "scripts/generate-assets.mjs",
   "scripts/validate-assets.mjs"
@@ -84,7 +93,8 @@ const appAssetConfigs = [
 
 let failed = false;
 
-checkGeneratedAssets();
+await checkGeneratedAssets();
+await checkStrictNaniCatalogs();
 for (const config of appAssetConfigs) {
   checkGeneratedFilesExist(config.label, config.assets, config.publicRoot);
   checkGeneratedFontFacesResolve(config.label, config.assets, config.fontFaces);
@@ -102,15 +112,33 @@ checkNoHardcodedRuntimeAssetPaths();
 
 if (failed) process.exitCode = 1;
 
-function checkGeneratedAssets() {
+async function checkGeneratedAssets() {
   const generatedFiles = [
-    { path: harnessGeneratedPath, expected: generateHarnessRuntimeAssetsModule() },
-    { path: gameAGeneratedPath, expected: generateGameARuntimeAssetsModule() },
-    { path: gameATestScriptsGeneratedPath, expected: generateGameATestScriptMetadataModule() }
+    { path: harnessRuntimeGeneratedPath, expected: generateHarnessRuntimeAssetsModule() },
+    { path: harnessNaniGeneratedPath, expected: await generateHarnessNaniProductionModule() },
+    { path: gameARuntimeGeneratedPath, expected: generateGameARuntimeAssetsModule() },
+    { path: gameANaniGeneratedPath, expected: await generateGameANaniProductionModule() },
+    { path: gameATestNaniGeneratedPath, expected: await generateGameANaniTestsModule() }
   ];
   for (const generated of generatedFiles) {
     const current = existsSync(generated.path) ? readFileSync(generated.path, "utf8") : "";
     if (current !== generated.expected) fail(`${relative(repoRoot, generated.path)} is out of date. Run pnpm generate:assets.`);
+  }
+}
+
+async function checkStrictNaniCatalogs() {
+  const analyses = [
+    ["Harness production", await analyzeHarnessNaniProduction("strict")],
+    ["Game A production", await analyzeGameANaniProduction("strict")],
+    ...await Promise.all(Object.keys(gameAAssetConfig.naniProject.testEntries).map(async (name) => [
+      `Game A test entry '${name}'`,
+      await analyzeGameANaniTests(name, "strict")
+    ]))
+  ];
+  for (const [label, analysis] of analyses) {
+    for (const diagnostic of analysis.diagnostics.filter((item) => item.disposition === "fatal")) {
+      fail(`${label} strict Nani validation failed at ${diagnostic.scriptPath ?? "catalog"}: ${diagnostic.message}`);
+    }
   }
 }
 

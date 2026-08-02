@@ -34,7 +34,12 @@ describe("VN devtools controller safety", () => {
       scriptRevision: "sha256:verified",
       sourceText: "#Start\nNarrator: Hello."
     };
-    const candidate = { entry, source, catalog: [source] };
+    const candidate = {
+      entry,
+      source,
+      catalog: [source],
+      sourceDiagnosticPolicy: "allow-recoverable-command-errors" as const
+    };
     const inspection = { entry, source, canMaterialize: true } as unknown as VnDebugScriptInspection;
     const rejected = createReadOnlyVnDevtoolsInspectionDisplay(inspection);
     const local = createVerifiedLocalVnDevtoolsInspectionDisplay(inspection, "sha256:verified");

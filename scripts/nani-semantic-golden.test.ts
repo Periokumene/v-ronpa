@@ -2,10 +2,9 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { gameAScriptMetadataByPath } from "../apps/game-a/src/generatedAssets";
-import { gameATestScriptMetadataByPath } from "../apps/game-a/src/generatedTestScripts";
-import { harnessScriptMetadataByPath } from "../apps/game-harness/src/harness/generatedAssets";
-import { harnessShowcaseScript } from "../apps/game-harness/src/harness/showcase/script";
+import { gameAScriptMetadataByPath } from "../apps/game-a/src/generatedNaniProduction";
+import { gameATestScriptMetadataByPath } from "../apps/game-a/src/generatedNaniTests";
+import { harnessScriptMetadataByPath } from "../apps/game-harness/src/harness/generatedNaniProduction";
 import { parseScenario } from "../packages/nani-parser/src/index";
 import { compileRuntimeScript } from "../packages/nani-runtime-compiler/src/index";
 
@@ -22,7 +21,7 @@ describe("Nani semantic golden from integration baseline", () => {
     expect(golden.canonicalization).toBe("stable-json-v1");
     expect(diagnosticGolden.baseline).toBe(golden.baseline);
     expect(golden.intentionalOverrides).toEqual({
-      "game-a-smoke": "Editor Tools moves the visual/audio setup before the first stable Workbench target and records its route/text identity.",
+      "game-a-test-smoke": "Editor Tools moves the visual/audio setup before the first stable Workbench target and records its route/text identity.",
       "game-a-production-catalog": "The accepted multi-Nani hard cut splits the former MILKBEGIN segment into chapter-02 and links it from opening with one static endpoint.",
       "csp-character-v2-alice-hard-cut": "The accepted CSP v2 hard cut replaces Alice assets and updates production/test appearance expressions, generated revisions, and preload plans without compatibility aliases.",
       "csp-character-v3-body-variants-alice-refresh": "The accepted CSP v3 hard cut moves body into the numeric runtime group, adds body0, and updates only the explicit test expression and its generated metadata.",
@@ -49,9 +48,7 @@ describe("Nani semantic golden from integration baseline", () => {
 
   for (const [id, expected] of Object.entries(golden.corpora)) {
     it(`preserves complete parser/compiler semantics for ${id}`, () => {
-      const sourceText = id === "harness-showcase"
-        ? harnessShowcaseScript
-        : readFileSync(resolve(process.cwd(), expected.sourceFile), "utf8");
+      const sourceText = readFileSync(resolve(process.cwd(), expected.sourceFile), "utf8");
       const parsed = parseScenario({ sourceText, scriptPath: expected.scriptPath });
       const compiled = compileRuntimeScript(parsed);
 

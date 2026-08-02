@@ -12,16 +12,16 @@ const sourceFiles = [
   "packages/nani-parser/fixtures/basic-trial-discussion.p1.nani",
   "packages/nani-parser/fixtures/basic-navi.p1.nani",
   "apps/game-a/src/nani/opening.nani",
-  "apps/game-a/src/test-nani/smoke.nani",
-  "apps/game-a/src/test-nani/character-smoke.nani"
+  "apps/game-a/src/nani-test/smoke.nani",
+  "apps/game-a/src/nani-test/character-smoke.nani"
 ];
 const openingCorpus = sourceFiles.map((sourceFile) => ({
   scriptPath: sourceFile,
   sourceText: readFileSync(resolve(repoRoot, sourceFile), "utf8")
 }));
 openingCorpus.push({
-  scriptPath: "harness-showcase.nani",
-  sourceText: readTypescriptTemplate("apps/game-harness/src/harness/showcase/script.ts")
+  scriptPath: "harness/harness-showcase.nani",
+  sourceText: readFileSync(resolve(repoRoot, "apps/game-harness/src/nani/harness-showcase.nani"), "utf8")
 });
 
 const syntheticSource = Array.from({ length: 10_000 }, (_, index) => {
@@ -99,13 +99,6 @@ function parseAndCompile(sourceText, scriptPath) {
   const compiled = compileRuntimeScript(parsed);
   return parsed.scenario.statements.length + compiled.script.commands.length +
     parsed.diagnostics.length + compiled.diagnostics.length;
-}
-
-function readTypescriptTemplate(path) {
-  const text = readFileSync(resolve(repoRoot, path), "utf8");
-  const match = text.match(/`([\s\S]*)`;\s*$/u);
-  if (!match?.[1]) throw new Error(`Could not read Nani template from ${path}.`);
-  return match[1];
 }
 
 function measure(workload) {

@@ -227,13 +227,14 @@ export function useVnRuntime({
   profile,
   prepareScriptPresentation,
   routeTable,
+  sourceDiagnosticPolicy,
   storyPlayTiming,
   videoPort: configuredVideoPort,
   voiceSettings = DEFAULT_VOICE_SETTINGS
 }: UseVnRuntimeOptions): UseVnRuntimeResult {
   const compiledCatalog = useMemo(
-    () => compileVnRuntimeCatalog(entry, catalog),
-    [catalog, entry.initialScriptPath, entry.startLabel]
+    () => compileVnRuntimeCatalog(entry, catalog, sourceDiagnosticPolicy),
+    [catalog, entry.initialScriptPath, entry.startLabel, sourceDiagnosticPolicy]
   );
   const bootSession = useMemo(
     () =>
@@ -702,11 +703,7 @@ export function useVnRuntime({
     const catalogInvalid =
       hasInvalidStartLabel ||
       currentCatalog.diagnostics.length > 0 ||
-      currentCatalog.records.some((record) =>
-        [...record.bootSession.diagnostics.parser, ...record.bootSession.diagnostics.compiler].some(
-          (diagnostic) => diagnostic.severity === "error"
-        )
-      );
+      currentCatalog.records.some((record) => record.hasFatalSourceDiagnostics);
     if (catalogInvalid || !nextBoot) {
       onRuntimeStatus?.({ action: "story:start", outcome: "catalog-invalid" });
       return { ok: false, code: "catalog-invalid", message: "The VN runtime catalog is not linkable." };

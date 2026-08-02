@@ -10,9 +10,9 @@ VS Code language support for V-Ronpa `.nani` scripts.
 - Limits normal completion to runtime-implemented commands and compiler-consumed parameters. Handwritten compatibility commands and declared-but-unconsumed parameters still receive hover and compiler diagnostics.
 - Provides current-file label completion for `@goto #` and `goto:#`.
 - Loads production and test Nani catalogs from the nearest `asset.config.mjs` in trusted file workspaces.
-- Completes local labels before registered logical script paths, then completes labels from the selected target after `path.nani#`.
+- Completes local labels before discovered logical script paths, then completes labels from the selected target after `path.nani#`.
 - Publishes exact shared-linker diagnostics for malformed, dynamic, relative, wildcard, unknown-script, and unknown-label endpoints.
-- Resolves navigation endpoint hovers and Cmd/Ctrl+click definitions across registered `.nani` source files.
+- Resolves navigation endpoint hovers and Cmd/Ctrl+click definitions across discovered `.nani` source files.
 - Discovers the nearest `asset.config.mjs` for an opened `.nani` file and completes generated background, BGM, SFX, video, and layered-character resources.
 - Completes layered-character expression tokens from the matching `compositions.json`, including comma-separated `@char` and `@slide` expressions.
 - Renders a native 320x420 hover preview when the pointer is over the static identity value of an `@char` command.
@@ -43,11 +43,12 @@ Normal completion excludes commands whose catalog status is not `implemented` an
 ## Multi-Script Navigation
 
 In a trusted file workspace, the extension reads the nearest `asset.config.mjs`
-and indexes the top-level production `entry/scripts` plus each
-`testCatalogs.<name>.entry/scripts` catalog independently. Physical
-`sourceFile` paths are mapped to their registered logical `scriptPath`, so
-editor diagnostics use the same catalog authority as asset generation and the
-runtime linker.
+and delegates recursive scope discovery to `@v-ronpa/nani-project`. Production
+and development form one navigation catalog; test scripts form one isolated
+shared catalog with multiple explicit entries. Physical source paths map to
+logical `scriptPath` values through each scope's `sourceRoot` and `scriptRoot`,
+so editor diagnostics use the same membership and linker authority as asset
+generation and Vite.
 
 ```nani
 @goto #LocalLabel
@@ -58,15 +59,17 @@ runtime linker.
 
 Local label candidates appear before logical script paths. After a path and
 `#`, IntelliSense switches to labels from that target script. Hover reports the
-resolved script, label, and production/test catalog; Go to Definition opens the
-registered source and selects the label when present.
+resolved script, label, and scope; Go to Definition opens the discovered source
+and selects the label when present. Production-to-development navigation works
+in the development graph and is warned as valid only in development. Test
+navigation never links to production/development.
 
-Untrusted, unconfigured, and unregistered `.nani` files retain the existing
-single-file parser/compiler diagnostics and local-label completion. Catalogs
-containing `sourceFormat` entries such as the Harness TypeScript template are
-intentionally outside the 0.6.0 editor boundary and also fall back to
-single-file support. Configuration conflicts are reported against
-`asset.config.mjs` with diagnostic source `nani-project`.
+Every `.nani` below a configured managed root is a project member automatically;
+there is no unregistered state inside those roots. Files outside managed roots,
+as well as untrusted or unconfigured workspaces, retain single-file
+parser/compiler diagnostics and local-label completion. Configuration and
+discovery conflicts are reported against `asset.config.mjs` with diagnostic
+source `nani-project`.
 
 ## Project Assets
 
@@ -76,7 +79,16 @@ The configured generated assets export is the only authority for resource IDs. T
 
 Layered-character token names are read directly from each generated character pack's sibling `compositions.json`. Those files are watched independently, so token edits become available without regenerating or reinstalling the extension.
 
-Use **V-Ronpa Nani: Refresh Project Assets** from the Command Palette if an external tool changes files without producing a filesystem notification. The existing command now invalidates both asset metadata and Nani script catalogs. Missing or malformed project metadata is reported in the **V-Ronpa Nani** output channel; single-file parser/compiler diagnostics and command hover remain available while project-derived completion falls back. The asset index is completion-only: unknown IDs are not diagnosed because external paths and dynamic IDs remain valid authoring inputs.
+Use **V-Ronpa Nani: Refresh Project Assets** from the Command Palette if an
+external tool changes files without producing a filesystem notification. The
+existing command invalidates both asset metadata and Nani script catalogs. The
+extension watches `**/*.nani` below every managed root, so new, renamed, and
+deleted scripts are reindexed without editing config. Missing or malformed
+project metadata is reported in the **V-Ronpa Nani** output channel; single-file
+parser/compiler diagnostics and command hover remain available while
+project-derived completion falls back. The asset index is completion-only:
+unknown IDs are not diagnosed because external paths and dynamic IDs remain
+valid authoring inputs.
 
 ## Character Assembly Preview
 

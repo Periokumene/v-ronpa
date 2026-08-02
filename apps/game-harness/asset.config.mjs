@@ -2,28 +2,28 @@ export default {
   id: "game-harness",
   publicRoot: "apps/game-harness/public/harness",
   publicBaseUri: "/harness",
-  outputPath: "apps/game-harness/src/harness/generatedAssets.ts",
+  runtimeAssetOutputPath: "apps/game-harness/src/harness/generatedRuntimeAssets.ts",
+  naniProductionOutputPath: "apps/game-harness/src/harness/generatedNaniProduction.ts",
   exportName: "harnessRuntimeAssets",
   fontFacesExportName: "harnessFontFaces",
   fragmentsExportName: "harnessRuntimeAssetFragments",
-  entryLocatorExportName: "harnessVnEntryLocator",
-  scriptMetadataExportName: "harnessScriptMetadataByPath",
-  scriptCatalogExportName: "harnessScriptCatalog",
-  scriptSourcesExportName: "harnessScriptSourcesByPath",
-  entry: {
-    id: "vn:harness-showcase",
-    initialScriptPath: "harness/harness-showcase.nani",
-    startLabel: "Start"
-  },
   providers: ["pixi"],
-  voiceLocales: ["zh"],
-  scripts: [
-    {
-      sourceFile: "apps/game-harness/src/harness/showcase/script.ts",
-      sourceFormat: "typescript-template",
-      scriptPath: "harness/harness-showcase.nani"
-    }
-  ],
+  naniProject: {
+    scopes: {
+      production: {
+        sourceRoot: "apps/game-harness/src/nani",
+        scriptRoot: "harness"
+      }
+    },
+    mainEntry: {
+      id: "vn:harness-showcase",
+      scope: "production",
+      initialScriptPath: "harness/harness-showcase.nani",
+      startLabel: "Start"
+    },
+    testEntries: {},
+    voiceLocales: ["zh"]
+  },
   idOverrides: {
     "media/bgm/bgm-validation-main.ogg": "bgm:validation-main",
     "media/bgm/bgm-validation-alt.ogg": "bgm:validation-alt",

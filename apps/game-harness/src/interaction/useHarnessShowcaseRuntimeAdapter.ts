@@ -41,7 +41,7 @@ import {
   harnessShowcaseTrial
 } from "../harness/showcase";
 import { harnessShowcaseVnEntry } from "../harness/contentManifest";
-import { harnessScriptCatalog } from "../harness/generatedAssets";
+import { harnessScriptCatalog } from "../harness/generatedNaniProduction";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../harness/inputActions";
 import { useFirstPersonExplorationBridge } from "../harness/useFirstPersonExplorationBridge";
 import type { AudioPort, VideoPort } from "@v-ronpa/media-save";
@@ -132,7 +132,10 @@ export function useHarnessShowcaseRuntimeAdapter(
   const runtimeDefinition = useMemo<VnRuntimeDefinition>(
     () => ({
       entry: { ...harnessShowcaseVnEntry, profile: options.profile ?? "vn2d" },
-      catalog: harnessScriptCatalog
+      catalog: harnessScriptCatalog,
+      sourceDiagnosticPolicy: import.meta.env.DEV
+        ? "allow-recoverable-command-errors"
+        : "strict"
     }),
     [options.profile]
   );
@@ -144,6 +147,7 @@ export function useHarnessShowcaseRuntimeAdapter(
     ...(options.dialogueBleepSettings ? { dialogueBleepSettings: options.dialogueBleepSettings } : {}),
     entry: runtimeDefinition.entry,
     catalog: runtimeDefinition.catalog,
+    sourceDiagnosticPolicy: runtimeDefinition.sourceDiagnosticPolicy,
     gameId: "game-harness",
     onGameplayEvents: applyRuntimeGameplayEvents,
     onRuntimeStatus: recordRuntimeStatus,

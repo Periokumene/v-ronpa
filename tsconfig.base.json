@@ -19,6 +19,7 @@
       "@v-ronpa/asset-registry": ["packages/asset-registry/src/index.ts"],
       "@v-ronpa/layered-character": ["packages/layered-character/src/index.ts"],
       "@v-ronpa/nani-parser": ["packages/nani-parser/src/index.ts"],
+      "@v-ronpa/nani-project": ["packages/nani-project/src/index.ts"],
       "@v-ronpa/nani-runtime-compiler": ["packages/nani-runtime-compiler/src/index.ts"],
       "@v-ronpa/story-engine": ["packages/story-engine/src/index.ts"],
       "@v-ronpa/story-play": ["packages/story-play/src/index.ts"],

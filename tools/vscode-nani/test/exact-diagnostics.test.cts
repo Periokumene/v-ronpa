@@ -176,7 +176,7 @@ suite("V-Ronpa Nani exact diagnostics", () => {
     const completions = await executeCompletions(opening.uri, completionPosition, 0);
     assert.deepEqual(
       completions.items.slice(0, 3).map(completionLabel),
-      ["#Start", "game/opening.nani", "game/chapter.nani"]
+      ["#Start", "game/chapter.nani", "game/opening.nani"]
     );
 
     const endpointPosition = new vscode.Position(1, "@goto game/".length);
@@ -265,7 +265,7 @@ suite("V-Ronpa Nani exact diagnostics", () => {
     assert.deepEqual(fallback.items.map(completionLabel), ["#Solo"]);
   });
 
-  test("publishes duplicate script registration on the project config", async () => {
+  test("publishes duplicate discovered logical paths on the project config", async () => {
     const fixture = await createNavigationFixture(true);
     await vscode.commands.executeCommand("v-ronpa-nani.refreshProjectAssets");
     await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(fixture.openingUri));
@@ -275,7 +275,7 @@ suite("V-Ronpa Nani exact diagnostics", () => {
       (candidate) => candidate.source === "nani-project"
     );
     assert.equal(diagnostic.code, "invalid-project-script-config");
-    assert.ok(diagnostic.message.includes("registered more than once"));
+    assert.ok(diagnostic.message.includes("produced by both"));
   });
 
   test("renders a real layered character artifact only on the @char identity hover", async () => {
@@ -413,7 +413,7 @@ async function createCharacterPreviewFixture(): Promise<{ bodyPng: vscode.Uri; p
     "export default {",
     '  publicRoot: "public/example",',
     '  publicBaseUri: "/example",',
-    '  outputPath: "src/generatedAssets.ts",',
+    '  runtimeAssetOutputPath: "src/generatedAssets.ts",',
     '  exportName: "exampleAssets"',
     "};",
     ""
@@ -478,11 +478,12 @@ async function createNavigationFixture(duplicate = false): Promise<{
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
   assert.ok(workspaceFolder);
   const root = workspaceFolder.uri;
-  const openingUri = vscode.Uri.joinPath(root, "stories/opening.nani");
-  const chapterUri = vscode.Uri.joinPath(root, "stories/chapter.nani");
-  const smokeUri = vscode.Uri.joinPath(root, "stories/smoke.nani");
+  const openingUri = vscode.Uri.joinPath(root, "stories/nani/opening.nani");
+  const chapterUri = vscode.Uri.joinPath(root, "stories/nani/chapter.nani");
+  const smokeUri = vscode.Uri.joinPath(root, "stories/nani-test/smoke.nani");
   const configUri = vscode.Uri.joinPath(root, "asset.config.mjs");
-  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "stories"));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "stories/nani"));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "stories/nani-test"));
   await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "src"));
   await writeWorkspaceFile("pnpm-workspace.yaml", "packages: []\n");
   await vscode.workspace.fs.writeFile(
@@ -495,29 +496,43 @@ async function createNavigationFixture(duplicate = false): Promise<{
   );
   await vscode.workspace.fs.writeFile(chapterUri, Buffer.from("#Chapter\n@end"));
   await writeWorkspaceFile("src/generatedAssets.ts", "export const exampleAssets = [];\n");
-  const scripts = [
-    { sourceFile: "stories/opening.nani", scriptPath: "game/opening.nani" },
-    { sourceFile: "stories/chapter.nani", scriptPath: "game/chapter.nani" },
-    ...(duplicate
-      ? [{ sourceFile: "stories/opening.nani", scriptPath: "game/duplicate.nani" }]
-      : [])
-  ];
+  if (duplicate) {
+    await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "stories/nani-dev"));
+    await vscode.workspace.fs.writeFile(
+      vscode.Uri.joinPath(root, "stories/nani-dev/opening.nani"),
+      Buffer.from("#Start\n@end\n")
+    );
+  }
   await vscode.workspace.fs.writeFile(
     configUri,
     Buffer.from(`export default ${JSON.stringify({
       publicRoot: "public/example",
       publicBaseUri: "/example",
-      outputPath: "src/generatedAssets.ts",
+      runtimeAssetOutputPath: "src/generatedAssets.ts",
       exportName: "exampleAssets",
-      entry: { initialScriptPath: "game/opening.nani", startLabel: "Start" },
-      scripts,
-      testCatalogs: {
+      naniProject: {
+        scopes: {
+          production: { sourceRoot: "stories/nani", scriptRoot: "game" },
+          ...(duplicate
+            ? { development: { sourceRoot: "stories/nani-dev", scriptRoot: "game" } }
+            : {}),
+          test: { sourceRoot: "stories/nani-test", scriptRoot: "game/test" }
+        },
+        mainEntry: {
+          id: "vn:main",
+          scope: "production",
+          initialScriptPath: "game/opening.nani",
+          startLabel: "Start"
+        },
+        testEntries: {
         smoke: {
-          entry: { initialScriptPath: "game/test/smoke.nani" },
-          scripts: [
-            { sourceFile: "stories/smoke.nani", scriptPath: "game/test/smoke.nani" }
-          ]
-        }
+            id: "vn:test-smoke",
+            scope: "test",
+            initialScriptPath: "game/test/smoke.nani",
+            startLabel: "Start"
+          }
+        },
+        voiceLocales: []
       }
     }, null, 2)};\n`)
   );

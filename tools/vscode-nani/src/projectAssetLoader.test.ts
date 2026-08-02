@@ -141,7 +141,7 @@ function createAssetFixture(): {
     `export default {
       publicRoot: "apps/example/public/example",
       publicBaseUri: "/example",
-      outputPath: "apps/example/src/generatedAssets.ts",
+      runtimeAssetOutputPath: "apps/example/src/generatedAssets.ts",
       exportName: "exampleAssets"
     };\n`
   );

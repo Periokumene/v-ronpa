@@ -5,55 +5,44 @@ import { createNaniDevtoolsVitePlugin } from "@v-ronpa/app-vn-devtools/vite";
 import { resolveWorktreeAppRuntimeEnv } from "../../scripts/worktree-env.mjs";
 import gameAAssetConfig from "./asset.config.mjs";
 
-export const GAME_A_SMOKE_VITE_MODE = "game-a-smoke";
-export const GAME_A_CHARACTER_SMOKE_VITE_MODE = "game-a-character-smoke";
+export const GAME_A_TEST_SMOKE_VITE_MODE = "game-a-test-smoke";
+export const GAME_A_TEST_CHARACTER_VITE_MODE = "game-a-test-character";
 
 export function resolveGameAViteCacheDir(mode: string): string {
   const safeMode = mode.replace(/[^a-zA-Z0-9_-]/gu, "-");
   return `node_modules/.vite-game-a-${safeMode}`;
 }
 
-export function resolveGameAStoryDefinitionModule(mode: string): string {
-  const modulePath = mode === GAME_A_SMOKE_VITE_MODE
-    ? "./src/gameASmokeStoryDefinition.ts"
-    : mode === GAME_A_CHARACTER_SMOKE_VITE_MODE
-      ? "./src/gameACharacterSmokeStoryDefinition.ts"
-      : "./src/gameAScripts.ts";
-  return fileURLToPath(new URL(modulePath, import.meta.url));
-}
-
-export function resolveGameANaniDevtoolsEntries(mode: string) {
-  const testCatalogName = mode === GAME_A_SMOKE_VITE_MODE
-    ? "smoke"
-    : mode === GAME_A_CHARACTER_SMOKE_VITE_MODE
-      ? "characterSmoke"
-      : undefined;
-  const configuredCatalog = testCatalogName
-    ? gameAAssetConfig.testCatalogs[testCatalogName]
-    : { entry: gameAAssetConfig.entry, scripts: gameAAssetConfig.scripts };
-  return configuredCatalog.scripts.map((script) => ({
-    sourceFile: fileURLToPath(new URL(`../../${script.sourceFile}`, import.meta.url)),
-    scriptPath: script.scriptPath,
-    entryId: configuredCatalog.entry.id
-  }));
-}
-
-export default defineConfig(({ mode }) => {
-  const runtimeEnv = resolveWorktreeAppRuntimeEnv("game-a");
+export function resolveGameANaniDevtoolsProject(mode: string) {
+  if (mode === GAME_A_TEST_SMOKE_VITE_MODE) {
+    return { entry: gameAAssetConfig.naniProject.testEntries.smoke, scopes: ["test"] as const };
+  }
+  if (mode === GAME_A_TEST_CHARACTER_VITE_MODE) {
+    return { entry: gameAAssetConfig.naniProject.testEntries.character, scopes: ["test"] as const };
+  }
   return {
-    // Playwright starts the VN and character smoke modes together. Vite's
-    // optimize-deps hashes are process-local, so sharing the default cache can
-    // otherwise produce transient `504 Outdated Optimize Dep` responses.
+    entry: gameAAssetConfig.naniProject.mainEntry,
+    scopes: ["production", "development"] as const
+  };
+}
+
+export default defineConfig(({ command, mode }) => {
+  const runtimeEnv = resolveWorktreeAppRuntimeEnv("game-a");
+  const nani = resolveGameANaniDevtoolsProject(mode);
+  const scopes = command === "build" && !mode.startsWith("game-a-test-")
+    ? (["production"] as const)
+    : nani.scopes;
+  return {
     cacheDir: resolveGameAViteCacheDir(mode),
-    plugins: [react(), createNaniDevtoolsVitePlugin({ entries: resolveGameANaniDevtoolsEntries(mode) })],
-    resolve: {
-      alias: [
-        {
-          find: /^\.\/gameAScripts$/u,
-          replacement: resolveGameAStoryDefinitionModule(mode)
-        }
-      ]
-    },
+    plugins: [
+      react(),
+      createNaniDevtoolsVitePlugin({
+        project: gameAAssetConfig.naniProject,
+        entry: nani.entry,
+        scopes,
+        root: fileURLToPath(new URL("../../", import.meta.url))
+      })
+    ],
     server: {
       host: "127.0.0.1",
       port: runtimeEnv.port,

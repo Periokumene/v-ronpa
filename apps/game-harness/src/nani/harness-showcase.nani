@@ -1,4 +1,4 @@
-export const harnessShowcaseScript = `#Start
+#Start
 @set route:"intro"
 @back bg:harness effect:fade time:0.15
 @inback bg:inner-academy-hall effect:fade time:0.15
@@ -278,4 +278,4 @@ Narrator: CHECKPOINT 10 - white flash、Ema slide、stage shake。应看到白�
 Narrator: CHECKPOINT 11 - cleanup + consecutive wait。bokeh、blur、rain、snow、sun 均应被移除，画面恢复清晰稳定；本句出现代表连续 cleanup wait 已全部完成，背景保持 bg:classroom。
 @hideChars time:0.2 wait!
 Narrator: CHECKPOINT 12 - hideChars + wait。角色应已隐藏；本句出现后覆盖层即将结束。
-@end`;
+@end

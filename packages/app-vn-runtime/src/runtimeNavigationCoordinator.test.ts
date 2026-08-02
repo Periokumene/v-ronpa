@@ -14,6 +14,27 @@ const entry: VnEntryDef = {
 };
 
 describe("runtime script navigation coordinator", () => {
+  it("keeps normal play runnable around a compiler-removed command only under the development policy", () => {
+    const catalog = [source("game/a.nani", [
+      "#Start",
+      "Narrator: Before.",
+      "@notACommand bad:true",
+      "Narrator: After."
+    ].join("\n"))];
+    const recovered = compileVnRuntimeCatalog(entry, catalog, "allow-recoverable-command-errors");
+    const strict = compileVnRuntimeCatalog(entry, catalog, "strict");
+    const record = recovered.recordsByPath.get("game/a.nani")!;
+
+    expect(record.hasFatalSourceDiagnostics).toBe(false);
+    expect(record.script.commands.map((command) => command.commandId)).toEqual(["print", "print"]);
+    expect(strict.recordsByPath.get("game/a.nani")?.hasFatalSourceDiagnostics).toBe(true);
+
+    const before = advanceVnSession(record.bootSession, "start");
+    const after = advanceVnSession(before.session, "manual");
+    expect(before.session.story.text?.current?.text).toBe("Before.");
+    expect(after.session.story.text?.current?.text).toBe("After.");
+  });
+
   it("records every script executed during an invisible chained transition", async () => {
     const catalog = compile([
       source("game/a.nani", "#Start\n@goto game/b.nani#Start"),
@@ -89,7 +110,7 @@ describe("runtime script navigation coordinator", () => {
 });
 
 function compile(catalog: VnRuntimeScriptCatalog) {
-  return compileVnRuntimeCatalog(entry, catalog);
+  return compileVnRuntimeCatalog(entry, catalog, "strict");
 }
 
 function source(scriptPath: string, sourceText: string) {

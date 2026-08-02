@@ -1,34 +1,74 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeCommand, RuntimeScript, RuntimeValue } from "@v-ronpa/contracts";
-import { serializeRuntimeScriptSemantics } from "../packages/nani-runtime-compiler/src/index.ts";
+import {
+  digestRuntimeScriptSemantics,
+  serializeRuntimeScriptSemantics
+} from "../packages/nani-runtime-compiler/src/index.ts";
 import { deriveLayeredCharacterPreloadPlan } from "../packages/layered-character/src/index.ts";
 import {
-  createScriptRevision,
-  generateGameARuntimeAssetsModule,
-  generateGameATestScriptMetadataModule
+  analyzeGameANaniDevelopment,
+  analyzeGameANaniProduction,
+  analyzeGameANaniTests,
+  generateGameANaniProductionModule,
+  generateGameANaniTestsModule
 } from "./generate-assets.mjs";
 
 describe("generated script revisions", () => {
-  it("ignores source locations but changes for semantic command content", () => {
+  it("ignores source locations but changes for semantic command content", async () => {
     const base = runtimeScript("Hello", 1);
-    expect(createScriptRevision(base)).toBe(createScriptRevision(runtimeScript("Hello", 99)));
-    expect(createScriptRevision(base)).not.toBe(createScriptRevision(runtimeScript("Changed", 1)));
+    expect(await digestRuntimeScriptSemantics(base)).toBe(
+      await digestRuntimeScriptSemantics(runtimeScript("Hello", 99))
+    );
+    expect(await digestRuntimeScriptSemantics(base)).not.toBe(
+      await digestRuntimeScriptSemantics(runtimeScript("Changed", 1))
+    );
   });
 
-  it("hashes the compiler-owned canonical semantic serialization", () => {
+  it("hashes the compiler-owned canonical semantic serialization", async () => {
     const script = runtimeScript("Hello", 1);
 
     expect(serializeRuntimeScriptSemantics(script)).toBe(
       '{"commands":[{"canonicalName":"print","category":"text","commandId":"print","params":{"autoNext":false,"text":"Hello"},"source":"v-ronpa","status":"implemented"}],"labels":{"Start":0},"scriptPath":"game/test.nani"}'
     );
-    expect(createScriptRevision(script)).toBe("sha256:455fbd5b40f88d7cf9f71f0bb6c13979e5f52f3fec3d7f2d6f39aff0837af8a9");
+    expect(await digestRuntimeScriptSemantics(script)).toBe("sha256:455fbd5b40f88d7cf9f71f0bb6c13979e5f52f3fec3d7f2d6f39aff0837af8a9");
   });
 });
 
 describe("generated Game A script metadata boundaries", () => {
-  it("keeps product and test-only Nani in separate generated exports", () => {
-    const productModule = generateGameARuntimeAssetsModule();
-    const testModule = generateGameATestScriptMetadataModule();
+  it("discovers the canonical physical scope directories while preserving logical script identity", async () => {
+    const production = await analyzeGameANaniProduction();
+    const development = await analyzeGameANaniDevelopment();
+    const tests = await analyzeGameANaniTests();
+
+    expect(production.scripts.map(({ sourceFile, scriptPath }) => ({ sourceFile, scriptPath }))).toEqual([
+      {
+        sourceFile: "apps/game-a/src/nani/chapter-02.nani",
+        scriptPath: "game-a/chapter-02.nani"
+      },
+      {
+        sourceFile: "apps/game-a/src/nani/opening.nani",
+        scriptPath: "game-a/opening.nani"
+      }
+    ]);
+    expect(development.scripts.find((script) => script.scope === "development")).toMatchObject({
+      sourceFile: "apps/game-a/src/nani-dev/draft-home-quarrel.nani",
+      scriptPath: "game-a/dev/draft-home-quarrel.nani"
+    });
+    expect(tests.scripts.map(({ sourceFile, scriptPath }) => ({ sourceFile, scriptPath }))).toEqual([
+      {
+        sourceFile: "apps/game-a/src/nani-test/character-smoke.nani",
+        scriptPath: "game-a/test/character-smoke.nani"
+      },
+      {
+        sourceFile: "apps/game-a/src/nani-test/smoke.nani",
+        scriptPath: "game-a/test/smoke.nani"
+      }
+    ]);
+  });
+
+  it("keeps product and shared test Nani in separate generated exports", async () => {
+    const productModule = await generateGameANaniProductionModule();
+    const testModule = await generateGameANaniTestsModule();
 
     expect(productModule).toContain('"game-a/opening.nani"');
     expect(productModule).toContain("export const gameAVnEntryLocator");
@@ -39,9 +79,9 @@ describe("generated Game A script metadata boundaries", () => {
     expect(testModule).toContain('"game-a/test/smoke.nani"');
     expect(testModule).toContain('"game-a/test/character-smoke.nani"');
     expect(testModule).toContain("export const gameATestEntryLocators");
-    expect(testModule).toContain("export const gameATestScriptCatalogs");
+    expect(testModule).toContain("export const gameATestScriptCatalog");
     expect(testModule).toContain('"smoke"');
-    expect(testModule).toContain('"characterSmoke"');
+    expect(testModule).toContain('"character"');
     expect(testModule).not.toContain('"game-a/opening.nani"');
   });
 });

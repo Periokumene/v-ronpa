@@ -78,6 +78,7 @@ export function GameAAppCore({
   const runtime = useGameAVnRuntime({
     entry: storyDefinition.entry,
     catalog: storyDefinition.catalog,
+    sourceDiagnosticPolicy: storyDefinition.sourceDiagnosticPolicy,
     prepareScriptPresentation: pixiPreparation.prepareScriptPresentation,
     assetResolver: assetRegistry,
     ...(gameAContentManifest.audio?.dialogueBleep ? { dialogueBleepConfig: gameAContentManifest.audio.dialogueBleep } : {}),

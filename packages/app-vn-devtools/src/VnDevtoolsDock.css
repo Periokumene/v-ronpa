@@ -117,6 +117,40 @@
   position: relative;
 }
 
+.vn-devtools-scope-badge {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border: 1px solid var(--vn-devtools-border-strong);
+  border-radius: 999px;
+  color: var(--vn-devtools-text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.vn-devtools-catalog-dirty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--vn-devtools-warning);
+  color: var(--vn-devtools-text-strong);
+  background: rgb(118 76 17 / 36%);
+  font-size: 11px;
+}
+
+.vn-devtools-catalog-dirty button {
+  padding: 4px 9px;
+  border: 1px solid var(--vn-devtools-warning);
+  border-radius: 4px;
+  color: var(--vn-devtools-text-strong);
+  background: transparent;
+  cursor: pointer;
+}
+
 .vn-devtools-script-trigger {
   display: flex;
   align-items: center;

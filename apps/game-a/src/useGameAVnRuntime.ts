@@ -17,6 +17,7 @@ export type UseGameAVnRuntimeOptions = Pick<
   | "voiceSettings"
   | "catalog"
   | "entry"
+  | "sourceDiagnosticPolicy"
 >;
 
 export function useGameAVnRuntime({ entry, ...options }: UseGameAVnRuntimeOptions) {

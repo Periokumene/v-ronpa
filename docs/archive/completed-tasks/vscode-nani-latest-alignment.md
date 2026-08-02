@@ -40,7 +40,7 @@ Align the VS Code `.nani` extension with all compiler, runtime, and project-reso
 
 - `tools/vscode-nani/**`
 - `apps/game-a/src/nani/opening.nani`
-- `apps/game-a/src/test-nani/smoke.nani`
+- `apps/game-a/src/nani-test/smoke.nani`
 - `apps/game-a/src/gameAScripts.test.ts`
 - `apps/game-a/src/generatedTestScripts.ts`
 - `docs/tasks/vscode-nani-latest-alignment.md`

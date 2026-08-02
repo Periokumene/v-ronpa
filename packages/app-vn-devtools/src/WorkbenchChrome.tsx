@@ -36,7 +36,11 @@ export function WorkbenchFileBar({ controller }: { controller: VnDevtoolsControl
       <div className="vn-devtools-file-status" data-phase={controller.status.phase}>
         <StatusIcon controller={controller} />
         <span>{statusLabels[controller.status.phase]}</span>
-        {controller.status.degraded && <span className="vn-devtools-degraded-label">Degraded</span>}
+        {controller.status.degraded && (
+          <span className="vn-devtools-degraded-label">
+            {controller.status.recovered ? "Recovered / Degraded" : "Degraded"}
+          </span>
+        )}
         {warningCount > 0 && <span className="vn-devtools-diagnostic-count is-warning">{warningCount}</span>}
         {errorCount > 0 && <span className="vn-devtools-diagnostic-count is-error">{errorCount}</span>}
       </div>
@@ -137,6 +141,11 @@ function ScriptPicker({ controller }: { controller: VnDevtoolsController }) {
       >
         <span className="vn-devtools-script-labels">
           <strong>{formatFileLabel(controller.viewedScriptPath)}</strong>
+          {controller.scripts.find((script) => script.viewed) && (
+            <small className="vn-devtools-scope-badge">
+              {controller.scripts.find((script) => script.viewed)!.scope}
+            </small>
+          )}
         </span>
         <ArrowDown size={13} weight="bold" aria-hidden="true" />
       </summary>
@@ -179,7 +188,16 @@ function ScriptPicker({ controller }: { controller: VnDevtoolsController }) {
             }}
           >
             <span>{formatFileLabel(script.scriptPath)}</span>
-            <small>{script.runtime ? "Running" : script.hasUpdateBadge ? "Updated" : ""}</small>
+            <small>
+              <span className="vn-devtools-scope-badge">{script.scope}</span>
+              {script.executionDisposition === "fatal"
+                ? " Fatal"
+                : script.runtime
+                  ? " Running"
+                  : script.hasUpdateBadge
+                    ? " Updated"
+                    : ""}
+            </small>
           </button>
         ))}
       </div>
@@ -305,6 +323,15 @@ function resolvePrimaryAction(
   controller: VnDevtoolsController,
   selectedLine: VnDevtoolsController["lines"][number] | undefined
 ) {
+  if (controller.catalogDirty) {
+    return {
+      label: "Refresh required",
+      title: "Refresh the page to rescan the changed Nani catalog",
+      Icon: WarningCircle,
+      disabled: true,
+      onClick: () => undefined
+    };
+  }
   if (controller.decision) {
     return {
       label: "Resolve decision",

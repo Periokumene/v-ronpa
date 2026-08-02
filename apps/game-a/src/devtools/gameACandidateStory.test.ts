@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { VnEntryDef, VnRuntimeScriptSource } from "@v-ronpa/contracts";
-import { inspectVnDebugScript } from "@v-ronpa/app-vn-runtime/debug";
+import { inspectVnDebugScript as inspectVnDebugScriptRaw } from "@v-ronpa/app-vn-runtime/debug";
 import type { VnDevtoolsScriptCandidate } from "@v-ronpa/app-vn-devtools";
 import type { GameAStoryDefinition } from "../gameAScripts";
 import { decorateGameACandidateStory } from "./gameACandidateStory";
@@ -58,7 +58,12 @@ function definition(
   candidate: VnDevtoolsScriptCandidate,
   plans: GameAStoryDefinition["characterPreloadPlanByScriptPath"]
 ): GameAStoryDefinition {
-  return { entry: candidate.entry, catalog: candidate.catalog, characterPreloadPlanByScriptPath: plans };
+  return {
+    entry: candidate.entry,
+    catalog: candidate.catalog,
+    sourceDiagnosticPolicy: candidate.sourceDiagnosticPolicy,
+    characterPreloadPlanByScriptPath: plans
+  };
 }
 
 async function canonicalCandidate(sourceText: string): Promise<VnDevtoolsScriptCandidate> {
@@ -76,5 +81,14 @@ async function canonicalCandidate(sourceText: string): Promise<VnDevtoolsScriptC
     sourceText
   };
   const inspection = await inspectVnDebugScript(entry, draft);
-  return { entry, source: inspection.source, catalog: [inspection.source] };
+  return {
+    entry,
+    source: inspection.source,
+    catalog: [inspection.source],
+    sourceDiagnosticPolicy: "allow-recoverable-command-errors"
+  };
+}
+
+function inspectVnDebugScript(entry: VnEntryDef, source: VnRuntimeScriptSource) {
+  return inspectVnDebugScriptRaw(entry, source, "allow-recoverable-command-errors");
 }

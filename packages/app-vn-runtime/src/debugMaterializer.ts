@@ -33,9 +33,11 @@ import type {
 } from "@v-ronpa/contracts";
 import { parseScenario, parseStaticNaniEndpoint, type LabelIR } from "@v-ronpa/nani-parser";
 import {
+  classifyNaniDiagnosticDisposition,
   compileRuntimeScript,
   digestRuntimeScriptSemantics,
-  linkRuntimeScriptCatalog
+  linkRuntimeScriptCatalog,
+  type NaniSourceDiagnosticPolicy
 } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import { collectVnSaveCheckpoint } from "./checkpoint";
@@ -88,6 +90,7 @@ export interface VnDebugLabelOutlineItem {
 
 export interface VnDebugScriptInspection {
   entry: VnEntryDef;
+  sourceDiagnosticPolicy: NaniSourceDiagnosticPolicy;
   source: VnRuntimeScriptSource;
   declaredRevisionMatches: boolean;
   script: RuntimeScript;
@@ -198,6 +201,7 @@ export type VnDebugMaterializationResult =
 
 interface MaterializeVnDebugTargetBaseInput {
   entry: VnEntryDef;
+  sourceDiagnosticPolicy: NaniSourceDiagnosticPolicy;
   target: VnDebugTargetAnchor;
   decisions?: VnDebugDecisionTrace;
   expectedRevision?: string;
@@ -226,7 +230,8 @@ export type MaterializeVnDebugTargetInput =
 
 export async function inspectVnDebugScript(
   entry: VnEntryDef,
-  source: VnRuntimeScriptSource
+  source: VnRuntimeScriptSource,
+  sourceDiagnosticPolicy: NaniSourceDiagnosticPolicy
 ): Promise<VnDebugScriptInspection> {
   const parsed = parseScenario({ sourceText: source.sourceText, scriptPath: source.scriptPath });
   const compiled = compileRuntimeScript(parsed);
@@ -275,9 +280,15 @@ export async function inspectVnDebugScript(
     } satisfies VnDebugSourceLine;
   });
   const candidateSource = { ...source, scriptRevision: revision };
-  const canMaterialize = !diagnostics.some((diagnostic) => diagnostic.severity === "error");
+  const dispositions = diagnostics.map((diagnostic) => classifyNaniDiagnosticDisposition({
+    source: diagnostic.source === "story" ? "entry" : diagnostic.source === "parser" ? "parser" : "compiler",
+    code: diagnostic.code,
+    severity: diagnostic.severity
+  }, sourceDiagnosticPolicy));
+  const canMaterialize = !dispositions.includes("fatal");
   return {
     entry,
+    sourceDiagnosticPolicy,
     source: candidateSource,
     declaredRevisionMatches: source.scriptRevision === revision,
     script: compiled.script,
@@ -289,6 +300,7 @@ export async function inspectVnDebugScript(
     canMaterialize,
     degraded:
       commands.some((command) => command.previewability === "degraded")
+      || dispositions.includes("recoverable")
       || diagnostics.some((diagnostic) => diagnostic.severity === "warning")
   };
 }
@@ -306,12 +318,13 @@ export async function materializeVnDebugTarget(
     profile,
     routeTable,
     signal,
+    sourceDiagnosticPolicy,
     target
   } = input;
   const providedInspection = input.inspection;
   const inspections: VnDebugScriptInspection[] = mode === "fast-current-script"
     ? [input.inspection]
-    : await Promise.all(input.catalog.map((source) => inspectVnDebugScript(entry, source)));
+    : await Promise.all(input.catalog.map((source) => inspectVnDebugScript(entry, source, sourceDiagnosticPolicy)));
   const inspectionsByPath = new Map(inspections.map((candidate) => [candidate.source.scriptPath, candidate]));
   if (providedInspection) inspectionsByPath.set(providedInspection.source.scriptPath, providedInspection);
   const inspection = mode === "fast-current-script"
@@ -336,10 +349,20 @@ export async function materializeVnDebugTarget(
   let diagnostics = [...inspection.diagnostics];
   let executedInstructions = 0;
   let executedScriptPaths: string[] = [];
-  let degraded = inspection.diagnostics.some(
-    (diagnostic) => diagnostic.severity === "warning" && diagnostic.code !== "declared-only-command"
-  );
+  let degraded = inspection.diagnostics.some((diagnostic) => classifyNaniDiagnosticDisposition({
+    source: diagnostic.source === "story" ? "entry" : diagnostic.source === "parser" ? "parser" : "compiler",
+    code: diagnostic.code,
+    severity: diagnostic.severity
+  }, sourceDiagnosticPolicy) === "recoverable");
   let lastStableAnchor: VnDebugTargetAnchor | undefined;
+
+  if (inspection.sourceDiagnosticPolicy !== sourceDiagnosticPolicy) {
+    return blocked(
+      base(),
+      "invalid-source",
+      "The supplied inspection was analyzed with a different source diagnostic policy."
+    );
+  }
 
   if (signal?.aborted) throw abortError();
   if (mode === "canonical-entry") {

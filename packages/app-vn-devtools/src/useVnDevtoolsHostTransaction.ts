@@ -108,7 +108,11 @@ export function useVnDevtoolsHostTransaction<Definition>({
 
   const prepare = useCallback(async (candidate: VnDevtoolsScriptCandidate, signal: AbortSignal) => {
     if (signal.aborted) return undefined;
-    const inspection = await inspectVnDebugScript(candidate.entry, candidate.source);
+    const inspection = await inspectVnDebugScript(
+      candidate.entry,
+      candidate.source,
+      candidate.sourceDiagnosticPolicy
+    );
     if (signal.aborted || !inspection.declaredRevisionMatches || !inspection.canMaterialize) return undefined;
     const catalogValidation = await validateVnDevtoolsCandidateCatalog(candidate);
     if (signal.aborted || !catalogValidation.ok) return undefined;

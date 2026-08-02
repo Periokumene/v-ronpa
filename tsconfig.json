@@ -5,6 +5,7 @@
     { "path": "packages/asset-registry" },
     { "path": "packages/layered-character" },
     { "path": "packages/nani-parser" },
+    { "path": "packages/nani-project" },
     { "path": "packages/nani-runtime-compiler" },
     { "path": "packages/story-engine" },
     { "path": "packages/story-play" },

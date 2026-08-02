@@ -90,6 +90,12 @@ export function VnDevtoolsDock({ controller, className }: VnDevtoolsDockProps) {
       />
 
       <WorkbenchFileBar controller={controller} />
+      {controller.catalogDirty && (
+        <div className="vn-devtools-catalog-dirty" data-testid="vn-devtools-catalog-dirty" role="status">
+          <span>Catalog changed. Refresh to rescan; preview and adoption are frozen.</span>
+          <button type="button" onClick={controller.actions.refreshCatalog}>Refresh</button>
+        </div>
+      )}
       <WorkbenchCommandStrip controller={controller} findResult={findResult} />
       <WorkbenchSymbols controller={controller} />
       <WorkbenchSourceView

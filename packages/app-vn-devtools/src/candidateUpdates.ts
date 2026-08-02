@@ -97,7 +97,11 @@ export async function prepareVnDevtoolsCandidateUpdate({
     scriptRevision: update.serverRevision ?? activeCandidate.source.scriptRevision
   };
   const candidateCatalog = replaceVnDevtoolsCandidateSource(activeCandidate, candidateSource);
-  const inspection = await inspectVnDebugScript(activeCandidate.entry, candidateSource);
+  const inspection = await inspectVnDebugScript(
+    activeCandidate.entry,
+    candidateSource,
+    activeCandidate.sourceDiagnosticPolicy
+  );
   throwIfAborted(signal);
   const replayTarget = impact === "executed-session" ? pinnedTarget : undefined;
   const finalReplayTarget = replayTarget
@@ -131,6 +135,7 @@ export async function prepareVnDevtoolsCandidateUpdate({
       target: finalReplayTarget,
       decisions,
       expectedRevision,
+      sourceDiagnosticPolicy: activeCandidate.sourceDiagnosticPolicy,
       ...(signal ? { signal } : {})
     });
     throwIfAborted(signal);
@@ -175,6 +180,7 @@ export async function prepareVnDevtoolsCandidateUpdate({
       target: finalReplayTarget,
       decisions,
       expectedRevision,
+      sourceDiagnosticPolicy: activeCandidate.sourceDiagnosticPolicy,
       ...(signal ? { signal } : {})
     });
     throwIfAborted(signal);

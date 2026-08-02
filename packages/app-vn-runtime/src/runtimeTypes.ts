@@ -11,6 +11,7 @@ import type {
 } from "@v-ronpa/contracts";
 import type { MediaRuntimeState, UiRuntimeState, StoryTextRevealEvent, StoryTextRevealState } from "@v-ronpa/app-vn-dispatch";
 import type { PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
+import type { NaniSourceDiagnosticPolicy } from "@v-ronpa/nani-runtime-compiler";
 import type { VnRuntimeDiagnostic } from "./runtimeDiagnostics";
 import type {
   StoryPlayAdvanceSource,
@@ -190,6 +191,7 @@ export type PrepareVnScriptPresentation = (
 export interface VnRuntimeDefinition {
   readonly entry: VnEntryDef;
   readonly catalog: VnRuntimeScriptCatalog;
+  readonly sourceDiagnosticPolicy: NaniSourceDiagnosticPolicy;
 }
 
 export interface StartVnStoryOptions {

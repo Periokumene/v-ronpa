@@ -6,7 +6,7 @@ Game A mounts a development-only, read-only Nani workbench beside the game:
 
 ```text
 VS Code save
-  -> allowlisted Vite source event
+  -> directory-discovered Vite snapshot or source event
   -> Node + browser parse/compile/revision check
   -> headless stable-state materialization
   -> shared host transaction + app policy callback
@@ -90,16 +90,26 @@ are discarded when semantic identity can no longer be proven.
 
 ## Source updates and atomic commit
 
-The Vite bridge watches every `.nani` in the configured production catalog. Its DEV virtual module
-provides an initial Node-inspected source, diagnostics, and revision, so a manual
-refresh uses the same two-sided verification as a later save. The generated
-catalog is the last-known-good runtime input, not a second source authority: a
-newer saved `.nani` may legitimately differ from it on first load. The Vite
-bridge invalidates its virtual snapshot before awaiting HMR inspection, closing
-the save/refresh race, while Node's semantic revision, the browser's independent
-semantic revision, and current-script diagnostics establish `verified-local`
-authority for FastDebug calculation. Canonical calculation and every adoption
-still require complete catalog validation. Every HMR candidate
+The Vite bridge asks `nani-project` for one complete snapshot. Normal
+development contains the production+development union; test modes contain the
+shared test catalog and select different explicit entries. Each discovered
+record includes scope, source, semantic revision, execution disposition,
+diagnostics, asset references, and character preload planning. The DEV wrapper
+constructs the complete initial story definition from this snapshot before
+mounting runtime, so ordinary cross-file navigation does not depend on Preview
+first.
+
+Game A's physical scope roots are `src/nani`, `src/nani-dev`, and
+`src/nani-test`. Vite never derives these names independently: scanning,
+watching, source-to-logical-path mapping, and dirty-event classification all
+consume the `sourceRoot` values from `asset.config.mjs`.
+
+A source edit retains monotonic HMR behavior. The bridge invalidates its virtual
+snapshot before awaiting HMR inspection, closing the save/refresh race, while
+Node's semantic revision, the browser's independent semantic revision, and
+current-script diagnostics establish `verified-local` authority for FastDebug
+calculation. Canonical calculation and every adoption still require complete
+catalog validation. Every HMR candidate
 carries a monotonic update ID, current source, diagnostics, and a server revision.
 Parser/compiler diagnostics carry their original half-open UTF-16 `TextSpan`
 through the Vite protocol; bridge failures without a source token remain
@@ -120,7 +130,19 @@ adoptions and commits share one serial queue. Cancellation is only a ticket up t
 host acceptance: after `restoreVnState()` succeeds, that transaction is
 irrevocable and finishes observing its new Story session before queued work runs.
 Superseded queued work is skipped and the newest valid candidate runs next.
-Compiler or catalog-link errors keep the last-known-good catalog record and scene.
+Adding, deleting, or renaming a managed `.nani` sends a catalog-dirty event
+instead of mutating the current catalog. Workbench shows a refresh-required
+banner and freezes every Preview/adoption while the last-known-good scene keeps
+running. The Refresh button reloads the page; startup rescans the directory and
+clears dirty state. No generator command or Vite restart is required.
+
+Fatal files stay visible in the source index and Problems but never enter the
+runnable catalog, and all of their Preview targets are disabled. Recoverable
+compiler-command errors stay red and show Recovered/Degraded; the removed line
+cannot be previewed, while valid commands can run through normal flow and
+FastDebug. Parser errors, duplicate labels, start-label errors, invalid links,
+and missing cross-file targets remain fatal. Compiler or catalog-link failures
+keep the last-known-good catalog record and scene.
 
 The runtime exposes the ordered, deduplicated script paths that actually
 contributed to the current story session. This includes intermediate scripts

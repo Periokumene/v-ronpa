@@ -1,7 +1,9 @@
 import type { RuntimeScript, VnEntryDef, VnRuntimeScriptCatalog, VnRuntimeScriptSource } from "@v-ronpa/contracts";
 import { createVnSession, type VnSessionState } from "@v-ronpa/app-vn-session";
 import {
+  classifyNaniDiagnosticDisposition,
   linkRuntimeScriptCatalog,
+  type NaniSourceDiagnosticPolicy,
   type RuntimeScriptCatalogDiagnostic
 } from "@v-ronpa/nani-runtime-compiler";
 
@@ -9,6 +11,7 @@ export interface CompiledVnRuntimeScriptRecord {
   source: VnRuntimeScriptSource;
   script: RuntimeScript;
   bootSession: VnSessionState;
+  hasFatalSourceDiagnostics: boolean;
 }
 
 export interface CompiledVnRuntimeCatalog {
@@ -19,7 +22,8 @@ export interface CompiledVnRuntimeCatalog {
 
 export function compileVnRuntimeCatalog(
   entry: Pick<VnEntryDef, "initialScriptPath" | "startLabel">,
-  catalog: VnRuntimeScriptCatalog
+  catalog: VnRuntimeScriptCatalog,
+  sourceDiagnosticPolicy: NaniSourceDiagnosticPolicy
 ): CompiledVnRuntimeCatalog {
   const records = catalog.map((source) => {
     const boot = createVnSession({
@@ -29,7 +33,13 @@ export function compileVnRuntimeCatalog(
         ? { startLabel: entry.startLabel }
         : {})
     });
-    return { source, script: boot.session.script, bootSession: boot.session };
+    const hasFatalSourceDiagnostics = [
+      ...boot.session.diagnostics.parser.map((diagnostic) => ({ source: "parser" as const, ...diagnostic })),
+      ...boot.session.diagnostics.compiler.map((diagnostic) => ({ source: "compiler" as const, ...diagnostic }))
+    ].some((diagnostic) =>
+      classifyNaniDiagnosticDisposition(diagnostic, sourceDiagnosticPolicy) === "fatal"
+    );
+    return { source, script: boot.session.script, bootSession: boot.session, hasFatalSourceDiagnostics };
   });
   const linked = linkRuntimeScriptCatalog(entry, records.map((record) => record.script));
   const recordsByPath = new Map<string, CompiledVnRuntimeScriptRecord>();

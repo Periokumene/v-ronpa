@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { VnEntryDef, VnRuntimeScriptSource } from "@v-ronpa/contracts";
-import { inspectVnDebugScript } from "@v-ronpa/app-vn-runtime/debug";
+import { inspectVnDebugScript as inspectVnDebugScriptRaw } from "@v-ronpa/app-vn-runtime/debug";
 import { prepareVnDevtoolsInitialCandidate } from "./initialCandidate";
 import type { VnDevtoolsScriptCandidate } from "./scriptCandidate";
-import type { NaniDevtoolsViteInitialCandidate } from "./viteProtocol";
+import type { NaniDevtoolsViteSourceCandidate } from "./viteProtocol";
 
 describe("Nani devtools initial candidate handshake", () => {
   it("keeps an invalid or server/browser-mismatched snapshot read-only", async () => {
@@ -46,7 +46,8 @@ describe("Nani devtools initial candidate handshake", () => {
     const activeEntry: VnDevtoolsScriptCandidate = {
       entry: runtimeEntry,
       source: generated.source,
-      catalog: [generated.source]
+      catalog: [generated.source],
+      sourceDiagnosticPolicy: "allow-recoverable-command-errors"
     };
 
     await expect(prepareVnDevtoolsInitialCandidate({
@@ -140,16 +141,19 @@ describe("Nani devtools initial candidate handshake", () => {
     const activeCandidate: VnDevtoolsScriptCandidate = {
       entry: runtimeEntry,
       catalog: [opening.source, chapter.source],
-      source: chapter.source
+      source: chapter.source,
+      sourceDiagnosticPolicy: "allow-recoverable-command-errors"
     };
 
     const prepared = await prepareVnDevtoolsInitialCandidate({
       activeCandidate,
       candidate: {
         entryId: runtimeEntry.id,
+        scope: "production",
         scriptPath: chapter.source.scriptPath,
         sourceText: chapter.source.sourceText,
         serverRevision: chapter.revision,
+        executionDisposition: "runnable",
         diagnostics: []
       },
       pinnedTarget: opening.commands[0]!.anchor,
@@ -187,16 +191,19 @@ describe("Nani devtools initial candidate handshake", () => {
     const activeCandidate: VnDevtoolsScriptCandidate = {
       entry: runtimeEntry,
       catalog: [opening.source, brokenChapter.source],
-      source: brokenChapter.source
+      source: brokenChapter.source,
+      sourceDiagnosticPolicy: "allow-recoverable-command-errors"
     };
 
     await expect(prepareVnDevtoolsInitialCandidate({
       activeCandidate,
       candidate: {
         entryId: runtimeEntry.id,
+        scope: "production",
         scriptPath: brokenChapter.source.scriptPath,
         sourceText: brokenChapter.source.sourceText,
         serverRevision: brokenChapter.revision,
+        executionDisposition: "runnable",
         diagnostics: []
       },
       vnActive: false
@@ -210,9 +217,11 @@ describe("Nani devtools initial candidate handshake", () => {
       activeCandidate,
       candidate: {
         entryId: runtimeEntry.id,
+        scope: "production",
         scriptPath: brokenChapter.source.scriptPath,
         sourceText: brokenChapter.source.sourceText,
         serverRevision: brokenChapter.revision,
+        executionDisposition: "runnable",
         diagnostics: []
       },
       pinnedTarget: brokenChapter.commands[0]!.anchor,
@@ -249,7 +258,16 @@ async function canonicalEntry(sourceText: string): Promise<VnDevtoolsScriptCandi
     sourceText
   };
   const inspection = await inspectVnDebugScript(entry, source);
-  return { entry, source: inspection.source, catalog: [inspection.source] };
+  return {
+    entry,
+    source: inspection.source,
+    catalog: [inspection.source],
+    sourceDiagnosticPolicy: "allow-recoverable-command-errors"
+  };
+}
+
+function inspectVnDebugScript(entry: VnEntryDef, source: VnRuntimeScriptSource) {
+  return inspectVnDebugScriptRaw(entry, source, "allow-recoverable-command-errors");
 }
 
 function withSource(
@@ -261,12 +279,14 @@ function withSource(
   return { ...candidate, source, catalog: [source] };
 }
 
-function candidate(sourceText: string, serverRevision: string | null): NaniDevtoolsViteInitialCandidate {
+function candidate(sourceText: string, serverRevision: string | null): NaniDevtoolsViteSourceCandidate {
   return {
     entryId: "opening",
+    scope: "production",
     scriptPath: "game-a/opening.nani",
     sourceText,
     serverRevision,
+    executionDisposition: serverRevision ? "runnable" : "fatal",
     diagnostics: []
   };
 }

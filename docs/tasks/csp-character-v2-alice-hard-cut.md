@@ -34,7 +34,7 @@ the prior design as `alice-kid`, and hard-cut Game A scripts and tests to the ne
 - `apps/game-a/public/game-a/characters/alice/**`
 - `apps/game-a/public/game-a/characters/alice-kid/**`
 - `apps/game-a/src/nani/**`
-- `apps/game-a/src/test-nani/**`
+- `apps/game-a/src/nani-test/**`
 - `apps/game-a/src/generatedAssets.ts`
 - `apps/game-a/src/generatedTestScripts.ts`
 - `apps/game-a/src/contentManifest.test.ts`

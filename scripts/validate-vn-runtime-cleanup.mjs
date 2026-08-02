@@ -174,11 +174,11 @@ if (!vnEntrySchemaBody) {
 
 const gameAViteConfigPath = "apps/game-a/vite.config.ts";
 const gameAViteConfig = stripComments(readFileSync(join(root, gameAViteConfigPath), "utf8"));
-if (!/gameAAssetConfig\.scripts/u.test(gameAViteConfig)) {
-  failures.push(`${gameAViteConfigPath}: production Nani Devtools membership must come from gameAAssetConfig.scripts.`);
+if (!/gameAAssetConfig\.naniProject/u.test(gameAViteConfig)) {
+  failures.push(`${gameAViteConfigPath}: Nani Devtools discovery must come from gameAAssetConfig.naniProject.`);
 }
-if (/gameAAssetConfig\.scripts\s*\[\s*0\s*\]/u.test(gameAViteConfig)) {
-  failures.push(`${gameAViteConfigPath}: production Nani Devtools must not collapse the catalog to its first script.`);
+if (/gameAAssetConfig\.scripts\b/u.test(gameAViteConfig)) {
+  failures.push(`${gameAViteConfigPath}: explicit per-script Nani membership is forbidden.`);
 }
 for (const hardcodedEntryIdentity of ["vn:game-a-main", "vn:game-a-test-smoke", "vn:game-a-test-character"]) {
   if (gameAViteConfig.includes(hardcodedEntryIdentity)) {
@@ -199,6 +199,46 @@ const gameAStoryDefinition = stripComments(readFileSync(join(root, gameAStoryDef
 if (/Object\.values\s*\(\s*gameAScriptSourcesByPath\s*\)/u.test(gameAStoryDefinition)) {
   failures.push(`${gameAStoryDefinitionPath}: the ordered generated catalog is the only runtime catalog authority.`);
 }
+
+for (const assetConfigPath of ["apps/game-a/asset.config.mjs", "apps/game-harness/asset.config.mjs"]) {
+  const assetConfig = stripComments(readFileSync(join(root, assetConfigPath), "utf8"));
+  if (!/\bnaniProject\s*:/u.test(assetConfig)) {
+    failures.push(`${assetConfigPath}: missing canonical naniProject directory-discovery configuration.`);
+  }
+  for (const legacyPattern of [
+    { pattern: /\bsourceFormat\s*:/u, label: "sourceFormat" },
+    { pattern: /\btestCatalogs\s*:/u, label: "testCatalogs" },
+    { pattern: /^\s*scripts\s*:/mu, label: "explicit scripts list" }
+  ]) {
+    if (legacyPattern.pattern.test(assetConfig)) {
+      failures.push(`${assetConfigPath}: legacy ${legacyPattern.label} is forbidden.`);
+    }
+  }
+}
+
+for (const legacyPath of [
+  "apps/game-a/src/generatedAssets.ts",
+  "apps/game-a/src/generatedTestScripts.ts",
+  "apps/game-harness/src/harness/generatedAssets.ts",
+  "apps/game-harness/src/harness/showcase/script.ts",
+  "apps/game-a/src/gameASmokeStoryDefinition.ts",
+  "apps/game-a/src/gameACharacterSmokeStoryDefinition.ts",
+  "apps/game-a/src/gameATestEntries.ts"
+]) {
+  if (existsSync(join(root, legacyPath))) failures.push(`${legacyPath}: legacy file must be deleted.`);
+}
+
+for (const [path, legacyModes] of [
+  ["apps/game-a/vite.config.ts", ["game-a-smoke", "game-a-character-smoke"]],
+  ["playwright.config.ts", ["game-a-smoke", "game-a-character-smoke"]]
+]) {
+  const text = readFileSync(join(root, path), "utf8");
+  for (const mode of legacyModes) {
+    if (text.includes(mode)) failures.push(`${path}: legacy Vite mode '${mode}' is forbidden.`);
+  }
+}
+
+checkNoRetiredNaniSourceDirectoryNames();
 
 const gameAApp = stripComments(readFileSync(join(root, gameAProductAppPath), "utf8"));
 if (/const\s+prepareScriptPresentation\b/u.test(gameAApp)) {
@@ -229,6 +269,50 @@ console.log("VN runtime cleanup guard passed.");
 
 function checkNoImport(path, specifier) {
   checkProductionPattern(path, moduleSpecifierPattern(specifier), `forbidden import '${specifier}'`);
+}
+
+function checkNoRetiredNaniSourceDirectoryNames() {
+  const retiredNames = [
+    ["dev", "nani"].join("-"),
+    ["test", "nani"].join("-")
+  ];
+  const searchableRoots = [
+    "apps",
+    "packages",
+    "scripts",
+    "tests",
+    "tools",
+    "docs",
+    "playwright.config.ts",
+    "package.json",
+    "pnpm-workspace.yaml",
+    "tsconfig.json",
+    "tsconfig.base.json"
+  ];
+  const searchableExtensions = new Set([
+    ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".cts", ".mts",
+    ".json", ".md", ".yaml", ".yml", ".toml", ".nani"
+  ]);
+
+  for (const searchableRoot of searchableRoots) {
+    const absolute = join(root, searchableRoot);
+    if (!existsSync(absolute)) continue;
+    for (const file of statSync(absolute).isDirectory() ? collectFiles(absolute) : [absolute]) {
+      const rel = toPosix(relative(root, file));
+      if (
+        rel === "scripts/validate-vn-runtime-cleanup.mjs"
+        || rel.startsWith("tools/vscode-nani/.vscode-test/")
+        || rel.startsWith("tools/vscode-nani/dist-types/")
+      ) continue;
+      if (!searchableExtensions.has(extname(file))) continue;
+      const text = readFileSync(file, "utf8");
+      for (const retiredName of retiredNames) {
+        if (text.includes(retiredName)) {
+          failures.push(`${rel}: retired Nani source directory '${retiredName}' is forbidden.`);
+        }
+      }
+    }
+  }
 }
 
 function checkNoImportOutside(path, specifier, allowedPrefixes) {

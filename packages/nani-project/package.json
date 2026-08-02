@@ -1,0 +1,15 @@
+{
+  "name": "@v-ronpa/nani-project",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/contracts": "workspace:*",
+    "@v-ronpa/layered-character": "workspace:*",
+    "@v-ronpa/nani-parser": "workspace:*",
+    "@v-ronpa/nani-runtime-compiler": "workspace:*"
+  }
+}

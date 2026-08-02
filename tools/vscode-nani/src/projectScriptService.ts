@@ -65,13 +65,7 @@ export class NaniProjectScriptService implements vscode.Disposable {
     const matches = config.catalogs.filter((catalog) =>
       catalog.scripts.some((script) => script.sourcePath === sourcePath)
     );
-    if (matches.length !== 1) {
-      this.logOnce(
-        `unregistered:${sourcePath}`,
-        `[scripts] ${sourcePath} is not registered in exactly one supported Nani catalog; using single-file language support.`
-      );
-      return undefined;
-    }
+    if (matches.length !== 1) return undefined;
     return matches[0];
   }
 
@@ -97,7 +91,12 @@ export class NaniProjectScriptService implements vscode.Disposable {
         records.map((record) => ({
           sourceUri: record.uri.toString(),
           analysis: record.analysis
-        }))
+        })),
+        {
+          scopeByScriptPath: new Map(
+            context.scripts.map((script) => [script.scriptPath, script.scope] as const)
+          )
+        }
       );
       for (const message of analysis.projectionErrors) {
         this.output.appendLine(`[scripts] Source-map projection failed: ${message}`);
@@ -173,6 +172,7 @@ export class NaniProjectScriptService implements vscode.Disposable {
       const value = loadProjectScriptConfig(configPath, workspaceRoot).catch((error) => ({
         configPath,
         catalogs: [],
+        scopeRoots: [],
         warnings: [],
         errors: [errorText(error)]
       }));
@@ -188,11 +188,8 @@ export class NaniProjectScriptService implements vscode.Disposable {
 
   private ensureWatchers(config: NaniProjectScriptConfig): void {
     if (this.watchers.has(config.configPath)) return;
-    const paths = new Set([
-      config.configPath,
-      ...config.catalogs.flatMap((catalog) => catalog.scripts.map((script) => script.sourcePath))
-    ]);
-    const watchers = [...paths].map((path) => {
+    const configWatcher = (() => {
+      const path = config.configPath;
       const watcher = vscode.workspace.createFileSystemWatcher(
         new vscode.RelativePattern(dirname(path), basename(path))
       );
@@ -201,7 +198,18 @@ export class NaniProjectScriptService implements vscode.Disposable {
       watcher.onDidCreate(invalidate);
       watcher.onDidDelete(invalidate);
       return watcher;
+    })();
+    const rootWatchers = config.scopeRoots.map((root) => {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(root, "**/*.nani")
+      );
+      const invalidate = () => this.invalidate(config.configPath);
+      watcher.onDidChange(invalidate);
+      watcher.onDidCreate(invalidate);
+      watcher.onDidDelete(invalidate);
+      return watcher;
     });
+    const watchers = [configWatcher, ...rootWatchers];
     this.watchers.set(config.configPath, watchers);
   }
 

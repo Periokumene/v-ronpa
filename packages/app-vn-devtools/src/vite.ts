@@ -1,187 +1,261 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { parseScenario } from "@v-ronpa/nani-parser";
+import { relative, resolve, sep } from "node:path";
 import {
-  compileRuntimeScript,
-  digestRuntimeScriptSemantics,
-  type RuntimeCompilerDiagnostic
-} from "@v-ronpa/nani-runtime-compiler";
-import type { Plugin } from "vite";
+  analyzeNaniCatalog,
+  type NaniEntryConfig,
+  type NaniProjectConfig,
+  type NaniScope
+} from "@v-ronpa/nani-project";
+import type { Plugin, ViteDevServer } from "vite";
 import {
-  NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID,
+  NANI_DEVTOOLS_VITE_CATALOG_DIRTY_EVENT,
+  NANI_DEVTOOLS_VITE_SNAPSHOT_MODULE_ID,
   NANI_DEVTOOLS_VITE_UPDATE_EVENT,
-  type NaniDevtoolsViteInitialCandidate,
+  type NaniDevtoolsDiscoveredSource,
+  type NaniDevtoolsViteCatalogDirty,
   type NaniDevtoolsViteDiagnostic,
+  type NaniDevtoolsViteSnapshot,
   type NaniDevtoolsViteUpdate
 } from "@v-ronpa/app-vn-devtools/vite-protocol";
 
 export {
-  NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID,
+  NANI_DEVTOOLS_VITE_CATALOG_DIRTY_EVENT,
+  NANI_DEVTOOLS_VITE_SNAPSHOT_MODULE_ID,
   NANI_DEVTOOLS_VITE_UPDATE_EVENT
 } from "@v-ronpa/app-vn-devtools/vite-protocol";
 export type {
+  NaniDevtoolsDiscoveredSource,
+  NaniDevtoolsViteCatalogDirty,
   NaniDevtoolsViteDiagnostic,
-  NaniDevtoolsViteInitialCandidate,
+  NaniDevtoolsViteSnapshot,
   NaniDevtoolsViteUpdate
 } from "@v-ronpa/app-vn-devtools/vite-protocol";
 
-const RESOLVED_NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID = `\0${NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID}`;
-
-export interface NaniDevtoolsViteEntry {
-  sourceFile: string;
-  scriptPath: string;
-  entryId: string;
-}
+const RESOLVED_SNAPSHOT_MODULE_ID = `\0${NANI_DEVTOOLS_VITE_SNAPSHOT_MODULE_ID}`;
 
 export interface NaniDevtoolsVitePluginOptions {
-  entries: readonly NaniDevtoolsViteEntry[];
-  /** Base path for relative sourceFile entries. Defaults to process.cwd(). */
+  project: NaniProjectConfig;
+  entry: NaniEntryConfig;
+  scopes: readonly NaniScope[];
+  /** Base path for project-relative source roots. Defaults to process.cwd(). */
   root?: string;
 }
 
 /**
- * Vite-only source bridge. It never reloads the page and never installs a
- * client runtime; consumers subscribe to NANI_DEVTOOLS_VITE_UPDATE_EVENT.
+ * Vite-only source bridge. Membership is always rescanned through nani-project;
+ * this plugin owns only the page-refresh dirty boundary and monotonic HMR IDs.
  */
 export function createNaniDevtoolsVitePlugin(options: NaniDevtoolsVitePluginOptions): Plugin {
-  const basePath = options.root ?? process.cwd();
-  const entriesBySourceFile = new Map<string, NaniDevtoolsViteEntry>();
-  for (const entry of options.entries) {
-    if (!entry.sourceFile.endsWith(".nani")) {
-      throw new Error(`Nani devtools sourceFile must end with .nani: ${entry.sourceFile}`);
-    }
-    const sourceFile = normalizeAbsolutePath(entry.sourceFile, basePath);
-    if (entriesBySourceFile.has(sourceFile)) {
-      throw new Error(`Nani devtools sourceFile is configured more than once: ${entry.sourceFile}`);
-    }
-    entriesBySourceFile.set(sourceFile, entry);
-  }
-
+  const projectRoot = resolve(options.root ?? process.cwd());
+  const scopeRoots = options.scopes.flatMap((scope) => {
+    const config = options.project.scopes[scope];
+    return config ? [resolve(projectRoot, config.sourceRoot)] : [];
+  });
   let updateId = 0;
+  let generation = 0;
   let serve = false;
+  let catalogDirty = false;
+  let lastSnapshot: NaniDevtoolsViteSnapshot | undefined;
+  let sourceFilesByPath = new Map<string, string>();
+  let server: ViteDevServer | undefined;
+
+  const invalidateSnapshot = () => {
+    const module = server?.moduleGraph.getModuleById(RESOLVED_SNAPSHOT_MODULE_ID);
+    if (module) server?.moduleGraph.invalidateModule(module);
+  };
+  const markCatalogDirty = (reason: NaniDevtoolsViteCatalogDirty["reason"]) => {
+    if (!serve || catalogDirty) return;
+    catalogDirty = true;
+    invalidateSnapshot();
+    server?.ws.send({
+      type: "custom",
+      event: NANI_DEVTOOLS_VITE_CATALOG_DIRTY_EVENT,
+      data: { generation, reason } satisfies NaniDevtoolsViteCatalogDirty
+    });
+  };
 
   return {
     name: "v-ronpa-nani-devtools",
     configResolved(config) {
       serve = config.command === "serve";
     },
-    resolveId(id) {
-      if (id === NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID) {
-        return RESOLVED_NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID;
+    async buildStart() {
+      if (serve) return;
+      const analysis = await analyzeNaniCatalog(options.project, {
+        projectRoot,
+        scopes: options.scopes,
+        entry: options.entry,
+        sourceDiagnosticPolicy: "strict"
+      });
+      const fatal = analysis.diagnostics.filter((diagnostic) => diagnostic.disposition === "fatal");
+      if (fatal.length > 0) {
+        this.error(fatal.map((diagnostic) =>
+          `${diagnostic.scriptPath ?? "catalog"}: ${diagnostic.message}`
+        ).join("\n"));
       }
+    },
+    configureServer(viteServer) {
+      server = viteServer;
+      const handleAdd = (file: string) => {
+        if (isManagedNaniPath(file, scopeRoots) && !sourceFilesByPath.has(normalizeAbsolutePath(file))) {
+          markCatalogDirty("add");
+        }
+      };
+      const handleUnlink = (file: string) => {
+        if (sourceFilesByPath.has(normalizeAbsolutePath(file))) markCatalogDirty("unlink");
+      };
+      viteServer.watcher.on("add", handleAdd);
+      viteServer.watcher.on("unlink", handleUnlink);
+    },
+    resolveId(id) {
+      if (id === NANI_DEVTOOLS_VITE_SNAPSHOT_MODULE_ID) return RESOLVED_SNAPSHOT_MODULE_ID;
     },
     async load(id) {
-      if (id !== RESOLVED_NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID) return;
-      // Keep source, diagnostics, and protocol markers out of production output.
-      if (!serve) return "export default [];";
-      const candidates = await Promise.all([...entriesBySourceFile].map(async ([sourceFile, entry]) => {
-        try {
-          return await inspectInitialCandidate(entry, await readFile(sourceFile, "utf8"));
-        } catch (error) {
-          return failedCandidate(entry, "", error);
-        }
+      if (id !== RESOLVED_SNAPSHOT_MODULE_ID) return;
+      if (!serve) return "export default null;";
+      lastSnapshot = await createSnapshot(options, projectRoot, ++generation);
+      sourceFilesByPath = new Map(lastSnapshot.scripts.map((script) => {
+        const scope = options.project.scopes[script.scope]!;
+        const scriptRoot = normalizedScriptRoot(scope.scriptRoot);
+        const relativePath = scriptRoot
+          ? script.scriptPath.slice(scriptRoot.length + 1)
+          : script.scriptPath;
+        return [normalizeAbsolutePath(resolve(projectRoot, scope.sourceRoot, relativePath)), script.scriptPath];
       }));
-      return `export default ${JSON.stringify(candidates)};`;
+      catalogDirty = false;
+      return `export default ${JSON.stringify(lastSnapshot)};`;
     },
     async handleHotUpdate(ctx) {
-      const entry = entriesBySourceFile.get(normalizeAbsolutePath(ctx.file, basePath));
-      if (!entry) return;
-
-      // Invalidate before the first await. A simultaneous page refresh must
-      // never import an old virtual snapshot beside Vite's newly-read ?raw
-      // module for the same save.
-      const initialModule = ctx.server.moduleGraph.getModuleById(
-        RESOLVED_NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID
-      );
-      if (initialModule) ctx.server.moduleGraph.invalidateModule(initialModule);
-
+      if (catalogDirty) return [];
+      const absoluteFile = normalizeAbsolutePath(ctx.file);
+      const scriptPath = sourceFilesByPath.get(absoluteFile);
+      if (!scriptPath) return;
+      invalidateSnapshot();
       const candidateUpdateId = ++updateId;
-      let update: NaniDevtoolsViteUpdate;
-      let sourceText = "";
       try {
-        sourceText = await ctx.read();
-        update = {
-          ...(await inspectInitialCandidate(entry, sourceText)),
-          updateId: candidateUpdateId
-        };
+        const snapshot = await createSnapshot(options, projectRoot, generation);
+        const script = snapshot.scripts.find((candidate) => candidate.scriptPath === scriptPath);
+        if (!script) {
+          markCatalogDirty("rename");
+          return [];
+        }
+        const update = sourceUpdate(options.entry.id, script, candidateUpdateId);
+        ctx.server.ws.send({ type: "custom", event: NANI_DEVTOOLS_VITE_UPDATE_EVENT, data: update });
       } catch (error) {
-        update = {
-          ...failedCandidate(entry, sourceText, error),
-          updateId: candidateUpdateId
+        const update: NaniDevtoolsViteUpdate = {
+          updateId: candidateUpdateId,
+          entryId: options.entry.id,
+          scope: scopeForFile(absoluteFile, options, projectRoot) ?? "development",
+          scriptPath,
+          sourceText: await Promise.resolve(ctx.read()).catch(() => ""),
+          serverRevision: null,
+          executionDisposition: "fatal",
+          diagnostics: [{
+            source: "bridge",
+            severity: "error",
+            disposition: "fatal",
+            message: error instanceof Error ? error.message : String(error)
+          }]
         };
+        ctx.server.ws.send({ type: "custom", event: NANI_DEVTOOLS_VITE_UPDATE_EVENT, data: update });
       }
-
-      ctx.server.ws.send({
-        type: "custom",
-        event: NANI_DEVTOOLS_VITE_UPDATE_EVENT,
-        data: update
-      });
       return [];
     }
   };
 }
 
-async function inspectInitialCandidate(
-  entry: NaniDevtoolsViteEntry,
-  sourceText: string
-): Promise<NaniDevtoolsViteInitialCandidate> {
-  const parsed = parseScenario({ sourceText, scriptPath: entry.scriptPath });
-  const compiled = compileRuntimeScript(parsed);
-  const parserDiagnostics: NaniDevtoolsViteDiagnostic[] = parsed.diagnostics.map((diagnostic) => ({
-    source: "parser",
+async function createSnapshot(
+  options: NaniDevtoolsVitePluginOptions,
+  projectRoot: string,
+  generation: number
+): Promise<NaniDevtoolsViteSnapshot> {
+  const analysis = await analyzeNaniCatalog(options.project, {
+    projectRoot,
+    scopes: options.scopes,
+    entry: options.entry,
+    sourceDiagnosticPolicy: "allow-recoverable-command-errors"
+  });
+  return {
+    generation,
+    entry: {
+      id: options.entry.id,
+      initialScriptPath: options.entry.initialScriptPath,
+      ...(options.entry.startLabel ? { startLabel: options.entry.startLabel } : {})
+    },
+    scripts: analysis.scripts.map((script) => ({
+      scope: script.scope,
+      scriptPath: script.scriptPath,
+      sourceText: script.sourceText,
+      semanticRevision: script.semanticRevision,
+      executionDisposition: script.executionDisposition,
+      diagnostics: script.diagnostics.map(toViteDiagnostic),
+      metadata: script.metadata
+    }))
+  };
+}
+
+function sourceUpdate(
+  entryId: string,
+  script: NaniDevtoolsDiscoveredSource,
+  updateId: number
+): NaniDevtoolsViteUpdate {
+  return {
+    updateId,
+    entryId,
+    scope: script.scope,
+    scriptPath: script.scriptPath,
+    sourceText: script.sourceText,
+    serverRevision: script.executionDisposition === "runnable" ? script.semanticRevision : null,
+    executionDisposition: script.executionDisposition,
+    diagnostics: script.diagnostics
+  };
+}
+
+function toViteDiagnostic(diagnostic: {
+  source: string;
+  severity: "info" | "warning" | "error";
+  disposition: "advisory" | "recoverable" | "fatal";
+  message: string;
+  code: string;
+  loc?: { line: number; column: number };
+  span?: { start: number; end: number };
+}): NaniDevtoolsViteDiagnostic {
+  return {
+    source: diagnostic.source as NaniDevtoolsViteDiagnostic["source"],
     severity: diagnostic.severity,
+    disposition: diagnostic.disposition,
     message: diagnostic.message,
     code: diagnostic.code,
-    lineNumber: diagnostic.loc.line,
-    columnNumber: diagnostic.loc.column,
-    span: diagnostic.span
-  }));
-  const compilerDiagnostics = compiled.diagnostics.map(toViteCompilerDiagnostic);
-  const diagnostics = [...parserDiagnostics, ...compilerDiagnostics];
-  const hasErrors = diagnostics.some((diagnostic) => diagnostic.severity === "error");
-  const serverRevision = hasErrors ? null : await digestRuntimeScriptSemantics(compiled.script);
-
-  return {
-    entryId: entry.entryId,
-    scriptPath: entry.scriptPath,
-    sourceText,
-    serverRevision,
-    diagnostics
+    ...(diagnostic.loc ? { lineNumber: diagnostic.loc.line, columnNumber: diagnostic.loc.column } : {}),
+    ...(diagnostic.span ? { span: diagnostic.span } : {})
   };
 }
 
-function failedCandidate(
-  entry: NaniDevtoolsViteEntry,
-  sourceText: string,
-  error: unknown
-): NaniDevtoolsViteInitialCandidate {
-  return {
-    entryId: entry.entryId,
-    scriptPath: entry.scriptPath,
-    sourceText,
-    serverRevision: null,
-    diagnostics: [
-      {
-        source: "bridge",
-        severity: "error",
-        message: error instanceof Error ? error.message : String(error)
-      }
-    ]
-  };
+function isManagedNaniPath(file: string, roots: readonly string[]): boolean {
+  if (!file.endsWith(".nani")) return false;
+  const normalized = normalizeAbsolutePath(file);
+  return roots.some((root) => isWithin(normalizeAbsolutePath(root), normalized));
 }
 
-function toViteCompilerDiagnostic(diagnostic: RuntimeCompilerDiagnostic): NaniDevtoolsViteDiagnostic {
-  return {
-    source: "compiler",
-    severity: diagnostic.severity,
-    message: diagnostic.message,
-    code: diagnostic.code,
-    lineNumber: diagnostic.loc.line,
-    columnNumber: diagnostic.loc.column,
-    span: diagnostic.span
-  };
+function scopeForFile(
+  file: string,
+  options: NaniDevtoolsVitePluginOptions,
+  projectRoot: string
+): NaniScope | undefined {
+  return options.scopes.find((scope) => {
+    const config = options.project.scopes[scope];
+    return config && isWithin(normalizeAbsolutePath(resolve(projectRoot, config.sourceRoot)), file);
+  });
 }
 
-function normalizeAbsolutePath(file: string, basePath: string): string {
-  return resolve(basePath, file).replaceAll("\\", "/");
+function isWithin(root: string, candidate: string): boolean {
+  const value = relative(root, candidate);
+  return value === "" || (!value.startsWith(`..${sep}`) && value !== ".." && !value.startsWith("/"));
+}
+
+function normalizedScriptRoot(value: string): string {
+  return value.replace(/^\.\//u, "").replace(/\/$/u, "");
+}
+
+function normalizeAbsolutePath(file: string): string {
+  return resolve(file).replaceAll("\\", "/");
 }

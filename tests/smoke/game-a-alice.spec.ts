@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const characterSourceFile = fileURLToPath(
-  new URL("../../apps/game-a/src/test-nani/character-smoke.nani", import.meta.url)
+  new URL("../../apps/game-a/src/nani-test/character-smoke.nani", import.meta.url)
 );
 
 test.setTimeout(120_000);

@@ -31,13 +31,13 @@ export default defineConfig({
       timeout: 120000
     },
     {
-      command: `VITE_DEV_PORT=${runtimeEnv.port} pnpm --filter @v-ronpa/game-a dev --mode game-a-smoke --host 127.0.0.1`,
+      command: `VITE_DEV_PORT=${runtimeEnv.port} pnpm --filter @v-ronpa/game-a dev --mode game-a-test-smoke --host 127.0.0.1`,
       url: gameAURL,
       reuseExistingServer: false,
       timeout: 120000
     },
     {
-      command: `VITE_DEV_PORT=${runtimeEnv.port + 1} pnpm --filter @v-ronpa/game-a dev --mode game-a-character-smoke --host 127.0.0.1`,
+      command: `VITE_DEV_PORT=${runtimeEnv.port + 1} pnpm --filter @v-ronpa/game-a dev --mode game-a-test-character --host 127.0.0.1`,
       url: gameACharacterURL,
       reuseExistingServer: false,
       timeout: 120000

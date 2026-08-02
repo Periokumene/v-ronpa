@@ -6,7 +6,7 @@ import { emptyProjectAssetIndex, parseCompositionTokens, parseGeneratedRuntimeAs
 export interface NaniAssetConfig {
   publicRoot: string;
   publicBaseUri: string;
-  outputPath: string;
+  runtimeAssetOutputPath: string;
   exportName: string;
 }
 
@@ -68,7 +68,7 @@ export async function loadProjectAssets(
 ): Promise<LoadedProjectAssets> {
   const projectRoot = findNaniProjectRoot(configPath, workspaceRoot);
   const config = assetConfig(await importConfig(configPath));
-  const outputPath = resolveConfigPath(projectRoot, config.outputPath);
+  const outputPath = resolveConfigPath(projectRoot, config.runtimeAssetOutputPath);
   const publicRoot = resolveConfigPath(projectRoot, config.publicRoot);
   let assets: ReturnType<typeof parseGeneratedRuntimeAssets>;
   try {
@@ -159,7 +159,7 @@ function assetConfig(moduleValue: unknown): NaniAssetConfig {
   return {
     publicRoot: requiredString(config.publicRoot, "publicRoot"),
     publicBaseUri: requiredString(config.publicBaseUri, "publicBaseUri"),
-    outputPath: requiredString(config.outputPath, "outputPath"),
+    runtimeAssetOutputPath: requiredString(config.runtimeAssetOutputPath, "runtimeAssetOutputPath"),
     exportName: requiredString(config.exportName, "exportName")
   };
 }

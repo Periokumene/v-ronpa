@@ -18,6 +18,7 @@
     "@v-ronpa/contracts": "workspace:*",
     "@v-ronpa/game-flow-machine": "workspace:*",
     "@v-ronpa/gameplay": "workspace:*",
+    "@v-ronpa/layered-character": "workspace:*",
     "@v-ronpa/media-save": "workspace:*",
     "@v-ronpa/nani-parser": "workspace:*",
     "@v-ronpa/nani-runtime-compiler": "workspace:*",

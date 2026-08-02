@@ -1,9 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, unlink, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const chapterSourceFile = fileURLToPath(
   new URL("../../apps/game-a/src/nani/chapter-02.nani", import.meta.url)
+);
+const catalogDirtyProbeFile = fileURLToPath(
+  new URL("../../apps/game-a/src/nani-dev/playwright-catalog-dirty.nani", import.meta.url)
 );
 
 test.setTimeout(240_000);
@@ -41,7 +44,7 @@ test("FastDebug previews the current script cold, switches without mutating the 
   await expect(stagedCueTarget.locator(".vn-devtools-preview-button")).toBeEnabled();
   await stagedCueTarget.locator(".vn-devtools-preview-button").click();
   await expect(page.getByTestId("vn-cue-text")).toHaveText(
-    "向下，向下，再向下。这样的坠落难道永远不会结束吗？",
+    "向下，向下，再向下",
     { timeout: 15_000 }
   );
   const stagedState = page.getByLabel("Stable state summaries").getByText("stage", { exact: true })
@@ -112,7 +115,8 @@ test("Game A traverses, saves, previews, restores, and completes its production 
   const scriptPicker = workbench.locator("details.vn-devtools-script-picker");
   await scriptPicker.locator("summary").click();
   await expect(workbench.getByRole("listbox", { name: "VN scripts" })).toBeVisible();
-  await expect(workbench.getByRole("option")).toHaveCount(2);
+  await expect(workbench.getByRole("option")).toHaveCount(3);
+  await expect(workbench.getByRole("option", { name: /draft-home-quarrel\.nani/ })).toContainText("development");
   await page.screenshot({ path: "test-results/game-a-multi-nani-script-selector-504.png", fullPage: true });
   await workbench.getByRole("option", { name: /chapter-02\.nani/ }).click();
   await expect.poll(async () => (await readSnapshot(page)).workbench.viewedScriptPath)
@@ -129,7 +133,7 @@ test("Game A traverses, saves, previews, restores, and completes its production 
   await advanceProductionStoryToStagedOpeningCue(page);
   await expectProductionStagedCueText(page, "向下");
   await expectProductionStagedCueText(page, "向下，向下");
-  await expectProductionStagedCueText(page, "向下，向下，再向下。这样的坠落难道永远不会结束吗？");
+  await expectProductionStagedCueText(page, "向下，向下，再向下");
   await page.screenshot({ path: "test-results/game-a-staged-cue-final-manual.png", fullPage: true });
   await advanceProductionStoryToFinalOpeningChoice(page);
   const beforeNavigation = await readSnapshot(page);
@@ -178,6 +182,48 @@ test("Game A traverses, saves, previews, restores, and completes its production 
   await expect(page.getByTestId("game-a-mode")).toHaveText("标题");
   await expect(workbench.getByLabel("Current runtime position")).toHaveCount(0);
   expect(consoleErrors).toEqual([]);
+});
+
+test("catalog structure changes freeze preview until refresh rescans the development root", async ({ page }) => {
+  await unlink(catalogDirtyProbeFile).catch(() => undefined);
+  await page.addInitScript(() => {
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
+    sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v4");
+  });
+
+  try {
+    await page.goto("/");
+    const workbench = page.getByTestId("vn-devtools-dock");
+    await expect(workbench).toBeVisible();
+    await expect.poll(async () => (await readSnapshot(page)).workbench.phase).toBe("ready");
+    const before = await readSnapshot(page);
+
+    await writeFile(catalogDirtyProbeFile, "#Probe\nNarrator: Catalog refresh probe.\n", "utf8");
+    const dirty = workbench.getByTestId("vn-devtools-catalog-dirty");
+    await expect(dirty).toBeVisible({ timeout: 15_000 });
+    await expect(dirty).toContainText("Refresh to rescan");
+    await expect(workbench.getByTestId("vn-devtools-primary-action")).toBeDisabled();
+    expect((await readSnapshot(page)).story).toEqual(before.story);
+    await page.screenshot({
+      path: "test-results/game-a-nani-catalog-dirty-refresh-required.png",
+      fullPage: true
+    });
+
+    await dirty.getByRole("button", { name: "Refresh" }).click();
+    await expect(workbench).toBeVisible({ timeout: 15_000 });
+    await expect(workbench.getByTestId("vn-devtools-catalog-dirty")).toHaveCount(0);
+    const picker = workbench.locator("details.vn-devtools-script-picker");
+    await picker.locator("summary").click();
+    const probe = workbench.getByRole("option", { name: /playwright-catalog-dirty\.nani/ });
+    await expect(probe).toContainText("development");
+    await page.screenshot({
+      path: "test-results/game-a-nani-scope-after-refresh.png",
+      fullPage: true
+    });
+  } finally {
+    await unlink(catalogDirtyProbeFile).catch(() => undefined);
+    if (!page.isClosed()) await page.reload().catch(() => undefined);
+  }
 });
 
 test("an opening fixed point never blocks viewing or previewing chapter-02 before and after runtime navigation", async ({ page }) => {

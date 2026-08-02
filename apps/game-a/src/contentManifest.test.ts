@@ -54,11 +54,15 @@ describe("game-a content manifest", () => {
       "/game-a/backgrounds/game-a-snow-outskirts-frame.png"
     );
     expect(registry.url({ id: "bg:home-outside", kind: "background" })).toBe("/game-a/backgrounds/home-outside.png");
+    expect(registry.url({ id: "bg:home-kitchen", kind: "background" })).toBe("/game-a/backgrounds/home-kitchen.png");
     expect(registry.url({ id: "bg:title", kind: "background" })).toBe("/game-a/backgrounds/title.png");
     expect(registry.url({ id: "bgm:dead-fish-riffle", kind: "bgm" })).toBe(
       "/game-a/media/bgm/dead-fish-riffle.mp3"
     );
     expect(registry.url({ id: "bgm:game-a-main", kind: "bgm" })).toBe("/game-a/media/bgm/game-a-main.ogg");
+    expect(registry.url({ id: "bgm:hmg-250504-dark-ambient-home", kind: "bgm" })).toBe(
+      "/game-a/media/bgm/hmg-250504-dark-ambient-home.webm"
+    );
     expect(registry.url({ id: "sfx:game-a-chime", kind: "sfx" })).toBe("/game-a/media/sfx/game-a-chime.ogg");
     expect(registry.url({ id: "sfx:gentle-rain-loop", kind: "sfx" })).toBe(
       "/game-a/media/sfx/gentle-rain-loop.mp3"

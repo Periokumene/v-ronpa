@@ -13,7 +13,9 @@
   "references": [
     { "path": "../app-vn-runtime" },
     { "path": "../contracts" },
+    { "path": "../layered-character" },
     { "path": "../nani-parser" },
+    { "path": "../nani-project" },
     { "path": "../nani-runtime-compiler" }
   ],
   "include": ["src"]

@@ -26,7 +26,7 @@ WebGL smoke suite, and remove the temporarily disabled AUTO/SKIP browser path.
 ## Constraints
 
 - Product Nani remains under `apps/game-a/src/nani/**`; test-only Nani lives
-  under `apps/game-a/src/test-nani/**` and is reachable only through
+  under `apps/game-a/src/nani-test/**` and is reachable only through
   `VITE_ENABLE_TEST_ENTRIES=1`.
 - No compatibility alias for the old test script path or test launch id.
 - AUTO/SKIP unit coverage remains active; only the timing-sensitive browser
@@ -104,7 +104,7 @@ pnpm exec playwright test tests/smoke/game-a-alice.spec.ts --project=game-a
 Current implementation evidence:
 
 - Product metadata contains only `game-a/opening.nani`; test metadata is
-  generated separately from `apps/game-a/src/test-nani/**`.
+  generated separately from `apps/game-a/src/nani-test/**`.
 - The focused generator/config/Game A/Harness suite passes 14 tests.
 - Repository tests pass: 64 files and 499 tests; contract validation passes 312 tests.
 - Fresh-server, one-worker Playwright lists and passes five active scenarios in

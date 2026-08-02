@@ -9,7 +9,7 @@ import {
   type VnDebugMaterializationResult,
   type VnDebugTargetAnchor
 } from "@v-ronpa/app-vn-runtime/debug";
-import type { NaniDevtoolsViteInitialCandidate } from "./viteProtocol";
+import type { NaniDevtoolsViteSourceCandidate } from "./viteProtocol";
 import {
   replaceVnDevtoolsCandidateSource,
   validateVnDevtoolsCandidateCatalog,
@@ -36,7 +36,7 @@ export type PreparedVnDevtoolsInitialCandidate =
 
 export interface PrepareVnDevtoolsInitialCandidateInput {
   activeCandidate: VnDevtoolsScriptCandidate;
-  candidate: NaniDevtoolsViteInitialCandidate;
+  candidate: NaniDevtoolsViteSourceCandidate;
   pinnedTarget?: VnDebugTargetAnchor;
   decisions?: VnDebugDecisionTrace;
   materializationMode?: VnDebugMaterializationMode;
@@ -61,7 +61,11 @@ export async function prepareVnDevtoolsInitialCandidate({
   if (candidate.entryId !== activeCandidate.entry.id || candidate.scriptPath !== activeCandidate.source.scriptPath) {
     return {
       kind: "retain-read-only",
-      inspection: await inspectVnDebugScript(activeCandidate.entry, activeCandidate.source),
+      inspection: await inspectVnDebugScript(
+        activeCandidate.entry,
+        activeCandidate.source,
+        activeCandidate.sourceDiagnosticPolicy
+      ),
       reason: "identity-mismatch"
     };
   }
@@ -71,7 +75,11 @@ export async function prepareVnDevtoolsInitialCandidate({
     scriptRevision: candidate.serverRevision ?? activeCandidate.source.scriptRevision
   };
   const candidateCatalog = replaceVnDevtoolsCandidateSource(activeCandidate, candidateSource);
-  const inspection = await inspectVnDebugScript(activeCandidate.entry, candidateSource);
+  const inspection = await inspectVnDebugScript(
+    activeCandidate.entry,
+    candidateSource,
+    activeCandidate.sourceDiagnosticPolicy
+  );
   throwIfAborted(signal);
   if (!candidate.serverRevision || !inspection.canMaterialize) {
     return { kind: "retain-read-only", inspection, reason: "invalid-source" };
@@ -91,6 +99,7 @@ export async function prepareVnDevtoolsInitialCandidate({
       target: finalPinnedTarget!,
       decisions,
       expectedRevision,
+      sourceDiagnosticPolicy: activeCandidate.sourceDiagnosticPolicy,
       ...(signal ? { signal } : {})
     });
     throwIfAborted(signal);
@@ -125,6 +134,7 @@ export async function prepareVnDevtoolsInitialCandidate({
       target: finalPinnedTarget,
       decisions,
       expectedRevision,
+      sourceDiagnosticPolicy: activeCandidate.sourceDiagnosticPolicy,
       ...(signal ? { signal } : {})
     });
     throwIfAborted(signal);

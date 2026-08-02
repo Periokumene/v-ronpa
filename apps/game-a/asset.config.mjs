@@ -2,63 +2,49 @@ export default {
   id: "game-a",
   publicRoot: "apps/game-a/public/game-a",
   publicBaseUri: "/game-a",
-  outputPath: "apps/game-a/src/generatedAssets.ts",
+  runtimeAssetOutputPath: "apps/game-a/src/generatedRuntimeAssets.ts",
+  naniProductionOutputPath: "apps/game-a/src/generatedNaniProduction.ts",
+  naniTestsOutputPath: "apps/game-a/src/generatedNaniTests.ts",
   exportName: "gameARuntimeAssets",
   fontFacesExportName: "gameAFontFaces",
   fragmentsExportName: "gameARuntimeAssetFragments",
-  entryLocatorExportName: "gameAVnEntryLocator",
-  scriptMetadataExportName: "gameAScriptMetadataByPath",
-  scriptCatalogExportName: "gameAScriptCatalog",
-  scriptSourcesExportName: "gameAScriptSourcesByPath",
-  testScriptOutputPath: "apps/game-a/src/generatedTestScripts.ts",
-  testEntryLocatorsExportName: "gameATestEntryLocators",
-  testScriptMetadataExportName: "gameATestScriptMetadataByPath",
-  testScriptCatalogsExportName: "gameATestScriptCatalogs",
-  testScriptSourcesExportName: "gameATestScriptSourcesByPath",
-  entry: {
-    id: "vn:game-a-main",
-    initialScriptPath: "game-a/opening.nani",
-    startLabel: "Start"
-  },
   providers: ["pixi"],
-  voiceLocales: ["zh"],
-  scripts: [
-    {
-      sourceFile: "apps/game-a/src/nani/opening.nani",
-      scriptPath: "game-a/opening.nani"
+  naniProject: {
+    scopes: {
+      production: {
+        sourceRoot: "apps/game-a/src/nani",
+        scriptRoot: "game-a"
+      },
+      development: {
+        sourceRoot: "apps/game-a/src/nani-dev",
+        scriptRoot: "game-a/dev"
+      },
+      test: {
+        sourceRoot: "apps/game-a/src/nani-test",
+        scriptRoot: "game-a/test"
+      }
     },
-    {
-      sourceFile: "apps/game-a/src/nani/chapter-02.nani",
-      scriptPath: "game-a/chapter-02.nani"
-    }
-  ],
-  testCatalogs: {
-    smoke: {
-      entry: {
+    mainEntry: {
+      id: "vn:game-a-main",
+      scope: "production",
+      initialScriptPath: "game-a/opening.nani",
+      startLabel: "Start"
+    },
+    testEntries: {
+      smoke: {
         id: "vn:game-a-test-smoke",
+        scope: "test",
         initialScriptPath: "game-a/test/smoke.nani",
         startLabel: "Start"
       },
-      scripts: [
-        {
-          sourceFile: "apps/game-a/src/test-nani/smoke.nani",
-          scriptPath: "game-a/test/smoke.nani"
-        }
-      ]
-    },
-    characterSmoke: {
-      entry: {
+      character: {
         id: "vn:game-a-test-character",
+        scope: "test",
         initialScriptPath: "game-a/test/character-smoke.nani",
         startLabel: "Start"
-      },
-      scripts: [
-        {
-          sourceFile: "apps/game-a/src/test-nani/character-smoke.nani",
-          scriptPath: "game-a/test/character-smoke.nani"
-        }
-      ]
-    }
+      }
+    },
+    voiceLocales: ["zh"]
   },
   idOverrides: {},
   fontFaceOverrides: {

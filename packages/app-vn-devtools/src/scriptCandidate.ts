@@ -8,11 +8,13 @@ import {
   type VnDebugScriptInspection
 } from "@v-ronpa/app-vn-runtime/debug";
 import { linkRuntimeScriptCatalog } from "@v-ronpa/nani-runtime-compiler";
+import type { NaniSourceDiagnosticPolicy } from "@v-ronpa/nani-runtime-compiler";
 
 export interface VnDevtoolsScriptCandidate {
   entry: VnEntryDef;
   catalog: VnRuntimeScriptCatalog;
   source: VnRuntimeScriptSource;
+  sourceDiagnosticPolicy: NaniSourceDiagnosticPolicy;
 }
 
 export type VnDevtoolsCandidateCatalogValidation =
@@ -26,10 +28,12 @@ export type VnDevtoolsCandidateCatalogValidation =
 export function createVnDevtoolsScriptCandidate(
   entry: VnEntryDef,
   catalog: VnRuntimeScriptCatalog,
-  scriptPath: string
+  scriptPath: string,
+  sourceDiagnosticPolicy: NaniSourceDiagnosticPolicy,
+  sourceIndex: VnRuntimeScriptCatalog = catalog
 ): VnDevtoolsScriptCandidate | undefined {
-  const source = catalog.find((candidate) => candidate.scriptPath === scriptPath);
-  return source ? { entry, catalog, source } : undefined;
+  const source = sourceIndex.find((candidate) => candidate.scriptPath === scriptPath);
+  return source ? { entry, catalog, source, sourceDiagnosticPolicy } : undefined;
 }
 
 export function replaceVnDevtoolsCandidateSource(
@@ -40,7 +44,7 @@ export function replaceVnDevtoolsCandidateSource(
   const catalog = replaced
     ? candidate.catalog.map((item) => item.scriptPath === source.scriptPath ? source : item)
     : [...candidate.catalog, source];
-  return { entry: candidate.entry, catalog, source };
+  return { ...candidate, catalog, source };
 }
 
 export function candidateFromVnDebugInspection(
@@ -60,7 +64,11 @@ export async function validateVnDevtoolsCandidateCatalog(
   candidate: VnDevtoolsScriptCandidate
 ): Promise<VnDevtoolsCandidateCatalogValidation> {
   const inspections = await Promise.all(
-    candidate.catalog.map((source) => inspectVnDebugScript(candidate.entry, source))
+    candidate.catalog.map((source) => inspectVnDebugScript(
+      candidate.entry,
+      source,
+      candidate.sourceDiagnosticPolicy
+    ))
   );
   const invalid = inspections.find((inspection) => !inspection.canMaterialize);
   if (invalid) {

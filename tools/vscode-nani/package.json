@@ -68,6 +68,7 @@
     "@v-ronpa/contracts": "workspace:*",
     "@v-ronpa/layered-character": "workspace:*",
     "@v-ronpa/nani-parser": "workspace:*",
+    "@v-ronpa/nani-project": "workspace:*",
     "@v-ronpa/nani-runtime-compiler": "workspace:*"
   },
   "devDependencies": {

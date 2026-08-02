@@ -5,15 +5,58 @@ import {
   type VnRuntimeScriptSource
 } from "@v-ronpa/contracts";
 import {
-  inspectVnDebugScript as inspectDebugScriptImpl,
-  materializeVnDebugTarget as materializeDebugTarget,
+  inspectVnDebugScript as inspectDebugScriptRaw,
+  materializeVnDebugTarget as materializeDebugTargetRaw,
   resolveVnDebugFinalTextStageAnchor,
   type VnDebugChoiceRequest,
   type VnDebugInputRequest,
-  type MaterializeVnDebugCanonicalTargetInput
+  type MaterializeVnDebugCanonicalTargetInput,
+  type MaterializeVnDebugTargetInput
 } from "./debugMaterializer";
 
 describe("VN debug inspection and materialization", () => {
+  it("runs valid commands around a removed recoverable command in canonical and FastDebug modes", async () => {
+    const testScript = entry([
+      "#Start",
+      "Narrator: Before.",
+      "@notACommand bad:true",
+      "Narrator: After.|#after_recovery|"
+    ].join("\n"));
+    const inspection = await inspectVnDebugScript(testScript);
+    const target = inspection.commands.find((command) =>
+      command.anchor.stableId === "print:after_recovery"
+    )!.anchor;
+
+    expect(inspection.canMaterialize).toBe(true);
+    expect(inspection.degraded).toBe(true);
+    expect(inspection.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "unknown-command", severity: "error" })
+    ]));
+    expect(inspection.sourceLines[2]?.anchors).toHaveLength(0);
+
+    const canonical = await materializeVnDebugTarget({
+      entry: inspection.entry,
+      inspection,
+      target
+    });
+    const fast = await materializeDebugTarget({
+      mode: "fast-current-script",
+      entry: testScript.entry,
+      inspection,
+      target
+    });
+    for (const result of [canonical, fast]) {
+      expect(result).toMatchObject({
+        status: "ready",
+        degraded: true,
+        checkpoint: { story: { text: { current: { text: "After." } } } }
+      });
+    }
+
+    const strict = await inspectDebugScriptRaw(testScript.entry, testScript.source, "strict");
+    expect(strict.canMaterialize).toBe(false);
+  });
+
   it("materializes Story, Pixi, UI, and persistent media from the canonical start label", async () => {
     const inspection = await inspectVnDebugScript(entry([
       "#Start",
@@ -801,13 +844,37 @@ function inspectVnDebugScript(value: DebugTestScript) {
   return inspectDebugScriptImpl(value.entry, value.source);
 }
 
+function inspectDebugScriptImpl(entry: VnEntryDef, source: VnRuntimeScriptSource) {
+  return inspectDebugScriptRaw(entry, source, "allow-recoverable-command-errors");
+}
+
+type MaterializeWithoutPolicy<T> = T extends unknown
+  ? Omit<T, "sourceDiagnosticPolicy">
+  : never;
+
+function materializeDebugTarget(input: MaterializeWithoutPolicy<MaterializeVnDebugTargetInput>) {
+  return materializeDebugTargetRaw({
+    ...input,
+    sourceDiagnosticPolicy: "allow-recoverable-command-errors"
+  } as MaterializeVnDebugTargetInput);
+}
+
 function materializeVnDebugTarget(
-  input: Omit<MaterializeVnDebugCanonicalTargetInput, "catalog" | "entry" | "mode"> & {
+  input: Omit<
+    MaterializeVnDebugCanonicalTargetInput,
+    "catalog" | "entry" | "mode" | "sourceDiagnosticPolicy"
+  > & {
     entry: VnEntryDef | DebugTestScript;
   }
 ) {
   const testEntry = "source" in input.entry ? input.entry : undefined;
   const runtimeEntry: VnEntryDef = testEntry?.entry ?? input.entry as VnEntryDef;
   const catalog = testEntry ? [testEntry.source] : [input.inspection!.source];
-  return materializeDebugTarget({ ...input, mode: "canonical-entry", entry: runtimeEntry, catalog });
+  return materializeDebugTargetRaw({
+    ...input,
+    mode: "canonical-entry",
+    entry: runtimeEntry,
+    catalog,
+    sourceDiagnosticPolicy: "allow-recoverable-command-errors"
+  });
 }

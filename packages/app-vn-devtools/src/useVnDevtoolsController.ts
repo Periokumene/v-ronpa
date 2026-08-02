@@ -75,7 +75,8 @@ import { mergeVnDevtoolsLayout, resolveVnDevtoolsSelection } from "./controllerV
 import { resolveVnDevtoolsLineRange } from "./sourceViewModel";
 import type {
   NaniDevtoolsViteDiagnostic,
-  NaniDevtoolsViteInitialCandidate,
+  NaniDevtoolsViteSourceCandidate,
+  NaniDevtoolsViteCatalogDirty,
   NaniDevtoolsViteUpdate
 } from "./viteProtocol";
 import {
@@ -85,6 +86,10 @@ import {
   type VnDevtoolsScriptCandidate
 } from "./scriptCandidate";
 import { createVnDevtoolsScriptAuthorityCoordinator } from "./scriptAuthorityCoordinator";
+import {
+  classifyNaniDiagnosticDisposition,
+  type NaniSourceDiagnosticPolicy
+} from "@v-ronpa/nani-runtime-compiler";
 
 export interface VnDevtoolsRuntimeObservation {
   shell: Pick<VnRuntimeShellPort, "interactionFacts" | "storyRuntime" | "uiRuntime">;
@@ -95,16 +100,18 @@ export interface VnDevtoolsRuntimeObservation {
 
 export interface VnDevtoolsSourceUpdateSource {
   subscribe(listener: (update: NaniDevtoolsViteUpdate) => void): () => void;
+  subscribeCatalogDirty?(listener: (event: NaniDevtoolsViteCatalogDirty) => void): () => void;
 }
 
 export interface UseVnDevtoolsControllerOptions {
   entry: VnEntryDef;
   catalog: VnRuntimeScriptCatalog;
+  sourceDiagnosticPolicy: NaniSourceDiagnosticPolicy;
   runtime: VnDevtoolsRuntimeObservation;
   vnActive: boolean;
   sessionKey: string;
   storage?: VnDevtoolsStorageLike;
-  initialCandidates?: readonly NaniDevtoolsViteInitialCandidate[];
+  initialCandidates?: readonly NaniDevtoolsViteSourceCandidate[];
   updateSource?: VnDevtoolsSourceUpdateSource;
   adoptCandidate(candidate: VnDevtoolsScriptCandidate, signal: AbortSignal): boolean | Promise<boolean>;
   commitCandidate(
@@ -157,6 +164,7 @@ export function useVnDevtoolsController({
   initialCandidates,
   runtime,
   sessionKey,
+  sourceDiagnosticPolicy,
   storage: configuredStorage,
   updateSource,
   vnActive
@@ -176,15 +184,32 @@ export function useVnDevtoolsController({
   const [width, setWidth] = useState(initialSession.width);
   const [layout, setLayout] = useState(initialSession.layout);
   const [materializationMode, setMaterializationMode] = useState(initialSession.materializationMode);
+  const sourceIndex = useMemo(() => initialCandidates?.map((candidate) => ({
+    scriptPath: candidate.scriptPath,
+    sourceText: candidate.sourceText,
+    scriptRevision: candidate.serverRevision ?? `fatal:${candidate.scriptPath}`
+  })) ?? catalog, [catalog, initialCandidates]);
   const [viewedScriptPath, setViewedScriptPath] = useState(
-    initialSession.viewedScriptPath && catalog.some((source) => source.scriptPath === initialSession.viewedScriptPath)
+    initialSession.viewedScriptPath && sourceIndex.some((source) => source.scriptPath === initialSession.viewedScriptPath)
       ? initialSession.viewedScriptPath
       : entryDefinition.initialScriptPath
   );
   const entry = useMemo(
-    () => createVnDevtoolsScriptCandidate(entryDefinition, catalog, viewedScriptPath)
-      ?? createVnDevtoolsScriptCandidate(entryDefinition, catalog, entryDefinition.initialScriptPath)!,
-    [catalog, entryDefinition, viewedScriptPath]
+    () => createVnDevtoolsScriptCandidate(
+      entryDefinition,
+      catalog,
+      viewedScriptPath,
+      sourceDiagnosticPolicy,
+      sourceIndex
+    )
+      ?? createVnDevtoolsScriptCandidate(
+        entryDefinition,
+        catalog,
+        entryDefinition.initialScriptPath,
+        sourceDiagnosticPolicy,
+        sourceIndex
+      )!,
+    [catalog, entryDefinition, sourceDiagnosticPolicy, sourceIndex, viewedScriptPath]
   );
   const initialCandidate = initialCandidates?.find((candidate) =>
     candidate.entryId === entry.entry.id && candidate.scriptPath === entry.source.scriptPath);
@@ -200,6 +225,7 @@ export function useVnDevtoolsController({
     message: "Inspecting active Nani source.",
     cancellable: true
   });
+  const [catalogDirty, setCatalogDirty] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<PendingDecisionContext | undefined>(undefined);
   const [lastCheckpoint, setLastCheckpoint] = useState<SaveableVnState | undefined>(undefined);
   const lastCheckpointRef = useRef<SaveableVnState | undefined>(undefined);
@@ -331,7 +357,8 @@ export function useVnDevtoolsController({
     task,
     updateId,
     message,
-    expectedRevision
+    expectedRevision,
+    recovered
   }: {
     candidateInspection: VnDebugScriptInspection;
     result: Extract<Awaited<ReturnType<typeof materializeVnDebugTarget>>, { status: "ready" }>;
@@ -339,6 +366,7 @@ export function useVnDevtoolsController({
     updateId?: number;
     message: string;
     expectedRevision?: string;
+    recovered?: boolean;
   }) => {
     if (!task.isCurrent()) return;
     const candidatePath = candidateInspection.source.scriptPath;
@@ -366,6 +394,7 @@ export function useVnDevtoolsController({
             message: "Checkpoint accepted; finishing the host restore.",
             cancellable: false,
             degraded: result.degraded,
+            recovered: recovered || hasRecoveredSourceDiagnostics(candidateInspection),
             ...(updateId !== undefined ? { updateId } : {})
           });
           // Host acceptance is the linearization point: later HMR work must
@@ -418,6 +447,7 @@ export function useVnDevtoolsController({
       phase: "ready",
       message,
       degraded: result.degraded,
+      recovered: recovered || hasRecoveredSourceDiagnostics(candidateInspection),
       ...(updateId !== undefined ? { updateId } : {})
     };
     scriptAuthority.cache(candidatePath, {
@@ -440,13 +470,15 @@ export function useVnDevtoolsController({
     expectedRevision,
     result,
     task,
-    updateId
+    updateId,
+    recovered
   }: {
     candidateInspection: VnDebugScriptInspection;
     expectedRevision?: string;
     result: VnDebugMaterializationResult;
     task: ReturnType<ReturnType<typeof createVnDevtoolsLatestTaskController>["begin"]>;
     updateId?: number;
+    recovered?: boolean;
   }) => {
     if (!task.isCurrent()) return;
     if (result.status === "decision-required") {
@@ -461,6 +493,7 @@ export function useVnDevtoolsController({
         phase: "decision-required",
         message: "This path needs a temporary tab-local decision before it can reach the preview point.",
         degraded: result.degraded,
+        recovered: recovered || hasRecoveredSourceDiagnostics(candidateInspection),
         ...(updateId !== undefined ? { updateId } : {})
       });
       return;
@@ -470,6 +503,7 @@ export function useVnDevtoolsController({
         phase: result.code === "invalid-source" || result.code === "expression-error" ? "error" : "blocked",
         message: result.message,
         degraded: result.degraded,
+        recovered: recovered || hasRecoveredSourceDiagnostics(candidateInspection),
         ...(updateId !== undefined ? { updateId } : {})
       });
       setHasUpdateBadge(true);
@@ -481,6 +515,7 @@ export function useVnDevtoolsController({
       task,
       ...(updateId !== undefined ? { updateId } : {}),
       ...(expectedRevision ? { expectedRevision } : {}),
+      ...(recovered !== undefined ? { recovered } : {}),
       message: "Stable checkpoint installed. External saves will return here."
     });
   }, [acceptReadyResult]);
@@ -510,6 +545,7 @@ export function useVnDevtoolsController({
     const common = {
       entry: candidateInspection.entry,
       inspection: candidateInspection,
+      sourceDiagnosticPolicy,
       target: finalTarget,
       decisions: sessionSnapshotRef.current.decisions,
       ...(expectedRevision ? { expectedRevision } : {}),
@@ -537,9 +573,13 @@ export function useVnDevtoolsController({
   }, [entry, handleMaterializationResult, materializationMode]);
 
   useEffect(() => {
+    const hostSource = catalog.find((source) => source.scriptPath === entry.source.scriptPath);
+    const hostIdentity = hostSource
+      ? scriptCandidateIdentity({ ...entry, source: hostSource })
+      : undefined;
+    if (hostIdentity && scriptAuthority.observeHost(entry.source.scriptPath, hostIdentity)) return;
+    if (hostIdentity && scriptAuthority.installedIdentity(entry.source.scriptPath) === hostIdentity) return;
     const identity = scriptCandidateIdentity(entry);
-    if (scriptAuthority.observeHost(entry.source.scriptPath, identity)) return;
-    if (scriptAuthority.installedIdentity(entry.source.scriptPath) === identity) return;
     const task = latestTasksRef.current.begin();
     const persistedTargetCandidate = persistedTargetRestoreCompletedRef.current
       ? undefined
@@ -554,7 +594,9 @@ export function useVnDevtoolsController({
       const targetCandidate = createVnDevtoolsScriptCandidate(
         entryDefinition,
         catalog,
-        crossViewedFastTarget.scriptPath
+        crossViewedFastTarget.scriptPath,
+        sourceDiagnosticPolicy,
+        sourceIndex
       );
       if (!targetCandidate) {
         setStatus({ phase: "blocked", message: "The persisted FastDebug target script is no longer in the catalog." });
@@ -569,7 +611,11 @@ export function useVnDevtoolsController({
             scriptRevision: targetInitialCandidate.serverRevision ?? targetCandidate.source.scriptRevision
           }
         : targetCandidate.source;
-      const targetInspection = await inspectVnDebugScript(entryDefinition, targetSource);
+      const targetInspection = await inspectVnDebugScript(
+        entryDefinition,
+        targetSource,
+        sourceDiagnosticPolicy
+      );
       if (
         !targetInspection.canMaterialize
         || (targetInitialCandidate?.serverRevision
@@ -617,7 +663,8 @@ export function useVnDevtoolsController({
               ? "error"
               : "blocked",
             message: prepared.message ?? initialCandidateFailureMessage(prepared.reason),
-            degraded: prepared.inspection.degraded
+            degraded: prepared.inspection.degraded,
+            recovered: hasRecoveredSourceDiagnostics(prepared.inspection, initialCandidate.diagnostics)
           };
           scriptAuthority.cache(entry.source.scriptPath, {
             display,
@@ -638,7 +685,10 @@ export function useVnDevtoolsController({
             candidateInspection: prepared.inspection,
             expectedRevision: prepared.expectedRevision,
             result: prepared.result,
-            task
+            task,
+            recovered: initialCandidate.diagnostics.some(
+              (diagnostic) => diagnostic.disposition === "recoverable"
+            )
           });
           return;
         }
@@ -657,7 +707,8 @@ export function useVnDevtoolsController({
             setStatus({
               phase: "blocked",
               message: "The host rejected the verified initial source; the previous definition remains installed.",
-              degraded: prepared.inspection.degraded
+              degraded: prepared.inspection.degraded,
+              recovered: hasRecoveredSourceDiagnostics(prepared.inspection, initialCandidate.diagnostics)
             });
             return;
           }
@@ -670,7 +721,8 @@ export function useVnDevtoolsController({
           const nextStatus: VnDevtoolsStatus = {
             phase: "ready",
             message: "Verified initial source adopted for the next New Game.",
-            degraded: prepared.inspection.degraded
+            degraded: prepared.inspection.degraded,
+            recovered: hasRecoveredSourceDiagnostics(prepared.inspection, initialCandidate.diagnostics)
           };
           scriptAuthority.cache(entry.source.scriptPath, {
             display,
@@ -690,12 +742,14 @@ export function useVnDevtoolsController({
           ? {
               phase: "blocked",
               message: "The verified initial source changed while VN is active. Preview a line before installing it.",
-              degraded: prepared.inspection.degraded
+              degraded: prepared.inspection.degraded,
+              recovered: hasRecoveredSourceDiagnostics(prepared.inspection, initialCandidate.diagnostics)
             }
           : {
               phase: "ready",
               message: "Initial source revision verified by the server and browser. Choose a line and press Preview.",
-              degraded: prepared.inspection.degraded
+              degraded: prepared.inspection.degraded,
+              recovered: hasRecoveredSourceDiagnostics(prepared.inspection, initialCandidate.diagnostics)
             };
         scriptAuthority.cache(entry.source.scriptPath, {
           display,
@@ -716,7 +770,7 @@ export function useVnDevtoolsController({
       return;
     }
     if (updateSource) {
-      void inspectVnDebugScript(entry.entry, entry.source).then((nextInspection) => {
+      void inspectVnDebugScript(entry.entry, entry.source, sourceDiagnosticPolicy).then((nextInspection) => {
         if (!task.isCurrent()) return;
         persistedTargetRestoreCompletedRef.current = true;
         scriptAuthority.install(entry.source.scriptPath, identity);
@@ -732,7 +786,7 @@ export function useVnDevtoolsController({
       });
       return;
     }
-    void inspectVnDebugScript(entry.entry, entry.source).then(async (nextInspection) => {
+    void inspectVnDebugScript(entry.entry, entry.source, sourceDiagnosticPolicy).then(async (nextInspection) => {
       if (!task.isCurrent()) return;
       persistedTargetRestoreCompletedRef.current = true;
       scriptAuthority.install(entry.source.scriptPath, identity);
@@ -746,7 +800,12 @@ export function useVnDevtoolsController({
         return;
       }
       if (!nextInspection.canMaterialize) {
-        setStatus({ phase: "error", message: "The active source has errors; no checkpoint was installed.", degraded: nextInspection.degraded });
+        setStatus({
+          phase: "error",
+          message: "The active source has errors; no checkpoint was installed.",
+          degraded: nextInspection.degraded,
+          recovered: hasRecoveredSourceDiagnostics(nextInspection)
+        });
         return;
       }
       if (!nextInspection.declaredRevisionMatches) {
@@ -769,7 +828,8 @@ export function useVnDevtoolsController({
             setStatus({
               phase: "blocked",
               message: "The host rejected the canonical source revision; the previous definition remains installed.",
-              degraded: nextInspection.degraded
+              degraded: nextInspection.degraded,
+              recovered: hasRecoveredSourceDiagnostics(nextInspection)
             });
             return;
           }
@@ -777,27 +837,39 @@ export function useVnDevtoolsController({
           setStatus({
             phase: "ready",
             message: "Canonical source revision adopted for the next New Game.",
-            degraded: nextInspection.degraded
+            degraded: nextInspection.degraded,
+            recovered: hasRecoveredSourceDiagnostics(nextInspection)
           });
           return;
         }
         setStatus({
           phase: "blocked",
           message: "The active source revision changed without a fixed point. Choose a preview target before installing it.",
-          degraded: nextInspection.degraded
+          degraded: nextInspection.degraded,
+          recovered: hasRecoveredSourceDiagnostics(nextInspection)
         });
         return;
       }
       setStatus({
         phase: "ready",
         message: "Choose a source line and press Preview.",
-        degraded: nextInspection.degraded
+        degraded: nextInspection.degraded,
+        recovered: hasRecoveredSourceDiagnostics(nextInspection)
       });
     });
   }, [catalog, entry, entryDefinition, handleMaterializationResult, initialCandidate, initialCandidates, initialSession.pinnedTarget, materializationMode, runMaterialization, scriptAuthority, updateSource, vnActive]);
 
   const handleSourceUpdate = useCallback((update: NaniDevtoolsViteUpdate) => {
-      const updateCandidate = createVnDevtoolsScriptCandidate(entryDefinition, catalog, update.scriptPath);
+      if (catalogDirty) return;
+      const updateCandidate = createVnDevtoolsScriptCandidate(
+        entryDefinition,
+        catalog,
+        update.scriptPath,
+        sourceDiagnosticPolicy,
+        catalog.some((source) => source.scriptPath === update.scriptPath)
+          ? catalog
+          : sourceIndex
+      );
       if (update.entryId !== entryDefinition.id || !updateCandidate) return;
       if (!updateGateRef.current.accept(update.updateId)) return;
       const updateIsViewed = update.scriptPath === scriptAuthority.viewedScriptPath();
@@ -814,11 +886,15 @@ export function useVnDevtoolsController({
         ? latestTasksRef.current.begin()
         : scriptAuthority.beginTask(update.scriptPath);
       const updateDiagnostics = toBridgeDiagnostics(update.diagnostics, String(update.updateId));
+      const updateRecovered = update.diagnostics.some((diagnostic) => diagnostic.disposition === "recoverable");
       scriptAuthority.markUpdated(update.scriptPath);
       setScriptAuthorityRevision((current) => current + 1);
       if (updateIsViewed) {
         setPendingDecision(undefined);
         setBridgeDiagnostics(updateDiagnostics);
+        if (updateDiagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+          updateLayout({ bottomPanelOpen: true, activePanel: "problems" });
+        }
         setHasUpdateBadge(collapsed);
         setStatus({
           phase: "updating",
@@ -860,7 +936,8 @@ export function useVnDevtoolsController({
                 ? "The saved source breaks the runtime catalog links. The last-known-good catalog is still running."
                 : "Server and browser computed different script revisions; refusing to install the candidate."),
             updateId: update.updateId,
-            degraded: prepared.inspection.degraded
+            degraded: prepared.inspection.degraded,
+            recovered: updateRecovered || hasRecoveredSourceDiagnostics(prepared.inspection)
           };
           scriptAuthority.cache(update.scriptPath, {
             display,
@@ -920,14 +997,22 @@ export function useVnDevtoolsController({
             status: {
               phase: "ready",
               message: "Source mapping updated; runtime presentation was not remounted.",
-              updateId: update.updateId
+              updateId: update.updateId,
+              degraded: prepared.inspection.degraded,
+              recovered: updateRecovered || hasRecoveredSourceDiagnostics(prepared.inspection)
             }
           });
           if (prepared.remappedTarget) {
             fixedPointCoordinatorRef.current!.replace(prepared.remappedTarget, lastCheckpointRef.current);
           }
           if (isUpdateViewed()) {
-            setStatus({ phase: "ready", message: "Source mapping updated; runtime presentation was not remounted.", updateId: update.updateId });
+            setStatus({
+              phase: "ready",
+              message: "Source mapping updated; runtime presentation was not remounted.",
+              updateId: update.updateId,
+              degraded: prepared.inspection.degraded,
+              recovered: updateRecovered || hasRecoveredSourceDiagnostics(prepared.inspection)
+            });
             setHasUpdateBadge(false);
             scriptAuthority.clearUpdated(update.scriptPath);
             setScriptAuthorityRevision((current) => current + 1);
@@ -940,7 +1025,8 @@ export function useVnDevtoolsController({
             result: prepared.result,
             task,
             expectedRevision: prepared.expectedRevision,
-            updateId: update.updateId
+            updateId: update.updateId,
+            recovered: updateRecovered
           });
           return;
         }
@@ -971,7 +1057,9 @@ export function useVnDevtoolsController({
                 ? "New revision adopted for the next New Game."
                 : "Updated script installed for future navigation; the current session was unchanged."
               : "Updated script installed in the catalog for future navigation; the current session was unchanged.",
-            updateId: update.updateId
+            updateId: update.updateId,
+            degraded: prepared.inspection.degraded,
+            recovered: updateRecovered || hasRecoveredSourceDiagnostics(prepared.inspection)
           };
           scriptAuthority.cache(update.scriptPath, {
             display: candidateDisplay,
@@ -1001,7 +1089,7 @@ export function useVnDevtoolsController({
         };
         if (update.scriptPath === scriptAuthority.viewedScriptPath()) setStatus(nextStatus);
       });
-  }, [catalog, collapsed, entryDefinition, handleMaterializationResult, materializationMode, runtime.presentation.storySession, runtime.shell.storyRuntime.executedScriptPaths, runtime.shell.storyRuntime.state.currentScriptPath, scriptAuthority, vnActive]);
+  }, [catalog, catalogDirty, collapsed, entryDefinition, handleMaterializationResult, materializationMode, runtime.presentation.storySession, runtime.shell.storyRuntime.executedScriptPaths, runtime.shell.storyRuntime.state.currentScriptPath, scriptAuthority, sourceDiagnosticPolicy, sourceIndex, updateLayout, vnActive]);
   const handleSourceUpdateRef = useRef(handleSourceUpdate);
   handleSourceUpdateRef.current = handleSourceUpdate;
 
@@ -1009,6 +1097,21 @@ export function useVnDevtoolsController({
     if (!updateSource) return;
     return updateSource.subscribe((update) => handleSourceUpdateRef.current(update));
   }, [updateSource]);
+
+  useEffect(() => {
+    if (!updateSource?.subscribeCatalogDirty) return;
+    return updateSource.subscribeCatalogDirty(() => {
+      latestTasksRef.current.cancel();
+      scriptAuthority.cancelTasks();
+      for (const source of sourceIndex) scriptAuthority.freezePreview(source.scriptPath);
+      setCatalogDirty(true);
+      setPendingDecision(undefined);
+      setStatus({
+        phase: "blocked",
+        message: "The Nani catalog structure changed. Refresh to rescan before previewing or adopting source."
+      });
+    });
+  }, [scriptAuthority, sourceIndex, updateSource]);
 
   useEffect(() => () => {
     latestTasksRef.current.cancel();
@@ -1107,6 +1210,7 @@ export function useVnDevtoolsController({
     const common = {
       entry: context.inspection.entry,
       inspection: context.inspection,
+      sourceDiagnosticPolicy,
       target: context.target,
       decisions: next,
       ...(context.expectedRevision ? { expectedRevision: context.expectedRevision } : {}),
@@ -1123,11 +1227,21 @@ export function useVnDevtoolsController({
       if (!task.isCurrent()) return;
       if (result.status === "decision-required") {
         setPendingDecision({ ...context, result });
-        setStatus({ phase: "decision-required", message: "Another path decision is required.", degraded: result.degraded });
+        setStatus({
+          phase: "decision-required",
+          message: "Another path decision is required.",
+          degraded: result.degraded,
+          recovered: hasRecoveredSourceDiagnostics(context.inspection)
+        });
         return;
       }
       if (result.status === "blocked") {
-        setStatus({ phase: "blocked", message: result.message, degraded: result.degraded });
+        setStatus({
+          phase: "blocked",
+          message: result.message,
+          degraded: result.degraded,
+          recovered: hasRecoveredSourceDiagnostics(context.inspection)
+        });
         return;
       }
       await acceptReadyResult({
@@ -1151,16 +1265,21 @@ export function useVnDevtoolsController({
     entryId: entry.entry.id,
     viewedScriptPath: entry.source.scriptPath,
     runtimeScriptPath: runtime.shell.storyRuntime.state.currentScriptPath,
-    scripts: catalog.map((source) => ({
+    scripts: sourceIndex.map((source) => {
+      const descriptor = initialCandidates?.find((candidate) => candidate.scriptPath === source.scriptPath);
+      return {
       scriptPath: source.scriptPath,
       revision: inspection?.source.scriptPath === source.scriptPath
         ? inspection.revision
         : scriptAuthority.cached(source.scriptPath)?.display.inspection.revision
           ?? source.scriptRevision,
       viewed: source.scriptPath === entry.source.scriptPath,
+      scope: descriptor?.scope ?? "production",
+      executionDisposition: descriptor?.executionDisposition ?? "runnable",
       runtime: source.scriptPath === runtime.shell.storyRuntime.state.currentScriptPath,
       ...(updatedScriptPaths.has(source.scriptPath) ? { hasUpdateBadge: true } : {})
-    })),
+    };
+    }),
     lines: lineModel.lines,
     ...(selectedLineId ? { selectedLineId } : {}),
     searchQuery,
@@ -1174,15 +1293,22 @@ export function useVnDevtoolsController({
     summaries,
     ...(decision ? { decision } : {}),
     hasUpdateBadge,
+    catalogDirty,
     actions: {
       selectScript(scriptPath) {
-        if (!catalog.some((source) => source.scriptPath === scriptPath)) return;
+        if (!sourceIndex.some((source) => source.scriptPath === scriptPath)) return;
         persistedTargetRestoreCompletedRef.current = true;
         latestTasksRef.current.cancel();
         scriptAuthority.view(scriptPath);
         const cached = scriptAuthority.cached(scriptPath);
         if (cached) {
-          const selectedCandidate = createVnDevtoolsScriptCandidate(entryDefinition, catalog, scriptPath);
+          const selectedCandidate = createVnDevtoolsScriptCandidate(
+            entryDefinition,
+            catalog,
+            scriptPath,
+            sourceDiagnosticPolicy,
+            sourceIndex
+          );
           if (selectedCandidate) {
             scriptAuthority.install(scriptPath, scriptCandidateIdentity(selectedCandidate));
           }
@@ -1266,6 +1392,7 @@ export function useVnDevtoolsController({
       updateLayout,
       search: setSearchQuery,
       setMaterializationMode(nextMode) {
+        if (catalogDirty) return;
         if (nextMode === materializationMode) return;
         if (hostCommitInFlightRef.current !== undefined) {
           setStatus({
@@ -1338,6 +1465,9 @@ export function useVnDevtoolsController({
             });
           });
         }
+      },
+      refreshCatalog() {
+        if (typeof window !== "undefined") window.location.reload();
       },
       submitDecision,
       cancelDecision() {
@@ -1521,6 +1651,24 @@ function createDiagnostics(
     } satisfies VnDevtoolsDiagnostic;
   });
   return mergeVnDevtoolsDiagnostics(bridgeDiagnostics, runtime);
+}
+
+function hasRecoveredSourceDiagnostics(
+  inspection: VnDebugScriptInspection,
+  serverDiagnostics: readonly NaniDevtoolsViteDiagnostic[] = []
+): boolean {
+  if (serverDiagnostics.some((diagnostic) => diagnostic.disposition === "recoverable")) return true;
+  return inspection.diagnostics.some((diagnostic) => classifyNaniDiagnosticDisposition({
+    source: diagnostic.source === "story"
+      ? "entry"
+      : diagnostic.source === "parser"
+        ? "parser"
+        : diagnostic.source === "compiler"
+          ? "compiler"
+          : "catalog",
+    code: diagnostic.code,
+    severity: diagnostic.severity
+  }, inspection.sourceDiagnosticPolicy) === "recoverable");
 }
 
 function toBridgeDiagnostics(

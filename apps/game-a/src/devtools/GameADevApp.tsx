@@ -10,13 +10,15 @@ import type { GameAStoryDefinition } from "../gameAScripts";
 import { GameANaniDevtools } from "./GameANaniDevtools";
 import { GameADevViewport } from "./GameADevViewport";
 import { decorateGameACandidateStory } from "./gameACandidateStory";
+import naniSnapshot from "virtual:v-ronpa-nani-devtools-snapshot";
 
 export function GameADevApp({
   initialStoryDefinition
 }: {
   initialStoryDefinition: GameAStoryDefinition;
 }) {
-  const definitionState = useVnDevtoolsDefinitionState(initialStoryDefinition);
+  const snapshotStoryDefinition = storyDefinitionFromSnapshot(initialStoryDefinition);
+  const definitionState = useVnDevtoolsDefinitionState(snapshotStoryDefinition);
   return (
     <GameAAppCore
       storyDefinition={definitionState.activeDefinition}
@@ -35,6 +37,31 @@ export function GameADevApp({
 
 function wrapGameADevPlayfield(playfield: ReactNode): ReactNode {
   return <GameADevViewport>{playfield}</GameADevViewport>;
+}
+
+function storyDefinitionFromSnapshot(fallback: GameAStoryDefinition): GameAStoryDefinition {
+  const runnable = naniSnapshot.scripts.filter((script) => script.executionDisposition === "runnable");
+  const discoveredAssetRefs = runnable.flatMap((script) => script.metadata?.assetRefs ?? []);
+  const assetRefs = [...new Map(
+    [...fallback.entry.assetRefs, ...discoveredAssetRefs].map((ref) => [`${ref.kind}:${ref.id}`, ref])
+  ).values()];
+  return {
+    entry: {
+      ...fallback.entry,
+      ...naniSnapshot.entry,
+      assetRefs
+    },
+    catalog: runnable.map((script) => ({
+      scriptPath: script.scriptPath,
+      sourceText: script.sourceText,
+      scriptRevision: script.semanticRevision
+    })),
+    sourceDiagnosticPolicy: "allow-recoverable-command-errors",
+    characterPreloadPlanByScriptPath: Object.fromEntries(runnable.map((script) => [
+      script.scriptPath,
+      script.metadata?.characterPreloadPlan ?? []
+    ]))
+  };
 }
 
 interface GameADevtoolsHostProps extends GameAAppContext {

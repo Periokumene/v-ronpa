@@ -22,6 +22,9 @@
       "path": "../../packages/nani-parser"
     },
     {
+      "path": "../../packages/nani-project"
+    },
+    {
       "path": "../../packages/nani-runtime-compiler"
     }
   ],

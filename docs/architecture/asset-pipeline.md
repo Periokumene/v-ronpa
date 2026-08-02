@@ -1,11 +1,28 @@
 # Runtime Asset Pipeline
 
-Each app owns a declarative `asset.config.mjs`. Its ordered `scripts` list is the
-only production catalog-membership authority. Generation scans public assets,
-compiles and links every configured `.nani`, emits `sourcesByPath`, stable
-semantic SHA-256 revisions, per-script asset refs and character plans, and
-records selected runtime providers. Unknown endpoints, labels, duplicate paths,
-and unsupported endpoint forms fail generation.
+Each app owns a declarative `asset.config.mjs`. Nani membership comes only from
+`naniProject.scopes`: every ordinary `.nani` below a configured `sourceRoot` is
+recursively discovered and mapped below its `scriptRoot`. Entries retain an
+explicit stable id, initial script path, optional start label, and scope;
+ordinary scripts are never registered one by one. `@v-ronpa/nani-project` is
+the sole implementation of discovery, compilation, linking, semantic revision,
+asset-ref collection, character preload planning, and diagnostic disposition
+used by the generator, Vite, and VS Code.
+
+Game A owns three physically separate scopes:
+
+```text
+apps/game-a/src/nani/**      -> game-a/**       (production)
+apps/game-a/src/nani-dev/**  -> game-a/dev/**   (development)
+apps/game-a/src/nani-test/** -> game-a/test/**  (test)
+```
+
+Harness owns `apps/game-harness/src/nani/** -> harness/**` as production. The
+scanner accepts ordinary `.nani` files only, rejects symlinks and configured
+roots outside the project, and stably sorts normalized POSIX logical paths.
+Missing roots or entries, duplicate logical paths, and case-only collisions are
+fatal. Renames create a new logical identity: there are no globs, ignores,
+allowlists, aliases, or save migrations.
 `nani-runtime-compiler` owns the canonical semantic byte serialization. It
 includes script path, labels, commands, and command semantics while excluding
 source text and source locations. Asset generation hashes those bytes with
@@ -14,14 +31,23 @@ tests require byte-for-byte and digest parity, so generated metadata, source
 updates, materialization, save identity, and caches cannot invent separate
 revision rules.
 
-Every config also declares one `entry` locator (`id`, `initialScriptPath`, and
-optional `startLabel`). Named `testCatalogs` each own an independent entry
-locator and ordered script list. Generation emits entry locators, ordered
-catalogs, source indexes, metadata, and preload plans for production and for
-each test catalog. Product manifests import only the product exports, while
-dedicated test-mode entry modules select a named test catalog. There is no per-entry
-`testOnly` marker. The production bundle scan rejects test script paths and
-therefore also guards this tree-shaking boundary.
+Generation emits runtime assets separately from Nani catalogs. Game A produces
+`generatedRuntimeAssets.ts`, `generatedNaniProduction.ts`, and
+`generatedNaniTests.ts`; Harness produces the first two equivalents. Each Nani
+module owns its entry locator(s), catalog, source/metadata indexes, semantic
+revisions, and diagnostics. All test entries select one shared test catalog.
+ContentManifest consumes runtime assets and production Nani metadata only.
+
+Development servers analyze production, development, and test source with
+`allow-recoverable-command-errors`. Only compiler `unknown-command` and
+error-severity `invalid-command-param` diagnostics are recoverable because the
+compiler removes those commands from `RuntimeScript`; they remain red errors
+and the result is marked Recovered/Degraded. Production builds and
+`validate:assets` use `strict`. Any other error is fatal by default. Production
+or test fatal diagnostics abort the complete generation transaction;
+recoverable diagnostics can be generated for development inspection but make
+strict asset validation fail. Development diagnostics are reported and never
+written into a committed development catalog.
 
 `RuntimeAssetFragment` is the only provider protocol. A `runtime-assets-*`
 package may contribute stable IDs, runtime assets, optional fonts, and source
@@ -37,9 +63,11 @@ is parsed by `ContentManifestSchema` and creates exactly one AssetRegistry.
 Future `runtime-assets-r3f`-style packages must reuse this protocol, composition,
 diagnostics, conformance test, and boundary gate.
 
-`pnpm generate:assets` updates generated modules. `pnpm validate:assets` checks
-generated freshness, files, fonts, character packs, provider refs, final
-manifests, and final registries.
+`pnpm generate:assets` rescans and updates generated modules. Ordinary Nani
+membership never requires a generation command during Vite development.
+`pnpm validate:assets` checks generated freshness, performs strict production
+and test catalog analysis, and validates files, fonts, character packs, provider
+refs, final manifests, and final registries.
 
 ## Layered character production and promotion
 

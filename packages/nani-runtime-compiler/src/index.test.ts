@@ -438,6 +438,7 @@ describe("nani runtime compiler", () => {
     expect(errors.filter((diagnostic) => /textId/u.test(diagnostic.message)).map((diagnostic) =>
       source.slice(diagnostic.span.start, diagnostic.span.end)
     )).toEqual(["shared_id", "bad id"]);
+    expect(result.script.commands.map((command) => command.params.text)).toEqual(["Inline"]);
   });
 
   it("detects a normal-line textId that duplicates an earlier explicit story text command", () => {
@@ -448,6 +449,7 @@ describe("nani runtime compiler", () => {
     expect(duplicate).toBeDefined();
     expect(source.slice(duplicate!.span.start, duplicate!.span.end)).toBe("shared_id");
     expect(duplicate?.loc.line).toBe(2);
+    expect(result.script.commands.map((command) => command.params.text)).toEqual(["Explicit"]);
   });
 
   it("normalizes visual runtime params without producing downstream command shapes", () => {

@@ -14,7 +14,8 @@ scripts.
 
 - Add or replace files under `apps/game-harness/public/harness/**`.
 - Run `pnpm generate:assets` to update
-  `apps/game-harness/src/harness/generatedAssets.ts`.
+  `apps/game-harness/src/harness/generatedRuntimeAssets.ts` and
+  `apps/game-harness/src/harness/generatedNaniProduction.ts`.
 - Run `pnpm validate:assets` to verify the generated manifest is current, files
   exist, and source code does not contain hardcoded runtime asset paths.
 - Voice fixtures must use `media/voice/<locale>/<textId>.ogg`. The `<textId>`

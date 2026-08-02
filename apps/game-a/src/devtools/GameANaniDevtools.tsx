@@ -1,10 +1,13 @@
 import { useEffect, useRef } from "react";
 import {
   canPreviewVnDevtoolsLine,
+  NANI_DEVTOOLS_VITE_CATALOG_DIRTY_EVENT,
   NANI_DEVTOOLS_VITE_UPDATE_EVENT,
   VnDevtoolsDock,
   useVnDevtoolsController,
   type NaniDevtoolsViteUpdate,
+  type NaniDevtoolsViteCatalogDirty,
+  type NaniDevtoolsViteSnapshot,
   type VnDevtoolsScriptCandidate,
   type VnDevtoolsSourceUpdateSource
 } from "@v-ronpa/app-vn-devtools";
@@ -16,9 +19,11 @@ import type {
 } from "@v-ronpa/app-vn-runtime";
 import type { SaveableVnState } from "@v-ronpa/contracts";
 import type { GameAStoryDefinition } from "../gameAScripts";
-import initialNaniCandidates from "virtual:v-ronpa-nani-devtools-initial";
+import naniSnapshot from "virtual:v-ronpa-nani-devtools-snapshot";
 
 const SESSION_KEY = "v-ronpa:game-a:nani-devtools:v4";
+
+const initialNaniCandidates = sourceCandidatesFromSnapshot(naniSnapshot);
 
 const gameANaniUpdateSource: VnDevtoolsSourceUpdateSource | undefined = import.meta.hot
   ? {
@@ -26,6 +31,11 @@ const gameANaniUpdateSource: VnDevtoolsSourceUpdateSource | undefined = import.m
         const handleUpdate = (update: NaniDevtoolsViteUpdate) => listener(update);
         import.meta.hot!.on(NANI_DEVTOOLS_VITE_UPDATE_EVENT, handleUpdate);
         return () => import.meta.hot?.off(NANI_DEVTOOLS_VITE_UPDATE_EVENT, handleUpdate);
+      },
+      subscribeCatalogDirty(listener) {
+        const handleDirty = (event: NaniDevtoolsViteCatalogDirty) => listener(event);
+        import.meta.hot!.on(NANI_DEVTOOLS_VITE_CATALOG_DIRTY_EVENT, handleDirty);
+        return () => import.meta.hot?.off(NANI_DEVTOOLS_VITE_CATALOG_DIRTY_EVENT, handleDirty);
       }
     }
   : undefined;
@@ -48,6 +58,18 @@ export interface GameANaniDevtoolsProps {
   ) => Promise<boolean>;
 }
 
+function sourceCandidatesFromSnapshot(snapshot: NaniDevtoolsViteSnapshot) {
+  return snapshot.scripts.map((script) => ({
+    entryId: snapshot.entry.id,
+    scope: script.scope,
+    scriptPath: script.scriptPath,
+    sourceText: script.sourceText,
+    serverRevision: script.executionDisposition === "runnable" ? script.semanticRevision : null,
+    executionDisposition: script.executionDisposition,
+    diagnostics: script.diagnostics
+  }));
+}
+
 declare global {
   interface Window {
     render_game_to_text?: () => string;
@@ -66,6 +88,7 @@ export function GameANaniDevtools({
     commitCandidate,
     entry: storyDefinition.entry,
     catalog: storyDefinition.catalog,
+    sourceDiagnosticPolicy: storyDefinition.sourceDiagnosticPolicy,
     initialCandidates: initialNaniCandidates,
     runtime,
     sessionKey: SESSION_KEY,
@@ -86,6 +109,12 @@ export function GameANaniDevtools({
           phase: current.controller.status.phase,
           message: current.controller.status.message ?? null,
           updateId: current.controller.status.updateId ?? null,
+          degraded: current.controller.status.degraded ?? false,
+          recovered: current.controller.status.recovered ?? false,
+          diagnostics: current.controller.diagnostics.map((diagnostic) => ({
+            code: diagnostic.code ?? null,
+            severity: diagnostic.severity
+          })),
           collapsed: current.controller.collapsed,
           pinned: current.controller.lines.some((line) => line.pinned),
           materializationMode: current.controller.materializationMode,

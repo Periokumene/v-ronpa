@@ -63,7 +63,10 @@ export function analyzeNaniCatalog(
   records: readonly {
     sourceUri: string;
     analysis: NaniDocumentAnalysis;
-  }[]
+  }[],
+  options: {
+    scopeByScriptPath?: ReadonlyMap<string, "production" | "development" | "test">;
+  } = {}
 ): NaniCatalogAnalysis {
   const analyses = new Map(
     records.map((record) => [record.analysis.compiled.script.scriptPath, record] as const)
@@ -107,6 +110,34 @@ export function analyzeNaniCatalog(
       span
     });
     diagnosticsByScriptPath.set(diagnostic.scriptPath, values);
+  }
+
+  if (options.scopeByScriptPath && catalogId === "development") {
+    const productionRecords = records.filter((record) =>
+      options.scopeByScriptPath?.get(record.analysis.compiled.script.scriptPath) === "production"
+    );
+    const productionLink = linkRuntimeScriptCatalog(
+      entry,
+      productionRecords.map((record) => record.analysis.compiled.script)
+    );
+    for (const diagnostic of productionLink.diagnostics) {
+      if (diagnostic.code !== "endpoint-script-missing" || diagnostic.commandIndex === undefined || !diagnostic.endpoint) {
+        continue;
+      }
+      const endpoint = parseStaticNaniEndpoint(diagnostic.endpoint, diagnostic.scriptPath);
+      if (!endpoint.ok || options.scopeByScriptPath.get(endpoint.endpoint.scriptPath) !== "development") continue;
+      const record = analyses.get(diagnostic.scriptPath);
+      if (!record) continue;
+      const values = diagnosticsByScriptPath.get(diagnostic.scriptPath) ?? [];
+      values.push({
+        code: "development-only-target",
+        message: `Navigation target '${endpoint.endpoint.scriptPath}' is valid only in the development catalog and will fail production validation.`,
+        severity: "warning",
+        source: "nani",
+        span: navigationDiagnosticSpan(record.analysis, diagnostic)
+      });
+      diagnosticsByScriptPath.set(diagnostic.scriptPath, values);
+    }
   }
 
   return {

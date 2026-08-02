@@ -136,19 +136,25 @@ function checkPublicApiShape() {
   rejectPattern(runtimeDiagnosticsPath, runtimeDiagnostics, /\b(?:VnRuntimeParserDiagnosticLike|VnRuntimeCompilerDiagnosticLike)\b/u, "loose runtime diagnostic mirror");
   requirePattern(runtimeDiagnosticsPath, runtimeDiagnostics, /\bspan\?\s*:\s*TextSpan\s*;/u, "optional runtime source span transport");
   requirePattern(viteProtocolPath, viteProtocol, /\bspan\?\s*:\s*TextSpan\s*;/u, "optional Workbench wire span transport");
-  if ((viteBridge.match(/\bspan\s*:\s*diagnostic\.span\b/gu) ?? []).length < 2) {
-    failures.push(`${viteBridgePath}: parser and compiler diagnostics must both preserve exact spans.`);
-  }
+  requirePattern(
+    viteBridgePath,
+    viteBridge,
+    /diagnostic\.span\s*\?\s*\{\s*span:\s*diagnostic\.span\s*\}/u,
+    "shared parser/compiler diagnostic span projection"
+  );
 }
 
 function checkUnifiedAuthorityShape() {
   const generatorPath = "scripts/generate-assets.mjs";
+  const naniProjectPath = "packages/nani-project/src/index.ts";
   const commandDocPath = "docs/nani/command-catalog.md";
   const generator = readRequired(generatorPath);
+  const naniProject = readRequired(naniProjectPath);
   const commandDoc = readRequired(commandDocPath);
 
-  requirePattern(generatorPath, generator, /import\s*\{[^}]*serializeRuntimeScriptSemantics[^}]*\}\s*from\s*["'][^"']*nani-runtime-compiler[^"']*["']/su, "compiler-owned semantic serializer import");
-  requirePattern(generatorPath, generator, /import\s*\{\s*deriveLayeredCharacterPreloadPlan\s*\}\s*from\s*["'][^"']*layered-character[^"']*["']/su, "layered-character preload authority import");
+  requirePattern(generatorPath, generator, /import\s*\{\s*analyzeNaniCatalog\s*\}\s*from\s*["'][^"']*nani-project[^"']*["']/su, "shared nani-project analysis import");
+  requirePattern(naniProjectPath, naniProject, /\bdigestRuntimeScriptSemantics\b/u, "compiler-owned semantic digest use");
+  requirePattern(naniProjectPath, naniProject, /\bderiveLayeredCharacterPreloadPlan\b/u, "layered-character preload authority use");
   rejectPattern(generatorPath, generator, /function\s+(?:stableJson|serializeRuntimeScriptSemantics|deriveLayeredCharacterPreloadPlan)\s*\(/u, "duplicated semantic/preload authority");
   requirePattern(commandDocPath, commandDoc, /<!-- BEGIN GENERATED COMMAND CATALOG -->[\s\S]*<!-- END GENERATED COMMAND CATALOG -->/u, "generated command matrix markers");
   rejectPattern(commandDocPath, commandDoc, /## Official Naninovel Commands/u, "legacy hand-maintained command matrix");

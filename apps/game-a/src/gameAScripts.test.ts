@@ -9,9 +9,9 @@ import { parseScenario } from "../../../packages/nani-parser/src/index";
 import { gameAVnEntry } from "./contentManifest";
 import { gameAStoryDefinition } from "./gameAScripts";
 import {
-  gameACharacterSmokeStoryDefinition,
-  gameASmokeStoryDefinition
-} from "./gameATestEntries";
+  gameATestEntryLocators,
+  gameATestScriptCatalog
+} from "./generatedNaniTests";
 
 describe("game-a nani catalogs", () => {
   it("uses one stable entry with opening and chapter-02 linked by an explicit endpoint", () => {
@@ -19,8 +19,8 @@ describe("game-a nani catalogs", () => {
     expect(gameAVnEntry.id).toBe("vn:game-a-main");
     expect(gameAVnEntry.initialScriptPath).toBe("game-a/opening.nani");
     expect(gameAStoryDefinition.catalog.map((source) => source.scriptPath)).toEqual([
-      "game-a/opening.nani",
-      "game-a/chapter-02.nani"
+      "game-a/chapter-02.nani",
+      "game-a/opening.nani"
     ]);
 
     const opening = source("game-a/opening.nani");
@@ -54,14 +54,15 @@ describe("game-a nani catalogs", () => {
     }
   });
 
-  it("keeps smoke catalogs isolated from production and valid as one-record catalogs", async () => {
-    for (const definition of [gameASmokeStoryDefinition, gameACharacterSmokeStoryDefinition]) {
-      expect(definition.catalog).toHaveLength(1);
-      const item = definition.catalog[0]!;
+  it("keeps one shared test catalog isolated from production and valid for each explicit entry", async () => {
+    expect(gameATestScriptCatalog).toHaveLength(2);
+    for (const item of gameATestScriptCatalog) {
       expect(item.scriptPath).toMatch(/^game-a\/test\//u);
       expect(item.sourceText).toContain("CHECKPOINT");
       expect(await digestRuntimeScriptSemantics(compile(item))).toBe(item.scriptRevision);
-      expect(linkRuntimeScriptCatalog(definition.entry, [compile(item)]).diagnostics).toEqual([]);
+    }
+    for (const entry of Object.values(gameATestEntryLocators)) {
+      expect(linkRuntimeScriptCatalog(entry, gameATestScriptCatalog.map(compile)).diagnostics).toEqual([]);
     }
     expect(gameAStoryDefinition.catalog.every((item) => !item.scriptPath.includes("/test/"))).toBe(true);
   });

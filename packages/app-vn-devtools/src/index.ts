@@ -81,11 +81,17 @@ export type {
   VnDevtoolsMonotonicUpdateGate,
   VnDevtoolsSerialCommitQueue
 } from "./sourceUpdates";
-export { NANI_DEVTOOLS_VITE_INITIAL_MODULE_ID, NANI_DEVTOOLS_VITE_UPDATE_EVENT } from "./viteProtocol";
+export {
+  NANI_DEVTOOLS_VITE_CATALOG_DIRTY_EVENT,
+  NANI_DEVTOOLS_VITE_SNAPSHOT_MODULE_ID,
+  NANI_DEVTOOLS_VITE_UPDATE_EVENT
+} from "./viteProtocol";
 export type {
-  NaniDevtoolsViteCandidate,
+  NaniDevtoolsDiscoveredSource,
+  NaniDevtoolsViteCatalogDirty,
   NaniDevtoolsViteDiagnostic,
-  NaniDevtoolsViteInitialCandidate,
+  NaniDevtoolsViteSnapshot,
+  NaniDevtoolsViteSourceCandidate,
   NaniDevtoolsViteUpdate
 } from "./viteProtocol";
 export { validateVnDevtoolsCandidateCatalog } from "./scriptCandidate";

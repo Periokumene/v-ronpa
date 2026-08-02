@@ -3,8 +3,8 @@ import type { VnPixiCharacterPreparationPlan } from "@v-ronpa/app-vn-shell";
 import { gameAVnEntry } from "./contentManifest";
 import {
   gameAScriptCatalog,
-  gameAScriptMetadataByPath,
-} from "./generatedAssets";
+  gameAScriptMetadataByPath
+} from "./generatedNaniProduction";
 
 export interface GameAStoryDefinition extends VnRuntimeDefinition {
   characterPreloadPlanByScriptPath: Readonly<Record<string, VnPixiCharacterPreparationPlan>>;
@@ -13,6 +13,9 @@ export interface GameAStoryDefinition extends VnRuntimeDefinition {
 export const gameAStoryDefinition: GameAStoryDefinition = {
   entry: gameAVnEntry,
   catalog: gameAScriptCatalog,
+  sourceDiagnosticPolicy: import.meta.env.DEV
+    ? "allow-recoverable-command-errors"
+    : "strict",
   characterPreloadPlanByScriptPath: Object.fromEntries(
     Object.entries(gameAScriptMetadataByPath).map(([scriptPath, metadata]) => [
       scriptPath,

@@ -40,6 +40,7 @@ export {
   digestRuntimeScriptSemantics,
   serializeRuntimeScriptSemantics
 } from "./semantics.ts";
+export * from "./diagnosticPolicy.ts";
 export * from "./catalog.ts";
 export type {
   RuntimeCompilerDiagnostic,
@@ -57,12 +58,14 @@ export function compileRuntimeScript(document: ParsedScenarioDocument): CompileR
   const commands: RuntimeCommand[] = [];
   const labels: Record<string, number> = {};
   const { scenario, sourceMap } = document;
+  const storyTextIdValidation = diagnoseStoryTextIds(document);
 
   for (const [statementIndex, statement] of scenario.statements.entries()) {
     if (statement.kind === "label") {
       labels[statement.name] = commands.length;
       continue;
     }
+    if (storyTextIdValidation.invalidStatementIndexes.has(statementIndex)) continue;
 
     const compiled = compileStatement(
       statement,
@@ -75,7 +78,7 @@ export function compileRuntimeScript(document: ParsedScenarioDocument): CompileR
     else if (compiled) commands.push(compiled);
   }
 
-  diagnostics.push(...diagnoseStoryTextIds(document));
+  diagnostics.push(...storyTextIdValidation.diagnostics);
 
   return {
     script: {
@@ -93,8 +96,12 @@ export function compileRuntimeScript(document: ParsedScenarioDocument): CompileR
   };
 }
 
-function diagnoseStoryTextIds(document: ParsedScenarioDocument): RuntimeCompilerDiagnostic[] {
+function diagnoseStoryTextIds(document: ParsedScenarioDocument): {
+  diagnostics: RuntimeCompilerDiagnostic[];
+  invalidStatementIndexes: ReadonlySet<number>;
+} {
   const diagnostics: RuntimeCompilerDiagnostic[] = [];
+  const invalidStatementIndexes = new Set<number>();
   const seen = new Map<string, boolean>();
 
   for (const [statementIndex, statement] of document.scenario.statements.entries()) {
@@ -134,6 +141,7 @@ function diagnoseStoryTextIds(document: ParsedScenarioDocument): RuntimeCompiler
           loc: statement.loc,
           span
         });
+        invalidStatementIndexes.add(statementIndex);
         continue;
       }
     }
@@ -148,6 +156,7 @@ function diagnoseStoryTextIds(document: ParsedScenarioDocument): RuntimeCompiler
         loc: statement.loc,
         span
       });
+      invalidStatementIndexes.add(statementIndex);
       continue;
     }
     const previousWasExplicit = seen.get(textId);
@@ -163,13 +172,14 @@ function diagnoseStoryTextIds(document: ParsedScenarioDocument): RuntimeCompiler
           loc: statement.loc,
           span
         });
+        invalidStatementIndexes.add(statementIndex);
       }
       continue;
     }
     seen.set(textId, explicitCommandTextId);
   }
 
-  return diagnostics;
+  return { diagnostics, invalidStatementIndexes };
 }
 
 function compileStatement(

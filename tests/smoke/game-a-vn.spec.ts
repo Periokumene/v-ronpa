@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const smokeSourceFile = fileURLToPath(new URL("../../apps/game-a/src/test-nani/smoke.nani", import.meta.url));
+const smokeSourceFile = fileURLToPath(new URL("../../apps/game-a/src/nani-test/smoke.nani", import.meta.url));
 const smokePreviewText = "CHECKPOINT SMOKE 00 - test-only VN entry is active.";
 
 // This intentionally covers the full edit/HMR/restore/branch/media workflow;
@@ -385,7 +385,11 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
 
   await advanceUntilChoices(page, 10);
   await expect(page.getByTestId("vn-choice-0")).toHaveText("继续媒体测试");
-  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-active-tasks", "empty");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute(
+    "data-pixi-active-tasks",
+    "empty",
+    { timeout: 15_000 }
+  );
   await page.screenshot({ path: "test-results/game-a-pixi.png", fullPage: true });
   await clickByTestId(page, "vn-choice-0");
   await advanceUntilText(page, "CHECKPOINT SMOKE VOICE", 4);
@@ -602,6 +606,9 @@ interface GameATextSnapshot {
     phase: string;
     message: string | null;
     updateId: number | null;
+    degraded: boolean;
+    recovered: boolean;
+    diagnostics: Array<{ code: string | null; severity: string }>;
     pinned: boolean;
     revision: string | null;
   };
@@ -664,19 +671,21 @@ async function exerciseNaniSourceSaveFlow(page: Page, workbench: ReturnType<Page
     await writeFile(smokeSourceFile, semanticUpdateSource, "utf8");
     await expect(page.getByTestId("vn-dialog-text")).toContainText(hmrPreviewText, { timeout: 15_000 });
     await expect.poll(() => readDevtoolsStorySession(page)).toBe(beforeSemanticUpdate + 1);
-    await expect.poll(async () => (await readGameSnapshot(page)).workbench.message)
-      .toContain("Stable checkpoint installed");
     const lastKnownGood = await readGameSnapshot(page);
 
     const invalidCompilerSource = `${semanticUpdateSource.trimEnd()}\n@back bg:main time:fast\n`;
     await writeFile(smokeSourceFile, invalidCompilerSource, "utf8");
-    await expect.poll(async () => (await readGameSnapshot(page)).workbench.phase, { timeout: 15_000 }).toBe("error");
+    await expect.poll(async () => (await readGameSnapshot(page)).workbench.phase, { timeout: 15_000 }).toBe("ready");
     await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "problems");
-    await expect.poll(async () => (await readGameSnapshot(page)).workbench.message)
-      .toContain("last-known-good");
-    const rejected = await readGameSnapshot(page);
-    expect(rejected.story.storySession).toBe(lastKnownGood.story.storySession);
-    expect(rejected.story.text).toBe(hmrPreviewText);
+    await expect(page.getByTestId("vn-devtools-file-bar")).toContainText("Recovered / Degraded");
+    const recovered = await readGameSnapshot(page);
+    expect(recovered.workbench.recovered).toBe(true);
+    expect(recovered.workbench.diagnostics).toContainEqual({
+      code: "invalid-command-param",
+      severity: "error"
+    });
+    expect(recovered.story.storySession).toBe(lastKnownGood.story.storySession);
+    expect(recovered.story.text).toBe(hmrPreviewText);
     const compilerDiagnostic = workbench.getByRole("button", { name: /invalid-command-param/ });
     await expect(compilerDiagnostic).toBeEnabled();
     await compilerDiagnostic.click();
@@ -684,10 +693,8 @@ async function exerciseNaniSourceSaveFlow(page: Page, workbench: ReturnType<Page
     await selectedDiagnosticLine.scrollIntoViewIfNeeded();
     await expect(selectedDiagnosticLine).toBeInViewport();
     await captureExactProblemsEvidence(page, workbench);
-    await expect(workbench.locator(".vn-devtools-preview-button:enabled")).toHaveCount(0);
-    await workbench.getByRole("button", { name: "Pin current" }).click();
-    await expect.poll(async () => (await readGameSnapshot(page)).workbench.message)
-      .toContain("not the installed runtime mapping");
+    await expect(selectedDiagnosticLine.locator(".vn-devtools-preview-button")).toBeDisabled();
+    await expect(workbench.locator(".vn-devtools-preview-button:enabled").first()).toBeVisible();
     expect((await readGameSnapshot(page)).story.storySession).toBe(lastKnownGood.story.storySession);
   } finally {
     await writeFile(smokeSourceFile, originalSource, "utf8");

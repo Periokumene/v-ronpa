@@ -5,10 +5,12 @@ import { harnessShowcaseEvidence, harnessShowcaseItem, harnessShowcaseMaps, harn
 import {
   harnessFontFaces,
   harnessRuntimeAssetFragments,
-  harnessRuntimeAssets,
+  harnessRuntimeAssets
+} from "./generatedRuntimeAssets";
+import {
   harnessVnEntryLocator,
   harnessScriptMetadataByPath
-} from "./generatedAssets";
+} from "./generatedNaniProduction";
 
 export const harnessShowcaseScriptPath = harnessVnEntryLocator.initialScriptPath;
 const harnessShowcaseScriptMetadata = harnessScriptMetadataByPath[harnessShowcaseScriptPath];

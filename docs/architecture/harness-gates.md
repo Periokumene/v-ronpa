@@ -23,15 +23,23 @@ must compose through the shared `app-vn-devtools` host transaction with only
 app policy callbacks, rather than expanding the VN debug core or cloning the
 transaction in an app.
 
-Game A product Nani lives only under `apps/game-a/src/nani/**`. Test-only Nani
-lives under `apps/game-a/src/test-nani/**` and has a separate generated metadata
-module. Vite selects the general smoke and Alice visual entries only in the
-dedicated `game-a-smoke` and `game-a-character-smoke` modes. Each Playwright
+Game A production, development, and test Nani live under
+`apps/game-a/src/nani/**`, `apps/game-a/src/nani-dev/**`, and
+`apps/game-a/src/nani-test/**`. All three use the shared directory discovery
+contract; test entries share one generated catalog. Vite selects the general
+smoke and Alice visual entries only in the dedicated `game-a-test-smoke` and
+`game-a-test-character` modes. Each Playwright
 project visits `/` on its own server; product runtime code does not parse
 test-entry URLs or expose an entry override. Browser tests must not navigate
 product labels or literal product dialogue as test checkpoints. Production
-build validation rejects the complete test path/id/checkpoint namespace as well
-as workbench text, test IDs, source-update event names, and tab-session keys.
+build validation rejects the complete development/test path and id namespaces,
+virtual snapshot and dirty/update protocols, workbench text, test IDs,
+source-update event names, and tab-session keys.
+
+Harness showcase source is the ordinary discovered file
+`apps/game-harness/src/nani/harness-showcase.nani`. Runtime adapter tests,
+semantic golden checks, and benchmarks consume that file or its generated
+catalog; no alternate source-template path exists.
 
 Playwright gates always start fresh, correctly configured app servers. On
 macOS, Chromium is launched through ANGLE's Metal backend and the independent

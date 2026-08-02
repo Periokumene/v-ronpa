@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
-import { harnessShowcaseScript } from "../harness/showcase";
+import {
+  harnessScriptSourcesByPath,
+  harnessVnEntryLocator
+} from "../harness/generatedNaniProduction";
 import {
   createInitialHarnessShowcaseTrialRuntime,
   harnessShowcasePosePresets
 } from "./useHarnessShowcaseRuntimeAdapter";
+
+const harnessShowcaseScript = harnessScriptSourcesByPath[harnessVnEntryLocator.initialScriptPath]!.sourceText;
 
 describe("harness showcase runtime adapter glue", () => {
   it("keeps the harness-showcase script as a Pixi, media, and rich text command showcase", () => {
