@@ -26,7 +26,7 @@
           "code": "invalid-text-id",
           "severity": "error",
           "message": "Invalid textId marker: bad id",
-          "loc": { "scriptPath": "diagnostics-text.nani", "line": 1, "column": 1, "raw": "A: Bad|#bad id|" },
+          "loc": { "scriptPath": "diagnostics-text.nani", "line": 1, "column": 4, "raw": "A: Bad|#bad id|" },
           "span": { "start": 8, "end": 14 },
           "lexeme": "bad id"
         },
@@ -34,7 +34,7 @@
           "code": "multiple-text-ids",
           "severity": "error",
           "message": "Text line may contain only one textId marker.",
-          "loc": { "scriptPath": "diagnostics-text.nani", "line": 2, "column": 1, "raw": "B: Many|#one| and |#two|" },
+          "loc": { "scriptPath": "diagnostics-text.nani", "line": 2, "column": 4, "raw": "B: Many|#one| and |#two|" },
           "span": { "start": 34, "end": 40 },
           "lexeme": "|#two|"
         },
@@ -57,7 +57,7 @@
         {
           "code": "unsupported-inline-command",
           "severity": "error",
-          "message": "Unsupported inline .nani command: [bogus]. Inline commands currently support [>] and [< speed:<decimal>].",
+          "message": "Unsupported inline .nani command: [bogus]. Inline commands support [-], [wait i], [>], and [< speed:<decimal>].",
           "loc": { "scriptPath": "diagnostics-inline.nani", "line": 1, "column": 37, "raw": "A: <font color=not-a-color>x</font> [bogus] [> extra] [< speed:fast]" },
           "span": { "start": 37, "end": 42 },
           "lexeme": "bogus"
@@ -82,7 +82,7 @@
           "code": "invalid-rich-text",
           "severity": "warning",
           "message": "Invalid rich text font color: not-a-color.",
-          "loc": { "scriptPath": "diagnostics-inline.nani", "line": 1, "column": 1, "raw": "A: <font color=not-a-color>x</font> [bogus] [> extra] [< speed:fast]" },
+          "loc": { "scriptPath": "diagnostics-inline.nani", "line": 1, "column": 4, "raw": "A: <font color=not-a-color>x</font> [bogus] [> extra] [< speed:fast]" },
           "span": { "start": 15, "end": 26 },
           "lexeme": "not-a-color"
         }

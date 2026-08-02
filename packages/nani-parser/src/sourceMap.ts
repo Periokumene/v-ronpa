@@ -29,12 +29,12 @@ export function resolveNaniSourceRef(sourceMap: NaniSourceMap, ref: NaniSourceRe
       requireStatementKind(statement, "text", ref);
       return validateSpan(sourceMap, requiredSpan(statement[textPartKey(ref.part)], ref));
     case "inline-command": {
-      requireStatementKind(statement, "text", ref);
+      requireInlineCommandStatementKind(statement, ref);
       const command = requiredInlineCommand(statement, ref.tokenIndex, ref).command;
       return validateSpan(sourceMap, requiredSpan(command[inlineCommandPartKey(ref.part)], ref));
     }
     case "inline-command-argument": {
-      requireStatementKind(statement, "text", ref);
+      requireInlineCommandStatementKind(statement, ref);
       const command = requiredInlineCommand(statement, ref.tokenIndex, ref).command;
       return validateSpan(
         sourceMap,
@@ -137,6 +137,13 @@ function requireStatementKind(
   ref: NaniSourceRef
 ): void {
   if (statement.kind !== expected) throw unresolvedSourceRef(ref);
+}
+
+function requireInlineCommandStatementKind(
+  statement: NaniStatementSourceMap,
+  ref: NaniSourceRef
+): void {
+  if (statement.kind !== "text" && statement.kind !== "command") throw unresolvedSourceRef(ref);
 }
 
 function requiredCommand(statement: NaniStatementSourceMap, ref: NaniSourceRef): NaniCommandSourceMap {

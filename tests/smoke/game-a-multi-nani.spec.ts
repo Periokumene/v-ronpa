@@ -35,6 +35,21 @@ test("FastDebug previews the current script cold, switches without mutating the 
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
 
+  const stagedCueTarget = workbench.locator('[data-testid^="vn-devtools-line-"]')
+    .filter({ hasText: "向下[-]" })
+    .first();
+  await expect(stagedCueTarget.locator(".vn-devtools-preview-button")).toBeEnabled();
+  await stagedCueTarget.locator(".vn-devtools-preview-button").click();
+  await expect(page.getByTestId("vn-cue-text")).toHaveText(
+    "向下，向下，再向下。这样的坠落难道永远不会结束吗？",
+    { timeout: 15_000 }
+  );
+  const stagedState = page.getByLabel("Stable state summaries").getByText("stage", { exact: true })
+    .locator("..").locator("dd");
+  await expect(stagedState).toHaveText("3/3");
+  await expect(stagedCueTarget).toHaveAttribute("aria-current", "step");
+  await page.screenshot({ path: "test-results/game-a-staged-cue-final-preview.png", fullPage: true });
+
   const scriptPicker = workbench.locator("details.vn-devtools-script-picker");
   await scriptPicker.locator("summary").click();
   await workbench.getByRole("option", { name: /chapter-02\.nani/ }).click();
@@ -111,6 +126,11 @@ test("Game A traverses, saves, previews, restores, and completes its production 
 
   await expect(page.getByTestId("title-new-game")).toBeEnabled({ timeout: 15_000 });
   await clickByTestId(page, "title-new-game");
+  await advanceProductionStoryToStagedOpeningCue(page);
+  await expectProductionStagedCueText(page, "向下");
+  await expectProductionStagedCueText(page, "向下，向下");
+  await expectProductionStagedCueText(page, "向下，向下，再向下。这样的坠落难道永远不会结束吗？");
+  await page.screenshot({ path: "test-results/game-a-staged-cue-final-manual.png", fullPage: true });
   await advanceProductionStoryToFinalOpeningChoice(page);
   const beforeNavigation = await readSnapshot(page);
   expect(beforeNavigation.workbench.runtimeScriptPath).toBe("game-a/opening.nani");
@@ -289,6 +309,26 @@ async function advanceProductionStoryToFinalOpeningChoice(page: Page): Promise<v
     await page.waitForTimeout(120);
   }
   await expect(page.getByTestId("vn-choice-0")).toHaveText("陪我去买牛奶吧");
+}
+
+async function advanceProductionStoryToStagedOpeningCue(page: Page): Promise<void> {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if ((await readSnapshot(page)).story.text === "向下") return;
+    await advanceVn(page);
+    await page.waitForTimeout(120);
+  }
+  await expect(page.getByTestId("vn-cue-text")).toHaveText("向下");
+}
+
+async function expectProductionStagedCueText(page: Page, expectedText: string): Promise<void> {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const snapshotText = (await readSnapshot(page)).story.text;
+    const cueText = (await page.getByTestId("vn-cue-text").textContent()) ?? "";
+    if (snapshotText === expectedText && cueText === expectedText) return;
+    await advanceVn(page);
+    await page.waitForTimeout(120);
+  }
+  await expect(page.getByTestId("vn-cue-text")).toHaveText(expectedText);
 }
 
 async function advanceUntilTitle(page: Page, maxSteps: number): Promise<void> {

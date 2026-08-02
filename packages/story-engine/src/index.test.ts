@@ -485,6 +485,51 @@ describe("story engine", () => {
     expect(state.backlog).toEqual([{ speaker: "Mira", text: "After clear." }]);
   });
 
+  it("accumulates staged story text and commits backlog only at the final stage", () => {
+    const runtimeScript = runtimeScriptFixture("staged-story.nani", [
+      runtimeCommand("print", "text", { speaker: "Felix", text: "A", autoNext: false }, {
+        textStage: { index: 0, count: 3 },
+        richText: { text: "A", runs: [{ start: 0, end: 1, style: { bold: true } }] }
+      }),
+      runtimeCommand("print", "text", { speaker: "Felix", text: "B", append: true, autoNext: false }, {
+        textStage: { index: 1, count: 3 },
+        richText: { text: "B", runs: [{ start: 0, end: 1, style: { italic: true } }] }
+      }),
+      runtimeCommand("print", "text", { speaker: "Felix", text: "C", append: true, autoNext: false }, {
+        textStage: { index: 2, count: 3 }
+      }),
+      runtimeCommand("print", "text", { text: "!", append: true, autoNext: false })
+    ]);
+
+    let state = createInitialStoryState(runtimeScript);
+    state = advanceToNextStop(state, runtimeScript).state;
+    expect(selectCurrentStoryLine(state)?.text).toBe("A");
+    expect(state.backlog).toEqual([]);
+
+    state = advanceToNextStop(state, runtimeScript).state;
+    expect(selectCurrentStoryLine(state)?.text).toBe("AB");
+    expect(state.backlog).toEqual([]);
+
+    state = advanceToNextStop(state, runtimeScript).state;
+    expect(selectCurrentStoryLine(state)).toEqual({
+      channel: "dialog",
+      speaker: "Felix",
+      text: "ABC",
+      richText: {
+        text: "ABC",
+        runs: [
+          { start: 0, end: 1, style: { bold: true } },
+          { start: 1, end: 2, style: { italic: true } }
+        ]
+      }
+    });
+    expect(state.backlog).toEqual([expect.objectContaining({ speaker: "Felix", text: "ABC" })]);
+
+    state = advanceToNextStop(state, runtimeScript).state;
+    expect(selectCurrentStoryLine(state)?.text).toBe("ABC!");
+    expect(state.backlog.map((entry) => entry.text)).toEqual(["ABC", "ABC!"]);
+  });
+
   it("stores rich text snapshots for print, append, backlog, and choices", () => {
     const runtimeScript = runtimeScriptFixture("rich-story.nani", [
       runtimeCommand(
@@ -954,6 +999,7 @@ function runtimeCommand(
     condition?: RuntimeCommand["condition"];
     unless?: RuntimeCommand["unless"];
     richText?: RuntimeCommand["richText"];
+    textStage?: RuntimeCommand["textStage"];
   } = {}
 ): RuntimeCommand {
   return {
@@ -964,6 +1010,7 @@ function runtimeCommand(
     status: options.status ?? "implemented",
     params,
     ...(options.richText ? { richText: options.richText } : {}),
+    ...(options.textStage ? { textStage: options.textStage } : {}),
     ...(options.condition ? { condition: options.condition } : {}),
     ...(options.unless ? { unless: options.unless } : {}),
     loc: {

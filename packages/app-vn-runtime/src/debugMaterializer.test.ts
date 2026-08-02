@@ -7,6 +7,7 @@ import {
 import {
   inspectVnDebugScript as inspectDebugScriptImpl,
   materializeVnDebugTarget as materializeDebugTarget,
+  resolveVnDebugFinalTextStageAnchor,
   type VnDebugChoiceRequest,
   type VnDebugInputRequest,
   type MaterializeVnDebugCanonicalTargetInput
@@ -67,6 +68,54 @@ describe("VN debug inspection and materialization", () => {
       text: "Stable Cue."
     });
     expect(result.checkpoint.ui).toMatchObject({ cue: true });
+  });
+
+  it("gives same-line text stages unique anchors and materializes the final cumulative checkpoint", async () => {
+    const inspection = await inspectVnDebugScript(entry([
+      "#Start",
+      '@cue "A[-]B[-]C" author:Narrator textId:cue_staged'
+    ].join("\n")));
+    const staged = inspection.commands.filter((candidate) => candidate.command.textStage);
+
+    expect(staged.map((candidate) => candidate.anchor.stableId)).toEqual([
+      "cue:cue_staged:stage:1",
+      "cue:cue_staged:stage:2",
+      "cue:cue_staged:stage:final"
+    ]);
+    expect(new Set(staged.map((candidate) => candidate.anchor.fingerprint)).size).toBe(3);
+    expect(inspection.sourceLines[1]?.anchors).toHaveLength(3);
+    const unkeyed = await inspectVnDebugScript(entry("#Start\nNarrator: X[-]Y[-]Z"));
+    expect(new Set(unkeyed.commands.map((candidate) => candidate.anchor.fingerprint)).size).toBe(3);
+
+    const middle = await materializeVnDebugTarget({
+      entry: inspection.entry,
+      inspection,
+      target: staged[1]!.anchor
+    });
+    expect(middle.status).toBe("ready");
+    if (middle.status === "ready") {
+      expect(middle.checkpoint.story.text?.current?.text).toBe("AB");
+      expect(middle.checkpoint.story.backlog).toEqual([]);
+    }
+
+    const final = await materializeVnDebugTarget({
+      entry: inspection.entry,
+      inspection,
+      target: staged[2]!.anchor
+    });
+    expect(final.status).toBe("ready");
+    if (final.status === "ready") {
+      expect(final.checkpoint.story.text?.current?.text).toBe("ABC");
+      expect(final.checkpoint.story.backlog.map((item) => item.text)).toEqual(["ABC"]);
+    }
+
+    const changed = await inspectVnDebugScript(entry([
+      "#Start",
+      '@cue "A[-]B[-]C[-]D" author:Narrator textId:cue_staged'
+    ].join("\n")));
+    expect(resolveVnDebugFinalTextStageAnchor(changed, staged[2]!.anchor)?.stableId).toBe(
+      "cue:cue_staged:stage:final"
+    );
   });
 
   it("stops at a complete choice group, and requests a decision only when traversing beyond it", async () => {

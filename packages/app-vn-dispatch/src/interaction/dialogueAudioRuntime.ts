@@ -30,6 +30,7 @@ export interface PlanDialogueLineAudioInput {
   textId?: string;
   voice: DialogueAudioVoiceSettings;
   voiceAssetAvailable: boolean;
+  continuation?: boolean;
 }
 
 export type DialogueAudioLifecycleSignal =
@@ -52,11 +53,14 @@ export function planDialogueLineAudio(
   input: PlanDialogueLineAudioInput
 ): DialogueAudioRuntimeStep {
   const stopped = stopActiveDialogueBleep(state);
-  const effects: DialogueAudioEffect[] = [...stopped.effects, { type: "stop-voice" }];
+  const effects: DialogueAudioEffect[] = [
+    ...stopped.effects,
+    ...(input.continuation ? [] : [{ type: "stop-voice" as const }])
+  ];
   const hasAvailableVoice = Boolean(input.textId && input.voiceAssetAvailable);
 
   if (hasAvailableVoice) {
-    if (input.pacing !== "skip" && input.textId && input.voice.volume > 0) {
+    if (!input.continuation && input.pacing !== "skip" && input.textId && input.voice.volume > 0) {
       const sourceRef = createVoiceAssetId(input.textId, input.voice.locale);
       effects.push({
         type: "play-voice",
@@ -66,14 +70,14 @@ export function planDialogueLineAudio(
         volume: input.voice.volume
       });
     }
-    return { state: stopped.state, effects, hasVoiceBoundary: true };
+    return { state: stopped.state, effects, hasVoiceBoundary: !input.continuation };
   }
 
   const bleep = planDialogueBleepStart(stopped.state, input);
   return {
     state: bleep.state,
     effects: [...effects, ...bleep.effects],
-    hasVoiceBoundary: true
+    hasVoiceBoundary: !input.continuation
   };
 }
 

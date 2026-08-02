@@ -191,6 +191,90 @@ test("harness renders Cue independently, retains it under choices, and waits for
   expect(consoleErrors).toEqual([]);
 });
 
+test("harness stages dialogue, print, and Cue through manual, AUTO, SKIP, save, and backlog", async ({ page }) => {
+  const consoleErrors = watchUnexpectedConsoleErrors(page);
+  const voiceRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/voice_validation_0001.ogg")) voiceRequests.push(request.url());
+  });
+
+  await bootHarness(page);
+  await configureTitleDisplay(page, { textSpeed: "0", textSize: "large" });
+  await startNavi(page);
+  await startStoryOverlay(page);
+  await advanceUntilText(page, "请选择测试路径");
+  await advanceUntilChoices(page);
+  await expect(page.getByTestId("vn-choice-6")).toHaveText("分支7：单句分阶段停靠验收");
+  await page.getByTestId("vn-choice-6").click();
+  await expect(page.getByTestId("harness-showcase-route")).toHaveText("staged-text");
+  await page.getByTestId("harness-showcase-debug-tab-inspector").click();
+
+  const backlogCount = page.getByTestId("inspector-lite").getByText("Backlog", { exact: true })
+    .locator("..").locator("dd");
+  await expect(backlogCount).toHaveText("0");
+
+  await advanceHarness(page);
+  await expect(page.getByTestId("vn-dialog-text")).toHaveText("下落");
+  await advanceHarness(page);
+  await advanceHarness(page);
+  await expect(page.getByTestId("vn-dialog-text")).toHaveText("下落，下落");
+  await expect(backlogCount).toHaveText("0");
+  await page.screenshot({ path: "test-results/harness-staged-dialog-stage-2.png", fullPage: true });
+
+  await page.getByTestId("vn-command-quick-save").click();
+  await expect(page.getByTestId("vn-command-quick-load")).toBeEnabled();
+  await advanceHarness(page);
+  await advanceHarness(page);
+  await expect(page.getByTestId("vn-dialog-text")).toHaveText("下落，下落，下落，仿佛没有尽头");
+  await expect(backlogCount).toHaveText("1");
+
+  await page.getByTestId("vn-command-quick-load").click();
+  await expect(page.getByTestId("load-confirmation")).toHaveCount(0);
+  await expect(page.getByTestId("vn-dialog-text")).toHaveText("下落，下落");
+  await expect(backlogCount).toHaveText("0");
+  await advanceHarness(page);
+  await advanceHarness(page);
+  await expect(page.getByTestId("vn-dialog-text")).toHaveText("下落，下落，下落，仿佛没有尽头");
+  await expect(backlogCount).toHaveText("1");
+
+  await page.getByTestId("vn-command-backlog").click();
+  await expect(page.getByTestId("backlog-entry-0")).toContainText("下落，下落，下落，仿佛没有尽头");
+  await expect(page.locator('[data-testid^="backlog-entry-"]')).toHaveCount(1);
+  await page.getByTestId("pause-surface-close").click();
+
+  await advanceHarnessUntilChoices(page);
+  await page.getByTestId("vn-choice-0").click();
+  await expect(page.getByTestId("vn-dialog-text")).toHaveText(/下|下落/);
+  await page.getByTestId("vn-command-auto").click();
+  await expect(page.getByTestId("vn-command-auto")).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => page.getByTestId("vn-dialog-text").textContent(), { timeout: 10_000 })
+    .toBe("下落，下落");
+  await page.screenshot({ path: "test-results/harness-staged-print-auto-stage-2.png", fullPage: true });
+  await expect.poll(async () => page.getByTestId("vn-dialog-text").textContent(), { timeout: 10_000 })
+    .toBe("下落，下落，下落，仿佛没有尽头");
+  await advanceHarnessUntilChoices(page);
+  expect(voiceRequests).toHaveLength(1);
+  await expect(backlogCount).toHaveText("2");
+
+  await page.getByTestId("vn-choice-0").click();
+  await expect(page.getByTestId("vn-cue-text")).toHaveText(/向|向下/);
+  await page.getByTestId("vn-command-skip").click();
+  await expect(page.getByTestId("vn-command-skip")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("vn-cue-text")).toHaveText(
+    "向下，向下，再向下。这样的坠落难道永远不会结束吗？",
+    { timeout: 10_000 }
+  );
+  await advanceHarnessUntilChoices(page);
+  await expect(backlogCount).toHaveText("3");
+  await page.screenshot({ path: "test-results/harness-staged-cue-skip-final.png", fullPage: true });
+
+  await page.getByTestId("vn-choice-0").click();
+  await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT STAGED DONE", { timeout: 5_000 });
+  await page.getByTestId("harness-showcase-debug-tab-runtime").click();
+  await expectNoRuntimeAssetDiagnostics(page);
+  expect(consoleErrors).toEqual([]);
+});
+
 async function advanceHarnessUntilSurfaceText(page: Page, testId: string, text: string) {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const surface = page.getByTestId(testId);

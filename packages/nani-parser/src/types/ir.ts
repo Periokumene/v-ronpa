@@ -44,6 +44,7 @@ export interface CommandIR {
   richTextPrimary?: RichTextDocumentIR;
   params: Record<string, NaniValue>;
   richTextParams?: Record<string, RichTextDocumentIR>;
+  textStages?: TextStageIR[];
   flags: Record<string, boolean>;
   inlineIndex?: number;
   children?: StatementIR[];
@@ -87,6 +88,12 @@ export interface RichTextDocumentIR {
   runs: RichTextRunIR[];
 }
 
+export interface TextStageIR {
+  text: string;
+  richText?: RichTextDocumentIR;
+  loc: SourceLocation;
+}
+
 export interface TextIR {
   kind: "text";
   speaker?: string;
@@ -94,6 +101,7 @@ export interface TextIR {
   textId?: string;
   tokens: TextToken[];
   richText?: RichTextDocumentIR;
+  textStages?: TextStageIR[];
   printParams?: Record<string, NaniValue>;
   loc: SourceLocation;
 }

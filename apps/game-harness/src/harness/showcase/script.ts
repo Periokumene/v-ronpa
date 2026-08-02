@@ -13,6 +13,29 @@ Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command sh
 @choice "分支4：首轮富文本标签验收" goto:#RichTextShowcase
 @choice "分支5：全局角色 Tone 验收" goto:#CharacterToneShowcase
 @choice "分支6：Cue 演出文本验收" goto:#CueShowcase
+@choice "分支7：单句分阶段停靠验收" goto:#StagedTextShowcase
+
+#StagedTextShowcase
+@set route:"staged-text"
+@clearBacklog
+@showPrinter default
+@showUI dialog
+@showUI commandBar visible:true
+Narrator: 下落[-]，下落[-]，下落，仿佛没有尽头
+@choice "继续 AUTO @print" goto:#StagedTextAuto
+
+#StagedTextAuto
+@print "下落[wait i]，下落[wait i]，下落，仿佛没有尽头" author:Ema textId:voice_validation_0001
+@choice "继续 SKIP @cue" goto:#StagedTextSkip
+
+#StagedTextSkip
+@cue "向下[-]，向下[-]，再向下。这样的坠落难道永远不会结束吗？" author:Narrator
+@choice "结束分阶段验收" goto:#StagedTextDone
+
+#StagedTextDone
+@hideCue
+Narrator: CHECKPOINT STAGED DONE - 三种分阶段文本均已完成。
+@end
 
 #CueShowcase
 @set route:"cue"

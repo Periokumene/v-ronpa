@@ -638,11 +638,19 @@ function executeStoryText(
   channel: StoryTextChannel
 ): StoryRuntimeState {
   const text = stringParam(command, "text") ?? "";
-  const speaker = stringParam(command, "speaker");
+  const authoredSpeaker = stringParam(command, "speaker");
   const printerId = stringParam(command, "printerId") ?? state.text?.printerId ?? "default";
-  const richText = command.richText ? cloneRichText(command.richText) : undefined;
-  const current = compactStoryTextLine({ channel, speaker, text, richText });
-  const backlogEntry: BacklogEntry = compactBacklogEntry(current);
+  const previous = state.text?.current;
+  const append = booleanParam(command, "append") === true;
+  const speaker = authoredSpeaker ?? (append ? previous?.speaker : undefined);
+  const nextText = append ? `${previous?.text ?? ""}${text}` : text;
+  const richText = append
+    ? appendRichText(previous?.richText, previous?.text ?? "", command.richText, text)
+    : command.richText
+      ? cloneRichText(command.richText)
+      : undefined;
+  const current = compactStoryTextLine({ channel, speaker, text: nextText, richText });
+  const finalStage = !command.textStage || command.textStage.index === command.textStage.count - 1;
 
   return {
     ...state,
@@ -651,7 +659,7 @@ function executeStoryText(
       visible: true,
       current
     },
-    backlog: [...state.backlog, backlogEntry]
+    backlog: finalStage ? [...state.backlog, compactBacklogEntry(current)] : state.backlog
   };
 }
 

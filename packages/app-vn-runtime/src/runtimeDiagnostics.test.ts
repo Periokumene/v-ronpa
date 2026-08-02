@@ -22,7 +22,7 @@ describe("VN runtime diagnostics", () => {
         code: "invalid-text-id",
         severity: "error",
         message: "Invalid textId marker: (empty)",
-        loc: "parser.nani:1:1",
+        loc: "parser.nani:1:8",
         span: { start: 10, end: 13 }
       },
       {

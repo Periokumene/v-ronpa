@@ -27,7 +27,8 @@ describe("Nani semantic golden from integration baseline", () => {
       "csp-character-v2-alice-hard-cut": "The accepted CSP v2 hard cut replaces Alice assets and updates production/test appearance expressions, generated revisions, and preload plans without compatibility aliases.",
       "csp-character-v3-body-variants-alice-refresh": "The accepted CSP v3 hard cut moves body into the numeric runtime group, adds body0, and updates only the explicit test expression and its generated metadata.",
       "global-character-tone": "The accepted global character Tone feature adds scripted product and showcase commands, generated revisions, and semantic compiler output without changing asset references.",
-      "cue-story-text-hard-cut": "The accepted Cue hard cut adds Game A and Harness acceptance branches, generated revisions, and canonical parser/compiler semantics without changing asset references."
+      "cue-story-text-hard-cut": "The accepted Cue hard cut adds Game A and Harness acceptance branches, generated revisions, and canonical parser/compiler semantics without changing asset references.",
+      "nani-inline-staged-text": "The accepted staged-text slice adds inline story stops, expands only opted-in lines into stable commands, and updates Game A and Harness revisions atomically."
     });
   });
 

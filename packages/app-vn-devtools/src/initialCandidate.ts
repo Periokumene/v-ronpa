@@ -2,6 +2,7 @@ import {
   EMPTY_VN_DEBUG_DECISION_TRACE,
   inspectVnDebugScript,
   materializeVnDebugTarget,
+  resolveVnDebugFinalTextStageAnchor,
   type VnDebugDecisionTrace,
   type VnDebugMaterializationMode,
   type VnDebugScriptInspection,
@@ -79,12 +80,15 @@ export async function prepareVnDevtoolsInitialCandidate({
     return { kind: "retain-read-only", inspection, reason: "revision-mismatch" };
   }
   const expectedRevision = candidate.serverRevision;
+  const finalPinnedTarget = pinnedTarget
+    ? resolveVnDebugFinalTextStageAnchor(inspection, pinnedTarget) ?? pinnedTarget
+    : undefined;
   if (pinnedTarget && materializationMode === "fast-current-script") {
     const result = await materializeVnDebugTarget({
       mode: materializationMode,
       entry: inspection.entry,
       inspection,
-      target: pinnedTarget,
+      target: finalPinnedTarget!,
       decisions,
       expectedRevision,
       ...(signal ? { signal } : {})
@@ -112,13 +116,13 @@ export async function prepareVnDevtoolsInitialCandidate({
       message: catalogValidation.message
     };
   }
-  if (pinnedTarget) {
+  if (finalPinnedTarget) {
     const result = await materializeVnDebugTarget({
       mode: "canonical-entry",
       entry: inspection.entry,
       catalog: candidateCatalog.catalog,
       inspection,
-      target: pinnedTarget,
+      target: finalPinnedTarget,
       decisions,
       expectedRevision,
       ...(signal ? { signal } : {})

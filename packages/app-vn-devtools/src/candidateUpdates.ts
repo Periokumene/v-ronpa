@@ -2,7 +2,7 @@ import {
   EMPTY_VN_DEBUG_DECISION_TRACE,
   inspectVnDebugScript,
   materializeVnDebugTarget,
-  resolveVnDebugAnchor,
+  resolveVnDebugFinalTextStageAnchor,
   type VnDebugDecisionTrace,
   type VnDebugMaterializationMode,
   type VnDebugScriptInspection,
@@ -100,6 +100,9 @@ export async function prepareVnDevtoolsCandidateUpdate({
   const inspection = await inspectVnDebugScript(activeCandidate.entry, candidateSource);
   throwIfAborted(signal);
   const replayTarget = impact === "executed-session" ? pinnedTarget : undefined;
+  const finalReplayTarget = replayTarget
+    ? resolveVnDebugFinalTextStageAnchor(inspection, replayTarget) ?? replayTarget
+    : undefined;
   const plan = planVnDevtoolsCandidate({
     serverRevision: update.serverRevision,
     browserRevision: inspection.revision,
@@ -120,12 +123,12 @@ export async function prepareVnDevtoolsCandidateUpdate({
     return { kind: "retain-last-known-good", inspection, reason: "invalid-source" };
   }
   if (plan.kind === "materialize-pinned-target" && materializationMode === "fast-current-script") {
-    if (!replayTarget) return { kind: "retain-last-known-good", inspection, reason: "invalid-source" };
+    if (!finalReplayTarget) return { kind: "retain-last-known-good", inspection, reason: "invalid-source" };
     const result = await materializeVnDebugTarget({
       mode: materializationMode,
       entry: inspection.entry,
       inspection,
-      target: replayTarget,
+      target: finalReplayTarget,
       decisions,
       expectedRevision,
       ...(signal ? { signal } : {})
@@ -149,7 +152,7 @@ export async function prepareVnDevtoolsCandidateUpdate({
   if (plan.kind === "refresh-source-mapping") {
     const remappedTarget = pinnedTarget
       ? pinnedTarget.scriptPath === inspection.source.scriptPath
-        ? resolveVnDebugAnchor(inspection, pinnedTarget)
+        ? resolveVnDebugFinalTextStageAnchor(inspection, pinnedTarget)
         : pinnedTarget
       : undefined;
     return {
@@ -161,7 +164,7 @@ export async function prepareVnDevtoolsCandidateUpdate({
     };
   }
   if (plan.kind === "materialize-pinned-target") {
-    if (!replayTarget) {
+    if (!finalReplayTarget) {
       return { kind: "retain-last-known-good", inspection, reason: "invalid-source" };
     }
     const result = await materializeVnDebugTarget({
@@ -169,7 +172,7 @@ export async function prepareVnDevtoolsCandidateUpdate({
       entry: inspection.entry,
       catalog: candidateCatalog.catalog,
       inspection,
-      target: replayTarget,
+      target: finalReplayTarget,
       decisions,
       expectedRevision,
       ...(signal ? { signal } : {})

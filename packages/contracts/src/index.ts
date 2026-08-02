@@ -977,7 +977,7 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   inback: ["appearanceAndTransition", "appearance", "via", "effect", "visible", "easing", "time", "wait"],
   input: ["variableName", "type", "summary", "value"],
   movie: ["moviePath", "time", "block"],
-  print: ["text", "speaker", "author", "as", "printer", "speed", "textId", "autoNext", "reset"],
+  print: ["text", "speaker", "author", "as", "printer", "speed", "textId", "autoNext", "reset", "append"],
   rain: ["power", "wind", "hue", "tint", "time", "easing", "wait"],
   resettext: ["printerId"],
   set: ["expression"],
@@ -1367,6 +1367,23 @@ export const RuntimeSourceCommandSchema = z
   .strict();
 export type RuntimeSourceCommand = z.infer<typeof RuntimeSourceCommandSchema>;
 
+export const RuntimeTextStageSchema = z
+  .object({
+    index: z.number().int().nonnegative(),
+    count: z.number().int().min(2)
+  })
+  .strict()
+  .superRefine((stage, ctx) => {
+    if (stage.index >= stage.count) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["index"],
+        message: "Runtime text stage index must be less than count."
+      });
+    }
+  });
+export type RuntimeTextStage = z.infer<typeof RuntimeTextStageSchema>;
+
 export const RuntimeCommandSchema = z
   .object({
     commandId: z.string().min(1),
@@ -1378,6 +1395,7 @@ export const RuntimeCommandSchema = z
     condition: RuntimeExpressionSchema.optional(),
     unless: RuntimeExpressionSchema.optional(),
     richText: RichTextDocumentSchema.optional(),
+    textStage: RuntimeTextStageSchema.optional(),
     loc: SourceLocationSchema,
     sourceCommand: RuntimeSourceCommandSchema.optional()
   })

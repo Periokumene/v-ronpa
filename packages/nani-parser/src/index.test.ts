@@ -1075,7 +1075,7 @@ describe("nani parser", () => {
     expect(result.diagnostics.map(({ severity, message }) => ({ severity, message }))).toEqual([
       {
         severity: "error",
-        message: "Unsupported inline .nani command: [bogus]. Inline commands currently support [>] and [< speed:<decimal>]."
+        message: "Unsupported inline .nani command: [bogus]. Inline commands support [-], [wait i], [>], and [< speed:<decimal>]."
       },
       {
         severity: "error",
@@ -1085,6 +1085,77 @@ describe("nani parser", () => {
     const text = result.scenario.statements[0] as TextIR;
     expect(text.tokens.filter((token) => token.kind === "inline-command")).toHaveLength(3);
     expect(text.printParams).toEqual({ speed: { type: "string", value: "fast" } });
+  });
+
+  it("parses staged ordinary, print, and cue text with command-line source maps", () => {
+    const source = [
+      "nar: 下落[-]，下落[wait i]，下落[>]",
+      '@print "<b>A</b>[-]<i>B</i>" author:Narrator',
+      '@cue text:"向下[-]再向下"'
+    ].join("\n");
+    const result = parseScenario({ sourceText: source, scriptPath: "staged-text.nani" });
+    const line = result.scenario.statements[0] as TextIR;
+    const print = result.scenario.statements[1] as CommandIR;
+    const cue = result.scenario.statements[2] as CommandIR;
+
+    expect(result.diagnostics).toEqual([]);
+    expect(line.textStages).toEqual([
+      expect.objectContaining({ text: "下落", loc: expect.objectContaining({ line: 1 }) }),
+      expect.objectContaining({ text: "，下落", loc: expect.objectContaining({ line: 1 }) }),
+      expect.objectContaining({ text: "，下落", loc: expect.objectContaining({ line: 1 }) })
+    ]);
+    expect(print.primary).toEqual({ type: "string", value: "<b>A</b><i>B</i>" });
+    expect(print.richTextPrimary?.text).toBe("AB");
+    expect(print.textStages).toEqual([
+      { text: "A", richText: { text: "A", runs: [{ start: 0, end: 1, style: { bold: true } }] }, loc: expect.any(Object) },
+      { text: "B", richText: { text: "B", runs: [{ start: 0, end: 1, style: { italic: true } }] }, loc: expect.any(Object) }
+    ]);
+    expect(cue.params.text).toEqual({ type: "string", value: "向下再向下" });
+    expect(cue.textStages?.map((stage) => stage.text)).toEqual(["向下", "再向下"]);
+    expect(sourceSlice(source, resolveNaniSourceRef(result.sourceMap, {
+      kind: "inline-command",
+      statementIndex: 1,
+      tokenIndex: 1,
+      part: "whole"
+    }))).toBe("[-]");
+  });
+
+  it("rejects invalid staged text boundaries and command combinations at their markers", () => {
+    const source = [
+      "nar: A[wait 0.5]B",
+      "nar: A[-][-]B",
+      "nar: A[-]   ",
+      "nar: <b>A[-]B</b>",
+      '@print "A[-]B" if:{ready}',
+      '@cue "A[>]B"',
+      '@print {line + "[-]"}',
+      "@cue A[wait i]"
+    ].join("\n");
+    const result = parseScenario({ sourceText: source, scriptPath: "invalid-staged-text.nani" });
+    const summaries = result.diagnostics.map((diagnostic) => [
+      diagnostic.code,
+      sourceSlice(source, diagnostic.span)
+    ]);
+
+    expect(summaries).toContainEqual(["invalid-inline-stage-wait", "0.5"]);
+    expect(summaries.filter(([code]) => code === "invalid-inline-stage-boundary")).toHaveLength(3);
+    expect(summaries).toContainEqual(["invalid-inline-stage-command", "if:{ready}"]);
+    expect(summaries).toContainEqual(["invalid-inline-stage-command", "[>]"]);
+    expect(summaries).toContainEqual(["invalid-inline-stage-command", "[-]"]);
+    expect(summaries).toContainEqual(["invalid-inline-stage-command", "[wait i]"]);
+  });
+
+  it("keeps escaped stage markers literal and restricts auto-next to the final stage", () => {
+    const source = ["nar: 下落\\[-\\]仍在下落", "nar: A[>]B[-]C"].join("\n");
+    const result = parseScenario({ sourceText: source, scriptPath: "staged-escaping.nani" });
+    const literal = result.scenario.statements[0] as TextIR;
+
+    expect(literal.textStages).toBeUndefined();
+    expect(literal.tokens).toEqual([{ kind: "text", text: "下落[-]仍在下落" }]);
+    expect(result.diagnostics.map((diagnostic) => [
+      diagnostic.code,
+      sourceSlice(source, diagnostic.span)
+    ])).toContainEqual(["invalid-inline-stage-position", "[>]"]);
   });
 
   it("targets each invalid inline-command argument form", () => {

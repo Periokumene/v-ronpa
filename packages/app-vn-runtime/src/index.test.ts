@@ -11,7 +11,7 @@ import type {
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot, reducePixiRuntimeCommand } from "@v-ronpa/pixi-stage-model";
-import { createInitialStoryState, storyRuntimeSnapshot } from "@v-ronpa/story-engine";
+import { advanceToNextStop, createInitialStoryState, storyRuntimeSnapshot } from "@v-ronpa/story-engine";
 import type { AudioHandle, AudioHandleFinishResult, AudioPort, VideoPort } from "@v-ronpa/media-save";
 import {
   applyVnRuntimeMediaEffects,
@@ -169,6 +169,29 @@ describe("app VN runtime helpers", () => {
     expect(plan.storyRuntime.state.text?.current?.channel).toBe("cue");
     expect(Object.values(plan.uiRuntime.surfaces).every((surface) => !surface.transition)).toBe(true);
     expect(plan.diagnostics).toEqual([]);
+  });
+
+  it("restores a complete intermediate text stage and advances to the next fragment", () => {
+    const runtimeScript = compileScenario("Narrator: A[-]B[-]C", "restore-staged-text.nani");
+    const first = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
+    const second = advanceToNextStop(first.state, runtimeScript);
+    expect(second.state.text?.current?.text).toBe("AB");
+    expect(second.state.backlog).toEqual([]);
+
+    const plan = createVnRuntimeRestorePlan({
+      active: true,
+      media: { bgmByGroup: {}, loopingSfxByKey: {} },
+      pixiStage: createInitialPixiStageSnapshot(),
+      script: runtimeScript,
+      story: storyRuntimeSnapshot(second.state),
+      ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+    });
+    expect(plan.storyRuntime.state.text?.current?.text).toBe("AB");
+    expect(plan.storyRuntime.state.instructionPointer).toBe(2);
+
+    const third = advanceToNextStop(plan.storyRuntime.state, runtimeScript);
+    expect(third.state.text?.current?.text).toBe("ABC");
+    expect(third.state.backlog.map((entry) => entry.text)).toEqual(["ABC"]);
   });
 
   it("resolves media sources through the asset registry and rejects raw URI fallback", () => {

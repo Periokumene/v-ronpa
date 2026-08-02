@@ -35,6 +35,7 @@ import type {
   SourceLocation,
   StatementIR,
   TextIR,
+  TextStageIR,
   TextSpan,
   TextToken
 } from "./types";
@@ -67,6 +68,17 @@ interface ParsedInlineTokens {
   readonly tokens: TextToken[];
   readonly textSources: Array<{ readonly tokenIndex: number; readonly source: SourcedText }>;
   readonly inlineCommands: NaniInlineCommandSourceMap[];
+  readonly hasStageStop: boolean;
+}
+
+type InlineTextContext = "ordinary" | "story-command";
+
+interface ParsedInlineTextContent extends ParsedInlineTokens {
+  readonly visibleSource: SourcedText;
+  readonly richText: ReturnType<typeof parseSourcedRichText>;
+  readonly textStages?: TextStageIR[];
+  readonly textId?: string;
+  readonly textIdMarkers: readonly NaniTextIdSourceMap[];
 }
 
 interface ExtractedTextId {
@@ -146,7 +158,12 @@ export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
         {}
       );
       if (parsed.metadataFirstValue) commandMetadata.set(parsed.command, parsed.metadataFirstValue);
-      attachCommandRichText(parsed, diagnostics);
+      const inlineText = attachCommandInlineText(
+        input.sourceText,
+        parsed,
+        diagnostics,
+        commandMetadata
+      );
       collectCommandMetadata(parsed, assets, dependencies);
       statements.push(parsed.command);
       statementSources.push({
@@ -155,7 +172,7 @@ export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
         markerSpan,
         nameSpan: parsed.sourceMap.nameSpan,
         command: parsed.sourceMap,
-        inlineCommands: [],
+        inlineCommands: inlineText?.inlineCommands ?? [],
         textIds: []
       });
       continue;
@@ -201,19 +218,14 @@ function parseText(
   const [speaker, appearance] = speakerDirective ? splitSpeaker(speakerDirective) : [undefined, undefined];
   const bodyStart = speakerMatch ? speakerMatch[0].length - body.length : 0;
   const bodySource = sliceSourcedText(lineSource, bodyStart, bodyStart + body.length);
-  const parsedInline = parseInlineTokens(
+  const parsedInline = parseInlineTextContent(
     sourceText,
     bodySource,
     { ...loc, column: loc.column + bodyStart },
     diagnostics,
-    commandMetadata
+    commandMetadata,
+    { context: "ordinary", extractTextId: true }
   );
-  const extractedTextId = extractTextIdFromTokens(parsedInline);
-  for (const diagnostic of extractedTextId.diagnostics) {
-    reportNaniDiagnostic(diagnostics, loc, diagnostic.code, "error", diagnostic.message, {
-      span: diagnostic.span
-    });
-  }
 
   const printParams: Record<string, NaniValue> = {};
   for (const token of parsedInline.tokens) {
@@ -222,22 +234,14 @@ function parseText(
     }
   }
 
-  const rawText = concatSourcedText(
-    extractedTextId.textSources.map((entry) => entry.source),
-    bodySource.span.start
-  );
-  const richText = parseSourcedRichText(rawText);
-  for (const diagnostic of richText.diagnostics) {
-    reportNaniDiagnostic(diagnostics, loc, "invalid-rich-text", "warning", diagnostic.message, {
-      span: diagnostic.span
-    });
-  }
-
   const statement: TextIR = { kind: "text", tokens: parsedInline.tokens, loc };
   if (speaker) statement.speaker = speaker;
   if (appearance) statement.appearance = appearance;
-  if (extractedTextId.textId) statement.textId = extractedTextId.textId;
-  if (shouldAttachRichText(rawText.text, richText.document)) statement.richText = richText.document;
+  if (parsedInline.textId) statement.textId = parsedInline.textId;
+  if (shouldAttachRichText(parsedInline.visibleSource.text, parsedInline.richText.document)) {
+    statement.richText = parsedInline.richText.document;
+  }
+  if (parsedInline.textStages) statement.textStages = parsedInline.textStages;
   if (Object.keys(printParams).length > 0) statement.printParams = printParams;
 
   const directive = speakerMatch?.[1];
@@ -262,7 +266,7 @@ function parseText(
       ...(appearanceSpan ? { appearanceSpan } : {}),
       bodySpan: bodySource.span,
       inlineCommands: parsedInline.inlineCommands,
-      textIds: extractedTextId.markers
+      textIds: parsedInline.textIdMarkers
     }
   };
 }
@@ -273,16 +277,180 @@ function splitSpeaker(value: string): [string | undefined, string | undefined] {
   return [value.slice(0, dot), value.slice(dot + 1)];
 }
 
+function parseInlineTextContent(
+  sourceText: string,
+  text: SourcedText,
+  loc: SourceLocation,
+  diagnostics: NaniDiagnosticSink,
+  commandMetadata: WeakMap<CommandIR, NaniValue>,
+  options: { readonly context: InlineTextContext; readonly extractTextId?: boolean }
+): ParsedInlineTextContent {
+  const parsed = parseInlineTokens(
+    sourceText,
+    text,
+    loc,
+    diagnostics,
+    commandMetadata,
+    options.context
+  );
+  const extracted = options.extractTextId
+    ? extractTextIdFromTokens(parsed)
+    : { diagnostics: [], markers: [], textSources: parsed.textSources } satisfies ExtractedTextId;
+  for (const diagnostic of extracted.diagnostics) {
+    reportNaniDiagnostic(diagnostics, loc, diagnostic.code, "error", diagnostic.message, {
+      span: diagnostic.span
+    });
+  }
+
+  const visibleSource = concatSourcedText(
+    extracted.textSources.map((entry) => entry.source),
+    text.span.start
+  );
+  const richText = parseSourcedRichText(visibleSource);
+  for (const diagnostic of richText.diagnostics) {
+    reportNaniDiagnostic(diagnostics, loc, "invalid-rich-text", "warning", diagnostic.message, {
+      span: diagnostic.span
+    });
+  }
+
+  const textStages = buildTextStages(
+    parsed,
+    extracted.textSources,
+    richText,
+    loc,
+    diagnostics
+  );
+  return {
+    ...parsed,
+    textSources: [...extracted.textSources],
+    visibleSource,
+    richText,
+    ...(textStages ? { textStages } : {}),
+    ...(extracted.textId ? { textId: extracted.textId } : {}),
+    textIdMarkers: extracted.markers
+  };
+}
+
+function buildTextStages(
+  parsed: ParsedInlineTokens,
+  textSources: readonly { readonly tokenIndex: number; readonly source: SourcedText }[],
+  fullRichText: ReturnType<typeof parseSourcedRichText>,
+  loc: SourceLocation,
+  diagnostics: NaniDiagnosticSink
+): TextStageIR[] | undefined {
+  if (!parsed.hasStageStop) return undefined;
+  const sourceByToken = new Map(textSources.map((entry) => [entry.tokenIndex, entry.source]));
+  const inlineByToken = new Map(parsed.inlineCommands.map((entry) => [entry.tokenIndex, entry.command]));
+  const groups: SourcedText[][] = [[]];
+  const boundaries: Array<{ command: CommandIR; source: NaniCommandSourceMap }> = [];
+  let sawStageStop = false;
+
+  for (const [tokenIndex, token] of parsed.tokens.entries()) {
+    if (token.kind === "text") {
+      const source = sourceByToken.get(tokenIndex);
+      if (source) groups.at(-1)?.push(source);
+      continue;
+    }
+    if (isInlineStageStop(token.command)) {
+      const source = inlineByToken.get(tokenIndex);
+      if (!source) continue;
+      sawStageStop = true;
+      boundaries.push({ command: token.command, source });
+      groups.push([]);
+      continue;
+    }
+    if (token.command.commandId === ">" && hasLaterStageStop(parsed.tokens, tokenIndex)) {
+      const source = inlineByToken.get(tokenIndex);
+      if (!source) continue;
+      reportNaniDiagnostic(
+        diagnostics,
+        token.command.loc,
+        "invalid-inline-stage-position",
+        "error",
+        "Inline auto-next [>] is allowed only in the final text stage.",
+        { span: source.span }
+      );
+    }
+  }
+  if (!sawStageStop) return undefined;
+
+  const stageSources = groups.map((group, index) => concatSourcedText(
+    group,
+    index === 0
+      ? boundaries[0]?.source.span.start ?? 0
+      : boundaries[index - 1]?.source.span.end ?? 0
+  ));
+  let valid = true;
+  for (const [index, source] of stageSources.entries()) {
+    const parsedStage = parseSourcedRichText(source);
+    if (parsedStage.document.text.trim().length > 0) continue;
+    valid = false;
+    const boundary = index === 0 ? boundaries[0] : boundaries[index - 1];
+    reportNaniDiagnostic(
+      diagnostics,
+      boundary?.command.loc ?? loc,
+      "invalid-inline-stage-boundary",
+      "error",
+      "Inline text stages must contain visible non-whitespace text on both sides of every stop.",
+      { span: boundary!.source.span }
+    );
+  }
+
+  const parsedStages = stageSources.map((source) => parseSourcedRichText(source));
+  if (fullRichText.diagnostics.length === 0) {
+    for (const [index, result] of parsedStages.entries()) {
+      if (result.diagnostics.length === 0) continue;
+      valid = false;
+      const boundary = index === 0 ? boundaries[0] : boundaries[index - 1];
+      reportNaniDiagnostic(
+        diagnostics,
+        boundary?.command.loc ?? loc,
+        "invalid-inline-stage-boundary",
+        "error",
+        "Inline text stops cannot appear inside an active rich-text tag or tag syntax.",
+        { span: boundary!.source.span }
+      );
+      break;
+    }
+  }
+  if (!valid) return undefined;
+
+  return parsedStages.map((result, index) => ({
+    text: result.document.text,
+    ...(shouldAttachRichText(stageSources[index]?.text ?? "", result.document)
+      ? { richText: result.document }
+      : {}),
+    loc: index === 0 ? loc : boundaries[index - 1]!.command.loc
+  }));
+}
+
+function isInlineStageStop(command: CommandIR): boolean {
+  if (command.commandId === "-") return command.args.length === 0;
+  return command.commandId === "wait" &&
+    command.args.length === 1 &&
+    command.args[0]?.kind === "value" &&
+    command.args[0].value.type === "string" &&
+    command.args[0].value.value.toLowerCase() === "i";
+}
+
+function hasLaterStageStop(tokens: readonly TextToken[], tokenIndex: number): boolean {
+  return tokens.slice(tokenIndex + 1).some(
+    (token) => token.kind === "inline-command" && isInlineStageStop(token.command)
+  );
+}
+
 function parseInlineTokens(
   sourceText: string,
   text: SourcedText,
   loc: SourceLocation,
   diagnostics: NaniDiagnosticSink,
-  commandMetadata: WeakMap<CommandIR, NaniValue>
+  commandMetadata: WeakMap<CommandIR, NaniValue>,
+  context: InlineTextContext
 ): ParsedInlineTokens {
   const tokens: TextToken[] = [];
   const textSources: Array<{ tokenIndex: number; source: SourcedText }> = [];
   const inlineCommands: NaniInlineCommandSourceMap[] = [];
+  let hasStageStop = false;
   let buffer = emptySourcedText(text.span.start);
   let index = 0;
   let identityRunStart = 0;
@@ -330,8 +498,9 @@ function parseInlineTokens(
           { fallbackCommandId: "noop" }
         );
         if (parsed.metadataFirstValue) commandMetadata.set(parsed.command, parsed.metadataFirstValue);
-        collectInlineCommandDiagnostics(parsed, diagnostics);
+        collectInlineCommandDiagnostics(parsed, diagnostics, context);
         parsed.command.inlineIndex = tokenIndex;
+        if (isInlineStageStop(parsed.command)) hasStageStop = true;
         tokens.push({ kind: "inline-command", command: parsed.command });
         inlineCommands.push({ tokenIndex, command: parsed.sourceMap });
         index = close + 1;
@@ -345,7 +514,7 @@ function parseInlineTokens(
 
   flushIdentityRun(text.text.length);
   flushBuffer();
-  return { tokens, textSources, inlineCommands };
+  return { tokens, textSources, inlineCommands, hasStageStop };
 }
 
 function extractTextIdFromTokens(parsed: ParsedInlineTokens): ExtractedTextId {
@@ -530,19 +699,49 @@ function parseCommand(
 
 function collectInlineCommandDiagnostics(
   parsed: ParsedCommand,
-  diagnostics: NaniDiagnosticSink
+  diagnostics: NaniDiagnosticSink,
+  context: InlineTextContext
 ): void {
   const command = parsed.command;
+  if (command.commandId === "-" || command.commandId === "wait") {
+    if (command.commandId === "-" && command.args.length === 0) return;
+    if (isInlineStageStop(command)) return;
+    const span = parsed.sourceMap.arguments[0]?.span ?? parsed.sourceMap.nameSpan;
+    reportNaniDiagnostic(
+      diagnostics,
+      command.loc,
+      command.commandId === "wait" ? "invalid-inline-stage-wait" : "invalid-inline-command-argument",
+      "error",
+      command.commandId === "wait"
+        ? "Inline [wait ...] supports only the input wait mode [wait i]; timed waits are not supported."
+        : "Inline stage stop [-] does not accept parameters.",
+      { span }
+    );
+    return;
+  }
+
   if (command.commandId !== ">" && command.commandId !== "<") {
     reportNaniDiagnostic(
       diagnostics,
       command.loc,
       "unsupported-inline-command",
       "error",
-      `Unsupported inline .nani command: [${command.commandId}]. Inline commands currently support [>] and [< speed:<decimal>].`,
+      `Unsupported inline .nani command: [${command.commandId}]. Inline commands support [-], [wait i], [>], and [< speed:<decimal>].`,
       {
         span: parsed.sourceMap.nameSpan
       }
+    );
+    return;
+  }
+
+  if (context === "story-command") {
+    reportNaniDiagnostic(
+      diagnostics,
+      command.loc,
+      "invalid-inline-stage-command",
+      "error",
+      `@print/@cue text accepts only [-] and [wait i] inline; use outer command parameters instead of [${command.commandId}].`,
+      { span: parsed.sourceMap.span }
     );
     return;
   }
@@ -599,6 +798,121 @@ function collectInlineCommandDiagnostics(
       );
     }
   }
+}
+
+function attachCommandInlineText(
+  sourceText: string,
+  parsed: ParsedCommand,
+  diagnostics: NaniDiagnosticSink,
+  commandMetadata: WeakMap<CommandIR, NaniValue>
+): ParsedInlineTextContent | undefined {
+  const command = parsed.command;
+  if (command.commandId !== "print" && command.commandId !== "cue") {
+    attachCommandRichText(parsed, diagnostics);
+    return undefined;
+  }
+
+  const effective = effectiveStoryCommandText(parsed);
+  const rawCommand = sourceText.slice(parsed.sourceMap.span.start, parsed.sourceMap.span.end);
+  const rawWait = /\[wait\s+i\]/iu.exec(rawCommand);
+  const rawStageMarker = /\[-\]|\[wait\s+i\]/iu.exec(rawCommand);
+  if (!effective || effective.value.type !== "string") {
+    if (rawStageMarker) {
+      const start = parsed.sourceMap.span.start + rawStageMarker.index;
+      reportNaniDiagnostic(
+        diagnostics,
+        command.loc,
+        "invalid-inline-stage-command",
+        "error",
+        "Dynamic @print/@cue text cannot be statically divided into inline stages.",
+        { span: { start, end: start + rawStageMarker[0].length } }
+      );
+    }
+    attachCommandRichText(parsed, diagnostics);
+    return undefined;
+  }
+
+  if (rawWait && !/\[wait\s+i\]/iu.test(effective.source.text)) {
+    const start = parsed.sourceMap.span.start + rawWait.index;
+    reportNaniDiagnostic(
+      diagnostics,
+      command.loc,
+      "invalid-inline-stage-command",
+      "error",
+      "Explicit @print/@cue [wait i] text must be enclosed in quotes.",
+      { span: { start, end: start + rawWait[0].length } }
+    );
+    attachCommandRichText(parsed, diagnostics);
+    return undefined;
+  }
+
+  const inlineText = parseInlineTextContent(
+    sourceText,
+    effective.source,
+    command.loc,
+    diagnostics,
+    commandMetadata,
+    { context: "story-command" }
+  );
+  const nextValue: NaniValue = { type: "string", value: inlineText.visibleSource.text };
+  const arg = command.args[effective.argumentIndex];
+  if (arg?.kind === "value") {
+    arg.value = nextValue;
+    command.primary = nextValue;
+    if (shouldAttachRichText(inlineText.visibleSource.text, inlineText.richText.document)) {
+      command.richTextPrimary = inlineText.richText.document;
+    }
+  } else if (arg?.kind === "param") {
+    arg.value = nextValue;
+    command.params[arg.key] = nextValue;
+    if (shouldAttachRichText(inlineText.visibleSource.text, inlineText.richText.document)) {
+      command.richTextParams = {
+        ...(command.richTextParams ?? {}),
+        [arg.key]: inlineText.richText.document
+      };
+    }
+  }
+
+  if (inlineText.textStages) {
+    command.textStages = inlineText.textStages;
+    for (const key of ["if", "unless"] as const) {
+      if (!(key === "if" ? command.condition : command.unless)) continue;
+      const argumentIndex = command.args.findIndex(
+        (candidate) => candidate.kind === "param" && candidate.key.toLowerCase() === key
+      );
+      const source = parsed.sourceMap.arguments[argumentIndex];
+      reportNaniDiagnostic(
+        diagnostics,
+        command.loc,
+        "invalid-inline-stage-command",
+        "error",
+        `Staged @${command.commandId} text cannot be combined with ${key}: conditions.`,
+        { span: source?.span ?? parsed.sourceMap.span }
+      );
+    }
+  }
+  return inlineText;
+}
+
+function effectiveStoryCommandText(parsed: ParsedCommand): {
+  readonly argumentIndex: number;
+  readonly source: SourcedText;
+  readonly value: NaniValue;
+} | undefined {
+  const primaryIndex = parsed.command.args.findIndex((arg) => arg.kind === "value");
+  if (primaryIndex >= 0) {
+    const arg = parsed.command.args[primaryIndex];
+    const source = parsed.argumentValues[primaryIndex];
+    if (arg?.kind === "value" && source) return { argumentIndex: primaryIndex, source, value: arg.value };
+  }
+  for (let index = parsed.command.args.length - 1; index >= 0; index -= 1) {
+    const arg = parsed.command.args[index];
+    const source = parsed.argumentValues[index];
+    if (arg?.kind === "param" && arg.key.toLowerCase() === "text" && source) {
+      return { argumentIndex: index, source, value: arg.value };
+    }
+  }
+  return undefined;
 }
 
 function attachCommandRichText(parsed: ParsedCommand, diagnostics: NaniDiagnosticSink): void {

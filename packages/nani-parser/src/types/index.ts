@@ -14,6 +14,7 @@ export type {
   SourceLocation,
   StatementIR,
   TextIR,
+  TextStageIR,
   TextToken,
   TextTokenInlineCommand,
   TextTokenText

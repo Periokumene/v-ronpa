@@ -584,7 +584,11 @@ export function useVnRuntime({
 
   function requestStoryTextPlaybackScheduleAdvance(source: StoryTextPlaybackScheduleSource): boolean {
     const revealGate = selectStoryTextPlaybackAdvanceGate({ source, reveal: storyTextRevealRuntimeRef.current.state });
-    const voiceReady = revealGate.ready ? getVoiceAutoAdvanceGateController().request(source) : false;
+    const voiceReady = revealGate.ready
+      ? isCurrentStoryTextStageIntermediate()
+        ? true
+        : getVoiceAutoAdvanceGateController().request(source)
+      : false;
     const request = selectStoryTextPlaybackAdvanceRequest({ revealGate, voiceReady });
     if (request.type === "blocked") return false;
     advanceStory(request.source);
@@ -895,6 +899,7 @@ export function useVnRuntime({
         if (
           (source === "manual" || source === "skip")
           && canAdvanceVnStoryFromSource({ active: current.active, state: current.story }, source)
+          && !isStoryTextStageIntermediate(current.story)
         ) clearVoiceAutoAdvanceGate({ stopVoice: true });
       },
       pacing: step.playStep.intent.pacing,
@@ -914,6 +919,20 @@ export function useVnRuntime({
     });
   }
   advanceStoryRef.current = advanceStory;
+
+  function isCurrentStoryTextStageIntermediate(): boolean {
+    return isStoryTextStageIntermediate(sessionRef.current.story);
+  }
+
+  function isStoryTextStageIntermediate(story: StoryRuntimeSnapshot): boolean {
+    const record = compiledCatalogRef.current.recordsByPath.get(story.currentScriptPath);
+    const command = record?.script.commands[story.instructionPointer - 1];
+    return Boolean(
+      isStoryTextCommand(command)
+      && command?.textStage
+      && command.textStage.index < command.textStage.count - 1
+    );
+  }
 
   function chooseStory(index: number) {
     if (navigationActiveRef.current) return;
@@ -1217,6 +1236,12 @@ export function useVnRuntime({
 
     const currentLine = selectCurrentStoryLine(storyState);
     const text = currentLine?.text ?? stringRuntimeParam(storyTextCommand, "text") ?? "";
+    const fragmentText = stringRuntimeParam(storyTextCommand, "text") ?? "";
+    const append = scalarValue(storyTextCommand.params.append) === true;
+    const prefixText = append && text.endsWith(fragmentText)
+      ? text.slice(0, text.length - fragmentText.length)
+      : "";
+    const initialVisibleUnitCount = countStoryTextRevealUnits(prefixText);
     const nowMs = readVnRuntimeNowMs();
     const schedule = selectStoryPlaySchedule(storyPlayState, storyState, {
       active,
@@ -1229,7 +1254,7 @@ export function useVnRuntime({
         : undefined;
     const scriptSpeed = numberRuntimeParam(storyTextCommand, "speed");
     const plan = createStoryTextPacingPlan({
-      unitCount: countStoryTextRevealUnits(text),
+      unitCount: countStoryTextRevealUnits(fragmentText),
       textSpeed: storyTextRevealSettings.textSpeed,
       ...(scriptSpeed !== undefined ? { scriptSpeed } : {}),
       ...(totalDelayMs !== undefined ? { totalDelayMs } : {})
@@ -1238,7 +1263,8 @@ export function useVnRuntime({
       lineKey: createStoryTextRevealLineKey(storyState, storyTextCommand),
       text,
       startedAtMs: nowMs,
-      durationMs: pacing === "skip" || !textVisible ? 0 : plan.revealDurationMs
+      durationMs: pacing === "skip" || !textVisible ? 0 : plan.revealDurationMs,
+      ...(initialVisibleUnitCount > 0 ? { initialVisibleUnitCount } : {})
     });
     const step = advanceStoryTextReveal(created, nowMs);
     const speakerId = currentLine?.speaker ?? stringRuntimeParam(storyTextCommand, "speaker");
@@ -1267,7 +1293,10 @@ export function useVnRuntime({
       ...(speakerId ? { speakerId } : {}),
       ...(textId ? { textId } : {}),
       voice: voiceSettings,
-      voiceAssetAvailable: voiceAvailability.available
+      voiceAssetAvailable: voiceAvailability.available,
+      ...(storyTextCommand.textStage && storyTextCommand.textStage.index > 0
+        ? { continuation: true }
+        : {})
     });
     dialogueAudioRuntimeRef.current = dialogueAudio.state;
     return {

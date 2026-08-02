@@ -138,6 +138,28 @@ describe("Nani devtools candidate update preparation", () => {
     expect(prepared.result.checkpoint.story.text?.current?.text).toBe("Updated.");
   });
 
+  it("remaps a persisted internal text stage to the final stage on source refresh", async () => {
+    const activeEntry = await canonicalEntry("#Start\nNarrator: A[-]B|#staged_line|");
+    const activeInspection = await inspectVnDebugScript(activeEntry.entry, activeEntry.source);
+    const changedSource = "#Start\nNarrator: A[-]B[-]C|#staged_line|";
+    const changedInspection = await inspectVnDebugScript(activeEntry.entry, {
+      ...activeEntry.source,
+      sourceText: changedSource
+    });
+    const prepared = await prepareVnDevtoolsCandidateUpdate({
+      activeCandidate: activeEntry,
+      update: update(changedSource, changedInspection.revision),
+      pinnedTarget: activeInspection.commands[0]!.anchor,
+      impact: "executed-session"
+    });
+
+    expect(prepared.kind).toBe("materialize-pinned-target");
+    if (prepared.kind !== "materialize-pinned-target" || prepared.result.status !== "ready") return;
+    expect(prepared.result.resolvedTarget.stableId).toBe("print:staged_line:stage:final");
+    expect(prepared.result.checkpoint.story.text?.current?.text).toBe("ABC");
+    expect(prepared.result.checkpoint.story.backlog.map((entry) => entry.text)).toEqual(["ABC"]);
+  });
+
   it("replays a changed predecessor through a fixed point in another script", async () => {
     const runtimeEntry: VnEntryDef = {
       id: "vn:multi",

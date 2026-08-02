@@ -47,6 +47,26 @@ describe("story text reveal runtime", () => {
     expect(completeStoryTextReveal(completed.state, 300).events).toEqual([]);
   });
 
+  it("keeps an appended prefix visible and emits ticks only for the new suffix", () => {
+    const state = createStoryTextRevealState({
+      lineKey: "line:append",
+      text: "ABCDEF",
+      initialVisibleUnitCount: 3,
+      startedAtMs: 0,
+      durationMs: 300
+    });
+
+    expect(selectVisibleRevealText(state)).toBe("ABC");
+    expect(state.eventCursor.tickUnitCount).toBe(3);
+    const started = advanceStoryTextReveal(state, 0);
+    expect(started.events.map((event) => event.type)).toEqual(["reveal-start"]);
+    const ticked = advanceStoryTextReveal(started.state, 100);
+    expect(ticked.events).toEqual([
+      expect.objectContaining({ type: "reveal-tick", unit: "D", unitIndex: 3, visibleUnitCount: 4 })
+    ]);
+    expect(selectVisibleRevealText(ticked.state)).toBe("ABCD");
+  });
+
   it("does not synthesize catch-up tick events when a reveal is completed immediately", () => {
     const revealing = createStoryTextRevealState({
       lineKey: "line:complete",

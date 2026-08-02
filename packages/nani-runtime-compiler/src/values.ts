@@ -18,15 +18,20 @@ export function getCommandParam(command: CommandShape, key: string): NaniValue |
   const direct = command.params[key];
   if (direct) return direct;
   const normalized = normalizeParamName(key);
-  return Object.entries(command.params).find(([candidate]) => normalizeParamName(candidate) === normalized)?.[1];
+  for (const candidate in command.params) {
+    if (normalizeParamName(candidate) === normalized) return command.params[candidate];
+  }
+  return undefined;
 }
 
 export function runtimeParam(command: CommandShape, key: string): RuntimeValue | undefined {
   const value = runtimeCommandValue(getCommandParam(command, key));
   if (value !== undefined) return value;
   const normalized = normalizeParamName(key);
-  const flag = Object.entries(command.flags).find(([candidate]) => normalizeParamName(candidate) === normalized);
-  return flag?.[1];
+  for (const candidate in command.flags) {
+    if (normalizeParamName(candidate) === normalized) return command.flags[candidate];
+  }
+  return undefined;
 }
 
 export function runtimeCommandValue(value: NaniValue | undefined): RuntimeValue | undefined {

@@ -64,14 +64,15 @@ export function compileRuntimeScript(document: ParsedScenarioDocument): CompileR
       continue;
     }
 
-    const command = compileStatement(
+    const compiled = compileStatement(
       statement,
       diagnostics,
       migratedDiagnostics,
       sourceMap,
       statementIndex
     );
-    if (command) commands.push(command);
+    if (Array.isArray(compiled)) commands.push(...compiled);
+    else if (compiled) commands.push(compiled);
   }
 
   diagnostics.push(...diagnoseStoryTextIds(document));
@@ -177,19 +178,20 @@ function compileStatement(
   migratedDiagnostics: RuntimeCompilerDiagnostic[],
   sourceMap: NaniSourceMap,
   statementIndex: number
-): RuntimeCommand | undefined {
+): RuntimeCommand | RuntimeCommand[] | undefined {
   if (statement.kind === "comment" || statement.kind === "label") return undefined;
   if (statement.kind === "text") return compileText(statement);
-  return compileCommand(
+  const command = compileCommand(
     statement,
     diagnostics,
     migratedDiagnostics,
     sourceMap,
     statementIndex
   );
+  return command ? expandTextStages(command, statement.textStages) : undefined;
 }
 
-function compileText(statement: TextIR): RuntimeCommand {
+function compileText(statement: TextIR): RuntimeCommand | RuntimeCommand[] {
   const text =
     statement.richText?.text ??
     statement.tokens
@@ -208,7 +210,7 @@ function compileText(statement: TextIR): RuntimeCommand {
   if (statement.printParams?.speed !== undefined) params.speed = runtimeValue(statement.printParams.speed);
   if (statement.textId) params.textId = statement.textId;
 
-  return {
+  const command: RuntimeCommand = {
     commandId: "print",
     canonicalName: "print",
     category: "text",
@@ -222,6 +224,7 @@ function compileText(statement: TextIR): RuntimeCommand {
       rawParams: statement.printParams ? plainParamRecord(statement.printParams) : {}
     }
   };
+  return expandTextStages(command, statement.textStages);
 }
 
 function compileCommand(
@@ -232,6 +235,17 @@ function compileCommand(
   statementIndex: number
 ): RuntimeCommand | undefined {
   const diagnosticContext: CommandDiagnosticContext = { command, sourceMap, statementIndex };
+  if (command.textStages && (command.condition || command.unless)) {
+    diagnostics.push(
+      createCommandDiagnostic(
+        diagnosticContext,
+        "invalid-command-param",
+        `Staged @${command.commandId} text cannot be combined with if/unless conditions.`,
+        "error"
+      )
+    );
+    return undefined;
+  }
   const definition = getNaniCommandDefinition(command.commandId);
   if (!definition) {
     diagnostics.push(
@@ -307,6 +321,27 @@ function compileCommand(
     loc: command.loc,
     sourceCommand
   };
+}
+
+function expandTextStages(
+  command: RuntimeCommand,
+  stages: readonly NonNullable<TextIR["textStages"]>[number][] | undefined
+): RuntimeCommand | RuntimeCommand[] {
+  if (!stages || stages.length < 2) return command;
+  const count = stages.length;
+  const { richText: _fullRichText, ...shared } = command;
+  return stages.map((stage, index) => ({
+    ...shared,
+    params: {
+      ...command.params,
+      text: stage.text,
+      ...(index > 0 ? { append: true } : {}),
+      autoNext: index === count - 1 ? command.params.autoNext ?? false : false
+    },
+    ...(stage.richText ? { richText: richTextDocument(stage.richText) } : {}),
+    textStage: { index, count },
+    loc: stage.loc
+  }));
 }
 
 function richTextForCommand(

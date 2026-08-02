@@ -9,6 +9,7 @@ import {
   EMPTY_VN_DEBUG_DECISION_TRACE,
   inspectVnDebugScript,
   materializeVnDebugTarget,
+  resolveVnDebugFinalTextStageAnchor,
   type VnDebugDecisionTrace,
   type VnDebugChoiceDecision,
   type VnDebugScriptInspection,
@@ -505,10 +506,11 @@ export function useVnDevtoolsController({
       cancellable: true,
       ...(updateId !== undefined ? { updateId } : {})
     });
+    const finalTarget = resolveVnDebugFinalTextStageAnchor(candidateInspection, target) ?? target;
     const common = {
       entry: candidateInspection.entry,
       inspection: candidateInspection,
-      target,
+      target: finalTarget,
       decisions: sessionSnapshotRef.current.decisions,
       ...(expectedRevision ? { expectedRevision } : {}),
       signal: task.signal
@@ -1035,8 +1037,8 @@ export function useVnDevtoolsController({
   );
   const decision = useMemo(() => pendingDecision ? toDockDecision(pendingDecision.result) : undefined, [pendingDecision]);
   const summaries = useMemo(
-    () => createSummaries(runtime, lastCheckpoint, materializationMode, lastMaterialization),
-    [lastCheckpoint, lastMaterialization, materializationMode, runtime]
+    () => createSummaries(runtime, lastCheckpoint, materializationMode, lastMaterialization, inspection),
+    [inspection, lastCheckpoint, lastMaterialization, materializationMode, runtime]
   );
   const effectiveStatus = useMemo(
     () => applyVnDevtoolsRuntimeDegradation(status, runtime.diagnostics.runtimeDiagnostics),
@@ -1225,7 +1227,9 @@ export function useVnDevtoolsController({
           });
           return;
         }
-        const anchor = lineModel.currentAnchor;
+        const anchor = lineModel.currentAnchor && inspection
+          ? resolveVnDebugFinalTextStageAnchor(inspection, lineModel.currentAnchor) ?? lineModel.currentAnchor
+          : lineModel.currentAnchor;
         if (!anchor || !runtime.shell.interactionFacts.isAtStableStop) {
           setStatus({ phase: "blocked", message: "The current runtime position is not a stable checkpoint." });
           return;
@@ -1431,7 +1435,11 @@ function createLineModel(
   }
   const lines = inspection.sourceLines.map((sourceLine) => {
     const lineId = `line-${sourceLine.line}`;
-    const anchor = sourceLine.anchors.find((candidate) => candidate.kind === "command") ?? sourceLine.anchors[0];
+    const commandAnchors = sourceLine.anchors.filter((candidate) => candidate.kind === "command");
+    const anchor = commandAnchors.find((candidate) => {
+      const stage = commandByIndex.get(candidate.commandIndex)?.command.textStage;
+      return Boolean(stage && stage.index === stage.count - 1);
+    }) ?? commandAnchors[0] ?? sourceLine.anchors[0];
     if (anchor) anchorByLineId.set(lineId, anchor);
     const command = anchor?.kind === "command" ? commandByIndex.get(anchor.commandIndex) : undefined;
     const label = labelsByLine.get(sourceLine.line);
@@ -1555,12 +1563,16 @@ function createSummaries(
     provenance: VnDebugMaterializationProvenance;
     executedInstructions: number;
     executedScriptPaths: readonly string[];
-  } | undefined
+  } | undefined,
+  inspection: VnDebugScriptInspection | undefined
 ): VnDevtoolsRuntimeSummaries {
   const story = runtime.shell.storyRuntime.state;
   const pixi = runtime.presentation.pixiStageRuntime.snapshot;
   const checkpoint = runtime.lifecycle.createVnSaveCheckpoint({ allowInactive: true });
   const stableCheckpoint = checkpoint.ok ? checkpoint.value : lastCheckpoint;
+  const currentStage = inspection?.source.scriptPath === story.currentScriptPath
+    ? inspection.script.commands[story.instructionPointer - 1]?.textStage
+    : undefined;
   return {
     story: [
       {
@@ -1573,6 +1585,7 @@ function createSummaries(
       { label: "executed instructions", value: lastMaterialization?.executedInstructions ?? null },
       { label: "executed scripts", value: lastMaterialization?.executedScriptPaths.join(", ") ?? null },
       { label: "pointer", value: story.instructionPointer },
+      ...(currentStage ? [{ label: "stage", value: `${currentStage.index + 1}/${currentStage.count}` }] : []),
       { label: "variables", value: Object.keys(story.variables).length },
       { label: "choices", value: story.pendingChoices.length },
       { label: "text", value: story.text?.current?.text ?? null },

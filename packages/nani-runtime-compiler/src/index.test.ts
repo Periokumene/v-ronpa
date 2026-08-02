@@ -346,6 +346,63 @@ describe("nani runtime compiler", () => {
     });
   });
 
+  it("lowers staged dialogue, print, and cue into stable suffix commands and expanded labels", () => {
+    const result = compileRuntimeScript(parseScenario({
+      sourceText: [
+        "#Start",
+        "Narrator: A[-]B[< speed:0.5]C[>]",
+        "#Printed",
+        '@print "<b>D</b>[-]<i>E</i>" author:Narrator textId:print_stage autoNext!',
+        "#Cued",
+        '@cue "F[wait i]G" author:Narrator textId:cue_stage autoNext!',
+        "#Done",
+        "@end"
+      ].join("\n"),
+      scriptPath: "staged-compile.nani"
+    }));
+
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
+    expect(result.script.labels).toEqual({ Start: 0, Printed: 2, Cued: 4, Done: 6 });
+    expect(result.script.commands.slice(0, 6)).toMatchObject([
+      { commandId: "print", params: { text: "A", speaker: "Narrator", speed: 0.5, autoNext: false }, textStage: { index: 0, count: 2 } },
+      { commandId: "print", params: { text: "BC", speaker: "Narrator", speed: 0.5, append: true, autoNext: true }, textStage: { index: 1, count: 2 } },
+      { commandId: "print", params: { text: "D", speaker: "Narrator", textId: "print_stage", autoNext: false }, textStage: { index: 0, count: 2 }, richText: { text: "D" } },
+      { commandId: "print", params: { text: "E", speaker: "Narrator", textId: "print_stage", append: true, autoNext: true }, textStage: { index: 1, count: 2 }, richText: { text: "E" } },
+      { commandId: "cue", params: { text: "F", speaker: "Narrator", textId: "cue_stage", autoNext: false }, textStage: { index: 0, count: 2 } },
+      { commandId: "cue", params: { text: "G", speaker: "Narrator", textId: "cue_stage", append: true, autoNext: true }, textStage: { index: 1, count: 2 } }
+    ]);
+  });
+
+  it("consumes explicit print append and rejects conditional staged commands", () => {
+    const append = compileRuntimeScript(parseScenario({
+      sourceText: '@print "continued" append:true',
+      scriptPath: "print-append.nani"
+    }));
+    expect(withoutDiagnosticLocations(append.diagnostics)).toEqual([]);
+    expect(append.script.commands[0]?.params).toEqual({ text: "continued", autoNext: false, append: true });
+
+    const conditional = compileRuntimeScript(parseScenario({
+      sourceText: '@print "A[-]B" if:{ready}',
+      scriptPath: "conditional-stage.nani"
+    }));
+    expect(conditional.script.commands).toEqual([]);
+    expect(conditional.diagnostics).toContainEqual(expect.objectContaining({
+      code: "invalid-command-param",
+      severity: "error",
+      message: "Staged @print text cannot be combined with if/unless conditions."
+    }));
+  });
+
+  it("includes staged command identity in runtime semantic revisions", async () => {
+    const staged = compileScriptForRevision(["Narrator: AB[-]C"]);
+    const relocatedStage = compileScriptForRevision(["Narrator: A[-]BC"]);
+    const unstaged = compileScriptForRevision(["Narrator: ABC"]);
+
+    expect(serializeRuntimeScriptSemantics(staged)).not.toBe(serializeRuntimeScriptSemantics(relocatedStage));
+    expect(await digestRuntimeScriptSemantics(staged)).not.toBe(await digestRuntimeScriptSemantics(relocatedStage));
+    expect(serializeRuntimeScriptSemantics(staged)).not.toBe(serializeRuntimeScriptSemantics(unstaged));
+  });
+
   it("diagnoses cue primary and story text ids at the exact offending spans", () => {
     const source = [
       "@cue",

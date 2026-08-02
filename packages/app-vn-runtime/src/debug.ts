@@ -8,7 +8,8 @@ export {
   EMPTY_VN_DEBUG_DECISION_TRACE,
   inspectVnDebugScript,
   materializeVnDebugTarget,
-  resolveVnDebugAnchor
+  resolveVnDebugAnchor,
+  resolveVnDebugFinalTextStageAnchor
 } from "./debugMaterializer";
 export type {
   MaterializeVnDebugTargetInput,

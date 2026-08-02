@@ -72,6 +72,38 @@ describe("dialogue audio runtime", () => {
     });
   });
 
+  it("keeps whole-line voice alive across staged continuations and restarts suffix bleep only", () => {
+    expect(
+      planDialogueLineAudio({}, lineInput({
+        continuation: true,
+        lineKey: "line:voice-stage-2",
+        textId: "voice_validation_0001",
+        voiceAssetAvailable: true
+      }))
+    ).toEqual({ state: {}, hasVoiceBoundary: false, effects: [] });
+
+    expect(
+      planDialogueLineAudio({}, lineInput({
+        continuation: true,
+        lineKey: "line:bleep-stage-2",
+        voiceAssetAvailable: false
+      }))
+    ).toEqual({
+      state: {
+        activeBleepLineKey: "line:bleep-stage-2",
+        activeBleepKey: "dialogue-bleep:line:bleep-stage-2",
+        activeBleepSourceRef: "bleep:dialogue-default"
+      },
+      hasVoiceBoundary: false,
+      effects: [{
+        type: "play-dialogue-bleep",
+        key: "dialogue-bleep:line:bleep-stage-2",
+        sourceRef: "bleep:dialogue-default",
+        volume: 0.2
+      }]
+    });
+  });
+
   it("falls back to bleep when voice is unavailable and still applies speaker overrides", () => {
     expect(
       planDialogueLineAudio(
@@ -202,7 +234,8 @@ describe("dialogue audio runtime", () => {
     speakerId,
     textId,
     voiceAssetAvailable = false,
-    voiceVolume = 1
+    voiceVolume = 1,
+    continuation = false
   }: {
     bleepVolume?: number;
     textVisible?: boolean;
@@ -213,6 +246,7 @@ describe("dialogue audio runtime", () => {
     textId?: string;
     voiceAssetAvailable?: boolean;
     voiceVolume?: number;
+    continuation?: boolean;
   }) {
     return {
       bleep: { config, volume: bleepVolume },
@@ -223,7 +257,8 @@ describe("dialogue audio runtime", () => {
       ...(speakerId ? { speakerId } : {}),
       ...(textId ? { textId } : {}),
       voice: { locale: "zh", volume: voiceVolume },
-      voiceAssetAvailable
+      voiceAssetAvailable,
+      ...(continuation ? { continuation } : {})
     };
   }
 });

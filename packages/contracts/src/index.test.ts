@@ -27,6 +27,7 @@ import {
   RuntimeAssetSchema,
   RuntimeCommandSchema,
   RuntimeScriptSchema,
+  RuntimeTextStageSchema,
   SAVE_BACKLOG_LIMIT,
   SaveDataSchema,
   SaveModeSchema,
@@ -50,6 +51,13 @@ import {
 } from "./index";
 
 describe("contracts", () => {
+  it("validates runtime text stage bounds", () => {
+    expect(RuntimeTextStageSchema.parse({ index: 1, count: 3 })).toEqual({ index: 1, count: 3 });
+    expect(() => RuntimeTextStageSchema.parse({ index: 0, count: 1 })).toThrow();
+    expect(() => RuntimeTextStageSchema.parse({ index: -1, count: 3 })).toThrow();
+    expect(() => RuntimeTextStageSchema.parse({ index: 3, count: 3 })).toThrow();
+  });
+
   it("validates the baseline content manifest", () => {
     const manifest = ContentManifestSchema.parse({
       version: 4,

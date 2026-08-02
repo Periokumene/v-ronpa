@@ -34,6 +34,7 @@ export type {
   SourceLocation,
   StatementIR,
   TextIR,
+  TextStageIR,
   TextSpan,
   TextToken,
   TextTokenInlineCommand,

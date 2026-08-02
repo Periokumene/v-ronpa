@@ -128,6 +128,34 @@ describe("story play", () => {
     expect(selectStoryPlaySchedule(choices.play, choices.story.state)).toEqual({ type: "idle" });
   });
 
+  it("schedules AUTO and SKIP per staged suffix instead of jumping to the full line", () => {
+    const script = runtimeScript("staged-automation.nani", [
+      runtimeCommand("print", "text", { text: "A", autoNext: false }, { textStage: { index: 0, count: 3 } }),
+      runtimeCommand("print", "text", { text: "BB", append: true, autoNext: false }, { textStage: { index: 1, count: 3 } }),
+      runtimeCommand("print", "text", { text: "CCC", append: true, autoNext: false }, { textStage: { index: 2, count: 3 } })
+    ]);
+    const first = advanceStoryPlay(createInitialStoryPlayState(), {
+      state: createInitialStoryState(script),
+      script,
+      source: "start"
+    });
+    const auto = toggleAutoStoryPlay(first.play);
+    const timing = { autoBaseDelayMs: 0, autoPerVisibleCharMs: 100, autoMinDelayMs: 0, autoMaxDelayMs: 10_000 };
+    expect(selectStoryPlaySchedule(auto, first.story.state, { timing })).toEqual({ type: "wait", source: "auto", delayMs: 100 });
+
+    const second = advanceStoryPlay(auto, { state: first.story.state, script, source: "auto" });
+    expect(second.play.currentStop?.visibleCharCount).toBe(2);
+    expect(second.story.state.text?.current?.text).toBe("ABB");
+    expect(second.story.state.backlog).toEqual([]);
+    expect(selectStoryPlaySchedule(second.play, second.story.state, { timing })).toEqual({ type: "wait", source: "auto", delayMs: 200 });
+
+    const skip = toggleSkipStoryPlay(second.play);
+    const final = advanceStoryPlay(skip, { state: second.story.state, script, source: "skip" });
+    expect(final.intent.pacing).toBe("skip");
+    expect(final.story.state.text?.current?.text).toBe("ABBCCC");
+    expect(final.story.state.backlog.map((entry) => entry.text)).toEqual(["ABBCCC"]);
+  });
+
   it("does not schedule AUTO when the host reports blocked or not ready", () => {
     const play = toggleAutoStoryPlay({
       ...createInitialStoryPlayState(),
@@ -254,7 +282,7 @@ function runtimeCommand(
   commandId: string,
   category: NaniCommandCategory,
   params: RuntimeCommand["params"] = {},
-  options: Partial<Pick<RuntimeCommand, "source" | "status" | "canonicalName">> = {}
+  options: Partial<Pick<RuntimeCommand, "source" | "status" | "canonicalName" | "textStage">> = {}
 ): RuntimeCommand {
   const source: NaniCommandSource = options.source ?? "v-ronpa";
   const status: NaniCommandStatus = options.status ?? "implemented";
@@ -265,6 +293,7 @@ function runtimeCommand(
     source,
     status,
     params,
+    ...(options.textStage ? { textStage: options.textStage } : {}),
     loc: { scriptPath: "story-play-test.nani", line: 1, column: 1, raw: commandId }
   };
 }

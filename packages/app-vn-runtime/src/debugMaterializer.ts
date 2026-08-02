@@ -694,6 +694,23 @@ export function resolveVnDebugAnchor(
   return lineMatches.length === 1 ? lineMatches[0]!.anchor : undefined;
 }
 
+export function resolveVnDebugFinalTextStageAnchor(
+  inspection: VnDebugScriptInspection,
+  anchor: VnDebugTargetAnchor
+): VnDebugTargetAnchor | undefined {
+  const resolved = resolveVnDebugAnchor(inspection, anchor);
+  if (!resolved || resolved.kind !== "command") return resolved;
+  const command = inspection.commands[resolved.commandIndex]?.command;
+  if (!command?.textStage) return resolved;
+  const final = inspection.commands.find((candidate) => {
+    const stage = candidate.command.textStage;
+    return candidate.command.commandId === command.commandId
+      && candidate.command.loc.line === command.loc.line
+      && Boolean(stage && stage.index === stage.count - 1);
+  });
+  return final?.anchor ?? resolved;
+}
+
 function createCommandAnchors(script: RuntimeScript, revision: string): VnDebugTargetAnchor[] {
   const ordinals = new Map<string, number>();
   const sortedLabels = Object.entries(script.labels).sort((left, right) => left[1] - right[1]);
@@ -705,6 +722,7 @@ function createCommandAnchors(script: RuntimeScript, revision: string): VnDebugT
       .map((candidate) => candidate ? normalizeSource(candidate.loc.raw) : "")
       .join("\u241f");
     const stableId = stableCommandId(command);
+    const stageRole = textStageRole(command);
     return {
       kind: "command",
       scriptPath: script.scriptPath,
@@ -714,7 +732,9 @@ function createCommandAnchors(script: RuntimeScript, revision: string): VnDebugT
       ordinal,
       commandId: command.commandId,
       ...(stableId ? { stableId } : {}),
-      fingerprint: shortFingerprint(`${nearestLabel}\u241e${command.commandId}\u241e${context}`)
+      fingerprint: shortFingerprint(
+        `${nearestLabel}\u241e${command.commandId}\u241e${stageRole ?? "line"}\u241e${command.loc.line}:${command.loc.column}\u241e${context}`
+      )
     };
   });
 }
@@ -738,7 +758,16 @@ function stableCommandId(command: RuntimeCommand): string | undefined {
     : command.commandId === "choice"
       ? command.params.id
       : undefined;
-  return typeof value === "string" && value ? `${command.commandId}:${value}` : undefined;
+  if (typeof value !== "string" || !value) return undefined;
+  const stageRole = textStageRole(command);
+  return `${command.commandId}:${value}${stageRole ? `:stage:${stageRole}` : ""}`;
+}
+
+function textStageRole(command: RuntimeCommand): string | undefined {
+  if (!command.textStage) return undefined;
+  return command.textStage.index === command.textStage.count - 1
+    ? "final"
+    : String(command.textStage.index + 1);
 }
 
 function createChoiceGroupDecisionAnchor(

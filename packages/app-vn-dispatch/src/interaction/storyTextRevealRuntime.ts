@@ -18,6 +18,7 @@ export interface StoryTextRevealState {
   text: string;
   units: string[];
   visibleUnitCount: number;
+  initialVisibleUnitCount: number;
   startedAtMs: number;
   durationMs: number;
   status: StoryTextRevealStatus;
@@ -29,6 +30,7 @@ export interface CreateStoryTextRevealStateInput {
   text: string;
   startedAtMs: number;
   durationMs: number;
+  initialVisibleUnitCount?: number;
 }
 
 export interface StoryTextRevealStep {
@@ -64,22 +66,32 @@ type GraphemeSegmenter = new (
 
 export function createStoryTextRevealState({
   durationMs,
+  initialVisibleUnitCount = 0,
   lineKey,
   startedAtMs,
   text
 }: CreateStoryTextRevealStateInput): StoryTextRevealState {
   const units = segmentStoryTextRevealUnits(text);
   const normalizedDurationMs = Math.max(0, Math.round(durationMs));
-  const complete = units.length === 0 || normalizedDurationMs === 0;
+  const normalizedInitialVisibleUnitCount = Math.max(
+    0,
+    Math.min(units.length, Math.floor(initialVisibleUnitCount))
+  );
+  const complete = normalizedInitialVisibleUnitCount === units.length || normalizedDurationMs === 0;
   return {
     lineKey,
     text,
     units,
-    visibleUnitCount: complete ? units.length : 0,
+    visibleUnitCount: complete ? units.length : normalizedInitialVisibleUnitCount,
+    initialVisibleUnitCount: normalizedInitialVisibleUnitCount,
     startedAtMs,
     durationMs: normalizedDurationMs,
     status: complete ? "complete" : "revealing",
-    eventCursor: { started: false, tickUnitCount: 0, finished: false }
+    eventCursor: {
+      started: false,
+      tickUnitCount: normalizedInitialVisibleUnitCount,
+      finished: false
+    }
   };
 }
 
@@ -207,7 +219,11 @@ function nextVisibleUnitCount(state: StoryTextRevealState, nowMs: number): numbe
   if (state.units.length === 0 || state.durationMs === 0) return state.units.length;
   const elapsedMs = Math.max(0, nowMs - state.startedAtMs);
   if (elapsedMs >= state.durationMs) return state.units.length;
-  return Math.min(state.units.length, Math.floor((elapsedMs / state.durationMs) * state.units.length));
+  const pendingUnitCount = state.units.length - state.initialVisibleUnitCount;
+  return Math.min(
+    state.units.length,
+    state.initialVisibleUnitCount + Math.floor((elapsedMs / state.durationMs) * pendingUnitCount)
+  );
 }
 
 function segmentStoryTextRevealUnits(text: string): string[] {

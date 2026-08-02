@@ -9,8 +9,12 @@ import {
 export const textUiMediaNormalizers: Readonly<Record<string, CommandNormalizerDescriptor>> = {
   print: {
     acceptsPrimary: true,
-    consumedParams: ["text", "author", "as", "printer", "speed", "textId", "autoNext", "reset"],
-    normalize: (command) => normalizeStoryTextParams(command, { includePrinter: true, includeReset: true })
+    consumedParams: ["text", "author", "as", "printer", "speed", "textId", "autoNext", "reset", "append"],
+    normalize: (command) => normalizeStoryTextParams(command, {
+      includePrinter: true,
+      includeReset: true,
+      includeAppend: true
+    })
   },
   cue: {
     acceptsPrimary: true,
@@ -187,7 +191,7 @@ export const textUiMediaNormalizers: Readonly<Record<string, CommandNormalizerDe
 
 function normalizeStoryTextParams(
   command: CommandShape,
-  options: { includePrinter?: boolean; includeReset?: boolean } = {}
+  options: { includePrinter?: boolean; includeReset?: boolean; includeAppend?: boolean } = {}
 ) {
   return compactParams({
     text: runtimeCommandValue(command.primary) ?? runtimeParam(command, "text") ?? "",
@@ -196,6 +200,7 @@ function normalizeStoryTextParams(
     speed: runtimeParam(command, "speed"),
     textId: runtimeParam(command, "textId"),
     autoNext: runtimeParam(command, "autoNext") ?? false,
-    reset: options.includeReset ? runtimeParam(command, "reset") : undefined
+    reset: options.includeReset ? runtimeParam(command, "reset") : undefined,
+    append: options.includeAppend ? runtimeParam(command, "append") : undefined
   });
 }

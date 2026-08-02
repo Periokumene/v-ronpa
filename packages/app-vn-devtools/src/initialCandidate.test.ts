@@ -80,6 +80,25 @@ describe("Nani devtools initial candidate handshake", () => {
     expect(prepared.result.checkpoint.story.text?.current?.text).toBe("Restored.");
   });
 
+  it("restores a persisted staged-line pin at the final stage", async () => {
+    const generatedEntry = await canonicalEntry("#Start\nNarrator: A[-]B|#staged_line|");
+    const sourceText = "#Start\nNarrator: A[-]B[-]C|#staged_line|";
+    const activeEntry = withSource(generatedEntry, sourceText);
+    const inspection = await inspectVnDebugScript(activeEntry.entry, activeEntry.source);
+    const oldInspection = await inspectVnDebugScript(generatedEntry.entry, generatedEntry.source);
+    const prepared = await prepareVnDevtoolsInitialCandidate({
+      activeCandidate: activeEntry,
+      candidate: candidate(sourceText, inspection.revision),
+      pinnedTarget: oldInspection.commands[0]!.anchor,
+      vnActive: true
+    });
+
+    expect(prepared.kind).toBe("materialize-pinned-target");
+    if (prepared.kind !== "materialize-pinned-target" || prepared.result.status !== "ready") return;
+    expect(prepared.result.resolvedTarget.stableId).toBe("print:staged_line:stage:final");
+    expect(prepared.result.checkpoint.story.text?.current?.text).toBe("ABC");
+  });
+
   it("adopts a verified changed revision only while inactive and leaves active sessions unmodified", async () => {
     const generatedEntry = await canonicalEntry("#Start\nNarrator: Active.|#active|");
     const sourceText = "#Start\nNarrator: Changed.|#changed|";
