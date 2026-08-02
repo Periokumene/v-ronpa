@@ -10,6 +10,9 @@
       "include": "#label"
     },
     {
+      "include": "#storyCommandLine"
+    },
+    {
       "include": "#commandLine"
     },
     {
@@ -81,6 +84,45 @@
         }
       ]
     },
+    "storyCommandLine": {
+      "name": "meta.command.story-text.line.nani",
+      "begin": "^(\\s*)(@)(?i:(print|cue))\\b",
+      "beginCaptures": {
+        "2": {
+          "name": "punctuation.definition.command.nani"
+        },
+        "3": {
+          "name": "support.function.command.nani"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#storyTextValue"
+        },
+        {
+          "include": "#storyString"
+        },
+        {
+          "include": "#inlineCompactStageStop"
+        },
+        {
+          "include": "#keyValue"
+        },
+        {
+          "include": "#flag"
+        },
+        {
+          "include": "#expression"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#primaryArg"
+        }
+      ]
+    },
     "dialogue": {
       "name": "meta.dialogue.line.nani",
       "begin": "^\\s*([A-Za-z0-9_ -]+)(?:(\\.)([A-Za-z0-9_ -]+))?\\s*(:)",
@@ -104,12 +146,67 @@
           "include": "#textId"
         },
         {
+          "include": "#inlineStageStop"
+        },
+        {
           "include": "#inlineCommand"
         },
         {
           "include": "#expression"
         }
       ]
+    },
+    "inlineStageStop": {
+      "patterns": [
+        {
+          "name": "meta.inline-stage-stop.compact.nani",
+          "match": "(?<!\\\\)(\\[)(-)(\\])",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.inline-stage-stop.begin.nani"
+            },
+            "2": {
+              "name": "keyword.control.input-stop.inline.compact.nani"
+            },
+            "3": {
+              "name": "punctuation.definition.inline-stage-stop.end.nani"
+            }
+          }
+        },
+        {
+          "name": "meta.inline-stage-stop.wait.nani",
+          "match": "(?<!\\\\)(\\[)(wait)(\\s+)(i)(\\])",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.inline-stage-stop.begin.nani"
+            },
+            "2": {
+              "name": "keyword.control.input-stop.inline.wait.nani"
+            },
+            "4": {
+              "name": "constant.language.wait-mode.input.nani"
+            },
+            "5": {
+              "name": "punctuation.definition.inline-stage-stop.end.nani"
+            }
+          }
+        }
+      ]
+    },
+    "inlineCompactStageStop": {
+      "name": "meta.inline-stage-stop.compact.nani",
+      "match": "(?<!\\\\)(\\[)(-)(\\])",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.inline-stage-stop.begin.nani"
+        },
+        "2": {
+          "name": "keyword.control.input-stop.inline.compact.nani"
+        },
+        "3": {
+          "name": "punctuation.definition.inline-stage-stop.end.nani"
+        }
+      }
     },
     "inlineCommand": {
       "name": "meta.inline-command.nani",
@@ -274,6 +371,114 @@
             {
               "match": "\\\\.",
               "name": "constant.character.escape.nani"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        }
+      ]
+    },
+    "storyString": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.story-text.nani",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.nani"
+            },
+            {
+              "include": "#inlineStageStop"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.story-text.nani",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.nani"
+            },
+            {
+              "include": "#inlineStageStop"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        }
+      ]
+    },
+    "storyTextValue": {
+      "patterns": [
+        {
+          "name": "meta.parameter.story-text.nani",
+          "begin": "\\b(text)(:)(\")",
+          "beginCaptures": {
+            "1": {
+              "name": "variable.parameter.nani"
+            },
+            "2": {
+              "name": "punctuation.separator.key-value.nani"
+            },
+            "3": {
+              "name": "punctuation.definition.string.begin.nani"
+            }
+          },
+          "end": "(?<!\\\\)(\")",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.nani"
+            }
+          },
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.nani"
+            },
+            {
+              "include": "#inlineStageStop"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "name": "meta.parameter.story-text.nani",
+          "begin": "\\b(text)(:)(')",
+          "beginCaptures": {
+            "1": {
+              "name": "variable.parameter.nani"
+            },
+            "2": {
+              "name": "punctuation.separator.key-value.nani"
+            },
+            "3": {
+              "name": "punctuation.definition.string.begin.nani"
+            }
+          },
+          "end": "(?<!\\\\)(')",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.nani"
+            }
+          },
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.nani"
+            },
+            {
+              "include": "#inlineStageStop"
             },
             {
               "include": "#expression"

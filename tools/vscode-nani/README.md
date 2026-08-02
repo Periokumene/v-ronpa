@@ -7,6 +7,12 @@ VS Code language support for V-Ronpa `.nani` scripts.
 - Registers `.nani` files with the `nani` language id.
 - Provides TextMate syntax highlighting for comments, labels, commands, parameters, flags, expressions, dialogue, inline commands, and textId markers.
 - Provides catalog-derived command, parameter, and allowed-value completion from bundled `naniCommandCatalog` metadata.
+- Provides catalog-derived `@cue` / `@hideCue` command, primary-text, parameter,
+  boolean-flag, hover, and exact diagnostic behavior.
+- Highlights and documents `[>]`, `[< speed:…]`, `[-]`, and `[wait i]` with
+  context-aware completion: dialogue permits all four, quoted static
+  `@print`/`@cue` permits the staged pair, and unquoted static text permits only
+  `[-]`.
 - Limits normal completion to runtime-implemented commands and compiler-consumed parameters. Handwritten compatibility commands and declared-but-unconsumed parameters still receive hover and compiler diagnostics.
 - Provides current-file label completion for `@goto #` and `goto:#`.
 - Loads production and test Nani catalogs from the nearest `asset.config.mjs` in trusted file workspaces.
@@ -75,7 +81,12 @@ source `nani-project`.
 
 Project-aware completion is enabled only in a [trusted VS Code workspace](https://code.visualstudio.com/docs/editor/workspace-trust). Starting at the current `.nani` file, the extension finds the closest ancestor `asset.config.mjs`, resolves its paths from the closest `pnpm-workspace.yaml` root, and dynamically loads the config.
 
-The configured generated assets export is the only authority for resource IDs. The extension does not reproduce the repository's filename-to-ID generation rules. After adding or renaming raw assets, run the project's existing asset generator; the extension watches the generated module and refreshes as soon as it changes.
+The module named by `runtimeAssetOutputPath` and its configured export are the
+only authority for resource IDs. The removed `outputPath` key is rejected and
+has no fallback. The extension does not reproduce the repository's
+filename-to-ID generation rules. After adding or renaming raw assets, run the
+project's existing asset generator; the extension watches the generated module
+and refreshes as soon as it changes.
 
 Layered-character token names are read directly from each generated character pack's sibling `compositions.json`. Those files are watched independently, so token edits become available without regenerating or reinstalling the extension.
 

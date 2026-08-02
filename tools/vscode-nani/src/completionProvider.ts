@@ -168,6 +168,29 @@ export function getNaniCompletions(
   }
 
   if (context.kind === "inline") {
+    const staged: NaniCompletion[] = [
+      {
+        label: "[-]",
+        insertText: "[-]",
+        kind: "snippet",
+        range: context.range,
+        detail: "Inline staged-text input stop",
+        documentation: "提交当前累计正文并等待一次输入，然后继续显示同一条剧情文本。",
+        isSnippet: false,
+        sortText: "2"
+      },
+      ...(context.mode === "explicit-unquoted" ? [] : [{
+        label: "[wait i]",
+        insertText: "[wait i]",
+        kind: "snippet" as const,
+        range: context.range,
+        detail: "Inline staged-text input stop · long form",
+        documentation: "`[-]` 的等价长写法；在显式 `@print` / `@cue` 中仅允许放在引号正文内。",
+        isSnippet: false,
+        sortText: "3"
+      }])
+    ];
+    if (context.mode !== "dialogue") return staged;
     return [
       {
         label: "[>]",
@@ -186,7 +209,8 @@ export function getNaniCompletions(
         detail: "Inline print speed command",
         isSnippet: true,
         sortText: "1"
-      }
+      },
+      ...staged
     ];
   }
 

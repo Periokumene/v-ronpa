@@ -45,11 +45,14 @@ export type CompletionContext =
     }
   | {
       kind: "inline";
+      mode: InlineTextMode;
       range: NaniRange;
     }
   | {
       kind: "none";
     };
+
+export type InlineTextMode = "dialogue" | "explicit-quoted" | "explicit-unquoted";
 
 export function splitSourceLines(sourceText: string): string[] {
   return sourceText.replace(/\r\n/g, "\n").split("\n");
@@ -86,16 +89,26 @@ export function getCompletionContext(sourceText: string, position: NaniPosition)
   const commandContext = getCommandCompletionContext(before, position.line);
   if (commandContext) return commandContext;
 
+  const inlineContext = getInlineCompletionContext(line, before, position.line);
+  if (inlineContext) return inlineContext;
+
   const paramValueContext = getParamValueCompletionContext(before, position.line);
   if (paramValueContext) return paramValueContext;
 
   const paramContext = getParamCompletionContext(before, position.line);
   if (paramContext) return paramContext;
 
-  const inlineContext = getInlineCompletionContext(line, before, position.line);
-  if (inlineContext) return inlineContext;
-
   return { kind: "none" };
+}
+
+export function getInlineTextMode(lineText: string, character: number): InlineTextMode | undefined {
+  const safe = clamp(character, 0, lineText.length);
+  if (/^\s*[@#;]/u.test(lineText)) {
+    const text = explicitStaticText(lineText);
+    return text && safe >= text.start && safe <= text.end ? text.mode : undefined;
+  }
+  const colon = lineText.indexOf(":");
+  return colon >= 0 && safe > colon ? "dialogue" : undefined;
 }
 
 export interface NaniEndpointToken {
@@ -294,13 +307,15 @@ function getLabelCompletionContext(lineText: string, before: string, line: numbe
 
 function getInlineCompletionContext(lineText: string, before: string, line: number): CompletionContext | undefined {
   if (/^\s*$/u.test(before)) return undefined;
-  if (/^\s*[@#;]/u.test(lineText)) return undefined;
+  const mode = getInlineTextMode(lineText, before.length);
+  if (!mode) return undefined;
 
-  const bracketStart = before.lastIndexOf("[");
+  const bracketStart = lastUnescapedOpenBracket(before);
   const lastClose = before.lastIndexOf("]");
   if (bracketStart > lastClose) {
     return {
       kind: "inline",
+      mode,
       range: {
         start: { line, character: bracketStart },
         end: { line, character: before.length }
@@ -310,8 +325,134 @@ function getInlineCompletionContext(lineText: string, before: string, line: numb
 
   return {
     kind: "inline",
+    mode,
     range: cursorRange(line, before.length)
   };
+}
+
+function explicitStaticText(lineText: string): {
+  start: number;
+  end: number;
+  mode: Exclude<InlineTextMode, "dialogue">;
+} | undefined {
+  const command = /^\s*@([A-Za-z_<>][A-Za-z0-9_<>-]*)\b/u.exec(lineText);
+  const commandId = command?.[1];
+  const definition = commandId ? getNaniCommandDefinition(commandId) : undefined;
+  if (!command || !definition || (definition.id !== "print" && definition.id !== "cue")) return undefined;
+
+  const argsStart = command[0].length;
+  const tokens = argumentTokens(lineText, argsStart);
+  if (tokens.some((token) =>
+    /^(?:if|unless)(?::|!|$)/iu.test(token.text)
+    || /^(?:append!|append:true)$/iu.test(token.text)
+  )) return undefined;
+  const paramNames = new Set([
+    ...definition.params.flatMap((param) => [param.name, ...(param.aliases ?? [])]),
+    "if",
+    "unless"
+  ].map((name) => name.toLowerCase()));
+  const namedText = tokens.find((token) => /^text:/iu.test(token.text));
+  let valueStart: number;
+  let primary = false;
+  if (namedText) {
+    valueStart = namedText.start + namedText.text.indexOf(":") + 1;
+  } else {
+    const first = tokens[0];
+    if (!first || parameterName(first.text, paramNames)) return undefined;
+    valueStart = first.start;
+    primary = true;
+  }
+  const firstCharacter = lineText[valueStart];
+  if (!firstCharacter || firstCharacter === "{") return undefined;
+  if (firstCharacter === '"' || firstCharacter === "'") {
+    const close = closingQuote(lineText, valueStart, firstCharacter);
+    return {
+      start: valueStart + 1,
+      end: close < 0 ? lineText.length : close,
+      mode: "explicit-quoted"
+    };
+  }
+  const token = tokens.find((candidate) =>
+    valueStart >= candidate.start && valueStart <= candidate.end
+  );
+  if (!token) return undefined;
+  const boundary = primary
+    ? tokens.find((candidate) =>
+      candidate.start > token.start && parameterName(candidate.text, paramNames)
+    )?.start ?? lineText.length
+    : token.end;
+  return { start: valueStart, end: boundary, mode: "explicit-unquoted" };
+}
+
+function argumentTokens(source: string, start: number): readonly { text: string; start: number; end: number }[] {
+  const tokens: { text: string; start: number; end: number }[] = [];
+  let tokenStart = -1;
+  let quote = "";
+  let braces = 0;
+  let escaped = false;
+  for (let index = start; index <= source.length; index += 1) {
+    if (index === source.length) {
+      if (tokenStart >= 0) {
+        tokens.push({ text: source.slice(tokenStart), start: tokenStart, end: source.length });
+      }
+      break;
+    }
+    const character = source[index] ?? " ";
+    if (tokenStart < 0) {
+      if (/\s/u.test(character)) continue;
+      tokenStart = index;
+    }
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === "{") braces += 1;
+    else if (character === "}" && braces > 0) braces -= 1;
+    if (braces === 0 && /\s/u.test(character)) {
+      tokens.push({ text: source.slice(tokenStart, index), start: tokenStart, end: index });
+      tokenStart = -1;
+    }
+  }
+  return tokens;
+}
+
+function parameterName(token: string, paramNames: ReadonlySet<string>): string | undefined {
+  const match = /^(?:!([A-Za-z_][A-Za-z0-9_-]*)|([A-Za-z_][A-Za-z0-9_-]*)(?::|!))/u.exec(token);
+  const name = (match?.[1] ?? match?.[2])?.toLowerCase();
+  return name && paramNames.has(name) ? name : undefined;
+}
+
+function closingQuote(source: string, start: number, quote: string): number {
+  let escaped = false;
+  for (let index = start + 1; index < source.length; index += 1) {
+    const character = source[index];
+    if (escaped) escaped = false;
+    else if (character === "\\") escaped = true;
+    else if (character === quote) return index;
+  }
+  return -1;
+}
+
+function lastUnescapedOpenBracket(source: string): number {
+  for (let index = source.length - 1; index >= 0; index -= 1) {
+    if (source[index] !== "[") continue;
+    let slashes = 0;
+    for (let cursor = index - 1; cursor >= 0 && source[cursor] === "\\"; cursor -= 1) slashes += 1;
+    if (slashes % 2 === 0) return index;
+  }
+  return -1;
 }
 
 function collectUsedParams(source: string): Set<string> {
@@ -338,3 +479,4 @@ function cursorRange(line: number, character: number): NaniRange {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+import { getNaniCommandDefinition } from "@v-ronpa/contracts";

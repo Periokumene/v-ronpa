@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
+import { naniCommandCatalog } from "@v-ronpa/contracts";
 import {
   allowedValueCompletionFacts,
   commandCompletionFacts,
@@ -17,6 +18,44 @@ describe("language facts", () => {
     expect(labels).not.toContain("addChoice");
     expect(labels).toContain("gameplay-event");
     expect(labels).not.toContain("voice");
+  });
+
+  it("emits every implemented canonical command and alias exactly once", () => {
+    const expected = naniCommandCatalog
+      .filter((definition) => definition.status === "implemented")
+      .flatMap((definition) => [definition.canonicalName, ...(definition.aliases ?? [])])
+      .sort();
+    const actual = commandCompletionFacts().map((fact) => fact.label).sort();
+
+    expect(actual).toEqual(expected);
+    expect(new Set(actual).size).toBe(actual.length);
+  });
+
+  it("derives every parameter suggestion from consumed catalog metadata", () => {
+    for (const definition of naniCommandCatalog.filter((candidate) => candidate.status === "implemented")) {
+      const expected = definition.params
+        .filter((param) => param.docs?.runtimeSupport !== "declared-not-consumed")
+        .flatMap((param) => [
+          `${param.name}:`,
+          ...(param.type.toLowerCase().includes("boolean") ? [`${param.name}!`, `!${param.name}`] : [])
+        ]);
+      const actual = paramCompletionFacts(definition.id).map((fact) => fact.label);
+      expect(actual, definition.canonicalName).toEqual(expected);
+      expect(new Set(actual).size, definition.canonicalName).toBe(actual.length);
+    }
+  });
+
+  it("covers Cue and HideCue from the canonical command catalog", () => {
+    expect(commandCompletionFacts().map((fact) => fact.label)).toEqual(
+      expect.arrayContaining(["cue", "hideCue"])
+    );
+    expect(paramCompletionFacts("cue").map((fact) => fact.label)).toEqual(expect.arrayContaining([
+      "text:", "author:", "speed:", "textId:", "autoNext:", "autoNext!", "!autoNext"
+    ]));
+    expect(paramCompletionFacts("hideCue").map((fact) => fact.label)).toEqual(expect.arrayContaining([
+      "time:", "wait:", "wait!", "!wait"
+    ]));
+    expect(primaryDocumentationFact("cue")?.documentation).toContain("Required.");
   });
 
   it("derives params and boolean flag variants from command specs", () => {

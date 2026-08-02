@@ -1,13 +1,26 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
 
-- Hard-cut catalog membership to recursive `naniProject.scopes` discovery via
-  the shared `@v-ronpa/nani-project` package.
+- Hard-cut project config, recursive catalog discovery, parse/compile/link,
+  diagnostic disposition, fatal-source filtering, exact span projection, and
+  unsaved-source analysis onto the shared `@v-ronpa/nani-project` package.
 - Added automatic managed-root `.nani` watching, production+development
   navigation with development-only target warnings, and one isolated shared
   test catalog with multiple explicit entries.
 - Removed per-file registration and non-`.nani` project-source fallback.
+- Added complete catalog-derived `@cue` / `@hideCue` completion, primary and
+  parameter hover, boolean flags, and exact required-text/textId diagnostics.
+- Added completion, hover, and distinct TextMate scopes for staged `[-]` and
+  `[wait i]` story text with explicit dialogue/quoted/unquoted boundaries.
+- Switched project asset loading exclusively to `runtimeAssetOutputPath` and
+  explicitly rejects the removed `outputPath` key.
+- Restored character assembly hover, Preview Character at Cursor, token-local
+  completion images, and complete-character projections against current Game A
+  and Harness generated assets.
+- Stabilized Extension Host catalog tests by waiting for real catalog
+  completion and definition results instead of treating empty diagnostics as
+  an indexing-ready signal.
 
 ## 0.6.1
 

@@ -147,8 +147,40 @@ describe("completion provider logic", () => {
     const source = "Felix.Happy: Hello [";
     const completions = getNaniCompletions(source, { line: 0, character: source.length });
 
-    expect(completions.map((completion) => completion.label)).toEqual(["[>]", "[< speed:0.8]"]);
+    expect(completions.map((completion) => completion.label)).toEqual([
+      "[>]",
+      "[< speed:0.8]",
+      "[-]",
+      "[wait i]"
+    ]);
     expect(completions[1]?.insertText).toBe("[< speed:${1:0.8}]");
     expect(completions[1]?.isSnippet).toBe(true);
+  });
+
+  it("limits explicit staged-text completions to the supported static body forms", () => {
+    const labels = (source: string) => getNaniCompletions(source, {
+      line: 0,
+      character: source.length
+    }).map((completion) => completion.label).filter((label) => label.startsWith("["));
+
+    expect(labels('@print "A[')).toEqual(["[-]", "[wait i]"]);
+    expect(labels('@cue text:"A[')).toEqual(["[-]", "[wait i]"]);
+    expect(labels("@cue A[")).toEqual(["[-]"]);
+    expect(labels("@print {dynamic}[")).toEqual([]);
+    expect(labels('@append "A[')).toEqual([]);
+    expect(labels('@choice "A[')).toEqual([]);
+    expect(labels('@print "A[" if:{ready}')).toEqual([]);
+    const appendLabels = (source: string) => getNaniCompletions(source, {
+      line: 0,
+      character: '@print "A['.length
+    }).map((completion) => completion.label).filter((label) => label.startsWith("["));
+    expect(appendLabels('@print "A[" append:false')).toEqual(["[-]", "[wait i]"]);
+    expect(appendLabels('@print "A[" append:true')).toEqual([]);
+    expect(labels(String.raw`Felix: literal \[`)).toEqual([
+      "[>]",
+      "[< speed:0.8]",
+      "[-]",
+      "[wait i]"
+    ]);
   });
 });

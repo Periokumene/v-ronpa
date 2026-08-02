@@ -23,4 +23,36 @@ describe("Nani TextMate navigation scopes", () => {
     expect(grammar.repository.labelReference?.captures?.["2"]?.name)
       .toBe("variable.other.label-fragment.nani");
   });
+
+  it("assigns independent scopes to compact and long staged markers", () => {
+    const grammar = JSON.parse(
+      readFileSync(join(process.cwd(), "syntaxes/nani.tmLanguage.json"), "utf8")
+    ) as {
+      repository: Record<string, {
+        patterns?: readonly {
+          name?: string;
+          match?: string;
+          captures?: Record<string, { name: string }>;
+        }[];
+      }>;
+    };
+    const patterns = grammar.repository.inlineStageStop?.patterns ?? [];
+
+    expect(patterns.map((pattern) => pattern.name)).toEqual([
+      "meta.inline-stage-stop.compact.nani",
+      "meta.inline-stage-stop.wait.nani"
+    ]);
+    expect(patterns[0]?.match).toContain("(?<!\\\\)");
+    expect(patterns[1]?.captures?.["4"]?.name).toBe("constant.language.wait-mode.input.nani");
+    const story = grammar.repository.storyCommandLine as unknown as {
+      begin: string;
+      patterns: readonly { include: string }[];
+    };
+    expect(story.begin).toContain("print|cue");
+    expect(story.patterns.map((pattern) => pattern.include)).toEqual(expect.arrayContaining([
+      "#storyTextValue",
+      "#storyString",
+      "#inlineCompactStageStop"
+    ]));
+  });
 });

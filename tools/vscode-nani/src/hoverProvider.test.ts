@@ -74,4 +74,26 @@ describe("hover provider logic", () => {
     expect(speed?.contents).toContain("Inline print speed parameter");
     expect(speed?.contents).toContain("设置当前文本行的显示速度倍率");
   });
+
+  it("returns staged marker docs in dialogue and explicit story text", () => {
+    const compact = getNaniHover("Felix: A[-]B", { line: 0, character: 9 });
+    const long = getNaniHover('@cue "A[wait i]B"', { line: 0, character: 12 });
+    const escaped = getNaniHover(String.raw`Felix: A\[-]B`, { line: 0, character: 10 });
+
+    expect(compact?.contents).toContain("staged-text input stop");
+    expect(long?.contents).toContain("与 `[-]` 等价");
+    expect(escaped).toBeUndefined();
+  });
+
+  it("derives Cue and HideCue command, primary, and boolean docs from the catalog", () => {
+    const cue = getNaniHover('@cue "Hello" autoNext!', { line: 0, character: 2 });
+    const primary = getNaniHover('@cue "Hello" autoNext!', { line: 0, character: 8 });
+    const flag = getNaniHover('@cue "Hello" autoNext!', { line: 0, character: 18 });
+    const hide = getNaniHover("@hideCue time:0.4 wait!", { line: 0, character: 4 });
+
+    expect(cue?.contents).toContain("画面中央");
+    expect(primary?.contents).toContain("text parameter · string · primary");
+    expect(flag?.contents).toContain("boolean");
+    expect(hide?.contents).toContain("隐藏中央演出文本 Surface");
+  });
 });

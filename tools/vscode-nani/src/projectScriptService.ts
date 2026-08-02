@@ -1,34 +1,32 @@
 import { basename, dirname } from "node:path";
 import * as vscode from "vscode";
-import { findNearestAssetConfig, projectAssetLoadingEnabled } from "./projectAssetLoader";
 import {
   analyzeNaniCatalog,
-  analyzeNaniDocument,
-  type NaniCatalogAnalysis,
-  type NaniDocumentAnalysis
+  type NaniCatalogAnalysis as SharedNaniCatalogAnalysis,
+  type NaniProjectDiagnostic
+} from "@v-ronpa/nani-project";
+import { findNearestAssetConfig, projectAssetLoadingEnabled } from "./projectAssetLoader";
+import {
+  type NaniCatalogAnalysis
 } from "./navigationAnalysis";
 import {
   loadProjectScriptConfig,
   type NaniProjectScriptConfig,
-  type NaniScriptCatalogContext,
-  type NaniScriptRegistration
+  type NaniScriptCatalogContext
 } from "./projectScripts";
+import type { NaniDiagnostic } from "./diagnostics";
 
 export interface NaniCatalogSnapshot {
   readonly generation: number;
   readonly context: NaniScriptCatalogContext;
   readonly analysis: NaniCatalogAnalysis;
   readonly sourceUrisByPath: ReadonlyMap<string, vscode.Uri>;
+  readonly sourceTextsByPath: ReadonlyMap<string, string>;
   readonly openVersions: ReadonlyMap<string, number>;
 }
 
 export interface NaniProjectScriptInvalidation {
   configPath?: string;
-}
-
-interface CachedAnalysis {
-  stamp: string;
-  analysis: NaniDocumentAnalysis;
 }
 
 interface CachedConfig {
@@ -39,7 +37,6 @@ interface CachedConfig {
 export class NaniProjectScriptService implements vscode.Disposable {
   private readonly configs = new Map<string, CachedConfig>();
   private readonly watchers = new Map<string, vscode.FileSystemWatcher[]>();
-  private readonly analysisCache = new Map<string, CachedAnalysis>();
   private readonly logKeys = new Set<string>();
   private readonly projectDiagnostics = vscode.languages.createDiagnosticCollection("nani-project");
   private readonly invalidationEmitter = new vscode.EventEmitter<NaniProjectScriptInvalidation>();
@@ -75,46 +72,39 @@ export class NaniProjectScriptService implements vscode.Disposable {
       const context = await this.getContext(documentUri);
       if (generation !== this.generation) continue;
       if (!context) return undefined;
-      const records = await Promise.all(
-        context.scripts.map(async (registration) => ({
-          registration,
-          ...(await this.analyzeRegistration(registration))
-        }))
-      );
+      const openVersions = new Map<string, number>();
+      const sharedAnalysis = await analyzeNaniCatalog(context.project, {
+        projectRoot: context.projectRoot,
+        scopes: context.scopes,
+        entries: context.entries,
+        sourceDiagnosticPolicy: "allow-recoverable-command-errors",
+        loadSourceText: async (script) => {
+          const uri = vscode.Uri.file(script.sourcePath);
+          const open = vscode.workspace.textDocuments.find(
+            (candidate) => candidate.uri.toString() === uri.toString()
+          );
+          if (open) {
+            openVersions.set(uri.toString(), open.version);
+            return open.getText();
+          }
+          return Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8");
+        }
+      });
       if (generation !== this.generation) continue;
       const current = context.scripts.find((script) => script.sourcePath === documentUri.fsPath);
       if (!current) return undefined;
-      const analysis = analyzeNaniCatalog(
-        context.catalogId,
-        current.scriptPath,
-        context.entry,
-        records.map((record) => ({
-          sourceUri: record.uri.toString(),
-          analysis: record.analysis
-        })),
-        {
-          scopeByScriptPath: new Map(
-            context.scripts.map((script) => [script.scriptPath, script.scope] as const)
-          )
-        }
-      );
-      for (const message of analysis.projectionErrors) {
-        this.output.appendLine(`[scripts] Source-map projection failed: ${message}`);
-      }
+      const analysis = projectCatalogView(context.catalogId, current.scriptPath, sharedAnalysis);
       const snapshot: NaniCatalogSnapshot = {
         generation,
         context,
         analysis,
         sourceUrisByPath: new Map(
-          records.map((record) => [record.registration.scriptPath, record.uri] as const)
+          sharedAnalysis.scripts.map((script) => [script.scriptPath, vscode.Uri.file(script.sourcePath)] as const)
         ),
-        openVersions: new Map(
-          records.flatMap((record) =>
-            record.openVersion === undefined
-              ? []
-              : [[record.uri.toString(), record.openVersion] as const]
-          )
-        )
+        sourceTextsByPath: new Map(
+          sharedAnalysis.scripts.map((script) => [script.scriptPath, script.sourceText] as const)
+        ),
+        openVersions
       };
       if (!this.isCurrent(snapshot)) continue;
       this.publishLinkProjectDiagnostics(context, analysis);
@@ -141,7 +131,6 @@ export class NaniProjectScriptService implements vscode.Disposable {
   refreshAll(): void {
     this.generation += 1;
     this.configs.clear();
-    this.analysisCache.clear();
     this.logKeys.clear();
     for (const watchers of this.watchers.values()) watchers.forEach((watcher) => watcher.dispose());
     this.watchers.clear();
@@ -164,7 +153,6 @@ export class NaniProjectScriptService implements vscode.Disposable {
     if (!cached || cached.stamp !== stamp) {
       if (cached) {
         this.generation += 1;
-        this.analysisCache.clear();
         this.watchers.get(configPath)?.forEach((watcher) => watcher.dispose());
         this.watchers.delete(configPath);
         this.invalidationEmitter.fire({ configPath });
@@ -216,53 +204,10 @@ export class NaniProjectScriptService implements vscode.Disposable {
   private invalidate(configPath: string): void {
     this.generation += 1;
     this.configs.delete(configPath);
-    this.analysisCache.clear();
     this.watchers.get(configPath)?.forEach((watcher) => watcher.dispose());
     this.watchers.delete(configPath);
     this.projectDiagnostics.delete(vscode.Uri.file(configPath));
     this.invalidationEmitter.fire({ configPath });
-  }
-
-  private async analyzeRegistration(registration: NaniScriptRegistration): Promise<{
-    uri: vscode.Uri;
-    analysis: NaniDocumentAnalysis;
-    openVersion?: number;
-  }> {
-    const uri = vscode.Uri.file(registration.sourcePath);
-    const open = vscode.workspace.textDocuments.find(
-      (document) => document.uri.toString() === uri.toString()
-    );
-    if (open) {
-      const stamp = `open:${open.version}`;
-      return {
-        uri,
-        analysis: this.cachedAnalysis(uri, stamp, open.getText(), registration.scriptPath),
-        openVersion: open.version
-      };
-    }
-    const stat = await vscode.workspace.fs.stat(uri);
-    const stamp = `disk:${stat.mtime}:${stat.size}`;
-    const cached = this.analysisCache.get(uri.toString());
-    if (cached?.stamp === stamp) return { uri, analysis: cached.analysis };
-    const sourceText = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8");
-    return {
-      uri,
-      analysis: this.cachedAnalysis(uri, stamp, sourceText, registration.scriptPath)
-    };
-  }
-
-  private cachedAnalysis(
-    uri: vscode.Uri,
-    stamp: string,
-    sourceText: string,
-    scriptPath: string
-  ): NaniDocumentAnalysis {
-    const key = uri.toString();
-    const cached = this.analysisCache.get(key);
-    if (cached?.stamp === stamp) return cached.analysis;
-    const analysis = analyzeNaniDocument(sourceText, scriptPath);
-    this.analysisCache.set(key, { stamp, analysis });
-    return analysis;
   }
 
   private publishConfigDiagnostics(configPath: string, errors: readonly string[]): void {
@@ -292,6 +237,47 @@ export class NaniProjectScriptService implements vscode.Disposable {
     this.logKeys.add(key);
     this.output.appendLine(message);
   }
+}
+
+function projectCatalogView(
+  catalogId: string,
+  currentScriptPath: string,
+  shared: SharedNaniCatalogAnalysis
+): NaniCatalogAnalysis {
+  const scriptsByPath = new Map(shared.scripts.map((script) => [script.scriptPath, script] as const));
+  const diagnosticsByScriptPath = new Map<string, NaniDiagnostic[]>(
+    shared.scripts.map((script) => [script.scriptPath, []])
+  );
+  const projectDiagnostics: NaniProjectDiagnostic[] = [];
+  for (const diagnostic of shared.diagnostics) {
+    if (!diagnostic.scriptPath || !diagnostic.span || !scriptsByPath.has(diagnostic.scriptPath)) {
+      projectDiagnostics.push(diagnostic);
+      continue;
+    }
+    diagnosticsByScriptPath.get(diagnostic.scriptPath)?.push({
+      code: diagnostic.code,
+      message: diagnostic.message,
+      severity: diagnostic.severity,
+      source: "nani",
+      span: diagnostic.span
+    });
+  }
+  return {
+    navigation: {
+      catalogId,
+      currentScriptPath,
+      scripts: new Map(shared.scripts
+        .filter((script) => script.executionDisposition === "runnable")
+        .map((script) => [script.scriptPath, {
+          scriptPath: script.scriptPath,
+          sourceUri: vscode.Uri.file(script.sourcePath).toString(),
+          sourceText: script.sourceText,
+          labels: script.labels
+        }]))
+    },
+    diagnosticsByScriptPath,
+    projectDiagnostics
+  };
 }
 
 function projectDiagnostic(message: string, code: string): vscode.Diagnostic {

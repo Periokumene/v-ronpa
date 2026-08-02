@@ -60,6 +60,28 @@ describe("project asset loading", () => {
     expect(loaded.warnings).toEqual([]);
   });
 
+  it("hard-rejects the legacy outputPath key without a fallback", async () => {
+    const fixture = createAssetFixture();
+    const current = {
+      publicRoot: "apps/example/public/example",
+      publicBaseUri: "/example",
+      runtimeAssetOutputPath: "apps/example/src/generatedAssets.ts",
+      exportName: "exampleAssets"
+    };
+
+    await expect(loadProjectAssets(fixture.configPath, fixture.root, async () => ({
+      default: { ...current, outputPath: current.runtimeAssetOutputPath }
+    }))).rejects.toThrow("'outputPath' is not supported");
+    await expect(loadProjectAssets(fixture.configPath, fixture.root, async () => ({
+      default: {
+        publicRoot: current.publicRoot,
+        publicBaseUri: current.publicBaseUri,
+        outputPath: current.runtimeAssetOutputPath,
+        exportName: current.exportName
+      }
+    }))).rejects.toThrow("'outputPath' is not supported");
+  });
+
   it("degrades malformed or missing character compositions to warnings while retaining assets", async () => {
     const fixture = createAssetFixture();
     writeFileSync(fixture.compositionsPath, '{"tokens":[]}');
@@ -108,6 +130,9 @@ describe("project asset loading", () => {
       expect.arrayContaining([
         expect.objectContaining({ id: "alice", kind: "character-pack" }),
         expect.objectContaining({ id: "alice-kid", kind: "character-pack" }),
+        expect.objectContaining({ id: "bg:home-kitchen", kind: "background" }),
+        expect.objectContaining({ id: "bg:home-outside", kind: "background" }),
+        expect.objectContaining({ id: "bgm:dead-fish-riffle", kind: "bgm" }),
         expect.objectContaining({ id: "bgm:game-a-main", kind: "bgm" }),
         expect.objectContaining({ id: "sfx:glug-glug-glug", kind: "sfx" })
       ])
@@ -118,6 +143,22 @@ describe("project asset loading", () => {
     expect(loaded.index.characterTokens["alice-kid"]).toEqual(
       expect.arrayContaining(["default", "body0", "effect0", "effect2", "effectOff"])
     );
+  });
+
+  it("loads the split Harness runtime module through its own public base URI", async () => {
+    const repoRoot = resolve(process.cwd(), "../..");
+    const loaded = await loadProjectAssets(
+      join(repoRoot, "apps/game-harness/asset.config.mjs"),
+      repoRoot
+    );
+
+    expect(loaded.index.assets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "Ema", kind: "character-pack" }),
+      expect.objectContaining({ id: "bg:inner-academy-hall", kind: "background" }),
+      expect.objectContaining({ id: "bgm:validation-main", kind: "bgm" })
+    ]));
+    expect(loaded.index.assets.find((asset) => asset.id === "Ema")?.optimizedUri)
+      .toMatch(/^\/harness\//u);
   });
 });
 

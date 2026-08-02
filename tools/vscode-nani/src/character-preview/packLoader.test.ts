@@ -106,6 +106,34 @@ describe("layered character preview pack loading", () => {
     expect(expressionPreview.bounds.maxX).toBeGreaterThan(expressionPreview.bounds.minX);
     expect(expressionPreview.bounds.maxY).toBeGreaterThan(expressionPreview.bounds.minY);
   });
+
+  it("renders a real Alice component contribution alongside the complete projection", async () => {
+    const root = resolve(process.cwd(), "../../apps/game-a/public/game-a/characters/alice");
+    const descriptor = { id: "alice", rootPath: root, characterPath: join(root, "character.json") };
+    const completion = await loadResolvedCharacterCompletionPreview(
+      descriptor,
+      request("body0,eye4"),
+      "body0"
+    );
+
+    expect(completion.contribution?.layers.map((layer) => layer.id)).toEqual(["root/eye>4"]);
+    expect(completion.complete.layers.map((layer) => layer.id)).toEqual(expect.arrayContaining([
+      "root/body>0",
+      "root/eye>4"
+    ]));
+  });
+
+  it("assembles the real Alice Kid pack discovered from generated assets", async () => {
+    const root = resolve(process.cwd(), "../../apps/game-a/public/game-a/characters/alice-kid");
+    const descriptor = { id: "alice-kid", rootPath: root, characterPath: join(root, "character.json") };
+    const preview = await loadResolvedCharacterPreview(descriptor, {
+      ...request("body0,effect2"),
+      characterId: "alice-kid"
+    });
+
+    expect(preview.layers.length).toBeGreaterThan(0);
+    expect(preview.bounds.maxX).toBeGreaterThan(preview.bounds.minX);
+  });
 });
 
 function packFixture() {

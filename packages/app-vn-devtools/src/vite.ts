@@ -1,6 +1,7 @@
 import { relative, resolve, sep } from "node:path";
 import {
   analyzeNaniCatalog,
+  parseNaniProjectConfig,
   type NaniEntryConfig,
   type NaniProjectConfig,
   type NaniScope
@@ -46,8 +47,10 @@ export interface NaniDevtoolsVitePluginOptions {
  */
 export function createNaniDevtoolsVitePlugin(options: NaniDevtoolsVitePluginOptions): Plugin {
   const projectRoot = resolve(options.root ?? process.cwd());
+  const project = parseNaniProjectConfig(options.project);
+  const resolvedOptions = { ...options, project };
   const scopeRoots = options.scopes.flatMap((scope) => {
-    const config = options.project.scopes[scope];
+    const config = project.scopes[scope];
     return config ? [resolve(projectRoot, config.sourceRoot)] : [];
   });
   let updateId = 0;
@@ -80,10 +83,10 @@ export function createNaniDevtoolsVitePlugin(options: NaniDevtoolsVitePluginOpti
     },
     async buildStart() {
       if (serve) return;
-      const analysis = await analyzeNaniCatalog(options.project, {
+      const analysis = await analyzeNaniCatalog(project, {
         projectRoot,
         scopes: options.scopes,
-        entry: options.entry,
+        entries: [options.entry],
         sourceDiagnosticPolicy: "strict"
       });
       const fatal = analysis.diagnostics.filter((diagnostic) => diagnostic.disposition === "fatal");
@@ -112,9 +115,9 @@ export function createNaniDevtoolsVitePlugin(options: NaniDevtoolsVitePluginOpti
     async load(id) {
       if (id !== RESOLVED_SNAPSHOT_MODULE_ID) return;
       if (!serve) return "export default null;";
-      lastSnapshot = await createSnapshot(options, projectRoot, ++generation);
+      lastSnapshot = await createSnapshot(resolvedOptions, projectRoot, ++generation);
       sourceFilesByPath = new Map(lastSnapshot.scripts.map((script) => {
-        const scope = options.project.scopes[script.scope]!;
+        const scope = project.scopes[script.scope]!;
         const scriptRoot = normalizedScriptRoot(scope.scriptRoot);
         const relativePath = scriptRoot
           ? script.scriptPath.slice(scriptRoot.length + 1)
@@ -132,7 +135,7 @@ export function createNaniDevtoolsVitePlugin(options: NaniDevtoolsVitePluginOpti
       invalidateSnapshot();
       const candidateUpdateId = ++updateId;
       try {
-        const snapshot = await createSnapshot(options, projectRoot, generation);
+        const snapshot = await createSnapshot(resolvedOptions, projectRoot, generation);
         const script = snapshot.scripts.find((candidate) => candidate.scriptPath === scriptPath);
         if (!script) {
           markCatalogDirty("rename");
@@ -144,7 +147,7 @@ export function createNaniDevtoolsVitePlugin(options: NaniDevtoolsVitePluginOpti
         const update: NaniDevtoolsViteUpdate = {
           updateId: candidateUpdateId,
           entryId: options.entry.id,
-          scope: scopeForFile(absoluteFile, options, projectRoot) ?? "development",
+          scope: scopeForFile(absoluteFile, resolvedOptions, projectRoot) ?? "development",
           scriptPath,
           sourceText: await Promise.resolve(ctx.read()).catch(() => ""),
           serverRevision: null,
@@ -171,7 +174,7 @@ async function createSnapshot(
   const analysis = await analyzeNaniCatalog(options.project, {
     projectRoot,
     scopes: options.scopes,
-    entry: options.entry,
+    entries: [options.entry],
     sourceDiagnosticPolicy: "allow-recoverable-command-errors"
   });
   return {

@@ -165,15 +165,81 @@ suite("V-Ronpa Nani exact diagnostics", () => {
     );
   });
 
+  test("provides Cue, HideCue, and staged-text editor behavior from shared facts", async () => {
+    const source = [
+      '@cue "Center[-]More" autoNext!',
+      "@hideCue time:0.4 wait!",
+      "Felix: A[",
+      '@cue "A['
+    ].join("\n");
+    const document = await openNaniDocument(source);
+    const commandHover = await executeHover(document.uri, new vscode.Position(0, 2));
+    const primaryHover = await executeHover(document.uri, new vscode.Position(0, 9));
+    const compactHover = await executeHover(document.uri, new vscode.Position(0, 13));
+    const hideHover = await executeHover(document.uri, new vscode.Position(1, 4));
+
+    assert.match(commandHover, /画面中央/u);
+    assert.match(primaryHover, /text parameter · string · primary/u);
+    assert.match(compactHover, /staged-text input stop/u);
+    assert.match(hideHover, /隐藏中央演出文本 Surface/u);
+
+    const dialogue = await executeCompletions(
+      document.uri,
+      new vscode.Position(2, "Felix: A[".length),
+      0
+    );
+    assert.deepEqual(dialogue.items.map(completionLabel), ["[>]", "[< speed:0.8]", "[-]", "[wait i]"]);
+    const explicit = await executeCompletions(
+      document.uri,
+      new vscode.Position(3, '@cue "A['.length),
+      0
+    );
+    assert.deepEqual(explicit.items.map(completionLabel), ["[-]", "[wait i]"]);
+  });
+
+  test("publishes exact required Cue text and textId diagnostics", async () => {
+    const source = [
+      "@cue",
+      "@cue 42",
+      '@cue "A" textId:shared_id',
+      '@print "B" textId:shared_id',
+      '@cue "C" textId:"bad id"'
+    ].join("\n");
+    const document = await openNaniDocument(source);
+    const diagnostics = await waitForDiagnostics(document.uri, (values) =>
+      values.some((diagnostic) => diagnostic.message.includes("@cue requires parameter text:string"))
+      && values.filter((diagnostic) => diagnostic.message.includes("Duplicate textId")).length >= 1
+      && values.some((diagnostic) => diagnostic.message.includes("Invalid textId"))
+    );
+
+    assert.equal(
+      diagnostics.find((diagnostic) => diagnostic.message.includes("@cue primary parameter expected string"))
+        && document.getText(diagnostics.find((diagnostic) => diagnostic.message.includes("@cue primary parameter expected string"))!.range),
+      "42"
+    );
+    assert.deepEqual(
+      diagnostics
+        .filter((diagnostic) => diagnostic.message.includes("Duplicate textId"))
+        .map((diagnostic) => document.getText(diagnostic.range)),
+      ["shared_id"]
+    );
+    const invalid = diagnostics.find((diagnostic) => diagnostic.message.includes("Invalid textId"));
+    assert.ok(invalid);
+    assert.equal(document.getText(invalid.range), "bad id");
+  });
+
   test("provides live multi-script diagnostics, completion, hover, and definitions", async () => {
     const fixture = await createNavigationFixture();
     const opening = await vscode.workspace.openTextDocument(fixture.openingUri);
     const chapter = await vscode.workspace.openTextDocument(fixture.chapterUri);
     const editor = await vscode.window.showTextDocument(opening);
-    await waitForDiagnostics(opening.uri, (diagnostics) => diagnostics.length === 0);
 
     const completionPosition = new vscode.Position(2, '@choice "Again" goto:'.length);
-    const completions = await executeCompletions(opening.uri, completionPosition, 0);
+    const completions = await waitForCompletions(
+      opening.uri,
+      completionPosition,
+      (items) => items.some((item) => completionLabel(item) === "game/chapter.nani")
+    );
     assert.deepEqual(
       completions.items.slice(0, 3).map(completionLabel),
       ["#Start", "game/chapter.nani", "game/opening.nani"]
@@ -184,10 +250,10 @@ suite("V-Ronpa Nani exact diagnostics", () => {
     assert.match(hover, /cross-script navigation target/u);
     assert.match(hover, /game\/chapter\.nani/u);
 
-    const definitions = await vscode.commands.executeCommand<Array<vscode.Location | vscode.LocationLink>>(
-      "vscode.executeDefinitionProvider",
+    const definitions = await waitForDefinitions(
       opening.uri,
-      endpointPosition
+      endpointPosition,
+      (values) => values.length === 1
     );
     assert.ok(definitions && definitions.length === 1);
     const definition = definitions[0];
@@ -610,6 +676,42 @@ async function executeCompletions(
   );
   assert.ok(completions, `Expected completions at ${position.line}:${position.character}`);
   return completions;
+}
+
+async function waitForCompletions(
+  uri: vscode.Uri,
+  position: vscode.Position,
+  predicate: (items: readonly vscode.CompletionItem[]) => boolean,
+  timeoutMs = 5_000
+): Promise<vscode.CompletionList> {
+  const deadline = Date.now() + timeoutMs;
+  let last: vscode.CompletionList | undefined;
+  while (Date.now() < deadline) {
+    last = await executeCompletions(uri, position, 0);
+    if (predicate(last.items)) return last;
+    await delay(100);
+  }
+  throw new Error(`Timed out waiting for catalog completions: ${last?.items.map(completionLabel).join(", ") ?? "none"}`);
+}
+
+async function waitForDefinitions(
+  uri: vscode.Uri,
+  position: vscode.Position,
+  predicate: (values: readonly (vscode.Location | vscode.LocationLink)[]) => boolean,
+  timeoutMs = 5_000
+): Promise<Array<vscode.Location | vscode.LocationLink>> {
+  const deadline = Date.now() + timeoutMs;
+  let last: Array<vscode.Location | vscode.LocationLink> = [];
+  while (Date.now() < deadline) {
+    last = await vscode.commands.executeCommand<Array<vscode.Location | vscode.LocationLink>>(
+      "vscode.executeDefinitionProvider",
+      uri,
+      position
+    ) ?? [];
+    if (predicate(last)) return last;
+    await delay(100);
+  }
+  throw new Error(`Timed out waiting for catalog definition; found ${last.length}.`);
 }
 
 function completionLabel(item: vscode.CompletionItem): string {
