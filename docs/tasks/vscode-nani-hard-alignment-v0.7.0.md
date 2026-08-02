@@ -10,11 +10,11 @@
 
 ## Status
 
-- State: `In Progress`
+- State: `Done`
 - Owner: `Codex`
 - Created: `2026-08-03`
 - Updated: `2026-08-03`
-- Completed Commit: `TBD`
+- Completed Commit: `77fde93`
 - Archive Target: `docs/archive/completed-tasks/vscode-nani-hard-alignment-v0.7.0.md`
 
 ## Goal
