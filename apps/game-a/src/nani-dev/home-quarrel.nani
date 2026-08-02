@@ -2,9 +2,11 @@
 ;离开本场后 :  人物知道什么 / 失去什么 / 还能做什么
 ;爱丽丝决定三日后去死
 
+@inback bg:home-kitchen
+@bgm bgm:hmg-250504-dark-ambient-home
 dad: 回来的太晚了点，药买回来了吗
 
-@char alice.eye1
+@char alice.armL1,eye1
 alice: 抱歉爸爸，路上出了点事
 dad: 药买回来了吗
 alice: 。。。买回来了
@@ -16,6 +18,7 @@ nar: 她手攥住袋口向上举起，略微晃了晃。好在牛奶是纸盒装
 alice: 那我就先回房间了
 
 dad: 等会[-]，吃了没，今天你妈上夜班没准备晚饭
+@char alice.armL2,mouth2,eye0
 alice: 没事，我不饿
 dad: 哪有饭点不吃饭的道理
 dad: 你妈没留饭，今天晚上我没力气做。迟点跟我一起去外面吃
@@ -53,6 +56,7 @@ alice: ……[-]哦
 dad: 先不要急着换衣服，迟点去楼下吃饭
 alice: 好，那我就先回房间——
 
+@stopBgm bgm:hmg-250504-dark-ambient-home
 dad: 等下
 alice: ……怎么了？
 dad: 药买回来了吗
