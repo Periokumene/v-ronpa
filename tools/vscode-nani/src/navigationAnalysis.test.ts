@@ -1,115 +1,30 @@
+import type { TextSpan } from "@v-ronpa/nani-parser";
 import { describe, expect, it } from "vitest";
 import { getNaniCompletions } from "./completionProvider";
 import { getNaniHover } from "./hoverProvider";
 import {
-  analyzeNaniCatalog,
   analyzeNaniDocument,
-  resolveNavigationTarget
+  resolveNavigationTarget,
+  type NaniNavigationIndex,
+  type NaniNavigationScript
 } from "./navigationAnalysis";
 
-describe("multi-script Nani navigation analysis", () => {
-  it("links valid goto and choice endpoints and exposes target labels", () => {
-    const opening = analyzeNaniDocument([
-      "#Start",
-      "@goto #Start",
-      '@choice "Continue" goto:game/chapter.nani#Chapter'
-    ].join("\n"), "game/opening.nani");
-    const chapter = analyzeNaniDocument("#Chapter\n@end", "game/chapter.nani");
-    const catalog = analyzeNaniCatalog(
-      "production",
-      "game/opening.nani",
-      { initialScriptPath: "game/opening.nani", startLabel: "Start" },
-      [
-        { sourceUri: "file:///opening.nani", analysis: opening },
-        { sourceUri: "file:///chapter.nani", analysis: chapter }
-      ]
-    );
-
-    expect([...catalog.diagnosticsByScriptPath.values()].flat()).toEqual([]);
-    expect(resolveNavigationTarget(
-      "game/chapter.nani#Chapter",
-      catalog.navigation
-    )?.label).toBe("Chapter");
-  });
-
-  it("projects linker failures onto the exact authored endpoint values", () => {
-    const source = [
-      "#Start",
-      "@goto ../relative.nani",
-      "@goto game/missing.nani",
-      '@choice "Continue" goto:game/chapter.nani#Missing'
-    ].join("\n");
-    const opening = analyzeNaniDocument(source, "game/opening.nani");
-    const chapter = analyzeNaniDocument("#Chapter\n@end", "game/chapter.nani");
-    const catalog = analyzeNaniCatalog(
-      "production",
-      "game/opening.nani",
-      { initialScriptPath: "game/opening.nani" },
-      [
-        { sourceUri: "file:///opening.nani", analysis: opening },
-        { sourceUri: "file:///chapter.nani", analysis: chapter }
-      ]
-    );
-    const diagnostics = catalog.diagnosticsByScriptPath.get("game/opening.nani") ?? [];
-
-    expect(diagnostics.map((diagnostic) => ({
-      code: diagnostic.code,
-      text: source.slice(diagnostic.span.start, diagnostic.span.end)
-    }))).toEqual([
-      { code: "endpoint-relative-path", text: "../relative.nani" },
-      { code: "endpoint-script-missing", text: "game/missing.nani" },
-      { code: "endpoint-label-missing", text: "game/chapter.nani#Missing" }
+describe("multi-script Nani navigation language features", () => {
+  it("resolves labels from the shared-analysis navigation view", () => {
+    const navigation = navigationIndex([
+      script("game/opening.nani", "#Start\n@goto game/chapter.nani#Chapter"),
+      script("game/chapter.nani", "#Chapter\n@end")
     ]);
-  });
 
-  it("uses shared endpoint rules for absolute, wildcard, dynamic, and malformed values", () => {
-    const source = [
-      "@goto /game/chapter.nani",
-      "@goto game/*.nani",
-      "@goto {nextScript}",
-      "@goto game/chapter",
-      "@call game/chapter.nani#Chapter"
-    ].join("\n");
-    const catalog = analyzeNaniCatalog(
-      "production",
-      "game/opening.nani",
-      { initialScriptPath: "game/opening.nani" },
-      [
-        {
-          sourceUri: "file:///opening.nani",
-          analysis: analyzeNaniDocument(source, "game/opening.nani")
-        },
-        {
-          sourceUri: "file:///chapter.nani",
-          analysis: analyzeNaniDocument("#Chapter\n@end", "game/chapter.nani")
-        }
-      ]
-    );
-    const endpointCodes = (catalog.diagnosticsByScriptPath.get("game/opening.nani") ?? [])
-      .map((diagnostic) => diagnostic.code)
-      .filter((code) => code.startsWith("endpoint-"));
-
-    expect(endpointCodes).toEqual([
-      "endpoint-relative-path",
-      "endpoint-wildcard",
-      "endpoint-not-static",
-      "endpoint-script-extension-required"
-    ]);
+    expect(resolveNavigationTarget("game/chapter.nani#Chapter", navigation)?.label).toBe("Chapter");
   });
 
   it("offers local labels before scripts and target labels after path hash", () => {
     const source = "#Local\n@goto ";
-    const opening = analyzeNaniDocument(source, "game/opening.nani");
-    const chapter = analyzeNaniDocument("#Chapter\n#Credits\n@end", "game/chapter.nani");
-    const navigation = analyzeNaniCatalog(
-      "production",
-      "game/opening.nani",
-      { initialScriptPath: "game/opening.nani" },
-      [
-        { sourceUri: "file:///opening.nani", analysis: opening },
-        { sourceUri: "file:///chapter.nani", analysis: chapter }
-      ]
-    ).navigation;
+    const navigation = navigationIndex([
+      script("game/opening.nani", source),
+      script("game/chapter.nani", "#Chapter\n#Credits\n@end")
+    ]);
 
     const initial = getNaniCompletions(
       source,
@@ -141,21 +56,10 @@ describe("multi-script Nani navigation analysis", () => {
 
   it("shows resolved endpoint hover and leaves invalid targets to diagnostics", () => {
     const source = "#Start\n@goto game/chapter.nani#Chapter";
-    const navigation = analyzeNaniCatalog(
-      "production",
-      "game/opening.nani",
-      { initialScriptPath: "game/opening.nani" },
-      [
-        {
-          sourceUri: "file:///opening.nani",
-          analysis: analyzeNaniDocument(source, "game/opening.nani")
-        },
-        {
-          sourceUri: "file:///chapter.nani",
-          analysis: analyzeNaniDocument("#Chapter\n@end", "game/chapter.nani")
-        }
-      ]
-    ).navigation;
+    const navigation = navigationIndex([
+      script("game/opening.nani", source),
+      script("game/chapter.nani", "#Chapter\n@end")
+    ]);
 
     expect(getNaniHover(source, { line: 1, character: 15 }, navigation)?.contents)
       .toContain("cross-script");
@@ -166,3 +70,27 @@ describe("multi-script Nani navigation analysis", () => {
     )).toBeUndefined();
   });
 });
+
+function navigationIndex(scripts: readonly NaniNavigationScript[]): NaniNavigationIndex {
+  return {
+    catalogId: "development",
+    currentScriptPath: "game/opening.nani",
+    scripts: new Map(scripts.map((value) => [value.scriptPath, value]))
+  };
+}
+
+function script(scriptPath: string, sourceText: string): NaniNavigationScript {
+  const analysis = analyzeNaniDocument(sourceText, scriptPath);
+  const labels: Record<string, TextSpan> = {};
+  for (const [index, statement] of analysis.parsed.scenario.statements.entries()) {
+    if (statement.kind !== "label") continue;
+    const span = analysis.parsed.sourceMap.statements[index]?.nameSpan;
+    if (span) labels[statement.name] = span;
+  }
+  return {
+    scriptPath,
+    sourceUri: `file:///${scriptPath}`,
+    sourceText,
+    labels
+  };
+}

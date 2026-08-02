@@ -87,6 +87,7 @@ checkNoProvenance(
 );
 checkPublicApiShape();
 checkUnifiedAuthorityShape();
+checkVscodeNaniProjectAuthority();
 
 if (failures.length > 0) {
   console.error("Nani diagnostics cleanup guard failed:");
@@ -152,12 +153,63 @@ function checkUnifiedAuthorityShape() {
   const naniProject = readRequired(naniProjectPath);
   const commandDoc = readRequired(commandDocPath);
 
-  requirePattern(generatorPath, generator, /import\s*\{\s*analyzeNaniCatalog\s*\}\s*from\s*["'][^"']*nani-project[^"']*["']/su, "shared nani-project analysis import");
+  requirePattern(generatorPath, generator, /import\s*\{[^}]*\banalyzeNaniCatalog\b[^}]*\}\s*from\s*["'][^"']*nani-project[^"']*["']/su, "shared nani-project analysis import");
   requirePattern(naniProjectPath, naniProject, /\bdigestRuntimeScriptSemantics\b/u, "compiler-owned semantic digest use");
   requirePattern(naniProjectPath, naniProject, /\bderiveLayeredCharacterPreloadPlan\b/u, "layered-character preload authority use");
   rejectPattern(generatorPath, generator, /function\s+(?:stableJson|serializeRuntimeScriptSemantics|deriveLayeredCharacterPreloadPlan)\s*\(/u, "duplicated semantic/preload authority");
   requirePattern(commandDocPath, commandDoc, /<!-- BEGIN GENERATED COMMAND CATALOG -->[\s\S]*<!-- END GENERATED COMMAND CATALOG -->/u, "generated command matrix markers");
   rejectPattern(commandDocPath, commandDoc, /## Official Naninovel Commands/u, "legacy hand-maintained command matrix");
+}
+
+function checkVscodeNaniProjectAuthority() {
+  const projectScriptsPath = "tools/vscode-nani/src/projectScripts.ts";
+  const projectServicePath = "tools/vscode-nani/src/projectScriptService.ts";
+  const navigationPath = "tools/vscode-nani/src/navigationAnalysis.ts";
+  const assetLoaderPath = "tools/vscode-nani/src/projectAssetLoader.ts";
+  const projectScripts = readRequired(projectScriptsPath);
+  const projectService = readRequired(projectServicePath);
+  const navigation = readRequired(navigationPath);
+  const assetLoader = readRequired(assetLoaderPath);
+
+  requirePattern(
+    projectScriptsPath,
+    projectScripts,
+    /parseNaniProjectConfig[\s\S]*?from\s*["']@v-ronpa\/nani-project["']/u,
+    "shared strict project-config parser import"
+  );
+  rejectPattern(
+    projectScriptsPath,
+    projectScripts,
+    /function\s+parseNaniProjectConfig\s*\(/u,
+    "extension-local project-config parser"
+  );
+  requirePattern(
+    projectServicePath,
+    projectService,
+    /analyzeNaniCatalog[\s\S]*?from\s*["']@v-ronpa\/nani-project["']/u,
+    "shared catalog analysis import"
+  );
+  for (const [path, text] of [
+    [projectScriptsPath, projectScripts],
+    [projectServicePath, projectService]
+  ]) {
+    rejectPattern(path, text, /\bcompileRuntimeScript\b/u, "project-catalog compiler call");
+    rejectPattern(path, text, /\blinkRuntimeScriptCatalog\b/u, "project-catalog linker call");
+    rejectPattern(path, text, /\b(?:testCatalogs|sourceFormat)\s*:/u, "removed project-config field");
+  }
+  rejectPattern(navigationPath, navigation, /\blinkRuntimeScriptCatalog\b/u, "extension-local catalog linker");
+  requirePattern(
+    assetLoaderPath,
+    assetLoader,
+    /requiredString\(config\.runtimeAssetOutputPath,\s*["']runtimeAssetOutputPath["']\)/u,
+    "runtimeAssetOutputPath-only asset loading"
+  );
+  rejectPattern(
+    assetLoaderPath,
+    assetLoader,
+    /(?:requiredString\()?config\.outputPath\b/u,
+    "legacy outputPath asset loading"
+  );
 }
 
 function readRequired(path) {

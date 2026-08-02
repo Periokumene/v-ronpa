@@ -156,6 +156,9 @@ async function importAssetConfig(configPath: string): Promise<unknown> {
 function assetConfig(moduleValue: unknown): NaniAssetConfig {
   const moduleRecord = record(moduleValue, "Asset config module must export an object.");
   const config = record(moduleRecord.default, "Asset config module must have a default object export.");
+  if ("outputPath" in config) {
+    throw new Error("Asset config 'outputPath' is not supported; use 'runtimeAssetOutputPath'.");
+  }
   return {
     publicRoot: requiredString(config.publicRoot, "publicRoot"),
     publicBaseUri: requiredString(config.publicBaseUri, "publicBaseUri"),

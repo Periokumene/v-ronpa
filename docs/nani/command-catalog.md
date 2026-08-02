@@ -129,10 +129,13 @@ order never implies navigation, and `@end` completes the whole entry.
   command identity and routes the current record to the centered, borderless
   Cue DOM surface. `@hideCue time:... wait!` fades only that surface and does
   not clear the current StoryText record.
-- Explicit `@print` and `@cue` parameters do not parse normal-line inline
-  controls such as `[< ...]`, `|#...|`, or `[>]`; those sequences remain literal
-  command text. Named `textId` values use `[A-Za-z0-9_-]+` and participate in
-  the same whole-script duplicate check as normal-line text IDs.
+- Explicit static `@print` and `@cue` text accepts staged input stops `[-]` and
+  `[wait i]`, but does not parse normal-line controls such as `[< ...]`,
+  `|#...|`, or `[>]`; those sequences remain literal command text. The long
+  `[wait i]` form requires a quoted explicit body. Dynamic text, conditional
+  staged commands, and `@print append:true` do not compile as staged text.
+  Named `textId` values use `[A-Za-z0-9_-]+` and participate in the same
+  whole-script duplicate check as normal-line text IDs.
 - `showUI` / `hideUI` are implemented as a V-Ronpa runtime UI subset. Supported
   targets are `dialog`, `commandBar`, and `toastLayer`; no-target commands apply
   to those three targets only and never affect Cue. `time` is normalized to `durationMs`; missing or
@@ -306,8 +309,8 @@ without pretending those params are Naninovel official.
 
 ## Inline Text Tokens
 
-`[< ...]` and `[>]` are inline text tokens discovered in the parser fixtures and
-implementation, not top-level `@` commands:
+`[< ...]`, `[>]`, `[-]`, and `[wait i]` are inline text tokens, not top-level
+`@` commands:
 
 - `[< speed:0.8]` is parsed as an inline command with id `<`. The parser copies
   its params into `TextIR.printParams`, so text presentation can adjust print
@@ -315,8 +318,17 @@ implementation, not top-level `@` commands:
 - `[>]` is parsed as an inline command with id `>`. The runtime compiler maps
   its presence to `RuntimeCommand.params.autoNext` on the compiled `print`
   command.
+- `[-]` commits the currently accumulated StoryText stage, waits for input,
+  and then continues revealing the same logical text entry.
+- `[wait i]` is the readable long form of `[-]`. It has the same input-stop
+  semantics; timed inline waits are intentionally unsupported.
 
-They are intentionally not part of `commandCatalog` in this baseline. If they
+Ordinary dialogue supports all four tokens. Static `@print` and `@cue` bodies
+support only `[-]` and `[wait i]`; unquoted explicit text supports only compact
+`[-]`. Escaped forms such as `\[-\]` remain visible text. `@append`, dynamic
+expressions, and other explicit commands do not opt into staged parsing.
+
+They are intentionally not part of `commandCatalog`. If they
 grow beyond inline text control, add a separate inline-token contract instead of
 mixing them with top-level Naninovel commands.
 

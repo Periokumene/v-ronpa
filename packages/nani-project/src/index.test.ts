@@ -6,6 +6,7 @@ import {
   NaniProjectDiscoveryError,
   analyzeNaniCatalog,
   discoverNaniProjectScripts,
+  parseNaniProjectConfig,
   type NaniProjectConfig
 } from "./index";
 
@@ -31,6 +32,39 @@ const baseConfig: NaniProjectConfig = {
   },
   voiceLocales: ["zh"]
 };
+
+describe("parseNaniProjectConfig", () => {
+  it("accepts only the current hard-cut project shape", () => {
+    expect(parseNaniProjectConfig(baseConfig)).toEqual(baseConfig);
+    for (const legacy of [
+      { ...baseConfig, scripts: [] },
+      { ...baseConfig, testCatalogs: [] },
+      { ...baseConfig, sourceFormat: "nani" },
+      {
+        ...baseConfig,
+        scopes: {
+          ...baseConfig.scopes,
+          production: { ...baseConfig.scopes.production, outputPath: "generated.ts" }
+        }
+      }
+    ]) {
+      expect(() => parseNaniProjectConfig(legacy)).toThrow(/Unknown key/u);
+    }
+  });
+
+  it("rejects invalid scopes and duplicate entry ids", () => {
+    expect(() => parseNaniProjectConfig({
+      ...baseConfig,
+      mainEntry: { ...baseConfig.mainEntry, scope: "test" }
+    })).toThrow("naniProject.mainEntry.scope must be 'production'");
+    expect(() => parseNaniProjectConfig({
+      ...baseConfig,
+      testEntries: {
+        smoke: { ...baseConfig.testEntries.smoke, id: baseConfig.mainEntry.id }
+      }
+    })).toThrow("entry ids must be unique");
+  });
+});
 
 describe("discoverNaniProjectScripts", () => {
   it("recursively discovers only .nani files in stable logical-path order", async () => {
@@ -121,6 +155,61 @@ describe("discoverNaniProjectScripts", () => {
 });
 
 describe("analyzeNaniCatalog", () => {
+  it("analyzes multiple entries in one isolated catalog", async () => {
+    const root = await projectRoot();
+    await mkdir(join(root, "nani-test"), { recursive: true });
+    await writeFile(join(root, "nani-test", "smoke.nani"), "#Start\n@end");
+    await writeFile(join(root, "nani-test", "character.nani"), "#Start\n@end");
+    const character = {
+      id: "vn:test-character",
+      scope: "test" as const,
+      initialScriptPath: "game/test/character.nani",
+      startLabel: "Start"
+    };
+
+    const result = await analyzeNaniCatalog(baseConfig, {
+      projectRoot: root,
+      scopes: ["test"],
+      entries: [baseConfig.testEntries.smoke!, character],
+      sourceDiagnosticPolicy: "allow-recoverable-command-errors"
+    });
+
+    expect(result.entries.map((entry) => entry.id)).toEqual(["vn:test", "vn:test-character"]);
+    expect(result.hasFatalDiagnostics).toBe(false);
+    expect(result.catalog.map((source) => source.scriptPath)).toEqual([
+      "game/test/character.nani",
+      "game/test/smoke.nani"
+    ]);
+  });
+
+  it("uses injected unsaved source text and emits exact catalog spans", async () => {
+    const root = await projectRoot();
+    await mkdir(join(root, "nani"), { recursive: true });
+    await writeFile(join(root, "nani", "opening.nani"), "#Start\n@goto game/missing.nani#Now");
+    const unsaved = "#Start\n@goto game/other.nani#Missing";
+    await writeFile(join(root, "nani", "other.nani"), "#Other\n@end");
+
+    const result = await analyzeNaniCatalog(baseConfig, {
+      projectRoot: root,
+      scopes: ["production"],
+      entries: [baseConfig.mainEntry],
+      sourceDiagnosticPolicy: "allow-recoverable-command-errors",
+      loadSourceText: async (script) => script.scriptPath === "game/opening.nani"
+        ? unsaved
+        : "#Other\n@end"
+    });
+    const diagnostic = result.diagnostics.find((candidate) => candidate.code === "endpoint-label-missing");
+
+    expect(diagnostic?.span && unsaved.slice(diagnostic.span.start, diagnostic.span.end))
+      .toBe("game/other.nani#Missing");
+    expect(result.scripts.find((script) => script.scriptPath === "game/opening.nani")?.sourceText)
+      .toBe(unsaved);
+    expect(result.scripts.find((script) => script.scriptPath === "game/opening.nani")?.diagnostics)
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: "endpoint-label-missing", span: diagnostic?.span })
+      ]));
+  });
+
   it("keeps a missing configured entry fatal and out of the runnable catalog", async () => {
     const root = await projectRoot();
     await mkdir(join(root, "nani"), { recursive: true });
@@ -129,7 +218,7 @@ describe("analyzeNaniCatalog", () => {
     const result = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
       scopes: ["production"],
-      entry: baseConfig.mainEntry,
+      entries: [baseConfig.mainEntry],
       sourceDiagnosticPolicy: "strict"
     });
 
@@ -152,7 +241,7 @@ describe("analyzeNaniCatalog", () => {
     const result = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
       scopes: ["production"],
-      entry: baseConfig.mainEntry,
+      entries: [baseConfig.mainEntry],
       sourceDiagnosticPolicy: "allow-recoverable-command-errors"
     });
 
@@ -177,7 +266,7 @@ describe("analyzeNaniCatalog", () => {
     const result = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
       scopes: ["production"],
-      entry: baseConfig.mainEntry,
+      entries: [baseConfig.mainEntry],
       sourceDiagnosticPolicy: "allow-recoverable-command-errors"
     });
 
@@ -199,7 +288,7 @@ describe("analyzeNaniCatalog", () => {
     const development = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
       scopes: ["production", "development"],
-      entry: baseConfig.mainEntry,
+      entries: [baseConfig.mainEntry],
       sourceDiagnosticPolicy: "allow-recoverable-command-errors"
     });
     expect(development.hasFatalDiagnostics).toBe(false);
@@ -214,7 +303,7 @@ describe("analyzeNaniCatalog", () => {
     const production = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
       scopes: ["production"],
-      entry: baseConfig.mainEntry,
+      entries: [baseConfig.mainEntry],
       sourceDiagnosticPolicy: "strict"
     });
     expect(production.hasFatalDiagnostics).toBe(true);

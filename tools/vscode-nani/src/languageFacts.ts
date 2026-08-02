@@ -182,6 +182,16 @@ export function primaryDocumentationFact(commandId: string): DocumentationFact |
 }
 
 export function inlineDocumentationFact(commandId: string, paramName?: string): DocumentationFact | undefined {
+  if (commandId === "-" || normalize(commandId) === "wait") {
+    return {
+      detail: commandId === "-"
+        ? "Inline staged-text input stop"
+        : "Inline staged-text input stop · long form",
+      documentation: commandId === "-"
+        ? "提交当前累计正文并等待一次输入，然后继续显示同一条剧情文本。"
+        : "`[wait i]` 与 `[-]` 等价。在显式 `@print` / `@cue` 中，长写法必须位于引号正文内。"
+    };
+  }
   if (commandId === ">") {
     return {
       detail: "Inline auto-next command",

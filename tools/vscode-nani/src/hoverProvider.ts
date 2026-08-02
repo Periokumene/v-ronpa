@@ -1,6 +1,7 @@
 import { parseStaticNaniEndpoint } from "@v-ronpa/nani-parser";
 import {
   getEndpointTokenAtPosition,
+  getInlineTextMode,
   lineAt,
   type NaniPosition,
   type NaniRange
@@ -91,13 +92,22 @@ function commandLineHover(line: string, position: NaniPosition): NaniHover | und
 function inlineHover(line: string, position: NaniPosition): NaniHover | undefined {
   const start = line.lastIndexOf("[", position.character);
   if (start < 0) return undefined;
+  if (start > 0 && line[start - 1] === "\\") return undefined;
   const end = line.indexOf("]", start + 1);
   if (end < position.character) return undefined;
+  if (!getInlineTextMode(line, position.character)) return undefined;
 
   const raw = line.slice(start + 1, end).trim();
   if (!raw) return undefined;
   const inlineOffset = line.slice(start + 1, end).indexOf(raw);
   const contentStart = start + 1 + Math.max(0, inlineOffset);
+  const stagedCommandId = raw === "-" ? "-" : /^wait\s+i$/iu.test(raw) ? "wait" : undefined;
+  if (stagedCommandId) {
+    const fact = inlineDocumentationFact(stagedCommandId);
+    return fact
+      ? hover(position.line, contentStart, contentStart + raw.length, `${fact.detail}\n\n${fact.documentation}`)
+      : undefined;
+  }
   const commandMatch = /^([<>])/u.exec(raw);
   const commandId = commandMatch?.[1];
   if (!commandId) return undefined;

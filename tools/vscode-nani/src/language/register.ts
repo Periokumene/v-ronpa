@@ -219,10 +219,10 @@ async function mapCatalogDiagnostics(
   const publications: Array<readonly [vscode.Uri, vscode.Diagnostic[]]> = [];
   for (const [scriptPath, computed] of snapshot.analysis.diagnosticsByScriptPath) {
     const uri = snapshot.sourceUrisByPath.get(scriptPath);
-    const source = snapshot.analysis.navigation.scripts.get(scriptPath);
-    if (!uri || !source) continue;
+    const sourceText = snapshot.sourceTextsByPath.get(scriptPath);
+    if (!uri || sourceText === undefined) continue;
     const mapped = computed.map((diagnostic) =>
-      toVscodeDiagnosticFromSourceText(source.sourceText, diagnostic)
+      toVscodeDiagnosticFromSourceText(sourceText, diagnostic)
     );
     publications.push([uri, mapped]);
   }
