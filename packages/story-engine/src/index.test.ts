@@ -485,6 +485,22 @@ describe("story engine", () => {
     expect(state.backlog).toEqual([{ speaker: "Mira", text: "After clear." }]);
   });
 
+  it("ignores dialogue appearance while retaining speaker and text", () => {
+    const runtimeScript = runtimeScriptFixture("dialogue-appearance.nani", [
+      runtimeCommand("print", "text", {
+        appearance: "sad",
+        autoNext: false,
+        speaker: "alice",
+        text: "不要担心。"
+      })
+    ]);
+
+    const state = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript).state;
+
+    expect(selectCurrentStoryLine(state)).toEqual({ channel: "dialog", speaker: "alice", text: "不要担心。" });
+    expect(state.backlog).toEqual([{ speaker: "alice", text: "不要担心。" }]);
+  });
+
   it("accumulates staged story text and commits backlog only at the final stage", () => {
     const runtimeScript = runtimeScriptFixture("staged-story.nani", [
       runtimeCommand("print", "text", { speaker: "Felix", text: "A", autoNext: false }, {

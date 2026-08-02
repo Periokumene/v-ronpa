@@ -45,6 +45,17 @@ import {
 import type { GameAUiConfig } from "./gameAUiConfig";
 import type { GameAUiAssets } from "./resolveGameAUiAssets";
 
+interface GameASpeakerPresentation {
+  label: string;
+  showNameplate: boolean;
+}
+
+const GAME_A_SPEAKER_PRESENTATIONS = {
+  alice: { label: "爱丽丝", showNameplate: true },
+  nar: { label: "nar", showNameplate: false },
+  narrator: { label: "旁白", showNameplate: true }
+} as const satisfies Readonly<Record<string, GameASpeakerPresentation>>;
+
 export interface GameASurfaceNavigation {
   pauseSection?: GamePauseSection | undefined;
   capabilities: InteractionCapabilitySnapshot;
@@ -97,6 +108,8 @@ export function GameADialogSurface({
   assets: GameAUiAssets;
   config: GameAUiConfig;
 }) {
+  const speaker = resolveGameASpeakerPresentation(model.speakerId, model.speakerLabel);
+
   return (
     <SurfaceFrame
       aria-label="视觉小说对话"
@@ -110,9 +123,9 @@ export function GameADialogSurface({
       className="game-a-dialog-surface"
       style={gameADialogStyle(model)}
     >
-      {config.dialog.showSpeakerName && model.speakerLabel ? (
+      {config.dialog.showSpeakerName && speaker.showNameplate && speaker.label ? (
         <div data-testid="vn-dialog-speaker" className="game-a-dialog-speaker">
-          {formatGameASpeakerLabel(model.speakerLabel)}
+          {formatGameASpeakerLabel(speaker.label)}
         </div>
       ) : null}
       <div aria-live="polite" data-testid="vn-dialog-state" className="game-a-dialog-state game-a-screen-reader-only">
@@ -187,7 +200,20 @@ export function GameACommandBar({ actions, model }: SurfaceSlotProps<VnCommandBa
 }
 
 function formatGameASpeakerLabel(label: string): string {
-  return `[${label.toUpperCase()}]`;
+  return `[${label}]`;
+}
+
+function resolveGameASpeakerPresentation(
+  speakerId: string | undefined,
+  fallbackLabel: string | undefined
+): GameASpeakerPresentation {
+  const configured = speakerId
+    ? GAME_A_SPEAKER_PRESENTATIONS[speakerId.toLowerCase() as keyof typeof GAME_A_SPEAKER_PRESENTATIONS]
+    : undefined;
+  if (configured) return configured;
+
+  const label = fallbackLabel ?? speakerId ?? "";
+  return { label, showNameplate: label.length > 0 };
 }
 
 function formatGameACommandLabel(label: string): string {
@@ -354,14 +380,17 @@ function GameABacklogOverlay({
         <p data-testid="backlog-empty" className="game-a-overlay-empty">暂无日志。</p>
       ) : (
         <ol data-testid="backlog-list" className="game-a-backlog-list">
-          {model.entries.map((entry, index) => (
-            <li data-testid={`backlog-entry-${index}`} key={`${entry.speaker ?? "narrator"}-${index}`}>
-              <strong>{entry.speaker ?? "旁白"}</strong>
-              <span>
-                <RichTextRenderer document={entry.richText} fallbackText={entry.text} />
-              </span>
-            </li>
-          ))}
+          {model.entries.map((entry, index) => {
+            const speaker = resolveGameASpeakerPresentation(entry.speaker, entry.speaker ?? "旁白");
+            return (
+              <li data-testid={`backlog-entry-${index}`} key={`${entry.speaker ?? "narrator"}-${index}`}>
+                <strong>{speaker.label}</strong>
+                <span>
+                  <RichTextRenderer document={entry.richText} fallbackText={entry.text} />
+                </span>
+              </li>
+            );
+          })}
         </ol>
       )}
     </GameAPauseSectionContent>

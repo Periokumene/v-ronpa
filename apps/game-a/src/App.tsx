@@ -164,7 +164,6 @@ export function GameAAppCore({
         dialogAppearance={gameAUiConfig.dialog.appearance}
         storyTextDisplay={storyTextDisplay}
         flow={flow}
-        formatStorySpeaker={displaySpeaker}
         overlayPages={overlayPages}
         runtime={runtime.shell}
         surfaces={gameASurfaces}
@@ -206,11 +205,6 @@ export function GameAAppCore({
       {renderAfterPlayfield?.({ runtime, flow })}
     </main>
   );
-}
-
-function displaySpeaker(speaker: string): string {
-  if (speaker === "Narrator") return "旁白";
-  return speaker;
 }
 
 function formatGameAMode(mode: string): string {

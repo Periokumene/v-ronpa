@@ -222,12 +222,64 @@ describe("game-a interaction surfaces", () => {
 
     expect(speaker?.props).toMatchObject({
       className: "game-a-dialog-speaker",
-      children: "[MIRA]"
+      children: "[Mira]"
     });
     expect(state?.props).toMatchObject({
       className: "game-a-dialog-state game-a-screen-reader-only",
       children: "阅读中"
     });
+  });
+
+  it.each(["Alice", "alice", "ALICE"])("maps %s to the configured Alice label", (speakerId) => {
+    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
+    const element = GameADialogSurface({
+      actions: {},
+      assets,
+      config: gameAUiConfig,
+      model: createDialogModel({ speakerId, speakerLabel: speakerId })
+    });
+
+    expect(findElementByTestId(element, "vn-dialog-speaker")?.props).toMatchObject({ children: "[爱丽丝]" });
+  });
+
+  it("preserves the existing Narrator label mapping", () => {
+    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
+    const element = GameADialogSurface({
+      actions: {},
+      assets,
+      config: gameAUiConfig,
+      model: createDialogModel({ speakerId: "Narrator", speakerLabel: "Narrator" })
+    });
+
+    expect(findElementByTestId(element, "vn-dialog-speaker")?.props).toMatchObject({ children: "[旁白]" });
+  });
+
+  it.each(["nar", "NAR"])("hides the configured %s nameplate", (speakerId) => {
+    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
+    const element = GameADialogSurface({
+      actions: {},
+      assets,
+      config: gameAUiConfig,
+      model: createDialogModel({ speakerId, speakerLabel: speakerId })
+    });
+
+    expect(findElementByTestId(element, "vn-dialog-speaker")).toBeUndefined();
+  });
+
+  it("keeps the global speaker-name switch authoritative", () => {
+    const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
+    const hiddenSpeakerConfig = {
+      ...gameAUiConfig,
+      dialog: { ...gameAUiConfig.dialog, showSpeakerName: false }
+    } as unknown as typeof gameAUiConfig;
+    const element = GameADialogSurface({
+      actions: {},
+      assets,
+      config: hiddenSpeakerConfig,
+      model: createDialogModel({ speakerId: "alice", speakerLabel: "alice" })
+    });
+
+    expect(findElementByTestId(element, "vn-dialog-speaker")).toBeUndefined();
   });
 
   it("renders centered choice skin without changing choice dispatch", () => {
@@ -394,6 +446,30 @@ describe("game-a interaction surfaces", () => {
     expect(dispatch).toHaveBeenCalledWith("open-save");
   });
 
+  it("uses the shared speaker label resolver in backlog without applying nameplate visibility", () => {
+    const surfaces = createGameASurfaces({
+      assets: resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig),
+      config: gameAUiConfig,
+      navigation: createNavigation({ pauseSection: "backlog" }),
+      vnPreparationPending: false
+    });
+    const BacklogSurface = surfaces.BacklogOverlay;
+    const markup = renderToStaticMarkup(
+      <BacklogSurface
+        actions={{ close: vi.fn() }}
+        model={createBacklogModel([
+          { speaker: "Alice", text: "Mapped." },
+          { speaker: "nar", text: "Hidden only on the nameplate." },
+          { speaker: "Mira", text: "Fallback preserves casing." }
+        ])}
+      />
+    );
+
+    expect(markup).toContain("<strong>爱丽丝</strong>");
+    expect(markup).toContain("<strong>nar</strong>");
+    expect(markup).toContain("<strong>Mira</strong>");
+  });
+
   it("renders save and load as separate pause tabs with CSS thumbnail placeholders for real slot ids", () => {
     const assets = resolveGameAUiAssets(createAssetRegistry(gameAContentManifest), gameAUiConfig);
     const surfaces = createGameASurfaces({
@@ -420,6 +496,7 @@ describe("game-a interaction surfaces", () => {
     expect(saveMarkup).toContain('data-testid="save-page-indicator"');
     expect(saveMarkup).toContain("1 / 8");
     expect(saveMarkup).toContain('draggable="false"');
+    expect(saveMarkup).toContain("<small>M: Saved line</small>");
 
     const loadSurfaces = createGameASurfaces({
       assets,
@@ -611,7 +688,7 @@ describe("game-a interaction surfaces", () => {
   });
 });
 
-function createDialogModel(): VnDialogViewModel {
+function createDialogModel(overrides: Partial<VnDialogViewModel> = {}): VnDialogViewModel {
   return {
     visible: true,
     speakerId: "Mira",
@@ -620,7 +697,8 @@ function createDialogModel(): VnDialogViewModel {
     state: "line",
     appearance: { backgroundOpacity: 0.92 },
     display: { textSize: "medium", textSpeed: 0.5 },
-    presentation: { targetVisible: false, mounted: true, opacity: 0.75, phase: "hiding" }
+    presentation: { targetVisible: false, mounted: true, opacity: 0.75, phase: "hiding" },
+    ...overrides
   };
 }
 
@@ -678,14 +756,14 @@ function createCommandBarModel(): VnCommandBarViewModel {
   };
 }
 
-function createBacklogModel(): BacklogOverlayViewModel {
+function createBacklogModel(entries: BacklogOverlayViewModel["entries"] = [
+  { speaker: "M", text: "You were right." },
+  { speaker: "Y", text: "Then we keep looking." }
+]): BacklogOverlayViewModel {
   return {
     visible: true,
     placement: "pause",
-    entries: [
-      { speaker: "M", text: "You were right." },
-      { speaker: "Y", text: "Then we keep looking." }
-    ]
+    entries
   };
 }
 

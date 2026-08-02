@@ -268,6 +268,21 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands.map((command) => command.commandId)).toEqual(["print", "print"]);
   });
 
+  it("preserves an unconsumed dialogue appearance without rejecting the line", () => {
+    const result = compileRuntimeScript(parseScenario({
+      sourceText: "alice.sad: 不要担心。",
+      scriptPath: "dialogue-appearance.nani"
+    }));
+
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
+    expect(result.script.commands).toEqual([
+      expect.objectContaining({
+        commandId: "print",
+        params: { appearance: "sad", autoNext: false, speaker: "alice", text: "不要担心。" }
+      })
+    ]);
+  });
+
   it("forwards inline text speed params on generic dialogue lines", () => {
     const parsed = parseScenario({
       sourceText: "Felix: A[< speed:0.8]B[>]\nMira: C[>]\nRen: Z[< speed:0]ero[>]",
