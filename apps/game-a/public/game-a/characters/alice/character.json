@@ -4,10 +4,10 @@
     "default"
   ],
   "renderSpace": {
-    "stageScale": 0.5,
+    "stageScale": 0.6428571428571429,
     "characterAnchor": [
       500.0,
-      185.0
+      435.0
     ]
   }
 }

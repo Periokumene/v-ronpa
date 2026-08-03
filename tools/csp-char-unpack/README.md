@@ -15,8 +15,8 @@ uv sync --locked
 
 uv run csp-char-unpack build /absolute/path/alice.clip --character-id alice
 uv run csp-char-unpack build /absolute/path/alice.clip --character-id alice \
-  --reference-stage-height 700 \
-  --anchor-bottom-offset 100
+  --reference-stage-height 900 \
+  --anchor-bottom-offset 350
 
 uv run csp-char-unpack list --character-id alice
 uv run csp-char-unpack prune --character-id alice --keep 10
@@ -24,7 +24,7 @@ uv run csp-char-unpack prune --character-id alice --keep 10 --apply
 ```
 
 `--character-id` is required. The root is always `/root`; there is no root-selection option. Render parameters default to
-`700` and `100`. The anchor uses the exact `/root/body/0` alpha bottom, and invalid body content rejects the run.
+`900` and `350`. The anchor uses the exact `/root/body/0` alpha bottom, and invalid body content rejects the run.
 
 The CLI has no output-directory option. Every build creates a new UTC timestamped run, including repeated builds of
 identical input. `prune` is a dry run unless `--apply` is present; it only removes run directories and never source

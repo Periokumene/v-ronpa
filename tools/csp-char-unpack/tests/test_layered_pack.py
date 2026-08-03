@@ -190,7 +190,7 @@ def test_builds_v3_pack_with_lower_camel_tokens_and_body_anchor(tmp_path: Path) 
     assert character == {
         "id": "alice",
         "defaultComposition": ["default"],
-        "renderSpace": {"stageScale": 7.0, "characterAnchor": [50.0, 160.0]},
+        "renderSpace": {"stageScale": 9.0, "characterAnchor": [50.0, 410.0]},
     }
     assert validate_pack(tmp_path) == "Validated V-Ronpa character pack 'alice'."
 
@@ -236,7 +236,7 @@ def test_body_variants_generate_tokens_and_anchor_from_body_zero(tmp_path: Path)
         "body2": ["root/body>2"],
     }
     character = json.loads((tmp_path / "character.json").read_text(encoding="utf-8"))
-    assert character["renderSpace"]["characterAnchor"] == [50.0, 160.0]
+    assert character["renderSpace"]["characterAnchor"] == [50.0, 410.0]
 
 
 def test_effect_is_optional_defaults_off_and_generates_explicit_off(tmp_path: Path) -> None:

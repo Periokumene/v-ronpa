@@ -9,6 +9,7 @@ import pytest
 from csp_char_unpack.cli import _main_parser
 from csp_char_unpack.converter import ConversionOptions, convert_clip_to_psd, ensure_clip_header
 from csp_char_unpack.errors import ToolError
+from csp_char_unpack.layered_pack import DEFAULT_ANCHOR_BOTTOM_OFFSET, DEFAULT_REFERENCE_STAGE_HEIGHT
 from csp_char_unpack.pipeline import (
     _new_run_id,
     _validate_conversion_structure,
@@ -107,4 +108,6 @@ def test_v3_cli_requires_character_id_and_rejects_removed_character_root() -> No
 
     parsed = parser.parse_args(["build", "alice.clip", "--character-id", "alice"])
     assert parsed.character_id == "alice"
+    assert parsed.reference_stage_height == DEFAULT_REFERENCE_STAGE_HEIGHT == 900.0
+    assert parsed.anchor_bottom_offset == DEFAULT_ANCHOR_BOTTOM_OFFSET == 350.0
     assert not hasattr(parsed, "character_root")
