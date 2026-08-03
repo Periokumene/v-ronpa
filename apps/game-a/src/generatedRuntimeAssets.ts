@@ -148,6 +148,19 @@ export const gameARuntimeAssets = [
       ]
     },
     {
+      "id": "bgm:hmg-390-indutrial-rock-beat-tense",
+      "kind": "bgm",
+      "optimizedUri": "/game-a/media/bgm/hmg-390-indutrial-rock-beat-tense.webm",
+      "format": "webm",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "game-a",
+        "vn"
+      ]
+    },
+    {
       "id": "bleep:game-a-dialogue",
       "kind": "bleep",
       "optimizedUri": "/game-a/media/bleep/game-a-dialogue.ogg",
@@ -216,6 +229,32 @@ export const gameARuntimeAssets = [
       "id": "sfx:noise-6hz",
       "kind": "sfx",
       "optimizedUri": "/game-a/media/sfx/noise-6hz.mp3",
+      "format": "mp3",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "game-a",
+        "vn"
+      ]
+    },
+    {
+      "id": "sfx:pixabay-fall-impact",
+      "kind": "sfx",
+      "optimizedUri": "/game-a/media/sfx/pixabay-fall-impact.mp3",
+      "format": "mp3",
+      "compression": [],
+      "lods": [],
+      "collisionProxyIds": [],
+      "tags": [
+        "game-a",
+        "vn"
+      ]
+    },
+    {
+      "id": "sfx:pixabay-wet-splat",
+      "kind": "sfx",
+      "optimizedUri": "/game-a/media/sfx/pixabay-wet-splat.mp3",
       "format": "mp3",
       "compression": [],
       "lods": [],

@@ -51,8 +51,8 @@ describe("generated Game A script metadata boundaries", () => {
       }
     ]);
     expect(development.scripts.find((script) => script.scope === "development")).toMatchObject({
-      sourceFile: "apps/game-a/src/nani-dev/draft-home-quarrel.nani",
-      scriptPath: "game-a/dev/draft-home-quarrel.nani"
+      sourceFile: "apps/game-a/src/nani-dev/home-quarrel.nani",
+      scriptPath: "game-a/dev/home-quarrel.nani"
     });
     expect(tests.scripts.map(({ sourceFile, scriptPath }) => ({ sourceFile, scriptPath }))).toEqual([
       {

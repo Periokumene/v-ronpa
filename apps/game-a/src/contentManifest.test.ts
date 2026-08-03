@@ -63,6 +63,9 @@ describe("game-a content manifest", () => {
     expect(registry.url({ id: "bgm:hmg-250504-dark-ambient-home", kind: "bgm" })).toBe(
       "/game-a/media/bgm/hmg-250504-dark-ambient-home.webm"
     );
+    expect(registry.url({ id: "bgm:hmg-390-indutrial-rock-beat-tense", kind: "bgm" })).toBe(
+      "/game-a/media/bgm/hmg-390-indutrial-rock-beat-tense.webm"
+    );
     expect(registry.url({ id: "sfx:game-a-chime", kind: "sfx" })).toBe("/game-a/media/sfx/game-a-chime.ogg");
     expect(registry.url({ id: "sfx:gentle-rain-loop", kind: "sfx" })).toBe(
       "/game-a/media/sfx/gentle-rain-loop.mp3"
@@ -71,6 +74,12 @@ describe("game-a content manifest", () => {
       "/game-a/media/sfx/glug-glug-glug.mp3"
     );
     expect(registry.url({ id: "sfx:noise-6hz", kind: "sfx" })).toBe("/game-a/media/sfx/noise-6hz.mp3");
+    expect(registry.url({ id: "sfx:pixabay-fall-impact", kind: "sfx" })).toBe(
+      "/game-a/media/sfx/pixabay-fall-impact.mp3"
+    );
+    expect(registry.url({ id: "sfx:pixabay-wet-splat", kind: "sfx" })).toBe(
+      "/game-a/media/sfx/pixabay-wet-splat.mp3"
+    );
     expect(registry.url({ id: "sfx:ui-hover-default", kind: "sfx" })).toBe(
       "/game-a/media/sfx/ui-hover-default.ogg"
     );
