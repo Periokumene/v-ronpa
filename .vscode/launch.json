@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Game A 开发服务器",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm --filter @v-ronpa/game-a dev",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Game Harness 开发服务器",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm --filter @v-ronpa/game-harness dev",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
