@@ -77,6 +77,7 @@ export class NaniProjectScriptService implements vscode.Disposable {
         projectRoot: context.projectRoot,
         scopes: context.scopes,
         entries: context.entries,
+        assetBindings: context.assetBindings,
         sourceDiagnosticPolicy: "allow-recoverable-command-errors",
         loadSourceText: async (script) => {
           const uri = vscode.Uri.file(script.sourcePath);

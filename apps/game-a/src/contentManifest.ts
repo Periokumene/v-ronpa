@@ -1,48 +1,49 @@
-import { composeContentManifest } from "@v-ronpa/asset-registry";
-import type { ContentManifestInput } from "@v-ronpa/contracts";
-import {
-  gameAFontFaces,
-  gameARuntimeAssetFragments,
-  gameARuntimeAssets
-} from "./generatedRuntimeAssets";
+import type { AssetRequirement, ContentManifestInput } from "@v-ronpa/contracts";
+import { ContentManifestSchema } from "@v-ronpa/contracts";
+import { gameAAssets } from "./generatedAssets";
 import {
   gameAVnEntryLocator,
   gameAScriptMetadataByPath
 } from "./generatedNaniProduction";
 
-const GAME_A_MAIN_BACKGROUND_ID = "bg:game-a-academy-hall-fullscreen";
-const GAME_A_INNER_BACKGROUND_ID = "bg:game-a-snow-outskirts-frame";
-const gameAScriptAssetRefs = Object.values(gameAScriptMetadataByPath).flatMap((metadata) => metadata.assetRefs);
+const gameAScriptRequirements = Object.values(gameAScriptMetadataByPath)
+  .flatMap((metadata) => metadata.requirements);
 
 export const gameAVnEntry = {
   ...gameAVnEntryLocator,
   title: "Game A",
   profile: "vn2d" as const,
-  assetRefs: [
-    ...dedupeAssetRefs(gameAScriptAssetRefs),
-    { id: "bleep:game-a-dialogue", kind: "bleep" as const, tags: ["game-a", "vn"] },
-    { id: "texture:ui:game-a-dialog-frame", kind: "texture" as const, tags: ["game-a", "ui", "vn"] },
-    { id: GAME_A_MAIN_BACKGROUND_ID, kind: "background" as const, tags: ["game-a", "preload", "vn"] },
-    { id: GAME_A_INNER_BACKGROUND_ID, kind: "background" as const, tags: ["game-a", "preload", "vn"] }
-  ]
+  requirements: dedupeRequirements([
+    ...gameAScriptRequirements,
+    { id: "bleep/dialogue", capability: "audio" },
+    { id: "ui/dialog-frame", capability: "image" },
+    { id: "bg/academy-hall", capability: "image" },
+    { id: "bg/inner/snow-outskirts", capability: "image" }
+  ])
 };
 
 const gameAContentManifestInput = {
-  version: 4,
-  assets: [
-    { id: "bg:title", kind: "background" as const, tags: ["game-a", "ui", "title"] },
-    { id: "sfx:ui-hover-default", kind: "sfx" as const, tags: ["game-a", "ui"] },
-    { id: "sfx:ui-click-default", kind: "sfx" as const, tags: ["game-a", "ui"] }
+  version: 5,
+  assets: gameAAssets,
+  requirements: [
+    { id: "bg/title", capability: "image" },
+    { id: "sfx/ui-hover-default", capability: "audio" },
+    { id: "sfx/ui-click-default", capability: "audio" }
   ],
   audio: {
     dialogueBleep: {
       enabled: true,
-      defaultSound: { sourceRef: "bleep:game-a-dialogue", gain: 1 },
+      defaultSound: { assetId: "bleep/dialogue", gain: 1 },
       speakerOverrides: {}
     }
   },
-  fonts: gameAFontFaces,
-  runtimeAssets: gameARuntimeAssets,
+  fonts: [{
+    id: "default",
+    family: "Fusion Pixel zh-Hans",
+    source: { type: "asset", assetId: "font/fusion-pixel-zh-hans" },
+    weight: "400",
+    style: "normal"
+  }],
   collisionProxies: [],
   vnEntries: [gameAVnEntry],
   maps: [],
@@ -51,8 +52,11 @@ const gameAContentManifestInput = {
   trials: []
 } satisfies ContentManifestInput;
 
-export const gameAContentManifest = composeContentManifest(gameAContentManifestInput, gameARuntimeAssetFragments);
+export const gameAContentManifest = ContentManifestSchema.parse(gameAContentManifestInput);
 
-function dedupeAssetRefs<T extends { id: string; kind: string }>(refs: readonly T[]): T[] {
-  return [...new Map(refs.map((ref) => [`${ref.kind}:${ref.id}`, ref])).values()];
+function dedupeRequirements(requirements: readonly AssetRequirement[]): AssetRequirement[] {
+  return [...new Map(requirements.map((requirement) => [
+    `${requirement.capability}:${requirement.id}`,
+    requirement
+  ])).values()];
 }

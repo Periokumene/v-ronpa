@@ -21,7 +21,7 @@ describe("VN checkpoint authority", () => {
       value: {
         entryId: "vn:test",
         script,
-        media: { bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } } },
+        media: { bgmByGroup: { music: { assetId: "bgm/main", volume: 0.4 } } },
         ui: { dialog: true }
       }
     });
@@ -29,7 +29,7 @@ describe("VN checkpoint authority", () => {
 
   it.each([
     ["input-wait", { runtimeWait: { kind: "input", commandId: "input", commandIndex: 1, variableName: "name", valueType: "string" } }],
-    ["movie-wait", { runtimeWait: { kind: "movie", commandId: "movie", commandIndex: 1, moviePath: "video:test", allowSkip: true } }],
+    ["movie-wait", { runtimeWait: { kind: "movie", commandId: "movie", commandIndex: 1, moviePath: "video/test", allowSkip: true } }],
     ["pause-wait", { runtimeWait: { kind: "pause", commandId: "wait", commandIndex: 1, mode: "confirm" } }],
     ["ui-wait", { presentationWait: { channel: "ui", commandId: "hideui", commandIndex: 1, durationMs: 100, targets: ["dialog"], targetVisible: false } }],
     ["pixi-wait", { presentationWait: { channel: "pixi", commandId: "flash", commandIndex: 1, expectedTasks: [] } }]
@@ -61,9 +61,9 @@ function checkpoint(story: StoryRuntimeSnapshot) {
     story,
     pixiStage: createInitialPixiStageSnapshot(),
     media: {
-      bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
-      loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+      bgmByGroup: { music: { assetId: "bgm/main", volume: 0.4 } },
+      loopingSfxByKey: { rain: { assetId: "sfx/rain", volume: 0.3, group: "rain" } }
     },
-    ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+    ui: { dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null }
   });
 }

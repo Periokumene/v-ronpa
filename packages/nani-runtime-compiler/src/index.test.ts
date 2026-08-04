@@ -21,6 +21,62 @@ function diagnosticSummaries(diagnostics: ReturnType<typeof compileRuntimeScript
 }
 
 describe("nani runtime compiler", () => {
+  it("normalizes strict pinp show and hide forms with stable defaults", () => {
+    const result = compileRuntimeScript(parseScenario({
+      scriptPath: "pinp.nani",
+      sourceText: [
+        '@pinp props:milk-bag alt:"牛奶袋"',
+        "@pinp texture/card pos:25,75 height:30 ratio:4,3 effect:none time:0",
+        "@pinp visible:false"
+      ].join("\n")
+    }));
+
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
+    expect("assets" in result.script).toBe(false);
+    expect(result.script.commands.map((command) => command.params)).toEqual([
+      {
+        assetId: "props:milk-bag",
+        positionPercent: [50, 50],
+        heightPercent: 20,
+        aspectRatio: [16, 9],
+        alt: "牛奶袋",
+        effect: "fade",
+        durationMs: 180,
+        visible: true
+      },
+      {
+        assetId: "texture/card",
+        positionPercent: [25, 75],
+        heightPercent: 30,
+        aspectRatio: [4, 3],
+        alt: "",
+        effect: "none",
+        durationMs: 0,
+        visible: true
+      },
+      { effect: "fade", durationMs: 180, visible: false }
+    ]);
+  });
+
+  it.each([
+    ["missing asset", "@pinp"],
+    ["asset on hide", "@pinp props:milk-bag visible:false"],
+    ["layout on hide", "@pinp visible:false height:20"],
+    ["bad position", "@pinp props:milk-bag pos:50,101"],
+    ["bad height", "@pinp props:milk-bag height:0"],
+    ["bad ratio", "@pinp props:milk-bag ratio:16,-9"],
+    ["unknown effect", "@pinp props:milk-bag effect:zoom"],
+    ["none with time", "@pinp props:milk-bag effect:none time:0.2"],
+    ["wait flag", "@pinp props:milk-bag wait!"]
+  ])("rejects invalid pinp form: %s", (_name, sourceText) => {
+    const result = compileRuntimeScript(parseScenario({ scriptPath: "pinp-invalid.nani", sourceText }));
+
+    expect(result.script.commands).toEqual([]);
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "invalid-command-param", severity: "error" })
+    ]));
+  });
+
   it("links local, direct goto, and choice endpoints against one catalog", () => {
     const opening = compileRuntimeScript(parseScenario({
       scriptPath: "game-a/opening.nani",
@@ -122,8 +178,8 @@ describe("nani runtime compiler", () => {
     ).toThrow(/has no argument origin/u);
   });
 
-  it("preserves corpus-style labels, assets, dependencies, source commands, and script output", () => {
-    const sourceText = ["#Start", "@back bg:atrium", "@goto chapter2.nani#Entry"].join("\n");
+  it("preserves corpus-style labels, dependencies, source commands, and script output", () => {
+    const sourceText = ["#Start", "@back bg/atrium", "@goto chapter2.nani#Entry"].join("\n");
     const parsed = parseScenario({ sourceText, scriptPath: "corpus-parity.nani" });
     const result = compileRuntimeScript({
       ...parsed,
@@ -137,20 +193,19 @@ describe("nani runtime compiler", () => {
     expect(result.script).toMatchObject({
       scriptPath: "corpus-parity.nani",
       labels: { Start: 0 },
-      assets: [{ id: "bg:atrium", kind: "background", tags: [] }],
       dependencies: [{ endpoint: "chapter2.nani#Entry" }],
       commands: [
         {
           commandId: "back",
           params: {
             target: PIXI_MAIN_BACKGROUND_ID,
-            appearance: "bg:atrium",
+            appearance: "bg/atrium",
             lazy: false,
             wait: false
           },
           sourceCommand: {
             rawCommandId: "back",
-            rawPrimary: "bg:atrium",
+            rawPrimary: "bg/atrium",
             rawParams: {},
             rawFlags: {}
           }
@@ -304,7 +359,7 @@ describe("nani runtime compiler", () => {
   it("compiles rich text to plain text params with top-level richText", () => {
     const parsed = parseScenario({
       sourceText: [
-        'Felix: <strong>Stop</strong> <font color="red" face="font:serif">there</font>[>]',
+        'Felix: <strong>Stop</strong> <font color="red" face="serif">there</font>[>]',
         '@print "<em>Printed</em>" author:Narrator',
         '@append "<u> joined</u>"',
         '@choice "<mark>Inspect</mark>" goto:#Inspect',
@@ -322,7 +377,7 @@ describe("nani runtime compiler", () => {
         text: "Stop there",
         runs: [
           { start: 0, end: 4, style: { bold: true } },
-          { start: 5, end: 10, style: { color: "red", fontId: "font:serif" } }
+          { start: 5, end: 10, style: { color: "red", fontFaceId: "serif" } }
         ]
       }
     });
@@ -455,8 +510,8 @@ describe("nani runtime compiler", () => {
   it("normalizes visual runtime params without producing downstream command shapes", () => {
     const parsed = parseScenario({
       sourceText: [
-        "@back bg:harness effect:fade",
-        "@inback bg:framed-room effect:fade time:0.2 easing:linear wait!",
+        "@back bg/harness effect:fade",
+        "@inback bg/framed-room effect:fade time:0.2 easing:linear wait!",
         "@flash color:#fff duration:120"
       ].join("\n"),
       scriptPath: "presentation.nani"
@@ -467,13 +522,13 @@ describe("nani runtime compiler", () => {
     expect(result.script.commands).toEqual([
       expect.objectContaining({
         commandId: "back",
-        params: expect.objectContaining({ target: PIXI_MAIN_BACKGROUND_ID, appearance: "bg:harness", transition: "fade" })
+        params: expect.objectContaining({ target: PIXI_MAIN_BACKGROUND_ID, appearance: "bg/harness", transition: "fade" })
       }),
       expect.objectContaining({
         commandId: "inback",
         params: expect.objectContaining({
           target: PIXI_INNER_BACKGROUND_ID,
-          appearance: "bg:framed-room",
+          appearance: "bg/framed-room",
           transition: "fade",
           durationMs: 200,
           easing: "linear",
@@ -492,7 +547,7 @@ describe("nani runtime compiler", () => {
 
   it("warns on unsupported inner background transform params without adding v1 public surface", () => {
     const parsed = parseScenario({
-      sourceText: "@inback bg:framed-room pos:50 scale:1.2 dissolve:fade",
+      sourceText: "@inback bg/framed-room pos:50 scale:1.2 dissolve:fade",
       scriptPath: "inback-unsupported-params.nani"
     });
     const result = compileRuntimeScript(parsed);
@@ -502,7 +557,7 @@ describe("nani runtime compiler", () => {
         commandId: "inback",
         params: expect.objectContaining({
           target: PIXI_INNER_BACKGROUND_ID,
-          appearance: "bg:framed-room"
+          appearance: "bg/framed-room"
         })
       })
     );
@@ -783,7 +838,7 @@ describe("nani runtime compiler", () => {
     const parsed = parseScenario({
       sourceText: [
         "#Start",
-        "@back bg:flower id:Flower",
+        "@back bg/flower id:Flower",
         "@char Ema.Pensive1,ArmR3 pos:50",
         "@char Ema",
         "@shake actorId:stage wait!"
@@ -798,7 +853,7 @@ describe("nani runtime compiler", () => {
         commandId: "back",
         params: expect.objectContaining({
           target: "Flower",
-          appearance: "bg:flower"
+          appearance: "bg/flower"
         })
       })
     );
@@ -935,7 +990,7 @@ describe("nani runtime compiler", () => {
   it("compiles command conditions and unless expressions onto runtime commands", () => {
     const parsed = parseScenario({
       sourceText: [
-        "@back bg:harness if:{showBg}",
+        "@back bg/harness if:{showBg}",
         "@choice \"Open\" goto:#Open if:{affinity>=3}",
         "@flash duration:120 unless:{flashDisabled}"
       ].join("\n"),
@@ -948,9 +1003,9 @@ describe("nani runtime compiler", () => {
       expect.objectContaining({
         commandId: "back",
         condition: { type: "expression", source: "showBg" },
-        params: expect.objectContaining({ appearance: "bg:harness" }),
+        params: expect.objectContaining({ appearance: "bg/harness" }),
         sourceCommand: expect.objectContaining({
-          rawPrimary: "bg:harness",
+          rawPrimary: "bg/harness",
           rawParams: {}
         })
       })
@@ -970,7 +1025,7 @@ describe("nani runtime compiler", () => {
   });
 
   it("binds identical command diagnostics to each statement's exact value span", () => {
-    const sourceText = ["@back bg:harness time:fast", "@back bg:harness time:fast"].join("\n");
+    const sourceText = ["@back bg/harness time:fast", "@back bg/harness time:fast"].join("\n");
     const parsed = parseScenario({ sourceText, scriptPath: "duplicate-diagnostics.nani" });
     const result = compileRuntimeScript(parsed);
 
@@ -988,7 +1043,7 @@ describe("nani runtime compiler", () => {
           scriptPath: "duplicate-diagnostics.nani",
           line: 1,
           column: 1,
-          raw: "@back bg:harness time:fast"
+          raw: "@back bg/harness time:fast"
         },
         span: { start: 22, end: 26 },
         slice: "fast"
@@ -999,7 +1054,7 @@ describe("nani runtime compiler", () => {
           scriptPath: "duplicate-diagnostics.nani",
           line: 2,
           column: 1,
-          raw: "@back bg:harness time:fast"
+          raw: "@back bg/harness time:fast"
         },
         span: { start: 49, end: 53 },
         slice: "fast"
@@ -1026,7 +1081,7 @@ describe("nani runtime compiler", () => {
   });
 
   it("targets the first incompatible list item instead of the whole parameter value", () => {
-    const sourceText = "@back bg:harness pos:1,bad,2";
+    const sourceText = "@back bg/harness pos:1,bad,2";
     const parsed = parseScenario({ sourceText, scriptPath: "list-item-span.nani" });
     const result = compileRuntimeScript(parsed);
 
@@ -1051,7 +1106,7 @@ describe("nani runtime compiler", () => {
   });
 
   it("falls back from empty list items, values, and command names to visible anchors", () => {
-    const listSource = "@back bg:harness pos:1,,2";
+    const listSource = "@back bg/harness pos:1,,2";
     const listResult = compileRuntimeScript(
       parseScenario({ sourceText: listSource, scriptPath: "empty-list-item-span.nani" })
     );
@@ -1061,7 +1116,7 @@ describe("nani runtime compiler", () => {
     });
     expect(listSource.slice(listResult.diagnostics[0]?.span.start, listResult.diagnostics[0]?.span.end)).toBe(",");
 
-    const valueSource = "@back bg:harness time:";
+    const valueSource = "@back bg/harness time:";
     const valueResult = compileRuntimeScript(
       parseScenario({ sourceText: valueSource, scriptPath: "empty-value-span.nani" })
     );
@@ -1106,7 +1161,7 @@ describe("nani runtime compiler", () => {
   });
 
   it("appends migrated semantic warnings after all existing compiler diagnostics", () => {
-    const sourceText = ["@flash bogus:1", "@back bg:harness time:fast"].join("\n");
+    const sourceText = ["@flash bogus:1", "@back bg/harness time:fast"].join("\n");
     const result = compileRuntimeScript(
       parseScenario({ sourceText, scriptPath: "migrated-warning-order.nani" })
     );
@@ -1154,7 +1209,7 @@ describe("nani runtime compiler", () => {
 
   it("propagates corrupt source-map invariants instead of guessing a diagnostic range", () => {
     const parsed = parseScenario({
-      sourceText: "@back bg:harness time:fast",
+      sourceText: "@back bg/harness time:fast",
       scriptPath: "corrupt-source-map.nani"
     });
     const statement = parsed.sourceMap.statements[0];
@@ -1179,7 +1234,7 @@ describe("nani runtime compiler", () => {
 
   it("skips error commands while preserving warning-level compiled commands", () => {
     const parsed = parseScenario({
-      sourceText: ["@back bg:harness time:fast", "@back bg:valid time:0.5"].join("\n"),
+      sourceText: ["@back bg/harness time:fast", "@back bg/valid time:0.5"].join("\n"),
       scriptPath: "diagnostics.nani"
     });
     const result = compileRuntimeScript(parsed);
@@ -1306,7 +1361,7 @@ describe("nani runtime compiler", () => {
 
   it("keeps explicit voice commands declared-only while textId dialogue audio stays app-derived", () => {
     const parsed = parseScenario({
-      sourceText: "@voice voice:zh:voice_validation_0001 volume:0.5\n@stopVoice",
+      sourceText: "@voice voice/zh/voice_validation_0001 volume:0.5\n@stopVoice",
       scriptPath: "explicit-voice-declared-only.nani"
     });
     const result = compileRuntimeScript(parsed);
@@ -1316,7 +1371,7 @@ describe("nani runtime compiler", () => {
         commandId: "voice",
         status: "stubbed",
         params: expect.objectContaining({
-          primary: "voice:zh:voice_validation_0001",
+          primary: "voice/zh/voice_validation_0001",
           volume: 0.5
         })
       }),
@@ -1373,12 +1428,12 @@ describe("nani runtime compiler", () => {
         "@toast \"Saved\" appearance:info time:1.5",
         "@wait i5",
         "@input playerName type:string summary:\"Name?\" value:Felix",
-        "@bgm bgm:validation-main group:music volume:0.45 fade:0.2",
-        "@sfx sfx:rain-inside-car-loop group:rain loop! volume:0.35",
-        "@sfxFast sfx:shock-fadeout group:shock volume:0.75",
+        "@bgm bgm/validation-main group:music volume:0.45 fade:0.2",
+        "@sfx sfx/rain-inside-car-loop group:rain loop! volume:0.35",
+        "@sfxFast sfx/shock-fadeout group:shock volume:0.75",
         "@stopSfx group:rain fade:0.2",
         "@stopBgm group:music fade:0.5",
-        "@movie video:validation-intro block!"
+        "@movie video/validation-intro block!"
       ].join("\n"),
       scriptPath: "non-pixi.nani"
     });
@@ -1413,19 +1468,19 @@ describe("nani runtime compiler", () => {
       defaultValue: "Felix"
     });
     expect(result.script.commands[9]?.params).toMatchObject({
-      bgmPath: "bgm:validation-main",
+      bgmPath: "bgm/validation-main",
       group: "music",
       volume: 0.45,
       fadeMs: 200
     });
     expect(result.script.commands[10]?.params).toMatchObject({
-      sfxPath: "sfx:rain-inside-car-loop",
+      sfxPath: "sfx/rain-inside-car-loop",
       group: "rain",
       loop: true,
       volume: 0.35
     });
     expect(result.script.commands[14]?.params).toEqual({
-      moviePath: "video:validation-intro",
+      moviePath: "video/validation-intro",
       block: true
     });
   });
@@ -1446,7 +1501,7 @@ describe("nani runtime compiler", () => {
   it("diagnoses unsupported media wait and advanced input/UI/sfxFast params", () => {
     const parsed = parseScenario({
       sourceText: [
-        "@bgm bgm:validation-main loop:false wait!",
+        "@bgm bgm/validation-main loop:false wait!",
         "@input playerName nostop!",
         "@hideUI commandBar wait! allowToggle!",
         "@sfxFast beep restart! additive! wait!"
@@ -1503,7 +1558,6 @@ function runtimeScriptForSerialization({
   return {
     scriptPath: "game/test.nani",
     labels: { Start: 0 },
-    assets: [{ id: "bg:ignored", kind: "background", tags: [] }],
     dependencies: [{ endpoint: "ignored.nani" }],
     commands: [
       {

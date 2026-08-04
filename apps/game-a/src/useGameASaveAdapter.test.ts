@@ -18,7 +18,7 @@ import {
 } from "./useGameASaveAdapter";
 
 describe("game-a save adapter", () => {
-  it("creates v9 save data from the canonical VN checkpoint", () => {
+  it("creates v11 save data from the canonical VN checkpoint", () => {
     const story = createStory(
       Array.from({ length: 25 }, (_, index) => ({
         speaker: "Mira",
@@ -29,7 +29,7 @@ describe("game-a save adapter", () => {
     const data = createGameASaveData({ vn: createVnCheckpoint(story) });
 
     expect(data).toMatchObject({
-      version: 9,
+      version: 11,
       gameId: "game-a",
       mode: "vn",
       vn: {
@@ -38,10 +38,10 @@ describe("game-a save adapter", () => {
         story: {
           backlog: expect.arrayContaining([{ speaker: "Mira", text: "Line 25" }])
         },
-        pixiStage: { version: 5 },
+        pixiStage: { version: 6 },
         media: {
-          bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
-          loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+          bgmByGroup: { music: { assetId: "bgm/main", volume: 0.4 } },
+          loopingSfxByKey: { rain: { assetId: "sfx/rain", volume: 0.3, group: "rain" } }
         }
       },
       navi: null,
@@ -61,7 +61,7 @@ describe("game-a save adapter", () => {
   });
 
   it("uses media-save as the sole slot policy authority for manual and quick saves", () => {
-    expect(GAME_A_SAVE_DB_NAME).toBe("v-ronpa-game-a-saves-v11");
+    expect(GAME_A_SAVE_DB_NAME).toBe("v-ronpa-game-a-saves-v13");
     expect(gameASaveSlotPolicy.namespace).toBe("game-a");
     expect(gameASaveSlotIds).toHaveLength(gameAManualSaveSlotCount);
     expect(gameASaveSlotIds.slice(0, 3)).toEqual(["slot:game-a:1", "slot:game-a:2", "slot:game-a:3"]);
@@ -107,7 +107,7 @@ function createStory(backlog: StoryRuntimeSnapshot["backlog"]): StoryRuntimeSnap
 
 function createPixiStage(): PixiStageSnapshot {
   return {
-    version: 5,
+    version: 6,
     revision: 0,
     backgroundsById: {},
     innerBackgroundsById: {},
@@ -131,9 +131,9 @@ function createVnCheckpoint(story: StoryRuntimeSnapshot): SaveableVnState {
     story: createSaveableStorySnapshot(story),
     pixiStage: createPixiStage(),
     media: {
-      bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
-      loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+      bgmByGroup: { music: { assetId: "bgm/main", volume: 0.4 } },
+      loopingSfxByKey: { rain: { assetId: "sfx/rain", volume: 0.3, group: "rain" } }
     },
-    ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+    ui: { dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null }
   };
 }

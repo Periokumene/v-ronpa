@@ -73,7 +73,7 @@ async function canonicalCandidate(sourceText: string): Promise<VnDevtoolsScriptC
     profile: "vn2d",
     initialScriptPath: "game-a/test/candidate.nani",
     startLabel: "Start",
-    assetRefs: []
+    requirements: []
   };
   const draft: VnRuntimeScriptSource = {
     scriptPath: entry.initialScriptPath,

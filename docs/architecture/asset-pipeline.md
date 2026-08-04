@@ -1,134 +1,115 @@
-# Runtime Asset Pipeline
+# App-relative Asset Pipeline
 
-Each app owns a declarative `asset.config.mjs`. Nani membership comes only from
-`naniProject.scopes`: every ordinary `.nani` below a configured `sourceRoot` is
-recursively discovered and mapped below its `scriptRoot`. Entries retain an
-explicit stable id, initial script path, optional start label, and scope;
-ordinary scripts are never registered one by one. `@v-ronpa/nani-project` is
-the sole implementation of discovery, compilation, linking, semantic revision,
-asset-ref collection, character preload planning, and diagnostic disposition
-used by the generator, Vite, and VS Code.
-
-Game A owns three physically separate scopes:
+Each independently published App owns one source root:
 
 ```text
-apps/game-a/src/nani/**      -> game-a/**       (production)
-apps/game-a/src/nani-dev/**  -> game-a/dev/**   (development)
-apps/game-a/src/nani-test/** -> game-a/test/**  (test)
+apps/game-a/assets/**
+apps/game-harness/assets/**
 ```
 
-Harness owns `apps/game-harness/src/nani/** -> harness/**` as production. The
-scanner accepts ordinary `.nani` files only, rejects symlinks and configured
-roots outside the project, and stably sorts normalized POSIX logical paths.
-Missing roots or entries, duplicate logical paths, and case-only collisions are
-fatal. Renames create a new logical identity: there are no globs, ignores,
-allowlists, aliases, or save migrations.
-`nani-runtime-compiler` owns the canonical semantic byte serialization. It
-includes script path, labels, commands, and command semantics while excluding
-source text and source locations. Asset generation hashes those bytes with
-Node SHA-256; browser inspection hashes the same bytes with Web Crypto. Golden
-tests require byte-for-byte and digest parity, so generated metadata, source
-updates, materialization, save identity, and caches cannot invent separate
-revision rules.
+An AssetId is the lowercase kebab path below `assets/`, with only the final
+extension removed. It does not include `assets`, an App name, a capability,
+or a protocol prefix: `assets/bg/home.png` is `bg/home`. Its uniqueness
+boundary is one App-owned registry, so different Apps may legitimately use the
+same ID.
 
-Generation emits runtime assets separately from Nani catalogs. Game A produces
-`generatedRuntimeAssets.ts`, `generatedNaniProduction.ts`, and
-`generatedNaniTests.ts`; Harness produces the first two equivalents. Each Nani
-module owns its entry locator(s), catalog, source/metadata indexes, semantic
-revisions, and diagnostics. All test entries select one shared test catalog.
-ContentManifest consumes runtime assets and production Nani metadata only.
+The conventional top-level folders are `bg`, `char`, `font`, `bgm`,
+`sfx`, `bleep`, `voice/<locale>`, `video`, `model`, `ui`, and
+`thumb`. They are organizational only. Capability is derived from MIME and
+declared by the consumer requirement; a PNG in `bg/` may be consumed by both
+a background command and PinP. Asset management does not define business kinds
+such as background, texture, voice, FX, or character-pack.
 
-Development servers analyze production, development, and test source with
-`allow-recoverable-command-errors`. Only compiler `unknown-command` and
-error-severity `invalid-command-param` diagnostics are recoverable because the
-compiler removes those commands from `RuntimeScript`; they remain red errors
-and the result is marked Recovered/Degraded. Production builds and
-`validate:assets` use `strict`. Any other error is fatal by default. Production
-or test fatal diagnostics abort the complete generation transaction;
-recoverable diagnostics can be generated for development inspection but make
-strict asset validation fail. Development diagnostics are reported and never
-written into a committed development catalog.
+## One rule implementation
 
-`RuntimeAssetFragment` is the only provider protocol. A `runtime-assets-*`
-package may contribute stable IDs, runtime assets, optional fonts, and source
-identity. It must not create a manifest, registry, resolver, loader, or alternate
-validator. It may depend only on contracts and asset-registry.
+`@v-ronpa/asset-project` is the Node-only authority shared by generation,
+validation, Vite, and the VS Code extension. Each App's `asset.config.mjs`
+contains only the relative source root, publish mount, generated module, and
+opaque bundle entries. The scanner:
 
-`runtime-assets-pixi` is the first provider. Apps select `providers: ["pixi"]`;
-generated modules expose its fragment. `composeContentManifest()` combines
-generated assets, provider fragments, and explicit UI/preload/optional refs.
-Every duplicate ID fails; nothing silently overrides another source. The result
-is parsed by `ContentManifestSchema` and creates exactly one AssetRegistry.
+- rejects symlinks, dot segments, unsupported extensions, invalid casing, and
+  duplicate IDs, including two formats with the same stem;
+- emits deterministic `AssetDefinition[]` values with
+  `uri: "assets/..."` and an authoritative MIME;
+- registers `char/<slug>/character.json` as the opaque `char/<slug>` JSON
+  asset while leaving its internal CSP layer files out of the registry;
+- generates the explicit `characterAssetIdByCharacterId` map, so runtime code
+  never derives `char/ema` from CharacterId `Ema`.
 
-Future `runtime-assets-r3f`-style packages must reuse this protocol, composition,
-diagnostics, conformance test, and boundary gate.
+`pnpm generate:assets` is the only writer. It produces `generatedAssets.ts`
+and the Nani catalogs. `pnpm validate:assets` calls the same scanner and
+generator in check mode, then validates MIME, media streams, voice mapping,
+character packs, manifests, registries, and forbidden raw URLs. There is no
+second discovery table, kind override, ID alias, or compatibility normalizer.
 
-`pnpm generate:assets` rescans and updates generated modules. Ordinary Nani
-membership never requires a generation command during Vite development.
-`pnpm validate:assets` checks generated freshness, performs strict production
-and test catalog analysis, and validates files, fonts, character packs, provider
-refs, final manifests, and final registries.
+## Manifest, registry, and publish boundary
 
-## Layered character production and promotion
+ContentManifest v5 contains one `assets: AssetDefinition[]` list and explicit
+`AssetRequirement[]` values. An App creates exactly one AssetRegistry with its
+deployment `baseUri`. Consumers provide `{ id, capability }`; the registry
+checks MIME capability and is solely responsible for turning the manifest's
+relative URI into a final URL. Consumers must not infer folders, extensions, or
+URLs from AssetId.
 
-The canonical character path is:
+The Vite plugin mounts the source tree at `/assets/**` during development and
+copies it without hashes to `dist/assets/**` during build. Vite-owned JS, CSS,
+and imported implementation files live under `dist/_bundle/**`.
+`publicDir: false` prevents a second static authority. This layout works under
+root or subpath deployment through `import.meta.env.BASE_URL`.
+
+Renderer-private implementation resources are a different ownership boundary.
+For example, Pixi FX textures live inside `pixi-presenter` and use
+`new URL(..., import.meta.url)`; they are bundled below `_bundle` and never
+appear in an App manifest. App content assets must always use the App registry.
+
+## Nani binding without VN identity changes
+
+Nani project configuration is separate in `nani.config.mjs`. Existing scope,
+entry, and script identities remain unchanged:
 
 ```text
-.clip
-  -> CSP archive and temporary PSD conversion
-  -> authoring-tree validation
-  -> cropped leaf composition
-  -> immutable character-pack run and QA
-  -> reviewed whole-directory promotion
-  -> generate/validate assets
-  -> ContentManifest and AssetRegistry + generated entry preload plan
-  -> Pixi stage readiness (fetch, decode, GPU upload)
-  -> synchronous @char expression
-  -> optional script-scoped global character Tone Filter
-  -> persistent final-character outline/opacity Filter
+apps/game-a/src/nani/**      -> game-a/**
+apps/game-a/src/nani-dev/**  -> game-a/dev/**
+apps/game-a/src/nani-test/** -> game-a/test/**
+apps/game-harness/src/nani/** -> harness/**
 ```
 
-The CSP workspace and run outputs remain tool-owned. Promotion is deliberately manual. The accepted character directory
-must be mirrored exactly into the app target, deleting target files that are absent from the run; merging with `cp -R` is
-forbidden because it preserves stale pack content. After promotion, run `pnpm generate:assets` and
-`pnpm validate:assets`. There is no promotion compatibility layer, conversion step, or alternate character registry.
+The parser produces syntax, labels, dependencies, and exact source mapping; it
+does not discover assets. The shared command catalog annotates resource-bearing
+parameters with either direct AssetId/capability binding or CharacterId lookup.
+`@v-ronpa/nani-project` performs this binding after compilation and emits
+per-script and per-entry requirements. Control values such as `group:music`
+are not AssetIds, and commands without a primary resource do not add a
+requirement.
 
-`pnpm validate:assets` and the CSP pack validator both call the layered-character source-pixel resolver. For every metadata
-layer it derives `unitsPerPixel = abs(localTransform.scale.x) / pixelsPerUnit`, requires square non-zero pixels, and
-requires one pack-wide value within relative error `1e-6`. Alice currently resolves to `1`; Ema resolves to `0.006`.
-Density is not duplicated in `character.json`.
+This changes only resource argument text such as `@back bg/home`. It does not
+change `VnEntry.id`, `gameId`, `scriptPath`, scriptRoot, labels, choices,
+goto targets, textId, entry selection, or cross-script diagnostics. A resource
+argument edit changes that script's semantic revision; moving the underlying
+file without changing the argument does not.
 
-## Catalog-scoped layered-character preparation
+Voice is an explicit generated index:
+`voiceIndex[locale][originalTextId] = AssetId`. Build-time normalization is
+used only for matching a voice filename to a declared textId; runtime dispatch
+does not construct `voice:<locale>:<textId>`. Missing voice remains legal,
+while collisions, invalid locales, and orphan voice files fail validation.
 
-The pure layered-character model derives one `VnPixiCharacterPreparationPlan` from each compiled RuntimeScript; asset
-generation and the Game A DEV content decorator call the same layered-character projection. It collects explicit
-`@char` character IDs, the default expression `""`, expression changes from `@char` and `@slide`, and applies wildcard
-expressions to every explicit character in the script. IDs and expressions are deduplicated and stably sorted. The plan is
-stored only in generated script metadata beside `scriptRevision` and `assetRefs`; it is not copied into ContentManifest,
-hand-written app configuration, `.nani`, or a character pack.
+## Layered character production and preparation
 
-One app-owned story definition pairs the entry, runtime catalog, and plans by
-script path. A verified DEV source candidate replaces one catalog record and its
-derived plan as one value. The canonical Pixi host mounts while the
-title or Navi surface is still active. Presenter mount loads and validates only referenced layers, deduplicates shared pack,
-metadata, and Texture work, and calls `renderer.prepare.upload()` for every unique successful Texture. Its stage handle
-becomes ready only after those uploads settle. Story-session changes do not remount this presenter or discard its WebGL
-context. Later scripts call the same presenter's idempotent
-`prepareCharacters(plan)`; changing a catalog record or plan never remounts the
-canvas. Prepared and in-flight expressions, textures, and GPU uploads are
-deduplicated.
+The CSP workspace and run outputs remain tool-owned. Promotion mirrors the
+accepted whole directory into `apps/<app>/assets/char/<slug>`, deleting stale
+target files, then runs generation and validation. Merging directories is
+forbidden. The layered-character validator derives one pack-wide source-pixel
+scale and validates the JSON package; density is not duplicated in
+`character.json`.
 
-Game A opening currently prepares 16 layers (about 0.09 MiB compressed and 1.18 MiB decoded). Harness showcase prepares 15
-layers (about 2.51 MiB compressed and 29.37 MiB decoded). Preparing the full Ema pack would decode about 111.79 MiB and is
-forbidden as a shared policy.
-
-`app-vn-shell` owns `usePixiVnScriptPreparation()`, the shared adapter used by
-new-game, cross-script navigation, Devtools Preview, and restore. It waits on the
-stage handle, selects the target script plan, and adds expressions still visible in the saved Pixi
-snapshot. Preparation returns a Result; failure leaves Story/Pixi/UI/media and
-the instruction pointer unchanged, while harmless resource-cache work may remain. Runtime
-requests outside the plan emit `asset-unprepared-character-expression`, switch synchronously to empty, and never initiate a
-background load, retry, compatibility lookup, or best-effort unoutlined fallback.
+Nani binding derives one character preparation plan per compiled script from
+explicit `@char` and `@slide` usage. The plan is stored beside
+`scriptRevision` and `requirements` in generated Nani metadata, not in
+ScenarioIR, RuntimeScript, hand-written App configuration, or the character
+pack. The App shell prepares only referenced expressions and saved visible
+expressions before a transaction. Unprepared or invalid expressions report a
+diagnostic and do not initiate a compatibility lookup or background load.
 
 ## Pixi final-character outline and token transitions
 

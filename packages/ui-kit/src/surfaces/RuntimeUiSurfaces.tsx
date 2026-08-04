@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import type { RichTextDocument } from "@v-ronpa/contracts";
 import { RichTextRenderer } from "./RichTextRenderer";
 import type { UiSurfacePresentationLike } from "./types";
@@ -42,6 +42,109 @@ export interface RuntimeInputPromptProps {
   onSubmit: (value: string | number | boolean) => void;
 }
 
+export interface RuntimePinpSurfaceProps {
+  alt: string;
+  aspectRatio: [number, number];
+  className?: string;
+  frameStyle?: CSSProperties;
+  heightPercent: number;
+  positionPercent: [number, number];
+  presentation: UiSurfacePresentationLike;
+  revision: number;
+  assetId: string;
+  uri?: string;
+}
+
+export function RuntimePinpSurface({
+  alt,
+  aspectRatio,
+  className,
+  frameStyle,
+  heightPercent,
+  positionPercent,
+  presentation,
+  revision,
+  assetId,
+  uri
+}: RuntimePinpSurfaceProps) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [revision, assetId, uri]);
+  return <RuntimePinpFrame
+    alt={alt}
+    aspectRatio={aspectRatio}
+    {...(className ? { className } : {})}
+    {...(frameStyle ? { frameStyle } : {})}
+    heightPercent={heightPercent}
+    onImageError={() => setFailed(true)}
+    positionPercent={positionPercent}
+    presentation={presentation}
+    revision={revision}
+    assetId={assetId}
+    unavailable={!uri || failed}
+    {...(uri ? { uri } : {})}
+  />;
+}
+
+export interface RuntimePinpFrameProps extends RuntimePinpSurfaceProps {
+  onImageError(): void;
+  unavailable: boolean;
+}
+
+export function RuntimePinpFrame({
+  alt,
+  aspectRatio,
+  className,
+  frameStyle,
+  heightPercent,
+  onImageError,
+  positionPercent,
+  presentation,
+  revision,
+  assetId,
+  unavailable,
+  uri
+}: RuntimePinpFrameProps) {
+  return (
+    <figure
+      className={className}
+      data-pinp-asset-id={assetId}
+      data-ui-phase={presentation.phase}
+      data-testid="runtime-pinp-surface"
+      style={{
+        ...pinpFrameStyle,
+        left: `${positionPercent[0]}%`,
+        top: `${positionPercent[1]}%`,
+        height: `${heightPercent}%`,
+        aspectRatio: `${aspectRatio[0]} / ${aspectRatio[1]}`,
+        opacity: presentation.opacity,
+        ...frameStyle
+      }}
+    >
+      {unavailable ? (
+        <div
+          aria-label={`图片加载失败：${alt || assetId}`}
+          data-testid="runtime-pinp-missing"
+          role="img"
+          style={pinpMissingStyle}
+        >
+          <span>PINP IMAGE UNAVAILABLE</span>
+          <code>{assetId}</code>
+        </div>
+      ) : (
+        <img
+          alt={alt}
+          data-testid="runtime-pinp-image"
+          draggable={false}
+          key={`${assetId}:${revision}`}
+          onError={onImageError}
+          src={uri}
+          style={pinpImageStyle}
+        />
+      )}
+    </figure>
+  );
+}
+
 export function RuntimeInputPromptSurface({
   defaultValue,
   onSubmit,
@@ -83,7 +186,7 @@ export function RuntimeInputPromptSurface({
 
 export interface RuntimeMovieOverlayProps {
   blocking: boolean;
-  sourceRef: string;
+  assetId: string;
   uri?: string;
   onEnded?: () => void;
   onSkip?: () => void;
@@ -95,7 +198,7 @@ export function RuntimeMovieOverlaySurface({
   onEnded,
   onSkip,
   onVideoElement,
-  sourceRef,
+  assetId,
   uri
 }: RuntimeMovieOverlayProps) {
   return (
@@ -112,7 +215,7 @@ export function RuntimeMovieOverlaySurface({
           style={movieVideoStyle}
         />
       ) : (
-        <div data-testid="runtime-movie-missing" style={movieMissingStyle}>{sourceRef}</div>
+        <div data-testid="runtime-movie-missing" style={movieMissingStyle}>{assetId}</div>
       )}
       {blocking ? (
         <button data-testid="runtime-movie-skip" onClick={onSkip} style={movieSkipStyle} type="button">
@@ -135,6 +238,43 @@ const toastLayerStyle: CSSProperties = {
   display: "grid",
   gap: 8,
   pointerEvents: "auto"
+};
+
+const pinpFrameStyle: CSSProperties = {
+  position: "absolute",
+  zIndex: "var(--vn-pinp-z-index, 8)",
+  boxSizing: "border-box",
+  margin: 0,
+  overflow: "hidden",
+  border: "1px solid var(--vn-pinp-border, rgba(255,255,255,0.26))",
+  borderRadius: 0,
+  background: "var(--vn-pinp-background, rgba(0,0,0,0.18))",
+  boxShadow: "var(--vn-pinp-shadow, 0 10px 28px rgba(0,0,0,0.24))",
+  transform: "translate(-50%, -50%)",
+  pointerEvents: "none"
+};
+
+const pinpImageStyle: CSSProperties = {
+  display: "block",
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  userSelect: "none",
+  pointerEvents: "none"
+};
+
+const pinpMissingStyle: CSSProperties = {
+  display: "grid",
+  placeContent: "center",
+  gap: 6,
+  width: "100%",
+  height: "100%",
+  padding: 10,
+  overflow: "hidden",
+  background: "rgba(12,16,22,0.82)",
+  color: "rgba(255,255,255,0.78)",
+  fontSize: 11,
+  textAlign: "center"
 };
 
 const toastStyle: CSSProperties = {

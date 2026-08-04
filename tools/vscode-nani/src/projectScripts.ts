@@ -1,5 +1,5 @@
 import { statSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   discoverNaniProjectScripts,
@@ -9,6 +9,8 @@ import {
   type NaniProjectConfig,
   type NaniScope
 } from "@v-ronpa/nani-project";
+import { scanAssetProject, type AssetProjectConfig } from "@v-ronpa/asset-project";
+import type { NaniAssetBindings } from "@v-ronpa/nani-project";
 import { findNaniProjectRoot } from "./projectAssetLoader";
 
 export interface NaniScriptRegistration {
@@ -24,6 +26,7 @@ export interface NaniScriptCatalogContext {
   readonly catalogId: "development" | "test";
   readonly scopes: readonly NaniScope[];
   readonly entries: readonly NaniEntryConfig[];
+  readonly assetBindings: NaniAssetBindings;
   readonly scripts: readonly NaniScriptRegistration[];
 }
 
@@ -45,8 +48,16 @@ export async function loadProjectScriptConfig(
   const projectRoot = findNaniProjectRoot(configPath, workspaceRoot);
   try {
     const moduleValue = record(await importConfig(configPath), "Asset config module must export an object.");
-    const assetConfig = record(moduleValue.default, "Asset config module must have a default object export.");
-    const naniProject = parseNaniProjectConfig(assetConfig.naniProject);
+    const assetConfig = record(moduleValue.default, "Asset config module must have a default object export.") as unknown as AssetProjectConfig;
+    const naniConfigPath = join(dirname(configPath), "nani.config.mjs");
+    const naniModule = record(await importConfig(naniConfigPath), "Nani config module must export an object.");
+    const naniProject = parseNaniProjectConfig(naniModule.default);
+    const assetScan = await scanAssetProject(assetConfig);
+    const assetBindings: NaniAssetBindings = {
+      appId: assetConfig.appId,
+      assets: assetScan.assets,
+      characterAssetIdByCharacterId: assetScan.characterAssetIdByCharacterId
+    };
     const discovered = await discoverNaniProjectScripts(naniProject, { projectRoot });
     const registrations = discovered.map((script) => ({
       scope: script.scope,
@@ -65,6 +76,7 @@ export async function loadProjectScriptConfig(
         catalogId: "development",
         scopes: ["production", "development"],
         entries: [naniProject.mainEntry],
+        assetBindings,
         scripts: developmentScripts
       });
     }
@@ -78,6 +90,7 @@ export async function loadProjectScriptConfig(
         catalogId: "test",
         scopes: ["test"],
         entries: testEntries,
+        assetBindings,
         scripts: testScripts
       });
     }

@@ -1,96 +1,73 @@
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, extname, join, relative } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import gameAAssetConfigInput from "../apps/game-a/asset.config.mjs";
-import harnessAssetConfigInput from "../apps/game-harness/asset.config.mjs";
+import gameAAssetConfig from "../apps/game-a/asset.config.mjs";
+import gameANaniConfigInput from "../apps/game-a/nani.config.mjs";
+import harnessAssetConfig from "../apps/game-harness/asset.config.mjs";
+import harnessNaniConfigInput from "../apps/game-harness/nani.config.mjs";
+import {
+  assetProjectGeneratedModule,
+  scanAssetProject
+} from "../packages/asset-project/src/index.ts";
 import { analyzeNaniCatalog, parseNaniProjectConfig } from "../packages/nani-project/src/index.ts";
 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
-const providerModuleById = new Map([
-  ["pixi", { module: "@v-ronpa/runtime-assets-pixi", exportName: "pixiRuntimeAssetFragment" }]
-]);
+const gameANaniConfig = parseNaniProjectConfig(gameANaniConfigInput);
+const harnessNaniConfig = parseNaniProjectConfig(harnessNaniConfigInput);
 
-const kindByDirectory = new Map([
-  ["backgrounds", "background"],
-  ["media/bleep", "bleep"],
-  ["media/bgm", "bgm"],
-  ["media/sfx", "sfx"],
-  ["media/video", "video"],
-  ["fonts", "font"],
-  ["models", "glb"],
-  ["thumbnails", "texture"],
-  ["ui", "texture"]
-]);
+let gameAScanPromise;
+let harnessScanPromise;
 
-const formatByExtension = new Map([
-  [".gltf", "gltf"], [".glb", "glb"], [".json", "json"],
-  [".png", "png"], [".webp", "webp"], [".avif", "avif"], [".ktx2", "ktx2"],
-  [".woff", "woff"], [".woff2", "woff2"], [".ttf", "ttf"], [".otf", "otf"],
-  [".mp3", "mp3"], [".ogg", "ogg"], [".mp4", "mp4"], [".webm", "webm"]
-]);
-
-const fontFormatPreference = new Map([
-  ["woff2", 4], ["woff", 3], ["otf", 2], ["ttf", 1]
-]);
-
-const harnessAssetConfig = normalizeAssetConfig(harnessAssetConfigInput);
-const gameAAssetConfig = normalizeAssetConfig(gameAAssetConfigInput);
-
-export function collectHarnessRuntimeAssets() {
-  return collectRuntimeAssets(harnessAssetConfig);
+export function collectHarnessAssets() {
+  return harnessScan().then((scan) => scan.assets);
 }
 
-export function collectHarnessFontFaces() {
-  return collectFontFaces(collectHarnessRuntimeAssets(), harnessAssetConfig);
+export function collectHarnessCharacterAssetIds() {
+  return harnessScan().then((scan) => scan.characterAssetIdByCharacterId);
 }
 
-export function collectGameARuntimeAssets() {
-  return collectRuntimeAssets(gameAAssetConfig);
+export function collectGameAAssets() {
+  return gameAScan().then((scan) => scan.assets);
 }
 
-export function collectGameAFontFaces() {
-  return collectFontFaces(collectGameARuntimeAssets(), gameAAssetConfig);
+export function collectGameACharacterAssetIds() {
+  return gameAScan().then((scan) => scan.characterAssetIdByCharacterId);
 }
 
-export function generateHarnessRuntimeAssetsModule() {
-  return generateRuntimeAssetsModule(
-    collectHarnessRuntimeAssets(),
-    collectHarnessFontFaces(),
-    harnessAssetConfig
-  );
+export async function generateHarnessAssetsModule() {
+  return generateAssetsModule(await harnessScan(), "harness");
 }
 
-export function generateGameARuntimeAssetsModule() {
-  return generateRuntimeAssetsModule(
-    collectGameARuntimeAssets(),
-    collectGameAFontFaces(),
-    gameAAssetConfig
-  );
+export async function generateGameAAssetsModule() {
+  return generateAssetsModule(await gameAScan(), "gameA");
 }
 
 export async function analyzeHarnessNaniProduction(sourceDiagnosticPolicy = "allow-recoverable-command-errors") {
-  return analyzeNaniCatalog(harnessAssetConfig.naniProject, {
+  return analyzeNaniCatalog(harnessNaniConfig, {
     projectRoot: repoRoot,
     scopes: ["production"],
-    entries: [harnessAssetConfig.naniProject.mainEntry],
+    entries: [harnessNaniConfig.mainEntry],
+    assetBindings: await bindingsFor(harnessAssetConfig, harnessScan()),
     sourceDiagnosticPolicy
   });
 }
 
 export async function analyzeGameANaniProduction(sourceDiagnosticPolicy = "allow-recoverable-command-errors") {
-  return analyzeNaniCatalog(gameAAssetConfig.naniProject, {
+  return analyzeNaniCatalog(gameANaniConfig, {
     projectRoot: repoRoot,
     scopes: ["production"],
-    entries: [gameAAssetConfig.naniProject.mainEntry],
+    entries: [gameANaniConfig.mainEntry],
+    assetBindings: await bindingsFor(gameAAssetConfig, gameAScan()),
     sourceDiagnosticPolicy
   });
 }
 
 export async function analyzeGameANaniDevelopment(sourceDiagnosticPolicy = "allow-recoverable-command-errors") {
-  return analyzeNaniCatalog(gameAAssetConfig.naniProject, {
+  return analyzeNaniCatalog(gameANaniConfig, {
     projectRoot: repoRoot,
     scopes: ["production", "development"],
-    entries: [gameAAssetConfig.naniProject.mainEntry],
+    entries: [gameANaniConfig.mainEntry],
+    assetBindings: await bindingsFor(gameAAssetConfig, gameAScan()),
     sourceDiagnosticPolicy
   });
 }
@@ -99,12 +76,13 @@ export async function analyzeGameANaniTests(
   entryName = "smoke",
   sourceDiagnosticPolicy = "allow-recoverable-command-errors"
 ) {
-  const entry = gameAAssetConfig.naniProject.testEntries[entryName];
+  const entry = gameANaniConfig.testEntries[entryName];
   if (!entry) throw new Error(`Unknown Game A test entry '${entryName}'.`);
-  return analyzeNaniCatalog(gameAAssetConfig.naniProject, {
+  return analyzeNaniCatalog(gameANaniConfig, {
     projectRoot: repoRoot,
     scopes: ["test"],
     entries: [entry],
+    assetBindings: await bindingsFor(gameAAssetConfig, gameAScan()),
     sourceDiagnosticPolicy
   });
 }
@@ -122,7 +100,7 @@ export async function generateGameANaniProductionModule() {
 }
 
 export async function generateGameANaniTestsModule() {
-  const entries = Object.entries(gameAAssetConfig.naniProject.testEntries);
+  const entries = Object.entries(gameANaniConfig.testEntries);
   const analyses = await Promise.all(entries.map(async ([name]) => [name, await analyzeGameANaniTests(name)]));
   for (const [name, analysis] of analyses) {
     assertGenerationHasNoFatalDiagnostics(analysis, `Game A test entry '${name}'`);
@@ -132,24 +110,33 @@ export async function generateGameANaniTestsModule() {
   return generateNaniTestsModule(analyses, reference, "gameA");
 }
 
-function generateRuntimeAssetsModule(assets, fontFaces, config) {
-  const providerImports = config.providers.map((id) => {
-    const provider = providerModuleById.get(id);
-    if (!provider) throw new Error(`Unknown runtime asset provider '${id}' in ${config.id}.`);
-    return `import { ${provider.exportName} } from \"${provider.module}\";`;
-  });
-  const providerExports = config.providers.map((id) => providerModuleById.get(id).exportName).join(", ");
+function gameAScan() {
+  gameAScanPromise ??= scanAssetProject(gameAAssetConfig);
+  return gameAScanPromise;
+}
+
+function harnessScan() {
+  harnessScanPromise ??= scanAssetProject(harnessAssetConfig);
+  return harnessScanPromise;
+}
+
+async function bindingsFor(config, scanPromise) {
+  const scan = await scanPromise;
+  return {
+    appId: config.appId,
+    assets: scan.assets,
+    characterAssetIdByCharacterId: scan.characterAssetIdByCharacterId
+  };
+}
+
+function generateAssetsModule(scan, prefix) {
   return [
-    "import type { FontFaceDefinition, RuntimeAsset } from \"@v-ronpa/contracts\";",
-    "import type { RuntimeAssetFragment } from \"@v-ronpa/asset-registry\";",
-    ...providerImports,
+    "import type { AssetDefinition, AssetId } from \"@v-ronpa/contracts\";",
     "",
     "// Generated by scripts/generate-assets.mjs. Do not edit by hand.",
-    `export const ${config.exportName} = ${json(assets)} satisfies RuntimeAsset[];`,
+    `export const ${prefix}Assets = ${json(scan.assets)} satisfies AssetDefinition[];`,
     "",
-    `export const ${config.fontFacesExportName} = ${json(fontFaces)} satisfies FontFaceDefinition[];`,
-    "",
-    `export const ${config.fragmentsExportName} = [${providerExports}] satisfies RuntimeAssetFragment[];`,
+    `export const ${prefix}CharacterAssetIdByCharacterId = ${json(scan.characterAssetIdByCharacterId)} satisfies Record<string, AssetId>;`,
     ""
   ].join("\n");
 }
@@ -158,23 +145,24 @@ function generateNaniModule(analysis, prefix, suffix) {
   const metadataByPath = Object.fromEntries(analysis.scripts.map((script) => [script.scriptPath, script.metadata]));
   const sourcesByPath = Object.fromEntries(analysis.scripts.map((script) => [script.scriptPath, script.source]));
   const revisions = Object.fromEntries(analysis.scripts.map((script) => [script.scriptPath, script.semanticRevision]));
-  const diagnostics = analysis.diagnostics;
   return [
-    "import type { AssetRef, VnEntryDef, VnRuntimeScriptCatalog, VnRuntimeScriptSource } from \"@v-ronpa/contracts\";",
+    "import type { AssetRequirement, VnEntryDef, VnRuntimeScriptCatalog, VnRuntimeScriptSource } from \"@v-ronpa/contracts\";",
     "import type { LayeredCharacterPreloadPlan } from \"@v-ronpa/layered-character\";",
     "",
     "// Generated by scripts/generate-assets.mjs. Do not edit by hand.",
     `export const ${prefix}VnEntryLocator = ${json(entryLocator(analysis.entries[0]))} as const satisfies Pick<VnEntryDef, \"id\" | \"initialScriptPath\" | \"startLabel\">;`,
     "",
-    `export const ${prefix}ScriptMetadataByPath = ${json(metadataByPath)} satisfies Record<string, { scriptRevision: string; assetRefs: AssetRef[]; characterPreloadPlan: LayeredCharacterPreloadPlan }>;`,
+    `export const ${prefix}ScriptMetadataByPath = ${json(metadataByPath)} satisfies Record<string, { scriptRevision: string; requirements: AssetRequirement[]; characterPreloadPlan: LayeredCharacterPreloadPlan }>;`,
     "",
     `export const ${prefix}ScriptSourcesByPath = ${json(sourcesByPath)} satisfies Record<string, VnRuntimeScriptSource>;`,
     "",
     `export const ${prefix}ScriptCatalog = ${json(analysis.catalog)} as const satisfies VnRuntimeScriptCatalog;`,
     "",
+    `export const ${prefix}VoiceIndex = ${json(analysis.voiceIndex)} as const;`,
+    "",
     `export const ${prefix}Nani${suffix}SemanticRevisions = ${json(revisions)} as const;`,
     "",
-    `export const ${prefix}Nani${suffix}Diagnostics = ${json(diagnostics)} as const;`,
+    `export const ${prefix}Nani${suffix}Diagnostics = ${json(analysis.diagnostics)} as const;`,
     ""
   ].join("\n");
 }
@@ -185,24 +173,37 @@ function generateNaniTestsModule(analyses, reference, prefix) {
   const sourcesByPath = Object.fromEntries(reference.scripts.map((script) => [script.scriptPath, script.source]));
   const revisions = Object.fromEntries(reference.scripts.map((script) => [script.scriptPath, script.semanticRevision]));
   const diagnostics = Object.fromEntries(analyses.map(([name, analysis]) => [name, analysis.diagnostics]));
+  const voiceIndex = mergeVoiceIndexes(analyses.map(([, analysis]) => analysis.voiceIndex));
   return [
-    "import type { AssetRef, VnEntryDef, VnRuntimeScriptCatalog, VnRuntimeScriptSource } from \"@v-ronpa/contracts\";",
+    "import type { AssetRequirement, VnEntryDef, VnRuntimeScriptCatalog, VnRuntimeScriptSource } from \"@v-ronpa/contracts\";",
     "import type { LayeredCharacterPreloadPlan } from \"@v-ronpa/layered-character\";",
     "",
     "// Generated by scripts/generate-assets.mjs. Do not edit by hand.",
     `export const ${prefix}TestEntryLocators = ${json(entryLocators)} as const satisfies Record<string, Pick<VnEntryDef, \"id\" | \"initialScriptPath\" | \"startLabel\">>;`,
     "",
-    `export const ${prefix}TestScriptMetadataByPath = ${json(metadataByPath)} satisfies Record<string, { scriptRevision: string; assetRefs: AssetRef[]; characterPreloadPlan: LayeredCharacterPreloadPlan }>;`,
+    `export const ${prefix}TestScriptMetadataByPath = ${json(metadataByPath)} satisfies Record<string, { scriptRevision: string; requirements: AssetRequirement[]; characterPreloadPlan: LayeredCharacterPreloadPlan }>;`,
     "",
     `export const ${prefix}TestScriptSourcesByPath = ${json(sourcesByPath)} satisfies Record<string, VnRuntimeScriptSource>;`,
     "",
     `export const ${prefix}TestScriptCatalog = ${json(reference.catalog)} as const satisfies VnRuntimeScriptCatalog;`,
+    "",
+    `export const ${prefix}TestVoiceIndex = ${json(voiceIndex)} as const;`,
     "",
     `export const ${prefix}NaniTestSemanticRevisions = ${json(revisions)} as const;`,
     "",
     `export const ${prefix}NaniTestDiagnostics = ${json(diagnostics)} as const;`,
     ""
   ].join("\n");
+}
+
+function mergeVoiceIndexes(indexes) {
+  const result = {};
+  for (const index of indexes) {
+    for (const [locale, values] of Object.entries(index)) {
+      result[locale] = { ...(result[locale] ?? {}), ...values };
+    }
+  }
+  return result;
 }
 
 function assertGenerationHasNoFatalDiagnostics(analysis, label) {
@@ -222,155 +223,30 @@ function entryLocator(entry) {
   };
 }
 
-function collectRuntimeAssets(config) {
-  if (!existsSync(config.publicRoot)) return [];
-  const assets = walkFiles(config.publicRoot)
-    .flatMap((absolutePath) => {
-      const rel = toPosix(relative(config.publicRoot, absolutePath));
-      const format = formatByExtension.get(extname(rel));
-      if (!format) return [];
-      const kind = kindForRelativePath(rel);
-      if (!kind) return [];
-      const asset = {
-        id: idForRelativePath(rel, kind, config),
-        kind,
-        optimizedUri: `${config.publicBaseUri}/${rel}`,
-        format,
-        compression: [],
-        lods: [],
-        collisionProxyIds: []
-      };
-      return [{ ...asset, tags: tagsForAsset(config, asset) }];
-    })
-    .sort((left, right) => stableCompare(left.id, right.id) || stableCompare(left.format, right.format));
-  return selectPreferredGeneratedAssets(assets);
-}
-
-function kindForRelativePath(rel) {
-  const parts = rel.split("/");
-  if (parts[0] === "media" && parts[1] === "voice") return parts.length === 4 ? "voice" : undefined;
-  if (/^characters\/[^/]+\/character\.json$/u.test(rel)) return "character-pack";
-  return kindByDirectory.get(parts.slice(0, -1).join("/"));
-}
-
-function idForRelativePath(rel, kind, config) {
-  const override = config.idOverrides[rel];
-  if (override) return override;
-  if (kind === "character-pack") return rel.split("/")[1];
-  const name = rel.split("/").at(-1).replace(extname(rel), "");
-  if (kind === "voice") return `voice:${rel.split("/").at(2)}:${name}`;
-  if (kind === "background") return `bg:${name}`;
-  if (kind === "bleep") return `bleep:${name}`;
-  if (kind === "bgm") return `bgm:${name}`;
-  if (kind === "sfx") return `sfx:${name}`;
-  if (kind === "video") return `video:${name}`;
-  if (kind === "glb") return `model:${name}`;
-  if (kind === "font") return `font:${name}`;
-  if (rel.startsWith("ui/")) return `texture:ui:${name}`;
-  return `texture:${name}`;
-}
-
-function collectFontFaces(assets, config) {
-  return assets
-    .filter((asset) => asset.kind === "font")
-    .map((asset) => {
-      const override = config.fontFaceOverrides[asset.id] ?? {};
-      return {
-        id: override.id ?? asset.id,
-        family: override.family ?? asset.id,
-        sourceRef: asset.id,
-        weight: override.weight ?? "400",
-        style: override.style ?? "normal"
-      };
-    })
-    .sort((left, right) => stableCompare(left.id, right.id));
-}
-
-function selectPreferredGeneratedAssets(assets) {
-  const byId = new Map();
-  for (const asset of assets) {
-    const previous = byId.get(asset.id);
-    if (!previous) {
-      byId.set(asset.id, asset);
-      continue;
-    }
-    if (previous.kind === "font" && asset.kind === "font") {
-      byId.set(asset.id, preferredFontAsset(previous, asset));
-      continue;
-    }
-    throw new Error(`Duplicate generated runtime asset id '${asset.id}' from ${previous.optimizedUri} and ${asset.optimizedUri}.`);
-  }
-  return [...byId.values()].sort((left, right) => stableCompare(left.id, right.id));
-}
-
-function preferredFontAsset(left, right) {
-  const leftPreference = fontFormatPreference.get(left.format) ?? 0;
-  const rightPreference = fontFormatPreference.get(right.format) ?? 0;
-  return rightPreference > leftPreference ? right : left;
-}
-
-function walkFiles(root) {
-  const output = [];
-  for (const name of readdirSync(root)) {
-    const absolutePath = join(root, name);
-    const stat = statSync(absolutePath);
-    if (stat.isDirectory()) output.push(...walkFiles(absolutePath));
-    else output.push(absolutePath);
-  }
-  return output;
-}
-
-function normalizeAssetConfig(config) {
-  return {
-    ...config,
-    naniProject: parseNaniProjectConfig(config.naniProject),
-    publicRoot: join(repoRoot, config.publicRoot),
-    runtimeAssetOutputPath: join(repoRoot, config.runtimeAssetOutputPath),
-    naniProductionOutputPath: join(repoRoot, config.naniProductionOutputPath),
-    ...(config.naniTestsOutputPath
-      ? { naniTestsOutputPath: join(repoRoot, config.naniTestsOutputPath) }
-      : {}),
-    idOverrides: config.idOverrides ?? {},
-    fontFaceOverrides: config.fontFaceOverrides ?? {},
-    providers: config.providers ?? []
-  };
-}
-
-function tagsForAsset(config, asset) {
-  if (asset.kind === "texture" && asset.id.startsWith("texture:ui:") && config.uiTextureTags) {
-    return config.uiTextureTags;
-  }
-  return config.tags;
-}
-
 function json(value) {
   return JSON.stringify(value, null, 2).replace(/\n/g, "\n  ");
 }
 
-function stableCompare(left, right) {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
-function toPosix(value) {
-  return value.split("\\").join("/");
-}
-
 async function collectOutputs() {
   const [
+    harnessAssets,
     harnessNaniProduction,
+    gameAAssets,
     gameANaniProduction,
     gameANaniTests
   ] = await Promise.all([
+    generateHarnessAssetsModule(),
     generateHarnessNaniProductionModule(),
+    generateGameAAssetsModule(),
     generateGameANaniProductionModule(),
     generateGameANaniTestsModule()
   ]);
   return [
-    { path: harnessAssetConfig.runtimeAssetOutputPath, content: generateHarnessRuntimeAssetsModule() },
-    { path: harnessAssetConfig.naniProductionOutputPath, content: harnessNaniProduction },
-    { path: gameAAssetConfig.runtimeAssetOutputPath, content: generateGameARuntimeAssetsModule() },
-    { path: gameAAssetConfig.naniProductionOutputPath, content: gameANaniProduction },
-    { path: gameAAssetConfig.naniTestsOutputPath, content: gameANaniTests }
+    { path: assetProjectGeneratedModule(harnessAssetConfig), content: harnessAssets },
+    { path: join(repoRoot, "apps/game-harness/src/harness/generatedNaniProduction.ts"), content: harnessNaniProduction },
+    { path: assetProjectGeneratedModule(gameAAssetConfig), content: gameAAssets },
+    { path: join(repoRoot, "apps/game-a/src/generatedNaniProduction.ts"), content: gameANaniProduction },
+    { path: join(repoRoot, "apps/game-a/src/generatedNaniTests.ts"), content: gameANaniTests }
   ];
 }
 

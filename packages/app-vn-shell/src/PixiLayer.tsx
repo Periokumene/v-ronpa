@@ -13,6 +13,7 @@ import {
 } from "@v-ronpa/pixi-presenter";
 import type { PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
 import type { PresentationTaskObservation } from "@v-ronpa/app-vn-runtime";
+import type { AssetId } from "@v-ronpa/contracts";
 
 export interface VnPixiCharacterPreparationPlanEntry {
   readonly characterId: string;
@@ -41,6 +42,7 @@ export interface PixiLayerProps {
   visible: boolean;
   characterOutlineEnabled: boolean;
   characterPreloadPlan: VnPixiCharacterPreparationPlan;
+  characterAssetIdByCharacterId: Readonly<Record<string, AssetId>>;
   assetResolver?: PixiAssetResolver;
 
   // Render side effects.
@@ -58,6 +60,7 @@ export function PixiLayer({
   visible,
   characterOutlineEnabled,
   characterPreloadPlan,
+  characterAssetIdByCharacterId,
   assetResolver,
   onDiagnostic,
   onStageHandleChanged,
@@ -91,6 +94,7 @@ export function PixiLayer({
       active: visible,
       characterOutlineEnabled,
       characterPreloadPlan: initialCharacterPreloadPlanRef.current,
+      characterAssetIdByCharacterId,
       ...(assetResolver ? { assetResolver } : {}),
       onDiagnostic: (diagnostic: PixiPresenterDiagnostic) => onDiagnosticRef.current?.(diagnostic),
       onTasksChanged: (tasks: PixiPresentationTaskSnapshot[]) => onTasksChangedRef.current?.(tasks)
@@ -112,7 +116,7 @@ export function PixiLayer({
       presenter.destroy();
       presenterRef.current = null;
     };
-  }, [assetResolver, characterOutlineEnabled]);
+  }, [assetResolver, characterAssetIdByCharacterId, characterOutlineEnabled]);
 
   useEffect(() => {
     presenterRef.current?.setActive(visible);

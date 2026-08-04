@@ -11,8 +11,7 @@
   "references": [
     { "path": "../contracts" },
     { "path": "../layered-character" },
-    { "path": "../pixi-stage-model" },
-    { "path": "../runtime-assets-pixi" }
+    { "path": "../pixi-stage-model" }
   ],
   "include": ["src"]
 }

@@ -20,7 +20,7 @@ const inspection = {
     title: "Opening",
     initialScriptPath: "game-a/opening.nani",
     profile: "vn2d",
-    assetRefs: []
+    requirements: []
   },
   source: {
     scriptPath: "game-a/opening.nani",

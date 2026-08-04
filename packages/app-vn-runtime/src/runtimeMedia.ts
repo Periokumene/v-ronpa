@@ -1,5 +1,5 @@
 import type { AssetResolver } from "@v-ronpa/asset-registry";
-import { createVoiceAssetId, type MediaRuntimeEffect } from "@v-ronpa/app-vn-dispatch";
+import { type MediaRuntimeEffect } from "@v-ronpa/app-vn-dispatch";
 import type { AudioHandle, AudioPort, VideoPort } from "@v-ronpa/media-save";
 import {
   createVnMediaHandleMissingDiagnostic,
@@ -12,7 +12,7 @@ import type { VnRuntimeVoiceSettings } from "./runtimeTypes";
 export type VnRuntimeMediaKind = "bgm" | "sfx" | "bleep" | "voice" | "video";
 
 export interface VnRuntimeMediaSourceResolverInput {
-  sourceRef: string;
+  assetId: string;
   kind: VnRuntimeMediaKind;
   assetResolver?: AssetResolver;
 }
@@ -33,7 +33,7 @@ export interface VnRuntimeMediaHandleStore {
 export interface ApplyVnRuntimeMediaEffectsInput {
   effects: MediaRuntimeEffect[];
   handles: VnRuntimeMediaHandleStore;
-  resolver: (input: Pick<VnRuntimeMediaSourceResolverInput, "sourceRef" | "kind">) => VnRuntimeMediaSourceResolverResult;
+  resolver: (input: Pick<VnRuntimeMediaSourceResolverInput, "assetId" | "kind">) => VnRuntimeMediaSourceResolverResult;
   audioPort?: AudioPort;
   videoPort?: VideoPort;
 }
@@ -46,7 +46,7 @@ export interface ApplyVnRuntimeMediaEffectsResult {
 export interface VnDialogueVoiceAssetAvailabilityResult {
   available: boolean;
   diagnostics: VnRuntimeDiagnostic[];
-  sourceRef?: string;
+  assetId?: string;
 }
 
 export function createInitialVnRuntimeMediaHandleStore(): VnRuntimeMediaHandleStore {
@@ -56,7 +56,7 @@ export function createInitialVnRuntimeMediaHandleStore(): VnRuntimeMediaHandleSt
 export function resolveVnRuntimeMediaSource({
   assetResolver,
   kind,
-  sourceRef
+  assetId
 }: VnRuntimeMediaSourceResolverInput): VnRuntimeMediaSourceResolverResult {
   if (!assetResolver) {
     return {
@@ -64,12 +64,13 @@ export function resolveVnRuntimeMediaSource({
         source: "asset",
         code: "asset-resolver-missing",
         severity: "error",
-        message: `Media source ${sourceRef} (${kind}) could not be resolved because no AssetResolver was provided.`
+        message: `Media source ${assetId} (${kind}) could not be resolved because no AssetResolver was provided.`
       }
     };
   }
 
-  const resolved = assetResolver.resolve({ id: sourceRef, kind });
+  const capability = kind === "video" ? "video" : "audio";
+  const resolved = assetResolver.resolve({ id: assetId, capability });
   if (resolved.uri) return { uri: resolved.uri };
 
   return {
@@ -77,9 +78,41 @@ export function resolveVnRuntimeMediaSource({
       resolved.diagnostic ?? {
         code: "asset-missing",
         severity: "error",
-        id: sourceRef,
-        kind,
-        message: `Media source ${sourceRef} (${kind}) could not be resolved.`
+        id: assetId,
+        capability,
+        message: `Media source ${assetId} (${kind}) could not be resolved.`
+      }
+    )
+  };
+}
+
+export function resolveVnRuntimeImageSource({
+  assetResolver,
+  assetId
+}: {
+  assetId: string;
+  assetResolver?: AssetResolver;
+}): VnRuntimeMediaSourceResolverResult {
+  if (!assetResolver) {
+    return {
+      diagnostic: {
+        source: "asset",
+        code: "asset-resolver-missing",
+        severity: "error",
+        message: `Pinp source ${assetId} (image) could not be resolved because no AssetResolver was provided.`
+      }
+    };
+  }
+  const resolved = assetResolver.resolve({ id: assetId, capability: "image" });
+  if (resolved.uri) return { uri: resolved.uri };
+  return {
+    diagnostic: createVnRuntimeAssetDiagnostic(
+      resolved.diagnostic ?? {
+        code: "asset-missing",
+        severity: "error",
+        id: assetId,
+        capability: "image",
+        message: `Pinp source ${assetId} (image) could not be resolved.`
       }
     )
   };
@@ -88,26 +121,29 @@ export function resolveVnRuntimeMediaSource({
 export function resolveVnDialogueVoiceAssetAvailability({
   assetResolver,
   textId,
+  voiceIndex,
   voiceSettings
 }: {
   assetResolver?: AssetResolver;
   textId?: string;
+  voiceIndex?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   voiceSettings: VnRuntimeVoiceSettings;
 }): VnDialogueVoiceAssetAvailabilityResult {
   if (!textId) return { available: false, diagnostics: [] };
-  const sourceRef = createVoiceAssetId(textId, voiceSettings.locale);
-  if (!assetResolver) return { available: false, diagnostics: [], sourceRef };
+  const assetId = voiceIndex?.[voiceSettings.locale]?.[textId];
+  if (!assetId) return { available: false, diagnostics: [] };
+  if (!assetResolver) return { available: false, diagnostics: [], assetId };
 
-  const resolved = assetResolver.resolve({ id: sourceRef, kind: "voice" });
-  if (resolved.uri) return { available: true, diagnostics: [], sourceRef };
-  if (resolved.diagnostic?.code === "asset-kind-mismatch") {
+  const resolved = assetResolver.resolve({ id: assetId, capability: "audio" });
+  if (resolved.uri) return { available: true, diagnostics: [], assetId };
+  if (resolved.diagnostic?.code === "asset-capability-mismatch") {
     return {
       available: false,
       diagnostics: [createVnRuntimeAssetDiagnostic({ ...resolved.diagnostic, severity: "warning" })],
-      sourceRef
+      assetId
     };
   }
-  return { available: false, diagnostics: [], sourceRef };
+  return { available: false, diagnostics: [], assetId };
 }
 
 export async function applyVnRuntimeMediaEffects({
@@ -122,7 +158,7 @@ export async function applyVnRuntimeMediaEffects({
   for (const effect of effects) {
     try {
       if (effect.type === "play-bgm") {
-        const resolved = resolver({ sourceRef: effect.sourceRef, kind: "bgm" });
+        const resolved = resolver({ assetId: effect.assetId, kind: "bgm" });
         if (!resolved.uri) {
           if (resolved.diagnostic) diagnostics.push(resolved.diagnostic);
           continue;
@@ -163,7 +199,7 @@ export async function applyVnRuntimeMediaEffects({
       }
 
       if (effect.type === "play-sfx") {
-        const resolved = resolver({ sourceRef: effect.sourceRef, kind: "sfx" });
+        const resolved = resolver({ assetId: effect.assetId, kind: "sfx" });
         if (!resolved.uri) {
           if (resolved.diagnostic) diagnostics.push(resolved.diagnostic);
           continue;
@@ -207,7 +243,7 @@ export async function applyVnRuntimeMediaEffects({
       if (effect.type === "play-dialogue-bleep") {
         handles.dialogueBleep?.stop();
         delete handles.dialogueBleep;
-        const resolved = resolver({ sourceRef: effect.sourceRef, kind: "bleep" });
+        const resolved = resolver({ assetId: effect.assetId, kind: "bleep" });
         if (!resolved.uri) {
           if (resolved.diagnostic) diagnostics.push({ ...resolved.diagnostic, severity: "warning" });
           continue;
@@ -239,7 +275,7 @@ export async function applyVnRuntimeMediaEffects({
         voiceHandle = undefined;
         handles.voice?.stop();
         delete handles.voice;
-        const resolved = resolver({ sourceRef: effect.sourceRef, kind: "voice" });
+        const resolved = resolver({ assetId: effect.assetId, kind: "voice" });
         if (!resolved.uri) {
           if (resolved.diagnostic) diagnostics.push({ ...resolved.diagnostic, severity: "warning" });
           continue;
@@ -255,7 +291,7 @@ export async function applyVnRuntimeMediaEffects({
         continue;
       }
 
-      const resolved = resolver({ sourceRef: effect.sourceRef, kind: "video" });
+      const resolved = resolver({ assetId: effect.assetId, kind: "video" });
       if (!resolved.uri) {
         if (resolved.diagnostic) diagnostics.push(resolved.diagnostic);
         continue;

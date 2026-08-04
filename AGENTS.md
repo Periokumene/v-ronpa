@@ -12,7 +12,7 @@
 - Keep Pixi command reduction and wait descriptors in `packages/pixi-stage-model`; dispatch/runtime must not import `pixi-presenter`.
 - Treat `VnRuntimeShellPort`, `VnPresentationPort`, `VnLifecyclePort`, and `VnDiagnosticsPort` as the only product VN runtime boundary. Harness diagnostics use the explicit debug entry.
 - Create saves only through stable VN checkpoints and validate `gameId`, `entryId`, and `scriptRevision` before restore.
-- Compose generated assets and `runtime-assets-*` fragments into one app-owned ContentManifest and one AssetRegistry. Providers cannot export registries, resolvers, loaders, or full manifests.
+- Keep App content below `apps/<app>/assets/**`, generate one ContentManifest v5, and resolve it through one App-owned AssetRegistry. Renderer-private implementation resources stay inside their adapter/presenter and do not enter the App manifest.
 - Keep raw R3F/Pixi renderer code inside adapter packages or `apps/game-harness` harness code; `apps/game-a` may mount canonical VN shell/Pixi host surfaces and use `packages/media-save` ports, but must not import session/dispatch/presenter, `three`, `@react-three/*`, `pixi.js`, `@pixi/*`, Dexie, Howler, Navi, or Trial packages directly.
 - Keep app-specific flow/save/overlay wiring in app packages such as `apps/game-harness`; shared VN packages expose shell surfaces and headless dispatch helpers only.
 - DOM UI owns text-heavy menus, dialogs, inventory, and accessibility-sensitive interactions.

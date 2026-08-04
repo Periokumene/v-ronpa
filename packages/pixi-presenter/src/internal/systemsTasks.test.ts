@@ -66,7 +66,7 @@ describe("pixi presentation task system integration", () => {
       assetResolver: {
         resolve(input) {
           resolverCalls.push(input);
-          if (input.kind === "character-pack") return { uri: characterPackUri() };
+          if (input.capability === "json") return { uri: characterPackUri() };
           return { uri: `/resolved/${input.id}.png` };
         }
       }
@@ -79,10 +79,10 @@ describe("pixi presentation task system integration", () => {
     ), false);
 
     expect(resolverCalls).toEqual([
-      { id: "Ema", kind: "character-pack" },
-      { id: "bg:test", kind: "background" }
+      { id: "char/ema", capability: "json" },
+      { id: "bg/test", capability: "image" }
     ]);
-    expect(load).toHaveBeenCalledWith("/resolved/bg:test.png");
+    expect(load).toHaveBeenCalledWith("/resolved/bg/test.png");
     expect(load).toHaveBeenCalledWith("https://assets.test/characters/Ema/layers/Body.png");
     expect(load).toHaveBeenCalledWith("https://assets.test/characters/Ema/layers/FacePensive.png");
     expect(fetch).toHaveBeenCalledWith(characterPackUri());
@@ -130,8 +130,8 @@ describe("pixi presentation task system integration", () => {
     expect(content?.mask).toBe(mask);
     expect(stroke).toBeDefined();
     expect(fallback?.visible).toBe(true);
-    expect(load).toHaveBeenCalledWith("/resolved/bg:test.png");
-    expect(load).toHaveBeenCalledWith("/resolved/bg:inner.png");
+    expect(load).toHaveBeenCalledWith("/resolved/bg/test.png");
+    expect(load).toHaveBeenCalledWith("/resolved/bg/inner.png");
 
     const frame = resolveInnerBackgroundFrameRect(960, 540);
     const imageRect = insetFrame(frame, innerBackgroundImageInsetPx);
@@ -243,17 +243,17 @@ describe("pixi presentation task system integration", () => {
         source: "asset",
         code: "asset-missing",
         severity: "error",
-        assetId: "Ema",
-        kind: "character-pack",
-        message: "Ema missing"
+        assetId: "char/ema",
+        capability: "json",
+        message: "char/ema missing"
       },
       {
         source: "asset",
         code: "asset-missing",
         severity: "error",
-        assetId: "bg:test",
-        kind: "background",
-        message: "bg:test missing"
+        assetId: "bg/test",
+        capability: "image",
+        message: "bg/test missing"
       }
     ]);
   });
@@ -280,9 +280,9 @@ describe("pixi presentation task system integration", () => {
         source: "asset",
         code: "asset-missing",
         severity: "error",
-        assetId: "bg:inner",
-        kind: "background",
-        message: "bg:inner missing"
+        assetId: "bg/inner",
+        capability: "image",
+        message: "bg/inner missing"
       }
     ]);
   });
@@ -349,7 +349,7 @@ describe("pixi presentation task system integration", () => {
     const { actors, root } = createSystems({
       assetResolver: {
         resolve(input) {
-          return input.kind === "character-pack" && input.id === "Ema"
+          return input.capability === "json" && input.id === "char/ema"
             ? { uri: characterPackUri() }
             : { uri: `/resolved/${input.id}.png` };
         }
@@ -386,7 +386,7 @@ describe("pixi presentation task system integration", () => {
     const { actors, root } = createSystems({
       assetResolver: {
         resolve(input) {
-          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+          return input.capability === "json" && input.id === "char/ema" ? { uri: characterPackUri() } : {};
         }
       }
     });
@@ -567,7 +567,7 @@ describe("pixi presentation task system integration", () => {
     const { actors, root, tasks, tweens } = createSystems({
       assetResolver: {
         resolve(input) {
-          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : { uri: `/resolved/${input.id}.png` };
+          return input.capability === "json" && input.id === "char/ema" ? { uri: characterPackUri() } : { uri: `/resolved/${input.id}.png` };
         }
       }
     });
@@ -620,7 +620,7 @@ describe("pixi presentation task system integration", () => {
     const { actors, root, tasks } = createSystems({
       assetResolver: {
         resolve(input) {
-          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+          return input.capability === "json" && input.id === "char/ema" ? { uri: characterPackUri() } : {};
         }
       }
     });
@@ -651,7 +651,7 @@ describe("pixi presentation task system integration", () => {
     const { actors, root, tasks, tweens } = createSystems({
       assetResolver: {
         resolve(input) {
-          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+          return input.capability === "json" && input.id === "char/ema" ? { uri: characterPackUri() } : {};
         }
       }
     });
@@ -748,7 +748,7 @@ describe("pixi presentation task system integration", () => {
     const { actors, root, tweens } = createSystems({
       assetResolver: {
         resolve(input) {
-          return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+          return input.capability === "json" && input.id === "char/ema" ? { uri: characterPackUri() } : {};
         }
       }
     });
@@ -905,7 +905,7 @@ describe("pixi presentation task system integration", () => {
       code: "asset-invalid-character-source-pixel-scale",
       severity: "error",
       assetId: "Ema",
-      kind: "character-pack"
+      capability: "json"
     }]);
   });
 
@@ -1608,6 +1608,7 @@ function createSystems(overrides: {
     width: () => viewport.width,
     height: () => viewport.height,
     characterOutlineEnabled: overrides.characterOutlineEnabled ?? true,
+    characterAssetIdByCharacterId: { Ema: "char/ema" },
     ...(overrides.assetResolver ? { assetResolver: overrides.assetResolver } : {}),
     ...(overrides.onDiagnostic ? { onDiagnostic: overrides.onDiagnostic } : {})
   };
@@ -1701,7 +1702,7 @@ function backgroundActor({ durationMs, wait = false }: { durationMs: number; wai
   return {
     id: "MainBackground",
     kind: "background",
-    appearance: "bg:test",
+    appearance: "bg/test",
     appearanceExpression: "",
     visible: true,
     alpha: 1,
@@ -1729,7 +1730,7 @@ function innerBackgroundActor({ durationMs, wait = false }: { durationMs: number
   return {
     id: INNER_BACKGROUND_ID,
     kind: "background",
-    appearance: "bg:inner",
+    appearance: "bg/inner",
     appearanceExpression: "",
     visible: true,
     alpha: 1,
@@ -1960,9 +1961,10 @@ function createCharacterSystem(
     width: () => 960,
     height: () => 540,
     characterOutlineEnabled: true,
+    characterAssetIdByCharacterId: { Ema: "char/ema" },
     assetResolver: {
       resolve(input) {
-        return input.kind === "character-pack" && input.id === "Ema" ? { uri: characterPackUri() } : {};
+        return input.capability === "json" && input.id === "char/ema" ? { uri: characterPackUri() } : {};
       }
     },
     ...overrides

@@ -57,12 +57,6 @@ checkNoImport("packages/app-vn-dispatch/src", "@v-ronpa/pixi-presenter");
 checkNoImport("packages/app-vn-runtime/src", "@v-ronpa/pixi-presenter");
 checkProductionToken("packages/pixi-presenter/src", "RuntimeCommand", "presenter must not interpret RuntimeCommand");
 checkProductionPattern("apps", /\binterface\s+Vn\w*Port\b/u, "apps must not define parallel VN runtime ports");
-checkProductionPattern(
-  "packages/runtime-assets-pixi/src",
-  /\b(createAssetRegistry|composeContentManifest|ContentManifest|AssetResolver|loader)\b/u,
-  "runtime asset providers may only export fragments"
-);
-
 const runtimeIndex = readFileSync(join(root, "packages/app-vn-runtime/src/index.ts"), "utf8");
 if (/export\s+\*/u.test(runtimeIndex)) failures.push("packages/app-vn-runtime/src/index.ts: wildcard exports are forbidden.");
 for (const debugOnlySymbol of [
@@ -174,15 +168,15 @@ if (!vnEntrySchemaBody) {
 
 const gameAViteConfigPath = "apps/game-a/vite.config.ts";
 const gameAViteConfig = stripComments(readFileSync(join(root, gameAViteConfigPath), "utf8"));
-if (!/gameAAssetConfig\.naniProject/u.test(gameAViteConfig)) {
-  failures.push(`${gameAViteConfigPath}: Nani Devtools discovery must come from gameAAssetConfig.naniProject.`);
+if (!/gameANaniConfig/u.test(gameAViteConfig)) {
+  failures.push(`${gameAViteConfigPath}: Nani Devtools discovery must come from nani.config.mjs.`);
 }
-if (/gameAAssetConfig\.scripts\b/u.test(gameAViteConfig)) {
+if (/gameANaniConfig\.scripts\b/u.test(gameAViteConfig)) {
   failures.push(`${gameAViteConfigPath}: explicit per-script Nani membership is forbidden.`);
 }
 for (const hardcodedEntryIdentity of ["vn:game-a-main", "vn:game-a-test-smoke", "vn:game-a-test-character"]) {
   if (gameAViteConfig.includes(hardcodedEntryIdentity)) {
-    failures.push(`${gameAViteConfigPath}: entry identity '${hardcodedEntryIdentity}' must come from asset.config.mjs.`);
+    failures.push(`${gameAViteConfigPath}: entry identity '${hardcodedEntryIdentity}' must come from nani.config.mjs.`);
   }
 }
 
@@ -202,8 +196,8 @@ if (/Object\.values\s*\(\s*gameAScriptSourcesByPath\s*\)/u.test(gameAStoryDefini
 
 for (const assetConfigPath of ["apps/game-a/asset.config.mjs", "apps/game-harness/asset.config.mjs"]) {
   const assetConfig = stripComments(readFileSync(join(root, assetConfigPath), "utf8"));
-  if (!/\bnaniProject\s*:/u.test(assetConfig)) {
-    failures.push(`${assetConfigPath}: missing canonical naniProject directory-discovery configuration.`);
+  if (/\bnaniProject\s*:/u.test(assetConfig)) {
+    failures.push(`${assetConfigPath}: asset projects must not contain Nani discovery configuration.`);
   }
   for (const legacyPattern of [
     { pattern: /\bsourceFormat\s*:/u, label: "sourceFormat" },
@@ -216,10 +210,15 @@ for (const assetConfigPath of ["apps/game-a/asset.config.mjs", "apps/game-harnes
   }
 }
 
+for (const naniConfigPath of ["apps/game-a/nani.config.mjs", "apps/game-harness/nani.config.mjs"]) {
+  const naniConfig = stripComments(readFileSync(join(root, naniConfigPath), "utf8"));
+  if (!/\bscopes\s*:/u.test(naniConfig)) failures.push(`${naniConfigPath}: missing canonical scope discovery.`);
+}
+
 for (const legacyPath of [
-  "apps/game-a/src/generatedAssets.ts",
+  "apps/game-a/src/generatedRuntimeAssets.ts",
   "apps/game-a/src/generatedTestScripts.ts",
-  "apps/game-harness/src/harness/generatedAssets.ts",
+  "apps/game-harness/src/harness/generatedRuntimeAssets.ts",
   "apps/game-harness/src/harness/showcase/script.ts",
   "apps/game-a/src/gameASmokeStoryDefinition.ts",
   "apps/game-a/src/gameACharacterSmokeStoryDefinition.ts",

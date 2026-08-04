@@ -15,11 +15,11 @@ VS Code language support for V-Ronpa `.nani` scripts.
   `[-]`.
 - Limits normal completion to runtime-implemented commands and compiler-consumed parameters. Handwritten compatibility commands and declared-but-unconsumed parameters still receive hover and compiler diagnostics.
 - Provides current-file label completion for `@goto #` and `goto:#`.
-- Loads production and test Nani catalogs from the nearest `asset.config.mjs` in trusted file workspaces.
+- Loads production and test Nani catalogs from the sibling `nani.config.mjs` of the nearest `asset.config.mjs` in trusted file workspaces.
 - Completes local labels before discovered logical script paths, then completes labels from the selected target after `path.nani#`.
 - Publishes exact shared-linker diagnostics for malformed, dynamic, relative, wildcard, unknown-script, and unknown-label endpoints.
 - Resolves navigation endpoint hovers and Cmd/Ctrl+click definitions across discovered `.nani` source files.
-- Discovers the nearest `asset.config.mjs` for an opened `.nani` file and completes generated background, BGM, SFX, video, and layered-character resources.
+- Discovers the nearest `asset.config.mjs` for an opened `.nani` file and completes scanner-derived image, audio, video, model, font, JSON, and layered-character resources.
 - Completes layered-character expression tokens from the matching `compositions.json`, including comma-separated `@char` and `@slide` expressions.
 - Renders a native 320x420 hover preview when the pointer is over the static identity value of an `@char` command.
 - Lazily renders native IntelliSense details for a selected `@char` appearance-token candidate, showing its local image and the complete projected character without adding a persistent panel.
@@ -48,8 +48,9 @@ Normal completion excludes commands whose catalog status is not `implemented` an
 
 ## Multi-Script Navigation
 
-In a trusted file workspace, the extension reads the nearest `asset.config.mjs`
-and delegates recursive scope discovery to `@v-ronpa/nani-project`. Production
+In a trusted file workspace, the extension uses the nearest `asset.config.mjs`
+as the App boundary, reads its sibling `nani.config.mjs`, and delegates recursive
+scope discovery to `@v-ronpa/nani-project`. Production
 and development form one navigation catalog; test scripts form one isolated
 shared catalog with multiple explicit entries. Physical source paths map to
 logical `scriptPath` values through each scope's `sourceRoot` and `scriptRoot`,
@@ -81,12 +82,11 @@ source `nani-project`.
 
 Project-aware completion is enabled only in a [trusted VS Code workspace](https://code.visualstudio.com/docs/editor/workspace-trust). Starting at the current `.nani` file, the extension finds the closest ancestor `asset.config.mjs`, resolves its paths from the closest `pnpm-workspace.yaml` root, and dynamically loads the config.
 
-The module named by `runtimeAssetOutputPath` and its configured export are the
-only authority for resource IDs. The removed `outputPath` key is rejected and
-has no fallback. The extension does not reproduce the repository's
-filename-to-ID generation rules. After adding or renaming raw assets, run the
-project's existing asset generator; the extension watches the generated module
-and refreshes as soon as it changes.
+The extension calls the shared `@v-ronpa/asset-project` scanner directly. It
+does not parse a generated TypeScript module or reproduce filename-to-ID, MIME,
+bundle, or CharacterId rules. After adding or renaming source assets, filesystem
+watching refreshes the same scanner view; `pnpm generate:assets` remains the
+repository's committed-output writer.
 
 Layered-character token names are read directly from each generated character pack's sibling `compositions.json`. Those files are watched independently, so token edits become available without regenerating or reinstalling the extension.
 
@@ -103,7 +103,7 @@ valid authoring inputs.
 
 ## Character Assembly Preview
 
-Hover the identity expression in a command such as `@char alice.body0,eye1,mouth3,armR4` to inspect the assembled layered character. The preview uses the generated character-pack mapping and the shared layered-character resolver, then embeds only the active PNG layers into a content-addressed SVG in VS Code extension storage. It reproduces layer order, anchors, pivots, scale, Z rotation, flips, color multiplication, and alpha. It intentionally does not approximate Pixi outlines, filters, animation, transitions, or stage transforms from other command parameters.
+Hover the identity expression in a command such as `@char alice.body0,eye1,mouth3,armR4` to inspect the assembled layered character. The preview uses the generated CharacterId-to-AssetId mapping and the shared layered-character resolver, then embeds only the active PNG layers into a content-addressed SVG in VS Code extension storage. It reproduces layer order, anchors, pivots, scale, Z rotation, flips, color multiplication, and alpha. It intentionally does not approximate Pixi outlines, filters, animation, transitions, or stage transforms from other command parameters.
 
 Command-name and non-identity parameter hovers continue to show language documentation. Preview failures are reported inside the hover and under `[char-preview]` in the **V-Ronpa Nani** output channel; they are never added to Problems. During a same-line edit, the last valid image remains visible with an explicit updating or invalid warning. Inserting or deleting a newline clears that conservative line cache.
 

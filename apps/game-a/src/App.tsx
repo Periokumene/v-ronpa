@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import {
   GameInteractionShell,
@@ -10,8 +10,9 @@ import {
   useGameSettingsAdapter,
   usePixiVnScriptPreparation
 } from "@v-ronpa/app-vn-shell";
+import { gameACharacterAssetIdByCharacterId } from "./generatedAssets";
 import { SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS } from "@v-ronpa/media-save";
-import { RichTextFontStyles } from "@v-ronpa/ui-kit";
+import { RichTextFontStyles, richTextFontFamilyValue } from "@v-ronpa/ui-kit";
 import { gameAContentManifest } from "./contentManifest";
 import { gameAStoryDefinition, type GameAStoryDefinition } from "./gameAScripts";
 import { useGameAFlowActor } from "./useGameAFlowActor";
@@ -62,8 +63,11 @@ export function GameAAppCore({
   renderAfterPlayfield,
   wrapPlayfield
 }: GameAAppCoreProps) {
-  const settings = useGameSettingsAdapter({ storageKey: "v-ronpa:game-a:settings:v2" });
-  const assetRegistry = useMemo(() => createAssetRegistry(gameAContentManifest), []);
+  const settings = useGameSettingsAdapter({ storageKey: "v-ronpa:game-a:settings:v3" });
+  const assetRegistry = useMemo(
+    () => createAssetRegistry(gameAContentManifest, { baseUri: import.meta.env.BASE_URL }),
+    []
+  );
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const storyTextDisplay = useMemo(() => settingsToStoryTextDisplaySettings(settings.settings), [settings.settings]);
   const storyTextRevealSettings = useMemo(() => ({ textSpeed: storyTextDisplay.textSpeed }), [storyTextDisplay.textSpeed]);
@@ -158,6 +162,9 @@ export function GameAAppCore({
   const assetDiagnosticCount = runtime.diagnostics.runtimeDiagnostics.filter(
     (diagnostic) => diagnostic.source === "asset"
   ).length;
+  const gameAFontStyle = {
+    "--game-a-font-family": richTextFontFamilyValue(settings.settings.display.fontFaceId)
+  } as CSSProperties;
 
   const playfield = (
     <section className="game-a-playfield" data-testid="game-a-playfield">
@@ -174,6 +181,7 @@ export function GameAAppCore({
             active={flow.mode === "vn" && runtime.shell.storyRuntime.active}
             assetResolver={assetRegistry}
             characterOutlineEnabled={true}
+            characterAssetIdByCharacterId={gameACharacterAssetIdByCharacterId}
             characterPreloadPlan={pixiPreparation.initialCharacterPreloadPlan}
             diagnostics={runtime.diagnostics}
             presentation={runtime.presentation}
@@ -195,6 +203,7 @@ export function GameAAppCore({
     <main
       className={className ? `game-a-shell ${className}` : "game-a-shell"}
       data-game-a-asset-diagnostics-count={String(assetDiagnosticCount)}
+      style={gameAFontStyle}
       {...gameAUiAudioBindings}
     >
       <RichTextFontStyles

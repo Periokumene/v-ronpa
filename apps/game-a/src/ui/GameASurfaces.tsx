@@ -7,6 +7,7 @@ import type {
   PauseSurfaceViewModel,
   RuntimeInputPromptActions,
   RuntimeInputPromptViewModel,
+  RuntimePinpViewModel,
   RuntimeToastActions,
   RuntimeToastLayerViewModel,
   SaveLoadOverlayActions,
@@ -38,6 +39,7 @@ import type { GamePauseSection, GameUiAction, InteractionCapabilitySnapshot } fr
 import {
   paginateSaveLoadSlotIds,
   RichTextRenderer,
+  RuntimePinpSurface,
   SAVE_LOAD_SLOTS_PER_PAGE,
   SurfaceFrame,
   VnCueSurface as SharedVnCueSurface
@@ -76,6 +78,7 @@ export function createGameASurfaces({
   return {
     Dialog: (props) => <GameADialogSurface {...props} assets={assets} config={config} />,
     Cue: GameACueSurface,
+    Pinp: GameAPinpSurface,
     Choices: GameAChoiceOverlay,
     CommandBar: GameACommandBar,
     Title: (props) => <GameATitleSurface {...props} assets={assets} config={config} vnPreparationPending={vnPreparationPending} />,
@@ -98,6 +101,10 @@ export function GameACueSurface({ model }: SurfaceSlotProps<VnCueViewModel>) {
       presentation={model.presentation}
     />
   );
+}
+
+export function GameAPinpSurface({ model }: SurfaceSlotProps<RuntimePinpViewModel>) {
+  return <RuntimePinpSurface {...model} className="game-a-pinp-surface" />;
 }
 
 export function GameADialogSurface({

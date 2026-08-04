@@ -16,6 +16,8 @@
     "baseUrl": ".",
     "paths": {
       "@v-ronpa/contracts": ["packages/contracts/src/index.ts"],
+      "@v-ronpa/asset-project": ["packages/asset-project/src/index.ts"],
+      "@v-ronpa/asset-project/vite": ["packages/asset-project/src/vite.ts"],
       "@v-ronpa/asset-registry": ["packages/asset-registry/src/index.ts"],
       "@v-ronpa/layered-character": ["packages/layered-character/src/index.ts"],
       "@v-ronpa/nani-parser": ["packages/nani-parser/src/index.ts"],

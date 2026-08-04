@@ -1,6 +1,33 @@
 import { z } from "zod";
 
 export const IdSchema = z.string().min(1).regex(/^[a-zA-Z0-9:_./-]+$/);
+export const AssetIdSchema = z
+  .string()
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/);
+export type AssetId = z.infer<typeof AssetIdSchema>;
+
+export const AssetCapabilitySchema = z.enum(["image", "audio", "video", "font", "model", "json"]);
+export type AssetCapability = z.infer<typeof AssetCapabilitySchema>;
+
+export const AssetDefinitionSchema = z
+  .object({
+    id: AssetIdSchema,
+    uri: z.string().min(1),
+    mimeType: z.string().min(1)
+  })
+  .strict();
+export type AssetDefinition = z.infer<typeof AssetDefinitionSchema>;
+
+export const AssetRequirementSchema = z
+  .object({
+    id: AssetIdSchema,
+    capability: AssetCapabilitySchema
+  })
+  .strict();
+export type AssetRequirement = z.infer<typeof AssetRequirementSchema>;
+
+export const FontFaceIdSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+export type FontFaceId = z.infer<typeof FontFaceIdSchema>;
 export const PIXI_MAIN_BACKGROUND_ID = "MainBackground" as const;
 export const PIXI_INNER_BACKGROUND_ID = "InnerBackground" as const;
 
@@ -34,7 +61,7 @@ export const RUNTIME_UI_GROUPS = ["dialog", "commandBar", "toastLayer"] as const
 export const RuntimeUiGroupSchema = z.enum(RUNTIME_UI_GROUPS);
 export type RuntimeUiGroup = z.infer<typeof RuntimeUiGroupSchema>;
 
-export const VN_UI_SURFACE_IDS = [...RUNTIME_UI_GROUPS, "cue"] as const;
+export const VN_UI_SURFACE_IDS = [...RUNTIME_UI_GROUPS, "cue", "pinp"] as const;
 export const VnUiSurfaceIdSchema = z.enum(VN_UI_SURFACE_IDS);
 export type VnUiSurfaceId = z.infer<typeof VnUiSurfaceIdSchema>;
 
@@ -250,6 +277,13 @@ export interface NaniCommandParamSpec {
   aliases?: string[];
   description?: string;
   docs?: NaniCommandParamDocs;
+  resource?: NaniCommandResourceBinding;
+}
+
+export interface NaniCommandResourceBinding {
+  capability: AssetCapability;
+  resolution: "asset-id" | "character-id";
+  runtimeParam: string;
 }
 
 export interface NaniCommandDefinition {
@@ -278,6 +312,14 @@ export type NaniCommandRecommendedRangeSpec = z.infer<typeof NaniCommandRecommen
 
 export const NaniCommandParamRuntimeSupportSchema = z.enum(["consumed", "declared-not-consumed"]);
 export type NaniCommandParamRuntimeSupportSpec = z.infer<typeof NaniCommandParamRuntimeSupportSchema>;
+
+export const NaniCommandResourceBindingSchema = z
+  .object({
+    capability: AssetCapabilitySchema,
+    resolution: z.enum(["asset-id", "character-id"]),
+    runtimeParam: z.string().min(1)
+  })
+  .strict();
 
 const NaniCommandDocScalarSchema = z.union([z.string(), z.number(), z.boolean()]);
 
@@ -312,7 +354,8 @@ export const NaniCommandParamSpecSchema = z
     repeatable: z.boolean().optional(),
     aliases: z.array(z.string().min(1)).optional(),
     description: z.string().optional(),
-    docs: NaniCommandParamDocsSchema.optional()
+    docs: NaniCommandParamDocsSchema.optional(),
+    resource: NaniCommandResourceBindingSchema.optional()
   })
   .strict();
 
@@ -412,6 +455,7 @@ const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
   hideui: "ui-output",
   input: "story-control",
   movie: "media-output",
+  pinp: "ui-output",
   print: "story-control",
   resettext: "story-control",
   set: "story-control",
@@ -899,6 +943,20 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
     param("time", "decimal"),
     param("wait", "boolean")
   ]),
+  {
+    ...vRonpa("pinp", "ui", [
+      param("assetId", "string", false, "v-ronpa"),
+      param("pos", "decimal list", false, "v-ronpa"),
+      param("height", "decimal", false, "v-ronpa"),
+      param("ratio", "decimal list", false, "v-ronpa"),
+      param("alt", "string", false, "v-ronpa"),
+      param("effect", "string", false, "v-ronpa"),
+      param("time", "decimal", false, "v-ronpa"),
+      param("visible", "boolean", false, "v-ronpa")
+    ]),
+    canonicalName: "pinp",
+    primaryParam: "assetId"
+  },
   vRonpa("trialkeyword", "ui", [param("id", "string"), param("text", "string"), param("speaker", "string"), param("evidence", "string")], [
     "trial-keyword"
   ])
@@ -907,8 +965,8 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
 const implementedCommandDocs: Record<string, NaniCommandDocs> = {
   append: { zh: "向当前文本框追加一段文本，不重置当前说话人或文本框状态。", examples: ['@append "继续显示的文本"'] },
   arrange: { zh: "按命名位置排列角色立绘，常用于快速把多个角色放到舞台预设位置。", examples: ["@arrange Felix.Left,Mira.Right wait!"] },
-  back: { zh: "切换主背景或背景演员，并可附带转场、位置、缩放和等待控制。", examples: ["@back bg:classroom effect:fade time:0.5 wait!"] },
-  bgm: { zh: "播放循环背景音乐，可设置音量、淡入淡出和分组。", examples: ["@bgm bgm:main volume:0.6 fade:1 group:music"] },
+  back: { zh: "切换主背景或背景演员，并可附带转场、位置、缩放和等待控制。", examples: ["@back bg/classroom effect:fade time:0.5 wait!"] },
+  bgm: { zh: "播放循环背景音乐，可设置音量、淡入淡出和分组。", examples: ["@bgm bgm/main volume:0.6 fade:1 group:music"] },
   blur: { zh: "对舞台或演员应用模糊效果，通常用于焦点转移或回忆演出；time 会插值 actor/stage blur 强度，power:0 time:x 会淡出后移除 blur。", examples: ["@blur stage power:0.4 time:0.3 wait!", "@blur actorId:MainBackground power:0 time:0.2 wait!"] },
   bokeh: { zh: "应用景深虚化效果，可调焦点、距离和强度；time 会插值 bokeh 强度，power:0 time:x 会淡出 overlay/root blur 后清理。", examples: ["@bokeh focus:Felix power:0.6 time:0.4", "@bokeh power:0 time:0.2 wait!"] },
   char: { zh: "显示或更新角色立绘外观，并可设置位置、表情、转场和动画时长。", examples: ["@char Felix.Happy pos:0.5,0 wait!"] },
@@ -930,15 +988,19 @@ const implementedCommandDocs: Record<string, NaniCommandDocs> = {
   hidechars: { zh: "隐藏当前角色立绘，并可设置动画时间和等待。", examples: ["@hideChars time:0.3 wait!"] },
   hidecue: { zh: "隐藏中央演出文本 Surface；不会清除当前正文或回看内容。", examples: ["@hideCue time:0.4 wait!"] },
   hideui: { zh: "隐藏 runtime UI 组；未指定目标时隐藏所有 v1 UI 组。", examples: ["@hideUI commandBar time:0.2"] },
-  inback: { zh: "切换内层背景，用于对话框、框景或局部背景演出。", examples: ["@inback bg:room effect:fade time:0.2"] },
+  inback: { zh: "切换内层背景，用于对话框、框景或局部背景演出。", examples: ["@inback bg/inner/room effect:fade time:0.2"] },
   input: { zh: "请求玩家输入，并把结果写入剧情变量。", examples: ['@input playerName type:string summary:"你的名字？"'] },
-  movie: { zh: "播放视频资源；block 为 true 时剧情等待视频完成或跳过。", examples: ["@movie video:intro block:true"] },
+  movie: { zh: "播放视频资源；block 为 true 时剧情等待视频完成或跳过。", examples: ["@movie video/intro block:true"] },
+  pinp: {
+    zh: "在 VN 主画面显示或隐藏一个非阻塞 DOM 画中画图片 Surface；资产 ID 按原字符串解析，不要求类型前缀。",
+    examples: ['@pinp thumb/evidence-keycard pos:50,50 height:20 ratio:16,9 alt:"门禁卡" effect:fade time:0.18', "@pinp visible:false effect:fade time:0.18"]
+  },
   print: { zh: "显示一行文本，可指定说话人、文本框和文本显示速度。", examples: ['@print "你好" author:Felix speed:0.8'] },
   rain: { zh: "设置雨天粒子效果参数；time 会把当前渲染中的 power、wind、hue、tint 插值到目标值，power:0 time:x 会淡出后清理雨层。", examples: ["@rain power:0.5 wind:-0.2 hue:215 tint:0.55 time:0.4", "@rain power:0 time:0.2 wait!"] },
   resettext: { zh: "重置文本框当前文本，保留默认文本框可见状态。", examples: ["@resetText"] },
   set: { zh: "设置剧情变量；支持动态变量名或表达式形式。", examples: ["@set route:left"] },
-  sfx: { zh: "播放音效，可设置音量、循环、淡入淡出和分组。", examples: ["@sfx sfx:door volume:0.8"] },
-  sfxfast: { zh: "播放快速音效，适合高频反馈；当前 runtime 只消费路径、音量和分组。", examples: ["@sfxFast sfx:click volume:0.8"] },
+  sfx: { zh: "播放音效，可设置音量、循环、淡入淡出和分组。", examples: ["@sfx sfx/door volume:0.8"] },
+  sfxfast: { zh: "播放快速音效，适合高频反馈；当前 runtime 只消费路径、音量和分组。", examples: ["@sfxFast sfx/click volume:0.8"] },
   shake: { zh: "对舞台或目标播放震动效果，可设置次数、强度、方向和等待。", examples: ["@shake target:stage power:0.5 count:3 duration:150 wait!"] },
   showprinter: { zh: "显示文本框或切换到指定文本打印器。", examples: ["@showPrinter default time:0.2"] },
   showui: { zh: "显示 runtime UI 组；未指定目标时显示所有 v1 UI 组。", examples: ["@showUI commandBar visible:true"] },
@@ -977,6 +1039,7 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   inback: ["appearanceAndTransition", "appearance", "via", "effect", "visible", "easing", "time", "wait"],
   input: ["variableName", "type", "summary", "value"],
   movie: ["moviePath", "time", "block"],
+  pinp: ["assetId", "pos", "height", "ratio", "alt", "effect", "time", "visible"],
   print: ["text", "speaker", "author", "as", "printer", "speed", "textId", "autoNext", "reset", "append"],
   rain: ["power", "wind", "hue", "tint", "time", "easing", "wait"],
   resettext: ["printerId"],
@@ -999,16 +1062,18 @@ const commonParamDocs: Record<string, NaniCommandParamDocs> = {
   actorId: { zh: "目标演员或舞台对象 ID。", examples: ["Felix", "stage"] },
   additive: { zh: "是否以叠加方式播放或混合。", allowedValues: ["true", "false"] },
   amount: { zh: "无量纲效果强度倍率。", recommendedRange: { min: 0 }, examples: ["0.5", "1", "2"] },
+  alt: { zh: "图片替代文本；省略时按装饰图处理。" },
   affinityDelta: { zh: "角色亲密度变化量，正数增加，负数减少。", defaultValue: 0 },
   allowToggle: { zh: "是否允许玩家切换对应 UI。", allowedValues: ["true", "false"] },
-  appearance: { zh: "外观或背景资源 ID。", examples: ["bg:classroom", "Happy"] },
+  appearance: { zh: "外观或背景资源 ID。", examples: ["bg/classroom", "Happy"] },
   appearanceAndTransition: { zh: "主参数形式的外观和可选转场，通常写作资源 ID 或 `资源.转场`。" },
+  assetId: { zh: "相对 App assets/ 根目录的不透明资产 ID；运行时不会拼接目录或扩展名。", examples: ["thumb/evidence-keycard", "ui/dialog-frame"] },
   append: { zh: "是否追加到当前文本而不是重置文本。", allowedValues: ["true", "false"] },
   as: { zh: "文本说话人的别名参数，等价于 author/speaker 的运行含义。" },
   autoNext: { zh: "文本显示完成后是否自动推进。", defaultValue: false, allowedValues: ["true", "false"] },
   author: { zh: "文本说话人 ID。", examples: ["Felix", "Narrator"] },
   avatar: { zh: "角色头像或头像外观 ID。" },
-  bgmPath: { zh: "背景音乐资源 ID 或路径。", examples: ["bgm:main"] },
+  bgmPath: { zh: "背景音乐 AssetId；参数名沿用 Nani 框架约定，但不接受原始路径。", examples: ["bgm/main"] },
   block: { zh: "是否阻塞剧情直到媒体播放完成。", defaultValue: false, allowedValues: ["true", "false"] },
   blockJump: { zh: "故障块跳动强度。", recommendedRange: { min: 0, max: 1 } },
   burstJump: { zh: "故障爆发跳动强度。", recommendedRange: { min: 0, max: 1 } },
@@ -1045,6 +1110,7 @@ const commonParamDocs: Record<string, NaniCommandParamDocs> = {
   group: { zh: "媒体分组名，用于同时控制一组音频。", examples: ["music", "rain"] },
   handler: { zh: "选项处理器 ID。" },
   handlerId: { zh: "选项处理器 ID。" },
+  height: { zh: "画框高度占游戏区域高度的百分比。", recommendedRange: { min: 0, max: 100, unit: "percent" } },
   hide: { zh: "是否隐藏对应元素。", allowedValues: ["true", "false"] },
   hold: { zh: "跳转时是否保留指定状态。", allowedValues: ["true", "false"] },
   hor: { zh: "是否启用水平震动。", allowedValues: ["true", "false"] },
@@ -1059,7 +1125,7 @@ const commonParamDocs: Record<string, NaniCommandParamDocs> = {
   lock: { zh: "选项锁定条件或锁定 ID。" },
   look: { zh: "是否启用朝向/注视，或指定注视外观。", allowedValues: ["true", "false"] },
   loop: { zh: "是否循环播放。", allowedValues: ["true", "false"] },
-  moviePath: { zh: "视频资源 ID 或路径。", examples: ["video:intro"] },
+  moviePath: { zh: "视频 AssetId；参数名沿用 Nani 框架约定，但不接受原始路径。", examples: ["video/intro"] },
   noise: { zh: "粒子或滤镜噪声强度。", recommendedRange: { min: 0, max: 1 } },
   nostop: { zh: "是否不停止等待输入流程；当前 runtime 暂不消费此参数。", allowedValues: ["true", "false"] },
   params: { zh: "转场或效果的数值参数列表。" },
@@ -1073,6 +1139,7 @@ const commonParamDocs: Record<string, NaniCommandParamDocs> = {
   printer: { zh: "文本打印器 ID。", examples: ["default"] },
   printerId: { zh: "文本打印器 ID。", defaultValue: "default", examples: ["default"] },
   quantity: { zh: "物品数量。", defaultValue: 1, recommendedRange: { min: 1 } },
+  ratio: { zh: "画框宽高比，写作两个正数。", examples: ["16,9", "4,3"] },
   release: { zh: "跳转时是否释放指定状态。", allowedValues: ["true", "false"] },
   reset: { zh: "是否重置文本或状态。", allowedValues: ["true", "false"] },
   restart: { zh: "是否重启音效播放。", allowedValues: ["true", "false"] },
@@ -1080,7 +1147,7 @@ const commonParamDocs: Record<string, NaniCommandParamDocs> = {
   scale: { zh: "缩放向量或倍率。", recommendedRange: { min: 0 } },
   seed: { zh: "随机种子，用于稳定粒子或滤镜结果。" },
   set: { zh: "选择后执行的变量赋值表达式。", examples: ["route:left"] },
-  sfxPath: { zh: "音效资源 ID 或路径。", examples: ["sfx:door"] },
+  sfxPath: { zh: "音效 AssetId；参数名沿用 Nani 框架约定，但不接受原始路径。", examples: ["sfx/door"] },
   show: { zh: "是否显示对应元素。", allowedValues: ["true", "false"] },
   skill: { zh: "技能 ID。", examples: ["skill:logic"] },
   skillId: { zh: "技能 ID。", examples: ["skill:logic"] },
@@ -1158,6 +1225,15 @@ const commandParamDocOverrides: Record<string, Record<string, Partial<NaniComman
     time: { defaultValue: 0, recommendedRange: { min: 0, unit: "seconds" } },
     wait: { defaultValue: false }
   },
+  pinp: {
+    alt: { defaultValue: "" },
+    effect: { defaultValue: "fade", allowedValues: ["fade", "none"] },
+    height: { defaultValue: 20, recommendedRange: { min: 0, max: 100, unit: "percent" } },
+    pos: { defaultValue: "50,50", recommendedRange: { min: 0, max: 100, unit: "percent" } },
+    ratio: { defaultValue: "16,9" },
+    time: { defaultValue: 0.18, recommendedRange: { min: 0, unit: "seconds" } },
+    visible: { defaultValue: true }
+  },
   showui: {
     visible: { defaultValue: true },
     uINames: { allowedValues: ["dialog", "commandBar", "toastLayer"] },
@@ -1219,7 +1295,35 @@ function runtimeSupportForCommandParam(commandId: string, paramName: string): Na
     : "declared-not-consumed";
 }
 
-export const naniCommandCatalog: NaniCommandDefinition[] = applyNaniCommandDocs(baseNaniCommandCatalog);
+const naniResourceBindings: Readonly<Record<string, Readonly<Record<string, NaniCommandResourceBinding>>>> = {
+  back: { appearanceAndTransition: { capability: "image", resolution: "asset-id", runtimeParam: "appearance" } },
+  bgm: { bgmPath: { capability: "audio", resolution: "asset-id", runtimeParam: "bgmPath" } },
+  char: { idAndAppearance: { capability: "json", resolution: "character-id", runtimeParam: "target" } },
+  inback: { appearanceAndTransition: { capability: "image", resolution: "asset-id", runtimeParam: "appearance" } },
+  movie: { moviePath: { capability: "video", resolution: "asset-id", runtimeParam: "moviePath" } },
+  pinp: { assetId: { capability: "image", resolution: "asset-id", runtimeParam: "assetId" } },
+  sfx: { sfxPath: { capability: "audio", resolution: "asset-id", runtimeParam: "sfxPath" } },
+  sfxfast: { sfxPath: { capability: "audio", resolution: "asset-id", runtimeParam: "sfxPath" } },
+  slide: { idAndAppearance: { capability: "json", resolution: "character-id", runtimeParam: "target" } }
+};
+
+function applyNaniResourceBindings(definitions: readonly NaniCommandDefinition[]): NaniCommandDefinition[] {
+  return definitions.map((definition) => {
+    const bindings = naniResourceBindings[definition.id];
+    if (!bindings) return definition;
+    return {
+      ...definition,
+      params: definition.params.map((paramSpec) => {
+        const resource = bindings[paramSpec.name];
+        return resource ? { ...paramSpec, resource } : paramSpec;
+      })
+    };
+  });
+}
+
+export const naniCommandCatalog: NaniCommandDefinition[] = applyNaniCommandDocs(
+  applyNaniResourceBindings(baseNaniCommandCatalog)
+);
 
 export const commandCatalog = naniCommandCatalog;
 
@@ -1232,28 +1336,6 @@ for (const definition of naniCommandCatalog) {
 export function getNaniCommandDefinition(id: string): NaniCommandDefinition | undefined {
   return naniCommandCatalogById.get(normalizeNaniCommandId(id));
 }
-
-export const RuntimeAssetKindSchema = z.enum([
-  "character-pack",
-  "background",
-  "bgm",
-  "sfx",
-  "bleep",
-  "voice",
-  "video",
-  "font",
-  "glb",
-  "texture",
-  "fx"
-]);
-export type RuntimeAssetKind = z.infer<typeof RuntimeAssetKindSchema>;
-
-export const AssetRefSchema = z.object({
-  id: IdSchema,
-  kind: RuntimeAssetKindSchema,
-  tags: z.array(z.string()).default([])
-}).strict();
-export type AssetRef = z.infer<typeof AssetRefSchema>;
 
 export const RuntimeExpressionSchema = z.object({ type: z.literal("expression"), source: z.string() }).strict();
 export type RuntimeExpression = z.infer<typeof RuntimeExpressionSchema>;
@@ -1270,7 +1352,7 @@ export const RichTextRunStyleSchema = z
     color: z.string().optional(),
     markColor: z.string().optional(),
     sizeScale: z.number().positive().optional(),
-    fontId: IdSchema.optional(),
+    fontFaceId: FontFaceIdSchema.optional(),
     verticalAlign: RichTextVerticalAlignSchema.optional()
   })
   .strict();
@@ -1417,75 +1499,25 @@ export const RuntimeScriptSchema = z
     scriptPath: z.string(),
     commands: z.array(RuntimeCommandSchema),
     labels: z.record(z.string(), z.number().int().nonnegative()).default({}),
-    assets: z.array(AssetRefSchema).default([]),
     dependencies: z.array(ScriptDependencySchema).default([])
   })
   .strict();
 export type RuntimeScript = z.infer<typeof RuntimeScriptSchema>;
 
-export const RuntimeAssetFormatSchema = z.enum([
-  "glb",
-  "gltf",
-  "png",
-  "json",
-  "webp",
-  "avif",
-  "ktx2",
-  "woff",
-  "woff2",
-  "ttf",
-  "otf",
-  "mp3",
-  "ogg",
-  "mp4",
-  "webm"
-]);
-export type RuntimeAssetFormat = z.infer<typeof RuntimeAssetFormatSchema>;
-
-export const AssetCompressionSchema = z.enum(["none", "meshopt", "draco", "ktx2", "basisu", "webp", "avif"]);
-export type AssetCompression = z.infer<typeof AssetCompressionSchema>;
-
-export const TextureBudgetSchema = z.object({
-  maxSizePx: z.number().int().positive(),
-  maxBytes: z.number().int().positive().optional()
-});
-export type TextureBudget = z.infer<typeof TextureBudgetSchema>;
-
-export const LodRefSchema = z.object({
-  level: z.number().int().nonnegative(),
-  uri: z.string().min(1),
-  maxDistance: z.number().positive()
-});
-export type LodRef = z.infer<typeof LodRefSchema>;
-
 export const CollisionProxySchema = z.object({
   id: IdSchema,
   kind: z.enum(["box", "sphere", "capsule", "convex-mesh", "trimesh", "navmesh"]),
-  assetId: IdSchema.optional(),
+  assetId: AssetIdSchema.optional(),
   size: Vector3Schema.optional(),
   radius: z.number().positive().optional(),
   height: z.number().positive().optional()
 }).strict();
 export type CollisionProxy = z.infer<typeof CollisionProxySchema>;
 
-export const RuntimeAssetSchema = z.object({
-  id: IdSchema,
-  kind: RuntimeAssetKindSchema,
-  sourceUri: z.string().optional(),
-  optimizedUri: z.string().min(1),
-  format: RuntimeAssetFormatSchema,
-  compression: z.array(AssetCompressionSchema).default([]),
-  textureBudget: TextureBudgetSchema.optional(),
-  lods: z.array(LodRefSchema).default([]),
-  collisionProxyIds: z.array(IdSchema).default([]),
-  tags: z.array(z.string()).default([])
-}).strict();
-export type RuntimeAsset = z.infer<typeof RuntimeAssetSchema>;
-
 const NormalizedSettingSchema = z.number().min(0).max(1);
 
 export const DialogueBleepSoundSchema = z.object({
-  sourceRef: IdSchema,
+  assetId: AssetIdSchema,
   gain: NormalizedSettingSchema.default(1)
 }).strict();
 export type DialogueBleepSoundInput = z.input<typeof DialogueBleepSoundSchema>;
@@ -1511,9 +1543,12 @@ export type ContentAudioConfig = z.infer<typeof ContentAudioConfigSchema>;
 
 export const FontFaceDefinitionSchema = z
   .object({
-    id: IdSchema,
+    id: FontFaceIdSchema,
     family: z.string().min(1),
-    sourceRef: IdSchema,
+    source: z.discriminatedUnion("type", [
+      z.object({ type: z.literal("system"), family: z.string().min(1) }).strict(),
+      z.object({ type: z.literal("asset"), assetId: AssetIdSchema }).strict()
+    ]),
     weight: z.string().min(1).default("400"),
     style: z.enum(["normal", "italic", "oblique"]).default("normal")
   })
@@ -1641,8 +1676,8 @@ export const EvidenceDetailSchema = z.object({
 export type EvidenceDetail = z.infer<typeof EvidenceDetailSchema>;
 
 export const EvidenceVisualSchema = z.object({
-  iconAssetId: IdSchema.optional(),
-  thumbnailAssetId: IdSchema.optional(),
+  iconAssetId: AssetIdSchema.optional(),
+  thumbnailAssetId: AssetIdSchema.optional(),
   accentColor: z.string().optional()
 });
 export type EvidenceVisual = z.infer<typeof EvidenceVisualSchema>;
@@ -1702,7 +1737,7 @@ export const WorldMapDefSchema = z.object({
   cameraRig: CameraRigDefSchema.optional(),
   collisionProxyIds: z.array(IdSchema).default([]),
   interactables: z.array(InteractableDefSchema).default([]),
-  assetRefs: z.array(AssetRefSchema).default([])
+  requirements: z.array(AssetRequirementSchema).default([])
 });
 export type WorldMapDef = z.infer<typeof WorldMapDefSchema>;
 
@@ -1750,7 +1785,7 @@ export type PixiActorTransitionSnapshot = z.infer<typeof PixiActorTransitionSnap
 export const PixiActorSnapshotSchema = z.object({
   id: IdSchema,
   kind: PixiActorKindSchema,
-  appearance: IdSchema.optional(),
+  appearance: AssetIdSchema.optional(),
   appearanceExpression: z.string().default(""),
   pose: z.string().optional(),
   visible: z.boolean().default(true),
@@ -1907,7 +1942,7 @@ const PixiInnerBackgroundActorMapSchema = z
   .default({});
 
 export const PixiStageSnapshotSchema = z.object({
-  version: z.literal(5),
+  version: z.literal(6),
   revision: z.number().int().nonnegative().default(0),
   backgroundsById: z.record(IdSchema, PixiActorSnapshotSchema).default({}),
   innerBackgroundsById: PixiInnerBackgroundActorMapSchema,
@@ -2194,7 +2229,7 @@ export const SettingsDisplaySnapshotSchema = z
   .object({
     textSpeed: NormalizedSettingSchema.default(0.5),
     textSize: SettingsTextSizeSchema.default("medium"),
-    fontFamilyId: IdSchema.default("font:default")
+    fontFaceId: FontFaceIdSchema.default("default")
   })
   .strict();
 export type SettingsDisplaySnapshot = z.infer<typeof SettingsDisplaySnapshotSchema>;
@@ -2229,7 +2264,7 @@ const DEFAULT_SETTINGS_SYSTEM_SNAPSHOT = {
 const DEFAULT_SETTINGS_DISPLAY_SNAPSHOT = {
   textSpeed: 0.5,
   textSize: "medium",
-  fontFamilyId: "font:default"
+  fontFaceId: "default"
 } as const;
 
 const DEFAULT_SETTINGS_SOUND_SNAPSHOT = {
@@ -2249,7 +2284,7 @@ const DEFAULT_SETTINGS_AUTOMATION_SNAPSHOT = {
 
 export const SettingsSnapshotSchema = z
   .object({
-    version: z.literal(2),
+    version: z.literal(3),
     system: SettingsSystemSnapshotSchema.default(DEFAULT_SETTINGS_SYSTEM_SNAPSHOT),
     display: SettingsDisplaySnapshotSchema.default(DEFAULT_SETTINGS_DISPLAY_SNAPSHOT),
     sound: SettingsSoundSnapshotSchema.default(DEFAULT_SETTINGS_SOUND_SNAPSHOT),
@@ -2266,7 +2301,7 @@ export interface SettingsPatch {
 }
 
 export function createDefaultSettingsSnapshot(): SettingsSnapshot {
-  return SettingsSnapshotSchema.parse({ version: 2 });
+  return SettingsSnapshotSchema.parse({ version: 3 });
 }
 
 export const SaveModeSchema = z.enum(["vn", "navi", "trial"]);
@@ -2313,7 +2348,7 @@ export const VnEntryDefSchema = z
     initialScriptPath: z.string().min(1),
     startLabel: z.string().min(1).optional(),
     profile: VnPresentationProfileSchema.default("vn2d"),
-    assetRefs: z.array(AssetRefSchema).default([])
+    requirements: z.array(AssetRequirementSchema).default([])
   })
   .strict();
 export type VnEntryDef = z.infer<typeof VnEntryDefSchema>;
@@ -2328,19 +2363,34 @@ export const VnRuntimeScriptSourceSchema = z
 export type VnRuntimeScriptSource = z.infer<typeof VnRuntimeScriptSourceSchema>;
 export type VnRuntimeScriptCatalog = readonly VnRuntimeScriptSource[];
 
+export const VnPinpCheckpointSchema = z
+  .object({
+    assetId: AssetIdSchema,
+    alt: z.string(),
+    positionPercent: z.tuple([
+      z.number().finite().min(0).max(100),
+      z.number().finite().min(0).max(100)
+    ]),
+    heightPercent: z.number().finite().positive().max(100),
+    aspectRatio: z.tuple([z.number().finite().positive(), z.number().finite().positive()])
+  })
+  .strict();
+export type VnPinpCheckpoint = z.infer<typeof VnPinpCheckpointSchema>;
+
 export const VnUiCheckpointSchema = z
   .object({
     dialog: z.boolean(),
     commandBar: z.boolean(),
     toastLayer: z.boolean(),
-    cue: z.boolean()
+    cue: z.boolean(),
+    pinp: VnPinpCheckpointSchema.nullable()
   })
   .strict();
 export type VnUiCheckpoint = z.infer<typeof VnUiCheckpointSchema>;
 
 export const VnMediaBgmTrackSchema = z
   .object({
-    sourceRef: z.string().min(1),
+    assetId: AssetIdSchema,
     volume: z.number().finite()
   })
   .strict();
@@ -2348,7 +2398,7 @@ export type VnMediaBgmTrack = z.infer<typeof VnMediaBgmTrackSchema>;
 
 export const VnMediaSfxLoopSchema = z
   .object({
-    sourceRef: z.string().min(1),
+    assetId: AssetIdSchema,
     volume: z.number().finite(),
     group: z.string().min(1).optional()
   })
@@ -2382,7 +2432,7 @@ export type SaveableVnState = z.infer<typeof SaveableVnStateSchema>;
 
 export const SaveDataSchema = z
   .object({
-    version: z.literal(9),
+    version: z.literal(11),
     gameId: IdSchema,
     savedAt: z.string(),
     mode: SaveModeSchema,
@@ -2442,11 +2492,11 @@ export function createSaveSlotSummaryFromSaveData(id: string, label: string, dat
 }
 
 export const ContentManifestSchema = z.object({
-  version: z.literal(4),
-  assets: z.array(AssetRefSchema).default([]),
+  version: z.literal(5),
+  assets: z.array(AssetDefinitionSchema).default([]),
+  requirements: z.array(AssetRequirementSchema).default([]),
   audio: ContentAudioConfigSchema.optional(),
   fonts: z.array(FontFaceDefinitionSchema).default([]),
-  runtimeAssets: z.array(RuntimeAssetSchema).default([]),
   collisionProxies: z.array(CollisionProxySchema).default([]),
   input: InputBindingMapSchema.optional(),
   vnEntries: z.array(VnEntryDefSchema).default([]),

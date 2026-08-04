@@ -10,35 +10,35 @@ describe("R3F exploration render scheduling", () => {
 });
 
 describe("R3F stage asset resolution", () => {
-  it("resolves map model assets from id-only WorldMapDef.assetRefs", () => {
+  it("resolves map model assets from id-only WorldMapDef.requirements", () => {
     const calls: unknown[] = [];
-    const result = resolveMapModelAsset(mapWithAssets([{ id: "model:academy-hall", kind: "glb", tags: [] }]), {
+    const result = resolveMapModelAsset(mapWithAssets([{ id: "model/academy-hall", capability: "model" }]), {
       resolve(input) {
         calls.push(input);
         return { uri: "/resolved/academy-hall.gltf" };
       }
     });
 
-    expect(calls).toEqual([{ id: "model:academy-hall", kind: "glb" }]);
-    expect(result).toEqual({ assetId: "model:academy-hall", uri: "/resolved/academy-hall.gltf" });
+    expect(calls).toEqual([{ id: "model/academy-hall", capability: "model" }]);
+    expect(result).toEqual({ assetId: "model/academy-hall", uri: "/resolved/academy-hall.gltf" });
   });
 
   it("reports missing model assets through the existing fallback path", () => {
-    const result = resolveMapModelAsset(mapWithAssets([{ id: "model:missing", kind: "glb", tags: [] }]), {
+    const result = resolveMapModelAsset(mapWithAssets([{ id: "model/missing", capability: "model" }]), {
       resolve() {
         return { diagnostic: { code: "asset-missing", severity: "error", message: "missing model" } };
       }
     });
 
     expect(result).toEqual({
-      assetId: "model:missing",
+      assetId: "model/missing",
       fallbackReason: "asset-error",
       diagnostic: {
         source: "asset",
         code: "asset-missing",
         severity: "error",
-        assetId: "model:missing",
-        kind: "glb",
+        assetId: "model/missing",
+        capability: "model",
         message: "missing model"
       }
     });
@@ -49,12 +49,12 @@ describe("R3F stage asset resolution", () => {
   });
 });
 
-function mapWithAssets(assetRefs: WorldMapDef["assetRefs"]): WorldMapDef {
+function mapWithAssets(requirements: WorldMapDef["requirements"]): WorldMapDef {
   return {
     id: "map:test",
     name: "Test Map",
     spawn: [0, 1, 2],
-    assetRefs,
+    requirements,
     interactables: [],
     collisionProxyIds: []
   };

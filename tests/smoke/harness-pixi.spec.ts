@@ -47,11 +47,11 @@ test("harness Pixi command and layered-character visual flow", async ({ page }) 
   await page.screenshot({ path: "test-results/harness-pixi-snow-storm.png", fullPage: true });
 
   await advanceUntilText(page, "CHECKPOINT 01C");
-  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg:inner-academy-hall");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg/inner/academy-hall");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/harness-pixi-sun-blur.png", fullPage: true });
   await advanceUntilText(page, "CHECKPOINT 01D");
-  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg:inner-snow-outskirts");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg/inner/snow-outskirts");
   await page.waitForTimeout(250);
   await page.screenshot({ path: "test-results/harness-pixi-inback-real-image.png", fullPage: true });
 

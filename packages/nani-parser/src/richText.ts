@@ -1,7 +1,7 @@
 import { spanForSourcedRange, type SourcedText } from "./sourcedText.ts";
 import type { RichTextDocumentIR, RichTextRunIR, RichTextRunStyleIR, TextSpan } from "./types";
 
-const richTextIdPattern = /^[a-zA-Z0-9:_./-]+$/u;
+const fontFaceIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const safeColorPattern = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/u;
 const safeNamedColors = new Set([
   "black",
@@ -305,7 +305,7 @@ function parseFontRichTextTag(
   }
 
   if (face) {
-    if (!richTextIdPattern.test(face.value) || !face.value.startsWith("font:")) {
+    if (!fontFaceIdPattern.test(face.value)) {
       const diagnosticRange = attributeValueRange(face);
       return {
         diagnostic: {
@@ -315,7 +315,7 @@ function parseFontRichTextTag(
         }
       };
     }
-    style.fontId = face.value;
+    style.fontFaceId = face.value;
   }
 
   if (Object.keys(style).length === 0) {

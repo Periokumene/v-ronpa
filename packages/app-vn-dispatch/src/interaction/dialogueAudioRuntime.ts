@@ -7,7 +7,7 @@ export type DialogueAudioPacing = "normal" | "skip";
 export interface DialogueAudioRuntimeState {
   activeBleepLineKey?: string;
   activeBleepKey?: string;
-  activeBleepSourceRef?: string;
+  activeBleepAssetId?: string;
 }
 
 export interface DialogueAudioVoiceSettings {
@@ -29,7 +29,7 @@ export interface PlanDialogueLineAudioInput {
   speakerId?: string;
   textId?: string;
   voice: DialogueAudioVoiceSettings;
-  voiceAssetAvailable: boolean;
+  voiceAssetId?: string;
   continuation?: boolean;
 }
 
@@ -57,16 +57,16 @@ export function planDialogueLineAudio(
     ...stopped.effects,
     ...(input.continuation ? [] : [{ type: "stop-voice" as const }])
   ];
-  const hasAvailableVoice = Boolean(input.textId && input.voiceAssetAvailable);
+  const hasAvailableVoice = Boolean(input.textId && input.voiceAssetId);
 
   if (hasAvailableVoice) {
-    if (!input.continuation && input.pacing !== "skip" && input.textId && input.voice.volume > 0) {
-      const sourceRef = createVoiceAssetId(input.textId, input.voice.locale);
+    if (!input.continuation && input.pacing !== "skip" && input.textId && input.voiceAssetId && input.voice.volume > 0) {
+      const assetId = input.voiceAssetId;
       effects.push({
         type: "play-voice",
-        key: sourceRef,
+        key: assetId,
         textId: input.textId,
-        sourceRef,
+        assetId,
         volume: input.voice.volume
       });
     }
@@ -102,10 +102,6 @@ export function resolveDialogueBleepSound(
   return config.defaultSound ?? undefined;
 }
 
-export function createVoiceAssetId(textId: string, locale: string): string {
-  return `voice:${locale}:${textId}`;
-}
-
 function planDialogueBleepStart(
   state: DialogueAudioRuntimeState,
   input: PlanDialogueLineAudioInput
@@ -125,9 +121,9 @@ function planDialogueBleepStart(
     state: {
       activeBleepLineKey: input.lineKey,
       activeBleepKey: key,
-      activeBleepSourceRef: sound.sourceRef
+      activeBleepAssetId: sound.assetId
     },
-    effects: [{ type: "play-dialogue-bleep", key, sourceRef: sound.sourceRef, volume }]
+    effects: [{ type: "play-dialogue-bleep", key, assetId: sound.assetId, volume }]
   };
 }
 

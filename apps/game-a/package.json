@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node ../../scripts/validate-game-a-production.mjs",
+    "build": "vite build && node ../../scripts/validate-game-a-production.mjs && node ../../scripts/validate-app-asset-build.mjs game-a",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@v-ronpa/asset-project": "workspace:*",
     "@v-ronpa/app-vn-devtools": "workspace:*",
     "@v-ronpa/app-vn-runtime": "workspace:*",
     "@v-ronpa/app-vn-shell": "workspace:*",
@@ -19,7 +20,6 @@
     "@v-ronpa/gameplay": "workspace:*",
     "@v-ronpa/layered-character": "workspace:*",
     "@v-ronpa/media-save": "workspace:*",
-    "@v-ronpa/runtime-assets-pixi": "workspace:*",
     "@v-ronpa/ui-kit": "workspace:*",
     "@xstate/react": "^6.1.0",
     "react": "^19.0.0",

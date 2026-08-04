@@ -144,7 +144,7 @@ describe("diagnostics", () => {
   });
 
   it("does not flag colon-form resource IDs as ignored primary values", () => {
-    for (const source of ["@bgm bgm:main", "@sfx sfx:door", "@back bg:room"]) {
+    for (const source of ["@bgm bgm/main", "@sfx sfx/door", "@back bg/room"]) {
       expect(
         computeNaniDiagnostics(source, "resource-primary.nani").filter(
           (diagnostic) => diagnostic.code === "ignored-promoted-primary"
@@ -154,7 +154,7 @@ describe("diagnostics", () => {
   });
 
   it("preserves compiler diagnostic codes and exact command/argument spans", () => {
-    const source = ["@voice voice:line", "@sfx sfx:door wait!"].join("\n");
+    const source = ["@voice voice/line", "@sfx sfx/door wait!"].join("\n");
     const diagnostics = computeNaniDiagnostics(source, "compat.nani");
     const declaredOnly = requiredDiagnostic(
       diagnostics,

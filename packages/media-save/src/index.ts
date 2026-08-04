@@ -2,7 +2,7 @@ import Dexie, { type EntityTable } from "dexie";
 import { Howl } from "howler";
 import { SaveDataSchema, createSaveSlotSummaryFromSaveData, type SaveData, type SaveSlotSummary } from "@v-ronpa/contracts";
 
-export type SaveOperationErrorCode = "invalid-save" | "storage-failed";
+export type SaveOperationErrorCode = "invalid-save" | "storage-failed" | "unsupported-version";
 
 export interface SaveOperationError {
   code: SaveOperationErrorCode;
@@ -136,6 +136,15 @@ interface SaveSlotPreviewRecord {
   blob: Blob;
 }
 
+export class UnsupportedSaveVersionError extends Error {
+  readonly code = "unsupported-version" as const;
+
+  constructor(readonly actualVersion: unknown) {
+    super(`SaveData version ${String(actualVersion)} is unsupported; expected version 11.`);
+    this.name = "UnsupportedSaveVersionError";
+  }
+}
+
 interface SaveDbShape extends Dexie {
   slots: EntityTable<SaveSlotIndexRecord, "id">;
   payloads: EntityTable<SaveSlotPayloadRecord, "slotId">;
@@ -143,6 +152,14 @@ interface SaveDbShape extends Dexie {
 }
 
 export function parseSaveData(value: unknown): SaveData {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "version" in value &&
+    value.version !== 11
+  ) {
+    throw new UnsupportedSaveVersionError(value.version);
+  }
   return SaveDataSchema.parse(value);
 }
 
@@ -447,7 +464,7 @@ function fail(error: SaveOperationError): SaveOperationResult<never> {
 function saveError(cause: unknown, fallbackCode: SaveOperationErrorCode = "invalid-save"): SaveOperationError {
   const message = cause instanceof Error ? cause.message : "Save operation failed.";
   return {
-    code: fallbackCode,
+    code: cause instanceof UnsupportedSaveVersionError ? cause.code : fallbackCode,
     message,
     cause
   };

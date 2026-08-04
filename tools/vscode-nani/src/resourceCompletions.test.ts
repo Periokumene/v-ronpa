@@ -4,40 +4,41 @@ import type { NaniProjectAssetIndex } from "./projectAssets";
 
 const projectAssets: NaniProjectAssetIndex = {
   assets: [
-    { id: "alice", kind: "character-pack", optimizedUri: "/game/characters/alice/character.json" },
-    { id: "bg:hall", kind: "background", optimizedUri: "/game/backgrounds/hall.png" },
-    { id: "bgm:main", kind: "bgm", optimizedUri: "/game/media/bgm/main.ogg" },
-    { id: "sfx:door", kind: "sfx", optimizedUri: "/game/media/sfx/door.ogg" },
-    { id: "video:intro", kind: "video", optimizedUri: "/game/media/video/intro.mp4" }
+    { id: "char/alice", mimeType: "application/json", uri: "assets/char/alice/character.json" },
+    { id: "bg/hall", mimeType: "image/png", uri: "assets/bg/hall.png" },
+    { id: "bgm/main", mimeType: "audio/ogg", uri: "assets/bgm/main.ogg" },
+    { id: "sfx/door", mimeType: "audio/ogg", uri: "assets/sfx/door.ogg" },
+    { id: "video/intro", mimeType: "video/mp4", uri: "assets/video/intro.mp4" }
   ],
+  characters: [{ characterId: "alice", assetId: "char/alice" }],
   characterTokens: {
     alice: ["Default", "EYE0", "EYE1", "MOUTH0"]
   }
 };
 
 describe("project resource completions", () => {
-  it("combines primary assets and runtime-consumed params at an empty primary", () => {
+  it("combines MIME-capable assets and runtime-consumed params at an empty primary", () => {
     const source = "@bgm ";
     const completions = getNaniCompletions(source, { line: 0, character: source.length }, projectAssets);
     const labels = completions.map((completion) => completion.label);
 
-    expect(labels).toContain("bgm:main");
+    expect(labels).toContain("bgm/main");
     expect(labels).toContain("volume:");
-    expect(labels).not.toContain("sfx:door");
+    expect(labels).toContain("sfx/door");
     expect(labels).not.toContain("loop!");
   });
 
-  it("completes colon-form primary IDs and named path params", () => {
-    const primary = "@sfx sfx:d";
+  it("completes slash-form primary IDs and named path params", () => {
+    const primary = "@sfx sfx/d";
     expect(getNaniCompletions(primary, { line: 0, character: primary.length }, projectAssets).map(item => item.label)).toEqual([
-      "sfx:door"
+      "sfx/door"
     ]);
 
-    const named = "@movie moviePath:video:i";
+    const named = "@movie moviePath:video/i";
     const completion = getNaniCompletions(named, { line: 0, character: named.length }, projectAssets)[0];
     expect(completion).toMatchObject({
-      label: "video:intro",
-      insertText: "video:intro",
+      label: "video/intro",
+      insertText: "video/intro",
       range: {
         start: { line: 0, character: "@movie moviePath:".length },
         end: { line: 0, character: named.length }
@@ -46,10 +47,10 @@ describe("project resource completions", () => {
   });
 
   it("completes a primary resource after already-entered named params", () => {
-    const source = "@bgm group:music bgm:m";
+    const source = "@bgm group:music bgm/m";
     const completions = getNaniCompletions(source, { line: 0, character: source.length }, projectAssets);
 
-    expect(completions.map((completion) => completion.label)).toEqual(["bgm:main"]);
+    expect(completions.map((completion) => completion.label)).toEqual(["bgm/main"]);
     expect(completions[0]?.range).toEqual({
       start: { line: 0, character: "@bgm group:music ".length },
       end: { line: 0, character: source.length }

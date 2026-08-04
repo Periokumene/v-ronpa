@@ -1,7 +1,7 @@
-import type { RuntimeAssetKind } from "@v-ronpa/contracts";
+import type { AssetCapability } from "@v-ronpa/contracts";
 import { getNaniCommandDefinition } from "@v-ronpa/contracts";
 import { lineAt, type NaniPosition, type NaniRange } from "./documentContext";
-import { assetsOfKind, type NaniProjectAssetIndex } from "./projectAssets";
+import { assetsOfCapability, type NaniProjectAssetIndex } from "./projectAssets";
 
 export interface NaniResourceCompletion {
   label: string;
@@ -26,36 +26,10 @@ export interface NaniResourceCompletionResult {
 }
 
 interface ResourceSlot {
-  kind: RuntimeAssetKind;
+  capability: AssetCapability;
   character: boolean;
   characterCompletionPreview: boolean;
 }
-
-const primarySlots: Readonly<Record<string, ResourceSlot>> = {
-  back: slot("background"),
-  inback: slot("background"),
-  bgm: slot("bgm"),
-  stopbgm: slot("bgm"),
-  sfx: slot("sfx"),
-  sfxfast: slot("sfx"),
-  stopsfx: slot("sfx"),
-  movie: slot("video"),
-  char: slot("character-pack", true, true),
-  slide: slot("character-pack", true)
-};
-
-const paramSlots: Readonly<Record<string, Readonly<Record<string, ResourceSlot>>>> = {
-  back: { appearanceandtransition: slot("background"), appearance: slot("background") },
-  inback: { appearanceandtransition: slot("background"), appearance: slot("background") },
-  bgm: { bgmpath: slot("bgm") },
-  stopbgm: { bgmpath: slot("bgm") },
-  sfx: { sfxpath: slot("sfx") },
-  sfxfast: { sfxpath: slot("sfx") },
-  stopsfx: { sfxpath: slot("sfx") },
-  movie: { moviepath: slot("video") },
-  char: { idandappearance: slot("character-pack", true, true) },
-  slide: { idandappearance: slot("character-pack", true) }
-};
 
 export function getNaniResourceCompletions(
   sourceText: string,
@@ -66,7 +40,8 @@ export function getNaniResourceCompletions(
   const before = line.slice(0, Math.min(position.character, line.length));
   const match = /^\s*@([A-Za-z_<>][A-Za-z0-9_<>-]*)(?:\s+(.*))?$/u.exec(before);
   const commandId = normalize(match?.[1] ?? "");
-  if (!commandId || !primarySlots[commandId]) return undefined;
+  const primary = resourceSlot(commandId);
+  if (!commandId || !primary) return undefined;
 
   const args = match?.[2];
   const tokenStart = currentTokenStart(before);
@@ -80,7 +55,6 @@ export function getNaniResourceCompletions(
 
   const hasCompletedPrimary = containsCompletedPrimary(commandId, completedPrefix);
   if (hasCompletedPrimary) return undefined;
-  const primary = primarySlots[commandId];
   return resourceResult(index, primary, token, position.line, tokenStart, before.length, token.length === 0);
 }
 
@@ -122,14 +96,14 @@ function resourceResult(
   }
   const prefix = rawPrefix.toLowerCase();
   return {
-    completions: assetsOfKind(index, resourceSlot.kind)
+    completions: assetsOfCapability(index, resourceSlot.capability)
       .filter((asset) => asset.id.toLowerCase().startsWith(prefix))
       .map((asset, assetIndex) => ({
         label: asset.id,
         insertText: asset.id,
         range: range(line, start, end),
-        detail: `${asset.kind} · generated project asset`,
-        documentation: asset.optimizedUri,
+        detail: `${asset.mimeType} · App asset`,
+        documentation: asset.uri,
         sortText: `0-${assetIndex.toString().padStart(4, "0")}`
       })),
     combineWithParams
@@ -149,14 +123,14 @@ function characterResult(
   if (dot < 0) {
     const prefix = rawPrefix.toLowerCase();
     return {
-      completions: assetsOfKind(index, "character-pack")
-        .filter((asset) => asset.id.toLowerCase().startsWith(prefix))
-        .map((asset, assetIndex) => ({
-          label: asset.id,
-          insertText: asset.id,
+      completions: index.characters
+        .filter((character) => character.characterId.toLowerCase().startsWith(prefix))
+        .map((character, assetIndex) => ({
+          label: character.characterId,
+          insertText: character.characterId,
           range: range(line, start, end),
-          detail: "character-pack · generated project asset",
-          documentation: asset.optimizedUri,
+          detail: "character · App JSON asset",
+          documentation: character.assetId,
           sortText: `0-${assetIndex.toString().padStart(4, "0")}`
         })),
       combineWithParams
@@ -195,17 +169,34 @@ function characterResult(
 function paramSlot(commandId: string, token: string): { slot: ResourceSlot; prefix: string; valueOffset: number } | undefined {
   const colon = token.indexOf(":");
   if (colon <= 0) return undefined;
-  const resourceSlot = paramSlots[commandId]?.[normalize(token.slice(0, colon))];
+  const resourceSlot = resourceSlotForParam(commandId, token.slice(0, colon));
   if (!resourceSlot) return undefined;
   return { slot: resourceSlot, prefix: token.slice(colon + 1), valueOffset: colon + 1 };
 }
 
-function slot(
-  kind: RuntimeAssetKind,
-  character = false,
-  characterCompletionPreview = false
-): ResourceSlot {
-  return { kind, character, characterCompletionPreview };
+function resourceSlot(commandId: string): ResourceSlot | undefined {
+  const definition = getNaniCommandDefinition(commandId);
+  const param = definition?.params.find((candidate) => candidate.resource);
+  if (!param?.resource) return undefined;
+  return {
+    capability: param.resource.capability,
+    character: param.resource.resolution === "character-id",
+    characterCompletionPreview: commandId === "char"
+  };
+}
+
+function resourceSlotForParam(commandId: string, paramName: string): ResourceSlot | undefined {
+  const definition = getNaniCommandDefinition(commandId);
+  const normalized = normalize(paramName);
+  const param = definition?.params.find((candidate) =>
+    [candidate.name, ...(candidate.aliases ?? [])].some((name) => normalize(name) === normalized)
+  );
+  if (!param?.resource) return undefined;
+  return {
+    capability: param.resource.capability,
+    character: param.resource.resolution === "character-id",
+    characterCompletionPreview: commandId === "char"
+  };
 }
 
 function range(line: number, start: number, end: number): NaniRange {

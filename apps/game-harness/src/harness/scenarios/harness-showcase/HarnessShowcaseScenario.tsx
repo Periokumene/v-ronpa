@@ -10,6 +10,7 @@ import {
   useGameSettingsAdapter,
   usePixiStageReadiness
 } from "@v-ronpa/app-vn-shell";
+import { harnessCharacterAssetIdByCharacterId } from "../../generatedAssets";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
 import type { GameplayState } from "@v-ronpa/gameplay";
 import { SAVE_SLOT_THUMBNAIL_CAPTURE_OPTIONS } from "@v-ronpa/media-save";
@@ -31,7 +32,10 @@ type DebugTabId = "runtime" | "inspector";
 export function HarnessShowcaseScenario() {
   const flowActor = useGameFlowActor();
   const settings = useGameSettingsAdapter();
-  const assetRegistry = useMemo(() => createAssetRegistry(harnessContentManifest), []);
+  const assetRegistry = useMemo(
+    () => createAssetRegistry(harnessContentManifest, { baseUri: import.meta.env.BASE_URL }),
+    []
+  );
   const storyPlayTiming = useMemo(() => settingsToStoryPlayTimingPolicy(settings.settings), [settings.settings]);
   const storyTextDisplay = useMemo(() => settingsToStoryTextDisplaySettings(settings.settings), [settings.settings]);
   const storyTextRevealSettings = useMemo(() => ({ textSpeed: storyTextDisplay.textSpeed }), [storyTextDisplay.textSpeed]);
@@ -96,6 +100,7 @@ export function HarnessShowcaseScenario() {
               active={flow.mode !== "trial" && runtime.shell.storyRuntime.active}
               assetResolver={assetRegistry}
               characterOutlineEnabled={true}
+              characterAssetIdByCharacterId={harnessCharacterAssetIdByCharacterId}
               characterPreloadPlan={harnessShowcaseCharacterPreloadPlan}
               diagnostics={runtime.diagnostics}
               presentation={runtime.presentation}

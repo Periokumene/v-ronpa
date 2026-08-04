@@ -73,7 +73,7 @@ export interface RichTextRunStyleIR {
   color?: string;
   markColor?: string;
   sizeScale?: number;
-  fontId?: string;
+  fontFaceId?: string;
   verticalAlign?: "sub" | "sup";
 }
 
@@ -120,12 +120,6 @@ export interface CommentIR {
 
 export type StatementIR = CommandIR | TextIR | LabelIR | CommentIR;
 
-export interface AssetRef {
-  id: string;
-  kind: string;
-  uri?: string;
-}
-
 export interface ScriptDependency {
   endpoint: string;
 }
@@ -134,6 +128,5 @@ export interface ScenarioIR {
   scriptPath: string;
   statements: StatementIR[];
   labels: Record<string, number>;
-  assets: AssetRef[];
   dependencies: ScriptDependency[];
 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0
+
+- Split project discovery between App-owned `asset.config.mjs` and sibling
+  `nani.config.mjs` without changing logical entry or script identities.
+- Switched asset completion and character previews to the shared App-relative
+  asset scanner, slash AssetIds, MIME capabilities, and explicit CharacterId
+  bindings; removed generated-module and business-kind parsing.
+- Added catalog-driven resource binding completion for image, audio, video,
+  model, font, JSON, PinP, and character parameters.
+
 ## 0.7.0
 
 - Hard-cut project config, recursive catalog discovery, parse/compile/link,

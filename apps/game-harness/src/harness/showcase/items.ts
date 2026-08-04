@@ -15,8 +15,8 @@ export const harnessShowcaseEvidence: EvidenceDef = {
   description: "A placeholder evidence object shown in Inspector Lite during the harness showcase.",
   details: [],
   visual: {
-    thumbnailAssetId: "texture:evidence:keycard-thumbnail",
-    iconAssetId: "texture:evidence:keycard-thumbnail",
+    thumbnailAssetId: "thumb/evidence-keycard",
+    iconAssetId: "thumb/evidence-keycard",
     accentColor: "#ffd166"
   },
   tags: ["harness", "harness-showcase"]

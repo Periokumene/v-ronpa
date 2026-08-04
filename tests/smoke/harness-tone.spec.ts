@@ -81,7 +81,7 @@ test("global character tone presets, cleanup, and save restore stay on the canon
   await expectTone(page, "none");
   await advanceUntilText(page, "CHECKPOINT TONE 10");
   await expectTone(page, "none");
-  await expect(page.getByTestId("harness-showcase-pixi-background")).toHaveText("bg:harness");
+  await expect(page.getByTestId("harness-showcase-pixi-background")).toHaveText("bg/showcase");
   await expect(page.getByTestId("harness-showcase-pixi-characters")).toContainText("[visible]");
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
   await expectNoRuntimeAssetDiagnostics(page);

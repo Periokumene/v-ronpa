@@ -390,9 +390,9 @@ export function SettingsOverlay({ embedded = false, onClose, onPatchSettings, on
           <SettingsOptionStepper
             label="Textbox font"
             testId="settings-display-font"
-            value={settings.display.fontFamilyId}
-            options={[["font:default", "Default"]]}
-            onChange={(fontFamilyId) => onPatchSettings({ display: { fontFamilyId } })}
+            value={settings.display.fontFaceId}
+            options={[["default", "Default"]]}
+            onChange={(fontFaceId) => onPatchSettings({ display: { fontFaceId } })}
           />
         </section>
 

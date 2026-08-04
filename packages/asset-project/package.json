@@ -1,0 +1,16 @@
+{
+  "name": "@v-ronpa/asset-project",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite": "./src/vite.ts"
+  },
+  "dependencies": {
+    "@v-ronpa/contracts": "workspace:*"
+  },
+  "peerDependencies": {
+    "vite": "^7.0.0"
+  }
+}

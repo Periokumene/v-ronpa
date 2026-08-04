@@ -86,7 +86,7 @@ describe("layered character preview pack loading", () => {
   });
 
   it("assembles the real Alice default and multi-token compositions", async () => {
-    const root = resolve(process.cwd(), "../../apps/game-a/public/game-a/characters/alice");
+    const root = resolve(process.cwd(), "../../apps/game-a/assets/char/alice");
     const descriptor = { id: "alice", rootPath: root, characterPath: join(root, "character.json") };
     const defaultPreview = await loadResolvedCharacterPreview(descriptor, request(""));
     const expressionPreview = await loadResolvedCharacterPreview(
@@ -108,7 +108,7 @@ describe("layered character preview pack loading", () => {
   });
 
   it("renders a real Alice component contribution alongside the complete projection", async () => {
-    const root = resolve(process.cwd(), "../../apps/game-a/public/game-a/characters/alice");
+    const root = resolve(process.cwd(), "../../apps/game-a/assets/char/alice");
     const descriptor = { id: "alice", rootPath: root, characterPath: join(root, "character.json") };
     const completion = await loadResolvedCharacterCompletionPreview(
       descriptor,
@@ -124,7 +124,7 @@ describe("layered character preview pack loading", () => {
   });
 
   it("assembles the real Alice Kid pack discovered from generated assets", async () => {
-    const root = resolve(process.cwd(), "../../apps/game-a/public/game-a/characters/alice-kid");
+    const root = resolve(process.cwd(), "../../apps/game-a/assets/char/alice-kid");
     const descriptor = { id: "alice-kid", rootPath: root, characterPath: join(root, "character.json") };
     const preview = await loadResolvedCharacterPreview(descriptor, {
       ...request("body0,effect2"),

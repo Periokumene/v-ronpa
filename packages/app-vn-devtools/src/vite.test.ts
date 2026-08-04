@@ -25,6 +25,7 @@ const project: NaniProjectConfig = {
   testEntries: {},
   voiceLocales: []
 };
+const emptyAssetBindings = { appId: "game", assets: [], characterAssetIdByCharacterId: {} } as const;
 
 describe("Nani devtools Vite snapshot bridge", () => {
   it("serves a complete production+development snapshot and omits it from builds", async () => {
@@ -37,7 +38,8 @@ describe("Nani devtools Vite snapshot bridge", () => {
       project,
       entry: project.mainEntry,
       scopes: ["production", "development"],
-      root
+      root,
+      assetBindings: emptyAssetBindings
     });
     callConfigResolved(plugin, "serve");
     const resolved = callResolveId(plugin, NANI_DEVTOOLS_VITE_SNAPSHOT_MODULE_ID);
@@ -91,7 +93,8 @@ describe("Nani devtools Vite snapshot bridge", () => {
       project,
       entry: project.mainEntry,
       scopes: ["production"],
-      root
+      root,
+      assetBindings: emptyAssetBindings
     });
     callConfigResolved(plugin, "build");
 
@@ -107,7 +110,8 @@ describe("Nani devtools Vite snapshot bridge", () => {
       project,
       entry: project.mainEntry,
       scopes: ["production"],
-      root
+      root,
+      assetBindings: emptyAssetBindings
     });
     callConfigResolved(plugin, "serve");
     const handlers = new Map<string, (file: string) => void>();
@@ -144,7 +148,8 @@ async function loadSnapshot(root: string): Promise<NaniDevtoolsViteSnapshot> {
     project,
     entry: project.mainEntry,
     scopes: ["production"],
-    root
+    root,
+    assetBindings: emptyAssetBindings
   });
   callConfigResolved(plugin, "serve");
   return parseDefaultExport(await callLoad(plugin, callResolveId(plugin, NANI_DEVTOOLS_VITE_SNAPSHOT_MODULE_ID)));

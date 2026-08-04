@@ -15,6 +15,7 @@ import type { PixiAssetResolver, PixiPresenterDiagnostic } from "./internal/asse
 import { PresentationTaskController, type PixiPresentationTaskSnapshot } from "./internal/presentationTasks";
 import { type PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
 import type { LayeredCharacterPreloadPlan } from "@v-ronpa/layered-character";
+import type { AssetId } from "@v-ronpa/contracts";
 
 export type { PixiPresentationTaskSnapshot } from "./internal/presentationTasks";
 export type { LayeredCharacterPreloadPlan } from "@v-ronpa/layered-character";
@@ -25,6 +26,7 @@ export interface PixiPresenterOptions {
   active: boolean;
   characterOutlineEnabled: boolean;
   characterPreloadPlan: LayeredCharacterPreloadPlan;
+  characterAssetIdByCharacterId: Readonly<Record<string, AssetId>>;
   width?: number;
   height?: number;
   onTasksChanged?: (tasks: PixiPresentationTaskSnapshot[]) => void;
@@ -145,7 +147,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
       initialized = false;
       return;
     }
-    await preloadBuiltInPixiFxAssets(options.assetResolver, options.onDiagnostic);
+    await preloadBuiltInPixiFxAssets();
     if (destroyed) {
       if (initialized) {
         app.destroy(true);
@@ -161,6 +163,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
       width: size.width,
       height: size.height,
       characterOutlineEnabled: options.characterOutlineEnabled,
+      characterAssetIdByCharacterId: options.characterAssetIdByCharacterId,
       renderer: app.renderer,
       ...(options.assetResolver ? { assetResolver: options.assetResolver } : {}),
       ...(options.onDiagnostic ? { onDiagnostic: options.onDiagnostic } : {})

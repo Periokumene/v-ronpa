@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from "react";
-import type { FontFaceDefinition, RuntimeAsset, RuntimeAssetFormat } from "@v-ronpa/contracts";
+import type { AssetDefinition, AssetRequirement, FontFaceDefinition } from "@v-ronpa/contracts";
 import { richTextFontCssVariableName } from "./RichTextRenderer";
 
 export interface RichTextFontAssetResolver {
-  resolve(input: { id: string; kind: "font" }): {
-    asset?: Pick<RuntimeAsset, "format"> | undefined;
-    uri?: string | undefined;
-    diagnostic?: { message: string } | undefined;
+  resolve(input: AssetRequirement): {
+    asset?: Pick<AssetDefinition, "mimeType">;
+    uri?: string;
+    diagnostic?: { message: string };
   };
 }
 
@@ -14,8 +14,8 @@ export interface RichTextFontDiagnostic {
   code: "font-asset-unresolved" | "font-asset-format-unsupported";
   severity: "warning" | "error";
   message: string;
-  fontId: string;
-  sourceRef: string;
+  fontFaceId: string;
+  assetId: string;
 }
 
 export interface RichTextFontCssResult {
@@ -33,13 +33,13 @@ export interface RichTextFontRuntimeDiagnostic {
   severity: "warning" | "error";
   message: string;
   assetId: string;
-  kind: "font";
-  fontId: string;
+  capability: "font";
+  fontFaceId: string;
 }
 
 export interface RichTextFontStylesProps extends CreateRichTextFontCssInput {
-  onDiagnostic?: ((diagnostic: RichTextFontRuntimeDiagnostic) => void) | undefined;
-  testId?: string | undefined;
+  onDiagnostic?: (diagnostic: RichTextFontRuntimeDiagnostic) => void;
+  testId?: string;
 }
 
 export function createRichTextFontCss({ fonts, assetResolver }: CreateRichTextFontCssInput): RichTextFontCssResult {
@@ -48,45 +48,47 @@ export function createRichTextFontCss({ fonts, assetResolver }: CreateRichTextFo
   const variables: string[] = [];
 
   for (const font of fonts) {
-    const resolved = assetResolver.resolve({ id: font.sourceRef, kind: "font" });
+    const family = cssString(font.family);
+    variables.push(`  ${richTextFontCssVariableName(font.id)}: ${family};`);
+    if (font.source.type === "system") continue;
+
+    const resolved = assetResolver.resolve({ id: font.source.assetId, capability: "font" });
     if (!resolved.asset || !resolved.uri) {
       diagnostics.push({
         code: "font-asset-unresolved",
         severity: "warning",
-        fontId: font.id,
-        sourceRef: font.sourceRef,
-        message: resolved.diagnostic?.message ?? `Font asset '${font.sourceRef}' could not be resolved.`
+        fontFaceId: font.id,
+        assetId: font.source.assetId,
+        message: resolved.diagnostic?.message ?? `Font asset '${font.source.assetId}' could not be resolved.`
       });
       continue;
     }
-    if (!isFontFormat(resolved.asset.format)) {
+    const format = fontFormatForMime(resolved.asset.mimeType);
+    if (!format) {
       diagnostics.push({
         code: "font-asset-format-unsupported",
         severity: "warning",
-        fontId: font.id,
-        sourceRef: font.sourceRef,
-        message: `Font asset '${font.sourceRef}' uses unsupported format '${resolved.asset.format}'.`
+        fontFaceId: font.id,
+        assetId: font.source.assetId,
+        message: `Font asset '${font.source.assetId}' uses unsupported MIME '${resolved.asset.mimeType}'.`
       });
       continue;
     }
-
-    const family = cssString(font.family);
-    fontFaces.push(
-      [
-        "@font-face {",
-        `  font-family: ${family};`,
-        `  src: ${fontSource(resolved.uri, resolved.asset.format)};`,
-        `  font-weight: ${font.weight};`,
-        `  font-style: ${font.style};`,
-        "  font-display: swap;",
-        "}"
-      ].join("\n")
-    );
-    variables.push(`  ${richTextFontCssVariableName(font.id)}: ${family};`);
+    fontFaces.push([
+      "@font-face {",
+      `  font-family: ${family};`,
+      `  src: url(${cssUrl(resolved.uri)}) format("${format}");`,
+      `  font-weight: ${font.weight};`,
+      `  font-style: ${font.style};`,
+      "  font-display: swap;",
+      "}"
+    ].join("\n"));
   }
 
   return {
-    cssText: [...fontFaces, variables.length > 0 ? `:root {\n${variables.join("\n")}\n}` : ""].filter(Boolean).join("\n"),
+    cssText: [...fontFaces, variables.length > 0 ? `:root {\n${variables.join("\n")}\n}` : ""]
+      .filter(Boolean)
+      .join("\n"),
     diagnostics
   };
 }
@@ -102,14 +104,7 @@ export function RichTextFontStyles({
   useEffect(() => {
     if (!onDiagnostic) return;
     for (const diagnostic of result.diagnostics) {
-      onDiagnostic({
-        code: diagnostic.code,
-        severity: diagnostic.severity,
-        message: diagnostic.message,
-        assetId: diagnostic.sourceRef,
-        kind: "font",
-        fontId: diagnostic.fontId
-      });
+      onDiagnostic({ ...diagnostic, capability: "font" });
     }
   }, [onDiagnostic, result.diagnostics]);
 
@@ -117,27 +112,34 @@ export function RichTextFontStyles({
     if (!onDiagnostic || typeof document === "undefined" || !document.fonts) return;
     let cancelled = false;
     for (const font of fonts) {
+      if (font.source.type !== "asset") continue;
+      const assetId = font.source.assetId;
       void document.fonts
-        .load(`${font.style} ${font.weight} 16px ${fontLoadFamily(font.family)}`)
-        .then(() => undefined)
+        .load(`${font.style} ${font.weight} 16px ${cssString(font.family)}`)
         .catch((error: unknown) => {
           if (cancelled) return;
           onDiagnostic({
             code: "font-load-failed",
             severity: "warning",
             message: `Font '${font.id}' failed to load: ${error instanceof Error ? error.message : String(error)}`,
-            assetId: font.sourceRef,
-            kind: "font",
-            fontId: font.id
+            assetId,
+            capability: "font",
+            fontFaceId: font.id
           });
         });
     }
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [fonts, onDiagnostic]);
 
   return result.cssText ? <style data-testid={testId}>{result.cssText}</style> : null;
+}
+
+function fontFormatForMime(mimeType: string): string | undefined {
+  if (mimeType === "font/woff") return "woff";
+  if (mimeType === "font/woff2") return "woff2";
+  if (mimeType === "font/ttf") return "truetype";
+  if (mimeType === "font/otf") return "opentype";
+  return undefined;
 }
 
 function cssString(value: string): string {
@@ -146,22 +148,4 @@ function cssString(value: string): string {
 
 function cssUrl(value: string): string {
   return `"${value.replace(/\\/gu, "\\\\").replace(/"/gu, "\\\"")}"`;
-}
-
-function fontSource(uri: string, format: RuntimeAssetFormat): string {
-  return `url(${cssUrl(uri)}) format("${fontFormat(format)}")`;
-}
-
-function isFontFormat(format: RuntimeAssetFormat): boolean {
-  return format === "woff" || format === "woff2" || format === "ttf" || format === "otf";
-}
-
-function fontFormat(format: RuntimeAssetFormat): string {
-  if (format === "ttf") return "truetype";
-  if (format === "otf") return "opentype";
-  return format;
-}
-
-function fontLoadFamily(family: string): string {
-  return cssString(family);
 }

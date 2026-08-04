@@ -15,6 +15,7 @@ import {
 } from "pixi.js";
 import { GodrayFilter, KawaseBlurFilter } from "pixi-filters";
 import type {
+  AssetId,
   PixiActorSnapshot,
   PixiCharacterToneSnapshot,
   PixiRainCommandParams,
@@ -51,6 +52,7 @@ export interface PixiPresenterSystemsOptions {
 
 interface PixiActorSystemOptions extends PixiPresenterSystemsOptions {
   characterOutlineEnabled: boolean;
+  characterAssetIdByCharacterId: Readonly<Record<string, AssetId>>;
 }
 
 interface ActorRecord {
@@ -1076,7 +1078,7 @@ export class ActorSystem {
     container.addChild(fallback.container);
     this.relayoutBackground(layout);
     const backgroundId = actor.appearance;
-    const backgroundUrl = backgroundId ? resolvePixiAsset(this.options.assetResolver, { id: backgroundId, kind: "background" }, this.options.onDiagnostic) : undefined;
+    const backgroundUrl = backgroundId ? resolvePixiAsset(this.options.assetResolver, { id: backgroundId, capability: "image" }, this.options.onDiagnostic) : undefined;
     if (backgroundId && backgroundUrl) {
       const sprite = new Sprite(Texture.EMPTY);
       sprite.visible = false;
@@ -1092,7 +1094,7 @@ export class ActorSystem {
           fallback.container.visible = false;
         })
         .catch((error) => {
-          this.options.onDiagnostic?.(pixiAssetLoadFailed({ id: backgroundId, kind: "background" }, error));
+          this.options.onDiagnostic?.(pixiAssetLoadFailed({ id: backgroundId, capability: "image" }, error));
           fallback.container.visible = true;
         });
     }
@@ -1131,7 +1133,7 @@ export class ActorSystem {
     this.relayoutInnerBackground(layout);
 
     const backgroundId = actor.appearance;
-    const backgroundUrl = backgroundId ? resolvePixiAsset(this.options.assetResolver, { id: backgroundId, kind: "background" }, this.options.onDiagnostic) : undefined;
+    const backgroundUrl = backgroundId ? resolvePixiAsset(this.options.assetResolver, { id: backgroundId, capability: "image" }, this.options.onDiagnostic) : undefined;
     if (backgroundId && backgroundUrl) {
       const sprite = new Sprite(Texture.EMPTY);
       sprite.visible = false;
@@ -1147,7 +1149,7 @@ export class ActorSystem {
           fallback.container.visible = false;
         })
         .catch((error) => {
-          this.options.onDiagnostic?.(pixiAssetLoadFailed({ id: backgroundId, kind: "background" }, error));
+          this.options.onDiagnostic?.(pixiAssetLoadFailed({ id: backgroundId, capability: "image" }, error));
           fallback.container.visible = true;
         });
     }
@@ -1973,7 +1975,7 @@ function colorFromId(id: string): number {
 }
 
 function backgroundStyleFromId(id: string): { color: number; alpha: number; strokeAlpha: number } {
-  if (id === "bg:black" || id === "bg:solid-black") return { color: 0x000000, alpha: 1, strokeAlpha: 0.22 };
+  if (id === "bg/black" || id === "bg/solid-black") return { color: 0x000000, alpha: 1, strokeAlpha: 0.22 };
   return { color: colorFromId(id), alpha: 0.78, strokeAlpha: 0.28 };
 }
 

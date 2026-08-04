@@ -95,7 +95,7 @@ the existing full-stage `@back` background path.
 
 Required regression cases:
 
-- Normal path: `@inback bg:x effect:fade time:0.2 wait!` compiles and reduces to
+- Normal path: `@inback bg/inner/x effect:fade time:0.2 wait!` compiles and reduces to
   `innerBackgroundsById.InnerBackground`.
 - Boundary or rejection path: unsupported v1 params warn; old SaveData before
   v7 and Pixi snapshot v4 reject.

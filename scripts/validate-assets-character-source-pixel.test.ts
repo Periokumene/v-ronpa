@@ -16,16 +16,16 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("shipped character-pack source-pixel validation", () => {
   it("accepts the current Alice, Alice Kid, and Ema packs at their canonical source-pixel units", () => {
-    expect(resolveLayeredCharacterSourcePixelScale(loadPackLayers("apps/game-a/public/game-a/characters/alice")))
+    expect(resolveLayeredCharacterSourcePixelScale(loadPackLayers("apps/game-a/assets/char/alice")))
       .toEqual({ ok: true, unitsPerPixel: 1 });
-    expect(resolveLayeredCharacterSourcePixelScale(loadPackLayers("apps/game-a/public/game-a/characters/alice-kid")))
+    expect(resolveLayeredCharacterSourcePixelScale(loadPackLayers("apps/game-a/assets/char/alice-kid")))
       .toEqual({ ok: true, unitsPerPixel: 1 });
-    expect(resolveLayeredCharacterSourcePixelScale(loadPackLayers("apps/game-harness/public/harness/characters/Ema")))
+    expect(resolveLayeredCharacterSourcePixelScale(loadPackLayers("apps/game-harness/assets/char/ema")))
       .toEqual({ ok: true, unitsPerPixel: 0.006 });
   });
 
   it("rejects zero, non-square, and mixed-density pack fixtures", () => {
-    const source = loadPackLayers("apps/game-a/public/game-a/characters/alice");
+    const source = loadPackLayers("apps/game-a/assets/char/alice");
     const zero = cloneLayers(source);
     zero[0]!.metadata.localTransform.scale.x = 0;
     expect(resolveLayeredCharacterSourcePixelScale(zero)).toMatchObject({

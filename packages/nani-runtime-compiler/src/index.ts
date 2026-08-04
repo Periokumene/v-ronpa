@@ -22,6 +22,7 @@ import {
   diagnoseCharacterToneParams,
   diagnoseExecutionBoundaryParams,
   diagnoseIgnoredPromotedPrimary,
+  diagnosePinpParams,
   diagnoseUiTargets,
   diagnoseUnsupportedImplementedParams,
   validateCommandAgainstCatalog,
@@ -85,11 +86,6 @@ export function compileRuntimeScript(document: ParsedScenarioDocument): CompileR
       scriptPath: scenario.scriptPath,
       commands,
       labels,
-      assets: scenario.assets.map((asset) => ({
-        id: asset.id,
-        kind: asset.kind as RuntimeScript["assets"][number]["kind"],
-        tags: []
-      })),
       dependencies: scenario.dependencies
     },
     diagnostics: [...diagnostics, ...migratedDiagnostics]
@@ -287,7 +283,8 @@ function compileCommand(
 
   const validationDiagnostics = [
     ...validateCommandAgainstCatalog(bound, definition, diagnosticContext),
-    ...diagnoseCharacterToneParams(bound, definition, diagnosticContext)
+    ...diagnoseCharacterToneParams(bound, definition, diagnosticContext),
+    ...diagnosePinpParams(bound, definition, diagnosticContext)
   ];
   const commandMigratedDiagnostics = [
     ...diagnoseIgnoredPromotedPrimary(bound, definition, normalizer, diagnosticContext),

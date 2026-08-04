@@ -3,6 +3,7 @@ import {
   analyzeNaniCatalog,
   parseNaniProjectConfig,
   type NaniEntryConfig,
+  type NaniAssetBindings,
   type NaniProjectConfig,
   type NaniScope
 } from "@v-ronpa/nani-project";
@@ -37,6 +38,7 @@ export interface NaniDevtoolsVitePluginOptions {
   project: NaniProjectConfig;
   entry: NaniEntryConfig;
   scopes: readonly NaniScope[];
+  assetBindings: NaniAssetBindings | Promise<NaniAssetBindings>;
   /** Base path for project-relative source roots. Defaults to process.cwd(). */
   root?: string;
 }
@@ -87,6 +89,7 @@ export function createNaniDevtoolsVitePlugin(options: NaniDevtoolsVitePluginOpti
         projectRoot,
         scopes: options.scopes,
         entries: [options.entry],
+        assetBindings: await options.assetBindings,
         sourceDiagnosticPolicy: "strict"
       });
       const fatal = analysis.diagnostics.filter((diagnostic) => diagnostic.disposition === "fatal");
@@ -175,6 +178,7 @@ async function createSnapshot(
     projectRoot,
     scopes: options.scopes,
     entries: [options.entry],
+    assetBindings: await options.assetBindings,
     sourceDiagnosticPolicy: "allow-recoverable-command-errors"
   });
   return {

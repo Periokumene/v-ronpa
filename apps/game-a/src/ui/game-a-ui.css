@@ -2,9 +2,16 @@
   --game-a-dialog-line: rgba(229, 234, 236, 0.74);
   --game-a-dialog-line-soft: rgba(229, 234, 236, 0.38);
   --game-a-ui-rich-font:
-    var(--v-ronpa-rich-font-font_fusion-pixel-zh-hans, sans-serif),
+    var(--game-a-font-family, var(--v-ronpa-rich-font-default, sans-serif)),
     sans-serif;
   --game-a-ui-mono-font: var(--game-a-ui-rich-font);
+}
+
+.game-a-pinp-surface {
+  --vn-pinp-z-index: 10;
+  --vn-pinp-border: var(--game-a-dialog-line-soft);
+  --vn-pinp-background: rgba(0, 0, 0, 0.18);
+  --vn-pinp-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
 .game-a-dialog-surface {

@@ -18,7 +18,7 @@ test("FastDebug previews the current script cold, switches without mutating the 
   });
   await page.addInitScript(() => {
     if (sessionStorage.getItem("game-a-fast-debug-smoke-ready") !== "true") {
-      indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
+      indexedDB.deleteDatabase("v-ronpa-game-a-saves-v13");
       sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v4");
       sessionStorage.setItem("game-a-fast-debug-smoke-ready", "true");
     }
@@ -87,8 +87,8 @@ test("FastDebug previews the current script cold, switches without mutating the 
   await expect.poll(async () => (await readSnapshot(page)).workbench.phase).toBe("ready");
   const canonical = await readSnapshot(page);
   expect(canonical.workbench.materializationMode).toBe("canonical-entry");
-  expect(canonical.stableCheckpoint?.media.bgmByGroup.music?.sourceRef).toBe("bgm:dead-fish-riffle");
-  expect(canonical.stableCheckpoint?.media.loopingSfxByKey.rain?.sourceRef).toBe("sfx:gentle-rain-loop");
+  expect(canonical.stableCheckpoint?.media.bgmByGroup.music?.assetId).toBe("bgm/dead-fish-riffle");
+  expect(canonical.stableCheckpoint?.media.loopingSfxByKey.rain?.assetId).toBe("sfx/gentle-rain-loop");
   await page.screenshot({ path: "test-results/game-a-fast-debug-entry-mode.png", fullPage: true });
 
   await page.reload();
@@ -104,7 +104,7 @@ test("Game A traverses, saves, previews, restores, and completes its production 
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   await page.addInitScript(() => {
-    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v13");
     sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v4");
   });
   await page.goto("/");
@@ -116,7 +116,7 @@ test("Game A traverses, saves, previews, restores, and completes its production 
   await scriptPicker.locator("summary").click();
   await expect(workbench.getByRole("listbox", { name: "VN scripts" })).toBeVisible();
   await expect(workbench.getByRole("option")).toHaveCount(3);
-  await expect(workbench.getByRole("option", { name: /draft-home-quarrel\.nani/ })).toContainText("development");
+  await expect(workbench.getByRole("option", { name: /home-quarrel\.nani/ })).toContainText("development");
   await page.screenshot({ path: "test-results/game-a-multi-nani-script-selector-504.png", fullPage: true });
   await workbench.getByRole("option", { name: /chapter-02\.nani/ }).click();
   await expect.poll(async () => (await readSnapshot(page)).workbench.viewedScriptPath)
@@ -138,8 +138,8 @@ test("Game A traverses, saves, previews, restores, and completes its production 
   await advanceProductionStoryToFinalOpeningChoice(page);
   const beforeNavigation = await readSnapshot(page);
   expect(beforeNavigation.workbench.runtimeScriptPath).toBe("game-a/opening.nani");
-  expect(beforeNavigation.stableCheckpoint?.media.loopingSfxByKey.rain?.sourceRef).toBe("sfx:gentle-rain-loop");
-  expect(beforeNavigation.stableCheckpoint?.media.bgmByGroup.music?.sourceRef).toBe("bgm:dead-fish-riffle");
+  expect(beforeNavigation.stableCheckpoint?.media.loopingSfxByKey.rain?.assetId).toBe("sfx/gentle-rain-loop");
+  expect(beforeNavigation.stableCheckpoint?.media.bgmByGroup.music?.assetId).toBe("bgm/dead-fish-riffle");
 
   await clickByTestId(page, "vn-choice-0");
   await expect(page.getByTestId("vn-dialog-text")).toContainText("这还差不多", { timeout: 15_000 });
@@ -187,7 +187,7 @@ test("Game A traverses, saves, previews, restores, and completes its production 
 test("catalog structure changes freeze preview until refresh rescans the development root", async ({ page }) => {
   await unlink(catalogDirtyProbeFile).catch(() => undefined);
   await page.addInitScript(() => {
-    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v13");
     sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v4");
   });
 
@@ -229,7 +229,7 @@ test("catalog structure changes freeze preview until refresh rescans the develop
 test("an opening fixed point never blocks viewing or previewing chapter-02 before and after runtime navigation", async ({ page }) => {
   await page.addInitScript(() => {
     if (sessionStorage.getItem("game-a-fixed-point-smoke-ready") !== "true") {
-      indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
+      indexedDB.deleteDatabase("v-ronpa-game-a-saves-v13");
       sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v4");
       sessionStorage.setItem("game-a-fixed-point-smoke-ready", "true");
     }
@@ -295,7 +295,7 @@ test("a future-script HMR installs only its catalog record even when opening has
   );
   expect(updatedSource).not.toBe(originalSource);
   await page.addInitScript(() => {
-    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v13");
     sessionStorage.removeItem("v-ronpa:game-a:nani-devtools:v4");
   });
 
@@ -425,8 +425,8 @@ interface GameASnapshot {
   };
   stableCheckpoint?: {
     media: {
-      bgmByGroup: Record<string, { sourceRef: string; volume: number }>;
-      loopingSfxByKey: Record<string, { sourceRef: string; group: string; volume: number }>;
+      bgmByGroup: Record<string, { assetId: string; volume: number }>;
+      loopingSfxByKey: Record<string, { assetId: string; group: string; volume: number }>;
     };
   };
 }

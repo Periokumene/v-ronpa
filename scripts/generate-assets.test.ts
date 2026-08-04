@@ -110,7 +110,6 @@ function runtimeScript(text: string, line: number): RuntimeScript {
   return {
     scriptPath: "game/test.nani",
     labels: { Start: 0 },
-    assets: [],
     dependencies: [],
     commands: [
       {

@@ -32,6 +32,7 @@ const baseConfig: NaniProjectConfig = {
   },
   voiceLocales: ["zh"]
 };
+const emptyAssetBindings = { appId: "game", assets: [], characterAssetIdByCharacterId: {} } as const;
 
 describe("parseNaniProjectConfig", () => {
   it("accepts only the current hard-cut project shape", () => {
@@ -155,6 +156,59 @@ describe("discoverNaniProjectScripts", () => {
 });
 
 describe("analyzeNaniCatalog", () => {
+  it("binds compiled resource commands and voice TextIds through the shared asset contract", async () => {
+    const root = await projectRoot();
+    await mkdir(join(root, "nani"), { recursive: true });
+    await writeFile(join(root, "nani", "opening.nani"), [
+      "#Start",
+      "@back bg/home",
+      "@pinp ui/frame",
+      "@bgm bgm/main",
+      "@sfx sfx/hit",
+      "@sfxFast sfx/shock",
+      "@movie video/intro",
+      "@char Ema",
+      "@slide Ema from:0,0 to:50,0",
+      "Narrator: Voice.|#game_voice_0001|",
+      "@end"
+    ].join("\n"));
+    const assets = [
+      ["bg/home", "image/png"],
+      ["ui/frame", "image/png"],
+      ["bgm/main", "audio/ogg"],
+      ["sfx/hit", "audio/ogg"],
+      ["sfx/shock", "audio/ogg"],
+      ["video/intro", "video/mp4"],
+      ["char/ema", "application/json"],
+      ["voice/zh/voice-0001", "audio/ogg"]
+    ].map(([id, mimeType]) => ({ id: id!, uri: `assets/${id}.bin`, mimeType: mimeType! }));
+
+    const result = await analyzeNaniCatalog(baseConfig, {
+      projectRoot: root,
+      scopes: ["production"],
+      entries: [baseConfig.mainEntry],
+      assetBindings: {
+        appId: "game",
+        assets,
+        characterAssetIdByCharacterId: { Ema: "char/ema" }
+      },
+      sourceDiagnosticPolicy: "strict"
+    });
+
+    expect(result.hasFatalDiagnostics).toBe(false);
+    expect(result.scripts[0]?.metadata.requirements).toEqual([
+      { id: "bg/home", capability: "image" },
+      { id: "bgm/main", capability: "audio" },
+      { id: "char/ema", capability: "json" },
+      { id: "sfx/hit", capability: "audio" },
+      { id: "sfx/shock", capability: "audio" },
+      { id: "ui/frame", capability: "image" },
+      { id: "video/intro", capability: "video" },
+      { id: "voice/zh/voice-0001", capability: "audio" }
+    ]);
+    expect(result.voiceIndex).toEqual({ zh: { game_voice_0001: "voice/zh/voice-0001" } });
+  });
+
   it("analyzes multiple entries in one isolated catalog", async () => {
     const root = await projectRoot();
     await mkdir(join(root, "nani-test"), { recursive: true });
@@ -169,6 +223,7 @@ describe("analyzeNaniCatalog", () => {
 
     const result = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
+      assetBindings: emptyAssetBindings,
       scopes: ["test"],
       entries: [baseConfig.testEntries.smoke!, character],
       sourceDiagnosticPolicy: "allow-recoverable-command-errors"
@@ -191,6 +246,7 @@ describe("analyzeNaniCatalog", () => {
 
     const result = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
+      assetBindings: emptyAssetBindings,
       scopes: ["production"],
       entries: [baseConfig.mainEntry],
       sourceDiagnosticPolicy: "allow-recoverable-command-errors",
@@ -217,6 +273,7 @@ describe("analyzeNaniCatalog", () => {
 
     const result = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
+      assetBindings: emptyAssetBindings,
       scopes: ["production"],
       entries: [baseConfig.mainEntry],
       sourceDiagnosticPolicy: "strict"
@@ -240,6 +297,7 @@ describe("analyzeNaniCatalog", () => {
 
     const result = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
+      assetBindings: emptyAssetBindings,
       scopes: ["production"],
       entries: [baseConfig.mainEntry],
       sourceDiagnosticPolicy: "allow-recoverable-command-errors"
@@ -265,6 +323,7 @@ describe("analyzeNaniCatalog", () => {
 
     const result = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
+      assetBindings: emptyAssetBindings,
       scopes: ["production"],
       entries: [baseConfig.mainEntry],
       sourceDiagnosticPolicy: "allow-recoverable-command-errors"
@@ -287,6 +346,7 @@ describe("analyzeNaniCatalog", () => {
 
     const development = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
+      assetBindings: emptyAssetBindings,
       scopes: ["production", "development"],
       entries: [baseConfig.mainEntry],
       sourceDiagnosticPolicy: "allow-recoverable-command-errors"
@@ -302,6 +362,7 @@ describe("analyzeNaniCatalog", () => {
 
     const production = await analyzeNaniCatalog(baseConfig, {
       projectRoot: root,
+      assetBindings: emptyAssetBindings,
       scopes: ["production"],
       entries: [baseConfig.mainEntry],
       sourceDiagnosticPolicy: "strict"

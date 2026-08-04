@@ -41,15 +41,18 @@ function wrapGameADevPlayfield(playfield: ReactNode): ReactNode {
 
 function storyDefinitionFromSnapshot(fallback: GameAStoryDefinition): GameAStoryDefinition {
   const runnable = naniSnapshot.scripts.filter((script) => script.executionDisposition === "runnable");
-  const discoveredAssetRefs = runnable.flatMap((script) => script.metadata?.assetRefs ?? []);
-  const assetRefs = [...new Map(
-    [...fallback.entry.assetRefs, ...discoveredAssetRefs].map((ref) => [`${ref.kind}:${ref.id}`, ref])
+  const discoveredRequirements = runnable.flatMap((script) => script.metadata?.requirements ?? []);
+  const requirements = [...new Map(
+    [...fallback.entry.requirements, ...discoveredRequirements].map((requirement) => [
+      `${requirement.capability}:${requirement.id}`,
+      requirement
+    ])
   ).values()];
   return {
     entry: {
       ...fallback.entry,
       ...naniSnapshot.entry,
-      assetRefs
+      requirements
     },
     catalog: runnable.map((script) => ({
       scriptPath: script.scriptPath,
@@ -57,6 +60,7 @@ function storyDefinitionFromSnapshot(fallback: GameAStoryDefinition): GameAStory
       scriptRevision: script.semanticRevision
     })),
     sourceDiagnosticPolicy: "allow-recoverable-command-errors",
+    ...(fallback.voiceIndex ? { voiceIndex: fallback.voiceIndex } : {}),
     characterPreloadPlanByScriptPath: Object.fromEntries(runnable.map((script) => [
       script.scriptPath,
       script.metadata?.characterPreloadPlan ?? []
@@ -78,7 +82,7 @@ function GameADevtoolsHost({ definitionState, flow, runtime }: GameADevtoolsHost
     runtime.diagnostics.observeAssetDiagnostic({
       code: "vn-devtools-flow-dispatch-failed",
       severity: "error",
-      kind: "vn-devtools",
+      capability: "vn-devtools",
       message: `The Nani workbench restored the candidate runtime, but ENTER_VN dispatch failed: ${message}`
     });
   }, [runtime.diagnostics]);

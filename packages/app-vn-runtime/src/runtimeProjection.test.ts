@@ -99,7 +99,7 @@ const stableTargetParityCases: StableTargetParityCase[] = [
     stopCanonicalName: "back",
     targetLabel: "Visual",
     assertStableState: (checkpoint) => {
-      expect(checkpoint.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
+      expect(checkpoint.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg/harness");
     }
   },
   {
@@ -123,7 +123,7 @@ const stableTargetParityCases: StableTargetParityCase[] = [
     name: "persistent BGM target",
     stopCanonicalName: "bgm",
     assertStableState: (checkpoint) => {
-      expect(checkpoint.media.bgmByGroup.music).toEqual({ sourceRef: "bgm:harness", volume: 0.4 });
+      expect(checkpoint.media.bgmByGroup.music).toEqual({ assetId: "bgm/harness", volume: 0.4 });
     }
   },
   {
@@ -131,7 +131,7 @@ const stableTargetParityCases: StableTargetParityCase[] = [
     stopCanonicalName: "sfx",
     assertStableState: (checkpoint) => {
       expect(checkpoint.media.loopingSfxByKey.rain).toEqual({
-        sourceRef: "sfx:rain",
+        assetId: "sfx/rain",
         group: "rain",
         volume: 0.25
       });
@@ -140,12 +140,90 @@ const stableTargetParityCases: StableTargetParityCase[] = [
 ];
 
 describe("projectVnRuntimeStep", () => {
+  it("projects pinp as stable checkpoint content without transition revisions or URIs", () => {
+    const boot = createVnSession({ scriptPath: "projection-pinp.nani", sourceText: "Narrator: Ready." });
+    const command: RuntimeCommand = {
+      commandId: "pinp",
+      canonicalName: "pinp",
+      category: "ui",
+      source: "v-ronpa",
+      status: "implemented",
+      params: {
+        assetId: "props:milk-bag",
+        positionPercent: [50, 50],
+        heightPercent: 20,
+        aspectRatio: [16, 9],
+        alt: "牛奶袋",
+        effect: "fade",
+        durationMs: 180,
+        visible: true
+      },
+      loc: { scriptPath: "projection-pinp.nani", line: 1, column: 1, raw: "@pinp props:milk-bag" }
+    };
+    const projected = projectVnRuntimeStep({
+      active: true,
+      animatePixi: true,
+      nowMs: 1000,
+      previousMediaState: createInitialMediaRuntimeState(),
+      previousPixiStage: createInitialPixiStageSnapshot(),
+      previousUiState: createInitialUiRuntimeState(),
+      profile: "vn2d",
+      runtimeCommands: [command],
+      session: boot.session
+    });
+
+    expect(projected.runtime.uiState).toMatchObject({
+      pinpSequence: 1,
+      pinp: { assetId: "props:milk-bag" },
+      surfaces: { pinp: { phase: "showing", targetVisible: true } }
+    });
+    expect(projected.stable.uiState.pinpSequence).toBe(0);
+    expect(projected.stable.uiState.surfaces.pinp).toEqual({
+      targetVisible: true,
+      mounted: true,
+      opacity: 1,
+      phase: "shown"
+    });
+    expect(projected.stable.uiState.pinp).toEqual({
+      assetId: "props:milk-bag",
+      alt: "牛奶袋",
+      positionPercent: [50, 50],
+      heightPercent: 20,
+      aspectRatio: [16, 9]
+    });
+    expect(createVnUiCheckpoint(projected.stable.uiState).pinp).toEqual(projected.stable.uiState.pinp);
+
+    const hidden = projectVnRuntimeStep({
+      active: true,
+      animatePixi: true,
+      nowMs: 1090,
+      previousMediaState: projected.stable.mediaState,
+      previousPixiStage: projected.stable.pixiStage,
+      previousUiState: projected.runtime.uiState,
+      profile: "vn2d",
+      runtimeCommands: [{
+        ...command,
+        params: { visible: false, effect: "fade", durationMs: 180 }
+      }],
+      session: boot.session
+    });
+    expect(hidden.runtime.uiState.surfaces.pinp).toMatchObject({ phase: "hiding", targetVisible: false });
+    expect(hidden.stable.uiState.surfaces.pinp).toEqual({
+      targetVisible: false,
+      mounted: false,
+      opacity: 0,
+      phase: "hidden"
+    });
+    expect(hidden.stable.uiState.pinp).toBeUndefined();
+    expect(createVnUiCheckpoint(hidden.stable.uiState).pinp).toBeNull();
+  });
+
   it("projects Story, Pixi, UI, and persistent media without applying host side effects", () => {
     const boot = createVnSession({
       scriptPath: "projection.nani",
       sourceText: [
-        "@back bg:harness",
-        "@bgm bgm:harness volume:0.4",
+        "@back bg/harness",
+        "@bgm bgm/harness volume:0.4",
         "@hideUI dialog time:0.2",
         "Felix: Projected."
       ].join("\n")
@@ -164,8 +242,8 @@ describe("projectVnRuntimeStep", () => {
     });
 
     expect(projected.session.story.backlog.at(-1)).toEqual({ speaker: "Felix", text: "Projected." });
-    expect(projected.stable.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
-    expect(projected.stable.mediaState.bgmByGroup.bgm).toEqual({ sourceRef: "bgm:harness", volume: 0.4 });
+    expect(projected.stable.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg/harness");
+    expect(projected.stable.mediaState.bgmByGroup.bgm).toEqual({ assetId: "bgm/harness", volume: 0.4 });
     expect(projected.stable.uiState.surfaces.dialog).toMatchObject({
       targetVisible: false,
       mounted: false,
@@ -280,7 +358,7 @@ describe("projectVnRuntimeStep", () => {
   it("records terminal Pixi state while suppressing presentation tasks for settled debug projection", () => {
     const boot = createVnSession({
       scriptPath: "projection-wait.nani",
-      sourceText: "@back bg:harness effect:fade time:0.2 wait!"
+      sourceText: "@back bg/harness effect:fade time:0.2 wait!"
     });
     const advanced = advanceVnSession(boot.session);
     const projected = projectVnRuntimeStep({
@@ -394,8 +472,8 @@ describe("projectVnRuntimeStep", () => {
     const sourceText = [
       "#Start",
       '@set route:"preview"',
-      "@back bg:harness",
-      "@sfx sfx:rain group:rain loop:true volume:0.3",
+      "@back bg/harness",
+      "@sfx sfx/rain group:rain loop:true volume:0.3",
       "@hideUI commandBar",
       "Narrator: Parity.|#parity_line|"
     ].join("\n");
@@ -457,11 +535,11 @@ describe("projectVnRuntimeStep", () => {
         "#Start",
         '@set route:"preview"',
         "#Visual",
-        "@back bg:harness",
+        "@back bg/harness",
         "@char Ema.Pensive1 pos:50",
         "@hideUI commandBar",
-        "@bgm bgm:harness group:music volume:0.4",
-        "@sfx sfx:rain group:rain loop:true volume:0.25",
+        "@bgm bgm/harness group:music volume:0.4",
+        "@sfx sfx/rain group:rain loop:true volume:0.25",
         "Narrator: Stable target parity.|#stable_target_parity|"
       ].join("\n");
       const fixture = debugFixture({
@@ -519,7 +597,7 @@ function debugFixture({
       initialScriptPath: scriptPath,
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     },
     source: { scriptPath, sourceText, scriptRevision: "sha256:placeholder" }
   };

@@ -3,7 +3,8 @@ import type { VnPixiCharacterPreparationPlan } from "@v-ronpa/app-vn-shell";
 import { gameAVnEntry } from "./contentManifest";
 import {
   gameAScriptCatalog,
-  gameAScriptMetadataByPath
+  gameAScriptMetadataByPath,
+  gameAVoiceIndex
 } from "./generatedNaniProduction";
 
 export interface GameAStoryDefinition extends VnRuntimeDefinition {
@@ -13,6 +14,7 @@ export interface GameAStoryDefinition extends VnRuntimeDefinition {
 export const gameAStoryDefinition: GameAStoryDefinition = {
   entry: gameAVnEntry,
   catalog: gameAScriptCatalog,
+  voiceIndex: gameAVoiceIndex,
   sourceDiagnosticPolicy: import.meta.env.DEV
     ? "allow-recoverable-command-errors"
     : "strict",

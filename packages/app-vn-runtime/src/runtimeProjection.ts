@@ -118,10 +118,28 @@ export function projectVnRuntimeStep({
     animatePixi ? transaction.uiState : settleUiRuntimeTransitions(transaction.uiState),
     story
   );
+  const stablePinpVisible = projectedUiState.surfaces.pinp.targetVisible && Boolean(projectedUiState.pinp);
   const stableUiState: UiRuntimeState = {
-    surfaces: projectedUiState.surfaces,
+    surfaces: {
+      ...projectedUiState.surfaces,
+      pinp: stablePinpVisible
+        ? { targetVisible: true, mounted: true, opacity: 1, phase: "shown" }
+        : { targetVisible: false, mounted: false, opacity: 0, phase: "hidden" }
+    },
     toasts: [],
-    toastSequence: 0
+    toastSequence: 0,
+    pinpSequence: 0,
+    ...(stablePinpVisible && projectedUiState.pinp
+      ? {
+          pinp: {
+            assetId: projectedUiState.pinp.assetId,
+            alt: projectedUiState.pinp.alt,
+            positionPercent: [projectedUiState.pinp.positionPercent[0], projectedUiState.pinp.positionPercent[1]],
+            heightPercent: projectedUiState.pinp.heightPercent,
+            aspectRatio: [projectedUiState.pinp.aspectRatio[0], projectedUiState.pinp.aspectRatio[1]]
+          }
+        }
+      : {})
   };
 
   return {

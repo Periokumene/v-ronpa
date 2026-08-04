@@ -1,5 +1,4 @@
 export type {
-  AssetRef,
   CommandArgIR,
   CommandIR,
   CommentIR,

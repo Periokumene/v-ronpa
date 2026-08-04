@@ -27,7 +27,9 @@ describe("Nani semantic golden from integration baseline", () => {
       "csp-character-v3-body-variants-alice-refresh": "The accepted CSP v3 hard cut moves body into the numeric runtime group, adds body0, and updates only the explicit test expression and its generated metadata.",
       "global-character-tone": "The accepted global character Tone feature adds scripted product and showcase commands, generated revisions, and semantic compiler output without changing asset references.",
       "cue-story-text-hard-cut": "The accepted Cue hard cut adds Game A and Harness acceptance branches, generated revisions, and canonical parser/compiler semantics without changing asset references.",
-      "nani-inline-staged-text": "The accepted staged-text slice adds inline story stops, expands only opted-in lines into stable commands, and updates Game A and Harness revisions atomically."
+      "nani-inline-staged-text": "The accepted staged-text slice adds inline story stops, expands only opted-in lines into stable commands, and updates Game A and Harness revisions atomically.",
+      "pinp-vn-surface": "The accepted Pinp Surface adds opaque texture commands, Game A and Harness showcases, generated asset references, and canonical parser/compiler output atomically.",
+      "app-relative-asset-protocol-v5": "The App-relative asset hard update moves resource binding out of parser and runtime script IR, adopts slash AssetIds, and preserves VN identity and navigation semantics."
     });
   });
 
@@ -65,8 +67,6 @@ describe("Nani semantic golden from integration baseline", () => {
         compilerDiagnosticsSha256: sha256Value(
           compiled.diagnostics.map(({ code, message, severity, loc }) => ({ code, message, severity, loc }))
         ),
-        scenarioAssetsSha256: sha256Value(parsed.scenario.assets),
-        runtimeAssetsSha256: sha256Value(compiled.script.assets),
         dependenciesSha256: sha256Value(compiled.script.dependencies)
       }).toEqual({
         sourceSha256: expected.sourceSha256,
@@ -77,14 +77,12 @@ describe("Nani semantic golden from integration baseline", () => {
         parserDiagnosticsSha256: expected.parserDiagnosticsSha256,
         runtimeScriptSha256: expected.runtimeScriptSha256,
         compilerDiagnosticsSha256: expected.compilerDiagnosticsSha256,
-        scenarioAssetsSha256: expected.scenarioAssetsSha256,
-        runtimeAssetsSha256: expected.runtimeAssetsSha256,
         dependenciesSha256: expected.dependenciesSha256
       });
     });
   }
 
-  it("preserves generated revisions, asset refs, and preload metadata", () => {
+  it("preserves generated revisions, requirements, voice indexes, and preload metadata", () => {
     const actualMetadata = {
       ...gameAScriptMetadataByPath,
       ...gameATestScriptMetadataByPath,
@@ -97,8 +95,9 @@ describe("Nani semantic golden from integration baseline", () => {
       expect({
         scriptRevision: metadata?.scriptRevision,
         metadataSha256: sha256Value(metadata),
-        assetRefsSha256: sha256Value(metadata?.assetRefs),
-        characterPreloadPlanSha256: sha256Value(metadata?.characterPreloadPlan)
+        requirementsSha256: sha256Value(metadata?.requirements),
+        characterPreloadPlanSha256: sha256Value(metadata?.characterPreloadPlan),
+        voiceIndexSha256: sha256Value(metadata?.voiceIndex ?? {})
       }).toEqual(expected);
     }
   });
@@ -150,16 +149,15 @@ interface CorpusGolden {
   parserDiagnosticsSha256: string;
   runtimeScriptSha256: string;
   compilerDiagnosticsSha256: string;
-  scenarioAssetsSha256: string;
-  runtimeAssetsSha256: string;
   dependenciesSha256: string;
 }
 
 interface GeneratedMetadataGolden {
   scriptRevision: string;
   metadataSha256: string;
-  assetRefsSha256: string;
+  requirementsSha256: string;
   characterPreloadPlanSha256: string;
+  voiceIndexSha256: string;
 }
 
 interface SemanticGolden {

@@ -1,7 +1,7 @@
 #Start
 @set route:"intro"
-@back bg:harness effect:fade time:0.15
-@inback bg:inner-academy-hall effect:fade time:0.15
+@back bg/showcase effect:fade time:0.15
+@inback bg/inner/academy-hall effect:fade time:0.15
 @char Ema pos:50
 Narrator: CHECKPOINT 00 - baseline。视觉小说联调剧本：这是测试入口，不是剧情样例。请先确认主背景、inner background frame 和 Ema 默认 layered character 可见。[>]
 Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command showcase；分支 2 保持完整 Pixi 命令视觉验收。
@@ -14,6 +14,25 @@ Narrator: 请选择测试路径。分支 1 是完整 non-Pixi runtime command sh
 @choice "分支5：全局角色 Tone 验收" goto:#CharacterToneShowcase
 @choice "分支6：Cue 演出文本验收" goto:#CueShowcase
 @choice "分支7：单句分阶段停靠验收" goto:#StagedTextShowcase
+@choice "分支8：Pinp 画中画验收" goto:#PinpShowcase
+
+#PinpShowcase
+@set route:"pinp"
+@showUI dialog
+@showUI commandBar visible:true
+@pinp thumb/evidence-keycard alt:"门禁卡证据缩略图" effect:fade time:0.18
+Narrator: CHECKPOINT PINP 00 - 默认画框应居中，占游戏区域高度约 20%，比例为 16:9。
+@choice "切换自定义位置与尺寸" goto:#PinpCustom
+
+#PinpCustom
+@pinp thumb/evidence-keycard pos:25,35 height:30 ratio:4,3 alt:"左上方门禁卡证据" effect:none time:0
+Narrator: CHECKPOINT PINP 01 - 画框中心应位于 25%,35%，高度 30%，比例为 4:3；同一资产也应重新挂载。
+@choice "隐藏 Pinp" goto:#PinpHide
+
+#PinpHide
+@pinp visible:false effect:fade time:0.18
+Narrator: CHECKPOINT PINP 02 - 退场完成后 Pinp DOM 与内容应被清除。
+@end
 
 #StagedTextShowcase
 @set route:"staged-text"
@@ -54,7 +73,7 @@ Narrator: CHECKPOINT CUE 03 - Cue 已完成淡出，随后普通 Dialog 才出�
 @end
 
 #VoiceTextIdAudioValidation
-@back bg:harness effect:fade time:0.15
+@back bg/showcase effect:fade time:0.15
 @char Ema.Pensive1,ArmR3 pos:50
 Narrator: CHECKPOINT VOICE REAL 00 - 真实 textId-音频验证。下面是一条连续支线：每条角色台词都应按 textId 自动播放对应 voice，并停止上一条 voice。
 Narrator: 夜里的牢房被帘子隔成一间临时密室。艾玛、雪莉和玛格围着一台拆开的旧广播装置，谁都没有先碰那个红色开关。
@@ -98,12 +117,12 @@ Narrator: CHECKPOINT RICH 03 - 上下标 H<sub>2</sub>O / x<sup>2</sup>，以及
 @print "<font color='red'>CHECKPOINT RICH 04 named color</font> + <font color='#ff5577'><b>hex color + bold</b></font> - @print 中颜色与粗体应生效。" author:Narrator
 @append " <font size='+1'>@append 追加段落字号变大</font>，但不继承上一段颜色。"
 @toast "<mark>CHECKPOINT RICH TOAST</mark> <small>toast 使用同一 renderer，且不进入存档。</small>" appearance:info time:2
-Narrator: CHECKPOINT RICH 05 - font face 英文同字符对比：默认 AaGgQq Font ID 123 / serif <font face='font:serif'>AaGgQq Font ID 123</font>；后者应使用注册 font id，中文不覆盖时可回退默认字体。
+Narrator: CHECKPOINT RICH 05 - font face 英文同字符对比：默认 AaGgQq Font ID 123 / serif <font face='serif'>AaGgQq Font ID 123</font>；后者应使用注册 font id，中文不覆盖时可回退默认字体。
 @choice "<b><font color='#ffd166'>富文本 choice</font></b> - 回到入口" goto:#Start
 
 #CharacterToneShowcase
 @set route:"character-tone"
-@back bg:harness effect:fade time:0.15
+@back bg/showcase effect:fade time:0.15
 @hideChars
 @charTone rain amount:0.5
 Narrator: CHECKPOINT TONE 00 - 无角色时预设 rain amount 0.5；右侧 Tone 应显示 rain@0.5，当前不应给背景或 DOM 对话框着色。
@@ -151,21 +170,21 @@ Narrator: CHECKPOINT MAIN 02 - input。输入已提交；右侧 Runtime variable
 Mira: CHECKPOINT BLEEP DEFAULT - nani speaker Mira 没有 override，应使用默认 dialogue bleep 008。
 Felix: CHECKPOINT BLEEP OVERRIDE - nani speaker Felix 应使用角色 override dialogue bleep 009。
 Narrator: CHECKPOINT BLEEP NULL - nani speaker Narrator 配置为 null override，应保持无 bleep。
-@bgm bgm:validation-main group:music volume:0.45 fade:0.2
-@sfx sfx:rain-inside-car-loop group:rain loop! volume:0.35 fade:0.2
-@sfx sfx:knock-door volume:0.9 fade:0.1
+@bgm bgm/validation-main group:music volume:0.45 fade:0.2
+@sfx sfx/rain-inside-car-loop group:rain loop! volume:0.35 fade:0.2
+@sfx sfx/knock-door volume:0.9 fade:0.1
 Narrator: CHECKPOINT MAIN 03 - audio fade-in layer。应听到 music 组 BGM 淡入、rain 组 loop SFX 淡入，并播放一次敲门 SFX。
 @bgm group:music volume:0.3 time:0.4
 @sfx group:rain volume:0.15 time:0.4
 Narrator: CHECKPOINT MAIN 03B - audio volume transition。music 组 BGM 与 rain 组 loop SFX 应平滑降低音量，且不重启资源。
-@bgm bgm:validation-main group:music volume:0.38 time:0.25
-@sfx sfx:rain-inside-car-loop group:rain loop! volume:0.25 time:0.25
+@bgm bgm/validation-main group:music volume:0.38 time:0.25
+@sfx sfx/rain-inside-car-loop group:rain loop! volume:0.25 time:0.25
 Narrator: CHECKPOINT MAIN 03C - same-resource volume transition。同组同资源 BGM 与 loop SFX 应视为平滑调音量，而不是重新播放。
-@bgm bgm:validation-alt group:music volume:0.45 fade:0.5
-@bgm bgm:validation-layer group:ambient volume:0.25 fade:0.1
-@sfxFast sfx:shock-fadeout volume:0.75
+@bgm bgm/validation-alt group:music volume:0.45 fade:0.5
+@bgm bgm/validation-layer group:ambient volume:0.25 fade:0.1
+@sfxFast sfx/shock-fadeout volume:0.75
 Narrator: CHECKPOINT MAIN 04 - grouped BGM。music 组 BGM 应被替换，ambient 组同时存在；sfxFast 播放一次。
-@movie video:validation-intro block:true
+@movie video/validation-intro block:true
 Narrator: CHECKPOINT MAIN 05 - movie complete。阻塞 movie 已结束或跳过；脚本恢复推进。
 @stopSfx group:rain fade:0.2
 @stopBgm group:music fade:0.5
@@ -186,16 +205,16 @@ Narrator: CHECKPOINT MAIN 07 - goto complete。显式 @goto 已跳到完成标�
 @set route:"classroom"
 @gameplay grant-evidence id:evidence:keycard
 Narrator: CHECKPOINT 00B - runtime state。分支 2 开始：右侧 Runtime 面板的 route 应为 classroom，evidence 应包含 evidence:keycard。
-@back bg:harness effect:fade time:0.2
+@back bg/showcase effect:fade time:0.2
 @rain power:0.5 wind:-1 hue:215 tint:0.55 time:0.1
-Narrator: CHECKPOINT 01A-L1 - rain half power left。背景为 bg:harness，画面前景应出现较轻、持续下落并向左倾斜的雨线；用于检查 power:0.5 与默认蓝色 tint。
+Narrator: CHECKPOINT 01A-L1 - rain half power left。背景为 bg/showcase，画面前景应出现较轻、持续下落并向左倾斜的雨线；用于检查 power:0.5 与默认蓝色 tint。
 @rain power:0.75 wind:0 hue:170 tint:1.1 time:0.1 easing:linear
 Narrator: CHECKPOINT 01A-L2 - rain neutral cyan。雨势应比 L1 更密，横向风接近 0，雨色应带更明显青色染色；用于检查 wind/hue/tint 参数映射。
 @rain power:1 wind:1 hue:300 tint:1.65 time:0.1
 Narrator: CHECKPOINT 01A-L3 - rain full right magenta。雨势应为最高档，前景雨线持续运动且改为向右风偏，并带更强紫红染色；用于检查 power:1、正 wind 和高 tint。
 @rain power:0 time:0.1 wait!
-Narrator: CHECKPOINT 01A-OFF - rain cleanup。雨应已关闭，背景保持 bg:harness；本句出现代表 rain power:0 wait! 的 weather-transition 已完成。
-@back bg:black effect:fade time:0.12
+Narrator: CHECKPOINT 01A-OFF - rain cleanup。雨应已关闭，背景保持 bg/showcase；本句出现代表 rain power:0 wait! 的 weather-transition 已完成。
+@back bg/black effect:fade time:0.12
 @char Ema.Pensive1,ArmR3 pos:50
 @snow power:0.55 time:0.1 xSpeed:-0.1 ySpeed:0.75 density:0.85 flakeScale:1 sway:0.45 fog:0.18 noise:0.012 seed:11
 Narrator: CHECKPOINT 01B-L1 - snow light。黑底与 Ema layered character 用于检查参数映射和轻雾染色：低档也应有明确雪粒、可见下落重力与轻微冷色雾。
@@ -206,20 +225,20 @@ Narrator: CHECKPOINT 01B-L3 - snow heavy。黑底上应出现清晰大雪、较�
 @snow power:1 time:0.1 xSpeed:-0.35 ySpeed:1.35 density:2 flakeScale:1.78 sway:1.28 fog:0.55 noise:0.055 seed:14
 Narrator: CHECKPOINT 01B-L4 - snow storm。黑底压力档：大雪、强重力、强摆动、较高雾与噪声同时开启，用于检查公开 snow 参数是否都能产生可见差异。
 @snow power:0 time:0.1
-@back bg:harness effect:fade time:0.12
+@back bg/showcase effect:fade time:0.12
 @sun power:0.3 time:0.2 pos:12,88 scale:1.1,1.1,1
 @blur actorId:MainBackground power:0.12 time:0.2
 Narrator: CHECKPOINT 01C - sun + blur。右上应出现柔和光束，主背景轻微虚化；雨雪此时应已关闭。inner background 仍在 snapshot 中，但会被 weather-back 的 sun 层覆盖或洗亮。
 @blur actorId:MainBackground power:0 time:0.12
 @sun power:0 time:0.12 wait!
-@inback bg:inner-snow-outskirts effect:fade time:0.2 wait!
-Narrator: CHECKPOINT 01D - inback switch。inner background frame 应从 academy hall 切换为 snow outskirts 真实图片；主背景仍保持 bg:harness。
+@inback bg/inner/snow-outskirts effect:fade time:0.2 wait!
+Narrator: CHECKPOINT 01D - inback switch。inner background frame 应从 academy hall 切换为 snow outskirts 真实图片；主背景仍保持 bg/showcase。
 @char Ema pos:50
 Narrator: CHECKPOINT 02A - char default composition。Ema 应回到 Default 展开结果；右侧 Pixi Chars 应显示 Ema/default。
 @char Ema.Pensive1 pos:50
 Narrator: CHECKPOINT 02B - char composite token。Pensive1 应从 Default 重新展开并替换 Head1 表情组，表现为沉思眼睛与嘴型。
 @char Ema.Pensive1,ArmR3 pos:50
-Narrator: CHECKPOINT 02C - char composite + arm。Ema 应以 Pensive1 + ArmR3 layered expression 可见；角色包应通过 ContentManifest 的 character-pack 入口解析。
+Narrator: CHECKPOINT 02C - char composite + arm。Ema 应以 Pensive1 + ArmR3 layered expression 可见；角色包应通过 ContentManifest 的 char/ema JSON 资产入口解析。
 @char Ema.Pensive1,ArmR3,ArmR4 pos:50
 Narrator: CHECKPOINT 02D - char override order。ArmR4 写在 ArmR3 之后，应覆盖同组右臂，右侧 Pixi Chars 应保留完整表达式 Pensive1,ArmR3,ArmR4。
 @char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Mouth01>Mouth01_Smile_Open pos:50
@@ -241,7 +260,7 @@ Narrator: CHECKPOINT 06 - shake。Ema 或其 fallback 应进行水平和垂直�
 @bokeh focus:Ema dist:10 power:0.55 time:0.2
 Narrator: CHECKPOINT 07 - bokeh only。画面应进入明显景深/柔焦状态，并出现柔和圆形光斑；下一步会先关闭 bokeh 再测试 glitch。
 @bokeh power:0 time:0.15
-@back bg:black effect:fade time:0.12
+@back bg/black effect:fade time:0.12
 @char Ema.Pensive1,ArmR3 pos:50
 @glitch power:0.35 time:1 blockJump:0.45 burstJump:0.1 pixelScatter:0.35 colorNoise:0.12 speed:0.8 seed:41
 Narrator: CHECKPOINT 07B-L1 - glitch light。黑底与 layered character 用于检查轻微 Morton 地址跳变；应只有少量块错位，人物边缘仍稳定可辨。
@@ -260,12 +279,12 @@ Narrator: CHECKPOINT 08B - glitchFilter persists。未重新触发 @glitch 的�
 Narrator: CHECKPOINT 08C - glitchFilter + pulse。持久 glitchFilter 底噪上叠加一次性 @glitch 冲击；DOM 对话框仍不应被扰动。
 @glitchFilter power:0 time:0.3 easing:linear wait!
 Narrator: CHECKPOINT 08D - glitchFilter off cleanup。持久 glitchFilter 已关闭；画面应回到稳定黑底，无 Morton 残留，后续雨雪不应被污染。
-@back bg:classroom effect:fade time:0.2
+@back bg/classroom effect:fade time:0.2
 @snow power:0.85 time:0.2 xSpeed:-0.18 ySpeed:0.85 density:1.35 flakeScale:1.18 sway:0.82 fog:0.32 noise:0.03 seed:29
 @rain power:0.85 wind:0.35 hue:215 tint:0.55 time:0.2
 @char Ema.Pensive1,ArmR3 pos:24,0
 @arrange Ema.24 look! time:0.2
-Narrator: CHECKPOINT 09 - rain + snow coexist。背景切到 bg:classroom，雨雪应同时清晰存在；Ema 不应被天气层遮没。
+Narrator: CHECKPOINT 09 - rain + snow coexist。背景切到 bg/classroom，雨雪应同时清晰存在；Ema 不应被天气层遮没。
 @flash color:#ffffff duration:120
 @slide Ema.Pensive1,ArmR3 from:15,0 to:24,0 time:0.25 easing:easeOut
 @shake actorId:stage power:0.2 time:0.07 count:3 hor! ver!
@@ -275,7 +294,7 @@ Narrator: CHECKPOINT 10 - white flash、Ema slide、stage shake。应看到白�
 @rain power:0 time:0.2 wait!
 @snow power:0 time:0.2 wait!
 @sun power:0 time:0.2 wait!
-Narrator: CHECKPOINT 11 - cleanup + consecutive wait。bokeh、blur、rain、snow、sun 均应被移除，画面恢复清晰稳定；本句出现代表连续 cleanup wait 已全部完成，背景保持 bg:classroom。
+Narrator: CHECKPOINT 11 - cleanup + consecutive wait。bokeh、blur、rain、snow、sun 均应被移除，画面恢复清晰稳定；本句出现代表连续 cleanup wait 已全部完成，背景保持 bg/classroom。
 @hideChars time:0.2 wait!
 Narrator: CHECKPOINT 12 - hideChars + wait。角色应已隐藏；本句出现后覆盖层即将结束。
 @end

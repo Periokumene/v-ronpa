@@ -1,4 +1,4 @@
-import type { AssetRef } from "@v-ronpa/contracts";
+import type { AssetRequirement } from "@v-ronpa/contracts";
 import type { LayeredCharacterPreloadPlan } from "@v-ronpa/layered-character";
 import type { TextSpan } from "@v-ronpa/nani-parser";
 import type { NaniDiagnosticDisposition } from "@v-ronpa/nani-runtime-compiler";
@@ -31,7 +31,7 @@ export interface NaniDevtoolsDiscoveredSource {
   diagnostics: readonly NaniDevtoolsViteDiagnostic[];
   metadata?: {
     scriptRevision: string;
-    assetRefs: readonly AssetRef[];
+    requirements: readonly AssetRequirement[];
     characterPreloadPlan: LayeredCharacterPreloadPlan;
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AssetRef, RuntimeCommand, VnRuntimeScriptSource } from "@v-ronpa/contracts";
+import type { RuntimeCommand, VnRuntimeScriptSource } from "@v-ronpa/contracts";
 import {
   compileRuntimeScript,
   digestRuntimeScriptSemantics,
@@ -67,15 +67,12 @@ describe("game-a nani catalogs", () => {
     expect(gameAStoryDefinition.catalog.every((item) => !item.scriptPath.includes("/test/"))).toBe(true);
   });
 
-  it("declares the deduplicated asset union from every production script on the entry", () => {
-    const entryRefs = new Set(gameAVnEntry.assetRefs.map((ref) => `${ref.kind}:${ref.id}`));
-    const scriptRefs = gameAStoryDefinition.catalog.flatMap((item) => collectRuntimeCommandAssetRefs(compile(item).commands));
-    expect(scriptRefs.filter((ref) => !entryRefs.has(`${ref.kind}:${ref.id}`))).toEqual([]);
-    expect(scriptRefs).toEqual(expect.arrayContaining([
-      { id: "alice", kind: "character-pack" },
-      { id: "bg:home-outside", kind: "background" },
-      { id: "bgm:dead-fish-riffle", kind: "bgm" },
-      { id: "sfx:gentle-rain-loop", kind: "sfx" }
+  it("declares the generated resource-binding union on the entry", () => {
+    expect(gameAVnEntry.requirements).toEqual(expect.arrayContaining([
+      { id: "char/alice", capability: "json" },
+      { id: "bg/home", capability: "image" },
+      { id: "bgm/dead-fish-riffle", capability: "audio" },
+      { id: "sfx/gentle-rain-loop", capability: "audio" }
     ]));
   });
 });
@@ -92,21 +89,6 @@ function compile(item: VnRuntimeScriptSource) {
   expect(parsed.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
   expect(compiled.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
   return compiled.script;
-}
-
-function collectRuntimeCommandAssetRefs(commands: RuntimeCommand[]): Array<Pick<AssetRef, "id" | "kind">> {
-  const refs = new Map<string, Pick<AssetRef, "id" | "kind">>();
-  const add = (id: string | undefined, kind: AssetRef["kind"]) => {
-    if (id) refs.set(`${kind}:${id}`, { id, kind });
-  };
-  for (const command of commands) {
-    if (command.commandId === "char") add(stringParam(command, "target"), "character-pack");
-    if (command.commandId === "back" || command.commandId === "inback") add(stringParam(command, "appearance"), "background");
-    if (command.commandId === "bgm") add(stringParam(command, "bgmPath"), "bgm");
-    if (command.commandId === "sfx" || command.commandId === "sfxfast") add(stringParam(command, "sfxPath"), "sfx");
-    if (command.commandId === "movie") add(stringParam(command, "moviePath"), "video");
-  }
-  return [...refs.values()].sort((left, right) => `${left.kind}:${left.id}`.localeCompare(`${right.kind}:${right.id}`));
 }
 
 function stringParam(command: RuntimeCommand, key: string): string | undefined {

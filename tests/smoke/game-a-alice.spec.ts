@@ -10,7 +10,7 @@ test.setTimeout(120_000);
 
 test("game-a test character entry stays on title until planned textures are uploaded", async ({ page }) => {
   const delayedRequests: string[] = [];
-  await page.route("**/game-a/characters/alice/assets/layers/**/*.png", async (route) => {
+  await page.route("**/assets/char/alice/assets/layers/**/*.png", async (route) => {
     delayedRequests.push(route.request().url());
     await new Promise((resolve) => setTimeout(resolve, 1_200));
     await route.continue();
@@ -208,7 +208,7 @@ async function advanceVn(page: Page) {
 }
 
 const characterInteriorOffsets = [
-  [0, 65],
+  [0, 100],
   [-30, 137],
   [0, 162],
   [-40, 232],

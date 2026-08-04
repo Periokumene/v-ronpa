@@ -15,6 +15,7 @@ export type UseGameAVnRuntimeOptions = Pick<
   | "prepareScriptPresentation"
   | "storyPlayTiming"
   | "voiceSettings"
+  | "voiceIndex"
   | "catalog"
   | "entry"
   | "sourceDiagnosticPolicy"

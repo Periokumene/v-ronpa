@@ -1,11 +1,17 @@
 import { readFile, readdir, lstat } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type {
-  AssetRef,
+  AssetDefinition,
+  AssetId,
+  AssetRequirement,
   RuntimeScript,
   VnEntryDef,
   VnRuntimeScriptCatalog,
   VnRuntimeScriptSource
+} from "@v-ronpa/contracts";
+import {
+  AssetIdSchema,
+  getNaniCommandDefinition
 } from "@v-ronpa/contracts";
 import {
   deriveLayeredCharacterPreloadPlan,
@@ -78,8 +84,16 @@ export interface NaniProjectDiagnostic {
 
 export interface NaniScriptMetadata {
   scriptRevision: string;
-  assetRefs: readonly AssetRef[];
+  requirements: readonly AssetRequirement[];
   characterPreloadPlan: LayeredCharacterPreloadPlan;
+}
+
+export type NaniVoiceIndex = Readonly<Record<string, Readonly<Record<string, AssetId>>>>;
+
+export interface NaniAssetBindings {
+  appId: string;
+  assets: readonly AssetDefinition[];
+  characterAssetIdByCharacterId: Readonly<Record<string, AssetId>>;
 }
 
 export interface AnalyzedNaniScript extends DiscoveredNaniScript {
@@ -97,6 +111,7 @@ export interface NaniCatalogAnalysis {
   entries: readonly NaniEntryConfig[];
   scripts: readonly AnalyzedNaniScript[];
   catalog: VnRuntimeScriptCatalog;
+  voiceIndex: NaniVoiceIndex;
   diagnostics: readonly NaniProjectDiagnostic[];
   hasFatalDiagnostics: boolean;
   hasRecoverableDiagnostics: boolean;
@@ -109,6 +124,7 @@ export interface DiscoverNaniProjectOptions {
 
 export interface AnalyzeNaniCatalogOptions extends DiscoverNaniProjectOptions {
   entries: readonly NaniEntryConfig[];
+  assetBindings: NaniAssetBindings;
   sourceDiagnosticPolicy: NaniSourceDiagnosticPolicy;
   loadSourceText?: (script: DiscoveredNaniScript) => Promise<string>;
 }
@@ -164,9 +180,9 @@ export function parseNaniProjectConfig(value: unknown): NaniProjectConfig {
     ])
   );
   if (!Array.isArray(project.voiceLocales) || !project.voiceLocales.every(
-    (locale) => typeof locale === "string" && locale.length > 0
+    (locale) => typeof locale === "string" && /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/u.test(locale)
   )) {
-    throw new Error("naniProject.voiceLocales must be an array of non-empty strings.");
+    throw new Error("naniProject.voiceLocales must contain lowercase BCP 47 locale tags.");
   }
   const mainEntry = parseEntryConfig(project.mainEntry, "production", "naniProject.mainEntry");
   const entryIds = [mainEntry, ...Object.values(testEntries)].map((entry) => entry.id);
@@ -290,7 +306,7 @@ export async function analyzeNaniCatalog(
     readFile(script.sourcePath, "utf8"));
   const records = await Promise.all(discovered.map((script) => analyzeScript(
     script,
-    config.voiceLocales,
+    options.assetBindings,
     options.sourceDiagnosticPolicy,
     loadSourceText
   )));
@@ -308,6 +324,8 @@ export async function analyzeNaniCatalog(
   for (const diagnostic of linkDiagnostics) {
     diagnostics.push(catalogDiagnostic(diagnostic, recordsByPath));
   }
+  const voiceBinding = bindVoiceAssets(records, config.voiceLocales, options.assetBindings);
+  diagnostics.push(...voiceBinding.diagnostics);
   if (selectedScopes.includes("production") && selectedScopes.includes("development")) {
     const productionScripts = runnableScripts.filter((script) => script.scope === "production");
     const developmentPaths = new Set(
@@ -354,7 +372,14 @@ export async function analyzeNaniCatalog(
       : script.executionDisposition,
     diagnostics: diagnostics.filter((diagnostic) =>
       diagnostic.scriptPath === script.scriptPath && diagnostic.source !== "entry"
-    )
+    ),
+    metadata: {
+      ...script.metadata,
+      requirements: mergeRequirements(
+        script.metadata.requirements,
+        voiceBinding.requirementsByScript.get(script.scriptPath) ?? []
+      )
+    }
   }));
   return {
     entries: [...options.entries],
@@ -362,6 +387,7 @@ export async function analyzeNaniCatalog(
     catalog: finalScripts
       .filter((script) => script.executionDisposition === "runnable")
       .map((script) => script.source),
+    voiceIndex: voiceBinding.voiceIndex,
     diagnostics,
     hasFatalDiagnostics: diagnostics.some((diagnostic) => diagnostic.disposition === "fatal"),
     hasRecoverableDiagnostics: diagnostics.some((diagnostic) => diagnostic.disposition === "recoverable")
@@ -380,7 +406,7 @@ export function naniEntryLocator(
 
 async function analyzeScript(
   discovered: DiscoveredNaniScript,
-  voiceLocales: readonly string[],
+  assetBindings: NaniAssetBindings,
   policy: NaniSourceDiagnosticPolicy,
   loadSourceText: (script: DiscoveredNaniScript) => Promise<string>
 ): Promise<AnalyzedNaniScriptRecord> {
@@ -388,9 +414,11 @@ async function analyzeScript(
   const parsed = parseScenario({ sourceText, scriptPath: discovered.scriptPath });
   const compiled = compileRuntimeScript(parsed);
   const semanticRevision = await digestRuntimeScriptSemantics(compiled.script);
+  const binding = bindCommandRequirements(compiled.script, discovered, assetBindings);
   const diagnostics = [
     ...parsed.diagnostics.map((diagnostic) => sourceDiagnostic("parser", diagnostic, policy, discovered)),
-    ...compiled.diagnostics.map((diagnostic) => sourceDiagnostic("compiler", diagnostic, policy, discovered))
+    ...compiled.diagnostics.map((diagnostic) => sourceDiagnostic("compiler", diagnostic, policy, discovered)),
+    ...binding.diagnostics
   ];
   const source: VnRuntimeScriptSource = {
     scriptPath: discovered.scriptPath,
@@ -412,7 +440,7 @@ async function analyzeScript(
       diagnostics,
       metadata: {
         scriptRevision: semanticRevision,
-        assetRefs: deriveScriptAssetRefs(compiled.script, voiceLocales),
+        requirements: binding.requirements,
         characterPreloadPlan: deriveLayeredCharacterPreloadPlan(compiled.script)
       }
     }
@@ -592,31 +620,190 @@ function discoveryDiagnostic(
   };
 }
 
-function deriveScriptAssetRefs(
+function bindCommandRequirements(
   script: RuntimeScript,
-  voiceLocales: readonly string[]
-): readonly AssetRef[] {
-  const refs = [...script.assets];
+  discovered: DiscoveredNaniScript,
+  bindings: NaniAssetBindings
+): { requirements: readonly AssetRequirement[]; diagnostics: readonly NaniProjectDiagnostic[] } {
+  const requirements: AssetRequirement[] = [];
+  const diagnostics: NaniProjectDiagnostic[] = [];
   for (const command of script.commands) {
-    const textId = command.commandId === "print" && typeof command.params.textId === "string"
-      ? command.params.textId
-      : undefined;
-    if (!textId) continue;
-    for (const locale of voiceLocales) {
-      refs.push({ id: `voice:${locale}:${textId}`, kind: "voice", tags: [] });
+    const definition = getNaniCommandDefinition(command.commandId);
+    if (!definition) continue;
+    for (const param of definition.params) {
+      const resource = param.resource;
+      if (!resource) continue;
+      const value = command.params[resource.runtimeParam];
+      if (typeof value !== "string" || !value || value.startsWith("group:")) continue;
+      const assetId = resource.resolution === "character-id"
+        ? bindings.characterAssetIdByCharacterId[value]
+        : value;
+      if (!assetId) {
+        if (value !== "*") {
+          diagnostics.push(bindingDiagnostic(
+            "character-asset-missing",
+            `Character '${value}' has no generated character asset binding.`,
+            discovered,
+            command.loc
+          ));
+        }
+        continue;
+      }
+      const parsed = AssetIdSchema.safeParse(assetId);
+      if (!parsed.success) {
+        diagnostics.push(bindingDiagnostic(
+          "invalid-asset-id",
+          `Command @${command.commandId} references invalid AssetId '${assetId}'.`,
+          discovered,
+          command.loc
+        ));
+        continue;
+      }
+      requirements.push({ id: parsed.data, capability: resource.capability });
     }
   }
-  const byId = new Map<string, AssetRef>();
-  for (const ref of refs) {
-    if (ref.id.startsWith("group:")) continue;
-    const previous = byId.get(ref.id);
-    if (previous && previous.kind !== ref.kind) {
-      throw new Error(`Script asset '${ref.id}' is referenced as both '${previous.kind}' and '${ref.kind}'.`);
+  return { requirements: mergeRequirements(requirements), diagnostics };
+}
+
+function bindVoiceAssets(
+  records: readonly AnalyzedNaniScriptRecord[],
+  voiceLocales: readonly string[],
+  bindings: NaniAssetBindings
+): {
+  voiceIndex: NaniVoiceIndex;
+  requirementsByScript: ReadonlyMap<string, readonly AssetRequirement[]>;
+  diagnostics: readonly NaniProjectDiagnostic[];
+} {
+  const diagnostics: NaniProjectDiagnostic[] = [];
+  const configuredLocales = new Set(voiceLocales);
+  const voiceAssetsByLocaleAndStem = new Map<string, AssetId>();
+  for (const asset of bindings.assets) {
+    if (!asset.id.startsWith("voice/")) continue;
+    const parts = asset.id.split("/");
+    if (parts.length !== 3 || !configuredLocales.has(parts[1]!)) {
+      diagnostics.push({
+        source: "catalog",
+        code: "voice-asset-locale-invalid",
+        severity: "error",
+        disposition: "fatal",
+        message: `Voice asset '${asset.id}' must use voice/<configured-locale>/<stem>.`
+      });
+      continue;
     }
-    byId.set(ref.id, { id: ref.id, kind: ref.kind, tags: ref.tags ?? [] });
+    voiceAssetsByLocaleAndStem.set(`${parts[1]}\0${parts[2]}`, asset.id);
   }
-  return [...byId.values()].sort((left, right) =>
-    left.id.localeCompare(right.id) || left.kind.localeCompare(right.kind)
+
+  const occurrences: Array<{
+    textId: string;
+    normalized: string;
+    scriptPath: string;
+    scope: NaniScope;
+    loc: { scriptPath: string; line: number; column: number; raw: string };
+  }> = [];
+  for (const record of records) {
+    for (const command of record.analyzed.runtimeScript.commands) {
+      const textId = command.commandId === "print" && typeof command.params.textId === "string"
+        ? command.params.textId
+        : undefined;
+      if (!textId) continue;
+      const normalized = normalizeVoiceStem(textId, bindings.appId);
+      if (!AssetIdSchema.safeParse(normalized).success || normalized.includes("/")) {
+        diagnostics.push(bindingDiagnostic(
+          "voice-text-id-invalid",
+          `TextId '${textId}' cannot be normalized to a voice asset stem.`,
+          record.analyzed,
+          command.loc
+        ));
+        continue;
+      }
+      occurrences.push({
+        textId,
+        normalized,
+        scriptPath: record.analyzed.scriptPath,
+        scope: record.analyzed.scope,
+        loc: command.loc
+      });
+    }
+  }
+
+  const originalByNormalized = new Map<string, string>();
+  for (const occurrence of occurrences) {
+    const previous = originalByNormalized.get(occurrence.normalized);
+    if (previous && previous !== occurrence.textId) {
+      diagnostics.push(bindingDiagnostic(
+        "voice-text-id-collision",
+        `TextIds '${previous}' and '${occurrence.textId}' normalize to the same voice stem '${occurrence.normalized}'.`,
+        occurrence,
+        occurrence.loc
+      ));
+    } else {
+      originalByNormalized.set(occurrence.normalized, occurrence.textId);
+    }
+  }
+
+  const mutableIndex: Record<string, Record<string, AssetId>> = {};
+  const requirementsByScript = new Map<string, AssetRequirement[]>();
+  for (const locale of [...voiceLocales].sort(stablePathCompare)) {
+    const localeIndex: Record<string, AssetId> = {};
+    for (const occurrence of occurrences) {
+      const assetId = voiceAssetsByLocaleAndStem.get(`${locale}\0${occurrence.normalized}`);
+      if (!assetId) continue;
+      localeIndex[occurrence.textId] = assetId;
+      const requirements = requirementsByScript.get(occurrence.scriptPath) ?? [];
+      requirements.push({ id: assetId, capability: "audio" });
+      requirementsByScript.set(occurrence.scriptPath, requirements);
+    }
+    mutableIndex[locale] = Object.fromEntries(
+      Object.entries(localeIndex).sort(([left], [right]) => stablePathCompare(left, right))
+    );
+  }
+
+  for (const [scriptPath, requirements] of requirementsByScript) {
+    requirementsByScript.set(scriptPath, [...mergeRequirements(requirements)]);
+  }
+  return { voiceIndex: mutableIndex, requirementsByScript, diagnostics };
+}
+
+function normalizeVoiceStem(textId: string, appId: string): string {
+  const normalized = textId
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/gu, "$1-$2")
+    .replace(/[^A-Za-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .toLocaleLowerCase("en-US");
+  const appPrefix = appId
+    .trim()
+    .replace(/[^A-Za-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .toLocaleLowerCase("en-US");
+  return normalized.startsWith(`${appPrefix}-`) ? normalized.slice(appPrefix.length + 1) : normalized;
+}
+
+function bindingDiagnostic(
+  code: string,
+  message: string,
+  discovered: Pick<DiscoveredNaniScript, "scope" | "scriptPath">,
+  loc: { scriptPath: string; line: number; column: number; raw: string }
+): NaniProjectDiagnostic {
+  return {
+    source: "catalog",
+    code,
+    severity: "error",
+    disposition: "fatal",
+    message,
+    scope: discovered.scope,
+    scriptPath: discovered.scriptPath,
+    loc
+  };
+}
+
+function mergeRequirements(...groups: readonly (readonly AssetRequirement[])[]): readonly AssetRequirement[] {
+  const unique = new Map<string, AssetRequirement>();
+  for (const requirement of groups.flat()) {
+    unique.set(`${requirement.id}\0${requirement.capability}`, requirement);
+  }
+  return [...unique.values()].sort((left, right) =>
+    stablePathCompare(left.id, right.id) || stablePathCompare(left.capability, right.capability)
   );
 }
 

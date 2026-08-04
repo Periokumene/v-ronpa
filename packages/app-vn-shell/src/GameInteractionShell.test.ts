@@ -136,6 +136,35 @@ describe("GameInteractionShell view models", () => {
     });
   });
 
+  it("projects pinp only during playable flow while retaining renderer-independent content", () => {
+    const pinpState: UiRuntimeState = {
+      ...createInitialUiRuntimeState(),
+      surfaces: {
+        ...createInitialUiRuntimeState().surfaces,
+        pinp: { targetVisible: true, mounted: true, opacity: 0.6, phase: "showing" }
+      },
+      pinpSequence: 4,
+      pinp: {
+        assetId: "props:milk-bag",
+        uri: "/assets/milk-bag.png",
+        alt: "牛奶袋",
+        positionPercent: [50, 50],
+        heightPercent: 20,
+        aspectRatio: [16, 9]
+      }
+    };
+    const runtime = createRuntime({ uiRuntimeState: pinpState });
+    const playable = createGameInteractionShellViewModels({ flow: createFlow({ mode: "vn" }), runtime });
+
+    expect(playable.pinp).toMatchObject({
+      assetId: "props:milk-bag",
+      revision: 4,
+      presentation: { opacity: 0.6, phase: "showing" }
+    });
+    expect(createGameInteractionShellViewModels({ flow: createFlow({ mode: "paused" }), runtime }).pinp).toBeUndefined();
+    expect(createGameInteractionShellViewModels({ flow: createFlow({ mode: "title" }), runtime }).pinp).toBeUndefined();
+  });
+
   it("keeps fading-out UI mounted and omits terminal hidden UI from view models", () => {
     const fading = createRuntime({
       uiRuntimeState: uiRuntimeStateWithSurfaces({
@@ -425,6 +454,7 @@ function createNoopSurfaces(): GameInteractionShellSurfaces {
     Choices: () => null,
     CommandBar: () => null,
     Cue: () => null,
+    Pinp: () => null,
     Dialog: () => null,
     InputPrompt: () => null,
     PauseSurface: ({ children }) => children,

@@ -21,6 +21,7 @@ import {
 import {
   selectUiSurfacePresentation,
   type RuntimeInputPrompt,
+  type RuntimePinpContent,
   type RuntimeToast,
   type UiRuntimeState,
   type UiSurfacePresentation
@@ -140,6 +141,12 @@ export interface RuntimeToastLayerViewModel {
   toasts: RuntimeToast[];
 }
 
+export interface RuntimePinpViewModel extends RuntimePinpContent {
+  visible: boolean;
+  presentation: UiSurfacePresentation;
+  revision: number;
+}
+
 export interface RuntimeToastActions {
   dismiss(toastId: string): void;
 }
@@ -234,6 +241,7 @@ export interface GameInteractionOverlayActions {
 export interface GameInteractionShellViewModels {
   dialog?: VnDialogViewModel | undefined;
   cue?: VnCueViewModel | undefined;
+  pinp?: RuntimePinpViewModel | undefined;
   choices?: VnChoicesViewModel | undefined;
   commandBar?: VnCommandBarViewModel | undefined;
   title?: TitleViewModel | undefined;
@@ -258,6 +266,7 @@ export interface GameInteractionOverlayViewModelInputs {
 export interface GameInteractionShellSurfaces {
   Dialog: SurfaceSlotComponent<VnDialogViewModel>;
   Cue: SurfaceSlotComponent<VnCueViewModel>;
+  Pinp: SurfaceSlotComponent<RuntimePinpViewModel>;
   Choices: SurfaceSlotComponent<VnChoicesViewModel, VnChoicesActions>;
   CommandBar: SurfaceSlotComponent<VnCommandBarViewModel, VnCommandBarActions>;
   Title: SurfaceSlotComponent<TitleViewModel, TitleActions>;
@@ -305,6 +314,7 @@ export function createGameInteractionShellViewModels({
 }: CreateGameInteractionShellViewModelsInput): GameInteractionShellViewModels {
   const dialogPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "dialog");
   const cuePresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "cue");
+  const pinpPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "pinp");
   const commandBarPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "commandBar");
   const toastLayerPresentation = selectUiSurfacePresentation(runtime.uiRuntime.state, "toastLayer");
   const showPlayableUi = flow.mode !== "title" && flow.mode !== "paused";
@@ -312,6 +322,10 @@ export function createGameInteractionShellViewModels({
     ? selectCurrentStoryLine(runtime.storyRuntime.state)
     : undefined;
   const showCue = runtime.storyRuntime.active && showPlayableUi && cuePresentation.mounted && currentLine?.channel === "cue";
+  const showPinp = runtime.storyRuntime.active &&
+    showPlayableUi &&
+    pinpPresentation.mounted &&
+    Boolean(runtime.uiRuntime.state.pinp);
   const showDialog = runtime.storyRuntime.active &&
     showPlayableUi &&
     dialogPresentation.mounted &&
@@ -358,6 +372,16 @@ export function createGameInteractionShellViewModels({
               ? { richText: runtime.storyTextRevealRuntime.visibleRichText ?? currentLine.richText }
               : {}),
             ...(storyTextDisplay ? { display: storyTextDisplay } : {})
+          }
+        }
+      : {}),
+    ...(showPinp && runtime.uiRuntime.state.pinp
+      ? {
+          pinp: {
+            visible: true,
+            presentation: pinpPresentation,
+            revision: runtime.uiRuntime.state.pinpSequence,
+            ...runtime.uiRuntime.state.pinp
           }
         }
       : {}),

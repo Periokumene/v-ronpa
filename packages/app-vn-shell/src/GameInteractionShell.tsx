@@ -6,6 +6,7 @@ import {
   ReadOnlyBacklogOverlay,
   RuntimeInputPromptSurface,
   RuntimeMovieOverlaySurface,
+  RuntimePinpSurface,
   RuntimeToastLayer,
   SaveLoadOverlay,
   SettingsOverlay,
@@ -29,6 +30,7 @@ import {
   type RuntimeInputPromptViewModel,
   type RuntimeToastActions,
   type RuntimeToastLayerViewModel,
+  type RuntimePinpViewModel,
   type PauseSurfaceActions,
   type PauseSurfaceViewModel,
   type SaveLoadOverlayActions,
@@ -186,6 +188,7 @@ export function GameInteractionShell({
       {showAdvanceHitPlane ? <VnAdvanceHitPlane onAdvance={() => runtime.advanceStory("manual")} /> : null}
       {models.dialog ? <resolvedSurfaces.Dialog model={models.dialog} actions={{}} /> : null}
       {models.cue ? <resolvedSurfaces.Cue model={models.cue} actions={{}} /> : null}
+      {models.pinp ? <resolvedSurfaces.Pinp model={models.pinp} actions={{}} /> : null}
       {models.choices ? (
         <resolvedSurfaces.Choices
           model={models.choices}
@@ -310,6 +313,7 @@ export function renderGameInteractionPauseSurface({
 export const defaultGameInteractionShellSurfaces: GameInteractionShellSurfaces = {
   Dialog: DefaultDialogSurface,
   Cue: DefaultCueSurface,
+  Pinp: DefaultPinpSurface,
   Choices: DefaultChoicesSurface,
   CommandBar: DefaultCommandBarSurface,
   Title: DefaultTitleSurface,
@@ -351,6 +355,10 @@ function DefaultCueSurface({ model }: SurfaceSlotProps<VnCueViewModel>) {
       presentation={model.presentation}
     />
   );
+}
+
+function DefaultPinpSurface({ model }: SurfaceSlotProps<RuntimePinpViewModel>) {
+  return <RuntimePinpSurface {...model} />;
 }
 
 function DefaultChoicesSurface({ actions, model }: SurfaceSlotProps<VnChoicesViewModel, VnChoicesActions>) {

@@ -1,7 +1,7 @@
 #Start
 @showUI dialog
 @showUI commandBar visible:true
-@back bg:game-a-academy-hall-fullscreen effect:fade time:0.05
+@back bg/academy-hall effect:fade time:0.05
 @charTone rain
 @char alice pos:50 time:0.3 wait!
 Narrator: CHECKPOINT CHARACTER 00 - default composition.

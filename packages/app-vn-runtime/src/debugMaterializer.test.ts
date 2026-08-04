@@ -61,12 +61,12 @@ describe("VN debug inspection and materialization", () => {
     const inspection = await inspectVnDebugScript(entry([
       "#Start",
       '@set route:"preview"',
-      "@back bg:harness effect:fade time:0.2 wait!",
+      "@back bg/harness effect:fade time:0.2 wait!",
       "@char Ema.Pensive1 pos:50 time:0.1 wait!",
       "@charTone rain amount:1.25 time:0.1 wait!",
       "@rain power:0.5 wind:-1 hue:215 tint:0.55 time:0.1 wait!",
-      "@bgm bgm:harness group:music volume:0.4",
-      "@sfx sfx:rain group:rain loop:true volume:0.25",
+      "@bgm bgm/harness group:music volume:0.4",
+      "@sfx sfx/rain group:rain loop:true volume:0.25",
       "@hideUI commandBar time:0.2 wait!",
       "Felix: Stable preview.|#preview_line|",
       "@end"
@@ -81,7 +81,7 @@ describe("VN debug inspection and materialization", () => {
       text: { current: { channel: "dialog", speaker: "Felix", text: "Stable preview." } }
     });
     expect(result.checkpoint.pixiStage).toMatchObject({
-      backgroundsById: { [PIXI_MAIN_BACKGROUND_ID]: { appearance: "bg:harness" } },
+      backgroundsById: { [PIXI_MAIN_BACKGROUND_ID]: { appearance: "bg/harness" } },
       charactersById: { Ema: { appearanceExpression: "Pensive1", pos: [0.5, 0] } },
       characterTone: {
         preset: "rain",
@@ -91,8 +91,8 @@ describe("VN debug inspection and materialization", () => {
       weather: { rain: { commandParams: { power: 0.5, wind: -1, hue: 215, tint: 0.55 } } }
     });
     expect(result.checkpoint.ui.commandBar).toBe(false);
-    expect(result.checkpoint.media.bgmByGroup.music).toEqual({ sourceRef: "bgm:harness", volume: 0.4 });
-    expect(result.checkpoint.media.loopingSfxByKey.rain).toEqual({ sourceRef: "sfx:rain", group: "rain", volume: 0.25 });
+    expect(result.checkpoint.media.bgmByGroup.music).toEqual({ assetId: "bgm/harness", volume: 0.4 });
+    expect(result.checkpoint.media.loopingSfxByKey.rain).toEqual({ assetId: "sfx/rain", group: "rain", volume: 0.25 });
   });
 
   it("treats cue as a stable StoryText target with terminal Cue visibility", async () => {
@@ -386,9 +386,9 @@ describe("VN debug inspection and materialization", () => {
     const conditional = await inspectVnDebugScript(entry([
       "#Start",
       "@set showBg:true",
-      "@back bg:harness if:{showBg}",
+      "@back bg/harness if:{showBg}",
       "@goto #Result",
-      "@back bg:unused",
+      "@back bg/unused",
       "#Result",
       "Narrator: Conditional.|#conditional|"
     ].join("\n")));
@@ -400,12 +400,12 @@ describe("VN debug inspection and materialization", () => {
     });
     expect(conditionalResult.status).toBe("ready");
     if (conditionalResult.status === "ready") {
-      expect(conditionalResult.checkpoint.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
+      expect(conditionalResult.checkpoint.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg/harness");
     }
 
     const expression = await inspectVnDebugScript(entry([
       "#Start",
-      "@back bg:harness if:{missingVariable}",
+      "@back bg/harness if:{missingVariable}",
       "Narrator: Never.|#after_expression|"
     ].join("\n")));
     const expressionTarget = expression.commands.find((command) => command.anchor.stableId === "print:after_expression")!.anchor;
@@ -571,7 +571,7 @@ describe("VN debug inspection and materialization", () => {
       initialScriptPath: "game-a/opening.nani",
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     };
     const chapter = await inspectDebugScriptImpl(runtimeEntry, {
       scriptPath: "game-a/chapter-02.nani",
@@ -638,7 +638,7 @@ describe("VN debug inspection and materialization", () => {
       initialScriptPath: "game-a/opening.nani",
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     };
     const chapter = await inspectDebugScriptImpl(runtimeEntry, {
       scriptPath: "game-a/chapter-02.nani",
@@ -699,7 +699,7 @@ describe("VN debug inspection and materialization", () => {
       initialScriptPath: "game-a/chapter-01.nani",
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     };
     const firstDraft: VnRuntimeScriptSource = {
       scriptPath: "game-a/chapter-01.nani",
@@ -707,7 +707,7 @@ describe("VN debug inspection and materialization", () => {
       sourceText: [
         "#Start",
         '@set route:"from-first"',
-        "@back bg:harness",
+        "@back bg/harness",
         "@charTone rain",
         '@choice "Continue" goto:game-a/chapter-02.nani#Start id:continue',
         '@choice "Stay" goto:#Stay id:stay',
@@ -760,7 +760,7 @@ describe("VN debug inspection and materialization", () => {
     });
     expect(result.checkpoint.story.variables).toEqual({ route: "from-first" });
     expect(result.checkpoint.story.text?.current?.text).toBe("Arrived.");
-    expect(result.checkpoint.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
+    expect(result.checkpoint.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg/harness");
     expect(result.checkpoint.pixiStage.characterTone).toBeUndefined();
     expect(result.executedScriptPaths).toEqual([
       "game-a/chapter-01.nani",
@@ -780,7 +780,7 @@ describe("VN debug inspection and materialization", () => {
       initialScriptPath: "game-a/opening.nani",
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     };
     const opening = await inspectDebugScriptImpl(runtimeEntry, {
       scriptPath: "game-a/opening.nani",
@@ -830,7 +830,7 @@ function entry(sourceText: string): DebugTestScript {
       initialScriptPath: "game-a/debug-test.nani",
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     },
     source: {
       scriptPath: "game-a/debug-test.nani",

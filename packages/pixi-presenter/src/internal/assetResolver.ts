@@ -1,9 +1,6 @@
-import type { RuntimeAssetKind } from "@v-ronpa/contracts";
+import type { AssetRequirement } from "@v-ronpa/contracts";
 
-export interface PixiAssetResolveInput {
-  id: string;
-  kind: RuntimeAssetKind;
-}
+export type PixiAssetResolveInput = AssetRequirement;
 
 export interface PixiAssetResolveResult {
   uri?: string;
@@ -24,7 +21,7 @@ export interface PixiPresenterDiagnostic {
   severity: "info" | "warning" | "error";
   message: string;
   assetId?: string;
-  kind?: RuntimeAssetKind;
+  capability?: AssetRequirement["capability"];
 }
 
 export function resolvePixiAsset(
@@ -38,8 +35,8 @@ export function resolvePixiAsset(
       code: "asset-resolver-missing",
       severity: "error",
       assetId: input.id,
-      kind: input.kind,
-      message: `Pixi asset '${input.id}' (${input.kind}) could not be resolved because no AssetResolver was provided.`
+      capability: input.capability,
+      message: `Pixi asset '${input.id}' (${input.capability}) could not be resolved because no AssetResolver was provided.`
     });
     return undefined;
   }
@@ -50,8 +47,8 @@ export function resolvePixiAsset(
     code: resolved.diagnostic?.code ?? "asset-missing",
     severity: resolved.diagnostic?.severity ?? "error",
     assetId: input.id,
-    kind: input.kind,
-    message: resolved.diagnostic?.message ?? `Pixi asset '${input.id}' (${input.kind}) could not be resolved.`
+    capability: input.capability,
+    message: resolved.diagnostic?.message ?? `Pixi asset '${input.id}' (${input.capability}) could not be resolved.`
   });
   return undefined;
 }
@@ -62,7 +59,7 @@ export function pixiAssetLoadFailed(input: PixiAssetResolveInput, error: unknown
     code: "asset-load-failed",
     severity: "error",
     assetId: input.id,
-    kind: input.kind,
-    message: `Pixi asset '${input.id}' (${input.kind}) failed to load: ${error instanceof Error ? error.message : String(error)}`
+    capability: input.capability,
+    message: `Pixi asset '${input.id}' (${input.capability}) failed to load: ${error instanceof Error ? error.message : String(error)}`
   };
 }

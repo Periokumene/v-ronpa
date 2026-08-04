@@ -88,11 +88,11 @@ export function createVnRuntimeAssetDiagnostic(
     severity?: "info" | "warning" | "error";
     id?: string;
     assetId?: string;
-    kind?: string;
+    capability?: string;
   }
 ): VnRuntimeDiagnostic {
   const assetId = diagnostic.assetId ?? diagnostic.id;
-  const detail = [assetId, diagnostic.kind].filter(Boolean).join(" ");
+  const detail = [assetId, diagnostic.capability].filter(Boolean).join(" ");
   return {
     source: "asset",
     code: diagnostic.code ?? "asset-unresolved",

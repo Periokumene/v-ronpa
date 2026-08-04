@@ -93,6 +93,32 @@ export const textUiMediaNormalizers: Readonly<Record<string, CommandNormalizerDe
         wait: runtimeParam(command, "wait") ?? false
       })
   },
+  pinp: {
+    acceptsPrimary: true,
+    consumedParams: ["assetId", "pos", "height", "ratio", "alt", "effect", "time", "visible"],
+    normalize: (command) => {
+      const visible = runtimeParam(command, "visible") ?? true;
+      const effect = runtimeParam(command, "effect") ?? "fade";
+      const requestedDuration = durationMsValue(runtimeParam(command, "time"));
+      if (visible === false) {
+        return compactParams({
+          effect,
+          durationMs: effect === "none" ? 0 : requestedDuration ?? 180,
+          visible: false
+        });
+      }
+      return compactParams({
+        assetId: runtimeCommandValue(command.primary) ?? runtimeParam(command, "assetId"),
+        positionPercent: runtimeParam(command, "pos") ?? [50, 50],
+        heightPercent: runtimeParam(command, "height") ?? 20,
+        aspectRatio: runtimeParam(command, "ratio") ?? [16, 9],
+        alt: runtimeParam(command, "alt") ?? "",
+        effect,
+        durationMs: effect === "none" ? 0 : requestedDuration ?? 180,
+        visible
+      });
+    }
+  },
   toast: {
     acceptsPrimary: true,
     consumedParams: ["text", "appearance", "time"],

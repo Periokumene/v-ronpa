@@ -201,14 +201,20 @@ function checkVscodeNaniProjectAuthority() {
   requirePattern(
     assetLoaderPath,
     assetLoader,
-    /requiredString\(config\.runtimeAssetOutputPath,\s*["']runtimeAssetOutputPath["']\)/u,
-    "runtimeAssetOutputPath-only asset loading"
+    /scanAssetProject[\s\S]*?from\s*["']@v-ronpa\/asset-project["']/u,
+    "shared asset-project scanner loading"
+  );
+  requirePattern(
+    projectScriptsPath,
+    projectScripts,
+    /join\(dirname\(configPath\),\s*["']nani\.config\.mjs["']\)/u,
+    "sibling nani.config.mjs loading"
   );
   rejectPattern(
     assetLoaderPath,
     assetLoader,
-    /(?:requiredString\()?config\.outputPath\b/u,
-    "legacy outputPath asset loading"
+    /\b(?:runtimeAssetOutputPath|outputPath|publicRoot|publicBaseUri)\b/u,
+    "legacy generated-module asset loading"
   );
 }
 

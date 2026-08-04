@@ -54,7 +54,7 @@ const howlerMock = vi.hoisted(() => {
 vi.mock("howler", () => ({ Howl: howlerMock.Howl }));
 
 const baseSave = SaveDataSchema.parse({
-  version: 9 as const,
+  version: 11 as const,
   gameId: "game:test",
   savedAt: "2026-06-14T00:00:00.000Z",
   mode: "navi" as const,
@@ -69,13 +69,13 @@ const baseSave = SaveDataSchema.parse({
       ended: false
     },
     pixiStage: {
-      version: 5 as const,
+      version: 6 as const,
       revision: 2,
       backgroundsById: {
         MainBackground: {
           id: "MainBackground",
           kind: "background",
-          appearance: "bg:harness"
+          appearance: "bg/harness"
         }
       },
       charactersById: {
@@ -97,10 +97,10 @@ const baseSave = SaveDataSchema.parse({
       }
     },
     media: {
-      bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
-      loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+      bgmByGroup: { music: { assetId: "bgm/main", volume: 0.4 } },
+      loopingSfxByKey: { rain: { assetId: "sfx/rain", volume: 0.3, group: "rain" } }
     },
-    ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+    ui: { dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null }
   },
   navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
   trial: null,
@@ -134,7 +134,7 @@ describe("media save contracts", () => {
     vi.useRealTimers();
   });
 
-  it("validates v9 saves through the strict parse boundary", () => {
+  it("validates v11 saves through the strict parse boundary", () => {
     expect(parseSaveData(baseSave)).toEqual(baseSave);
     expect(parseSaveData(baseSave).vn?.pixiStage.characterTone).toMatchObject({
       preset: "rain",
@@ -279,11 +279,23 @@ describe("media save contracts", () => {
     const result = await port.save({
       id: "slot:bad",
       label: "Bad",
-      data: { ...baseSave, version: 3 } as unknown as typeof baseSave
+      data: { ...baseSave, mode: "title" } as unknown as typeof baseSave
     });
 
     expect(result).toMatchObject({ ok: false, error: { code: "invalid-save" } });
     await expect(port.listSummaries()).resolves.toEqual({ ok: true, value: [summary] });
+  });
+
+  it("reports unsupported SaveData versions without writing or converting them", async () => {
+    const port = createMemorySavePort();
+    const result = await port.save({
+      id: "slot:legacy",
+      label: "Legacy",
+      data: { ...baseSave, version: 10 } as unknown as typeof baseSave
+    });
+
+    expect(result).toMatchObject({ ok: false, error: { code: "unsupported-version" } });
+    await expect(port.list()).resolves.toEqual({ ok: true, value: [] });
   });
 
   it("rejects previews that drift from the shared thumbnail policy", async () => {
@@ -337,8 +349,8 @@ describe("media save contracts", () => {
   it("passes loop options through playSfx and releases one-shot handles on end", () => {
     const port = createHowlerAudioPort();
 
-    port.playSfx("sfx:door", "/door.ogg", { volume: 0.6 });
-    port.playSfx("sfx:rain", "/rain.ogg", { loop: true, volume: 0.35 });
+    port.playSfx("sfx/door", "/door.ogg", { volume: 0.6 });
+    port.playSfx("sfx/rain", "/rain.ogg", { loop: true, volume: 0.35 });
 
     expect(howlerMock.instances[0]?.config).toMatchObject({ src: ["/door.ogg"], loop: false, volume: 0.6 });
     expect(howlerMock.instances[1]?.config).toMatchObject({ src: ["/rain.ogg"], loop: true, volume: 0.35 });
@@ -356,8 +368,8 @@ describe("media save contracts", () => {
   it("fades BGM and SFX in from zero to the target volume", () => {
     const port = createHowlerAudioPort();
 
-    port.playBgm("bgm:main", "/main.ogg", { volume: 0.7, fadeInMs: 300 });
-    port.playSfx("sfx:rain", "/rain.ogg", { loop: true, volume: 0.35, fadeInMs: 250 });
+    port.playBgm("bgm/main", "/main.ogg", { volume: 0.7, fadeInMs: 300 });
+    port.playSfx("sfx/rain", "/rain.ogg", { loop: true, volume: 0.35, fadeInMs: 250 });
 
     expect(howlerMock.instances[0]?.config).toMatchObject({ src: ["/main.ogg"], loop: true, volume: 0 });
     expect(howlerMock.instances[0]?.fade).toHaveBeenCalledWith(0, 0.7, 300);
@@ -368,7 +380,7 @@ describe("media save contracts", () => {
   it("plays dialogue bleep as a looped handle until stopped", async () => {
     const port = createHowlerAudioPort();
 
-    const handle = port.playDialogueBleep("dialogue-bleep:line", "/bleep.ogg", { volume: 0.4 });
+    const handle = port.playDialogueBleep("dialogue-bleep/line", "/bleep.ogg", { volume: 0.4 });
 
     expect(howlerMock.instances[0]?.config).toMatchObject({ src: ["/bleep.ogg"], loop: true, volume: 0.4 });
     expect(registeredHowlerEvents(0)).toEqual(["loaderror", "playerror"]);
@@ -382,7 +394,7 @@ describe("media save contracts", () => {
   it("plays voice as a one-shot handle and resolves finished on end", async () => {
     const port = createHowlerAudioPort();
 
-    const handle = port.playVoice("voice:zh:line", "/voice.ogg", { volume: 0.5 });
+    const handle = port.playVoice("voice/zh/line", "/voice.ogg", { volume: 0.5 });
 
     expect(howlerMock.instances[0]?.config).toMatchObject({ src: ["/voice.ogg"], loop: false, volume: 0.5 });
     expect(howlerMock.instances[0]?.once).toHaveBeenCalledWith("end", expect.any(Function));
@@ -398,7 +410,7 @@ describe("media save contracts", () => {
   it("fades to zero and resolves stopped exactly once", async () => {
     vi.useFakeTimers();
     const port = createHowlerAudioPort();
-    const handle = port.playBgm("bgm:main", "/main.ogg", { volume: 0.7 });
+    const handle = port.playBgm("bgm/main", "/main.ogg", { volume: 0.7 });
     const howl = howlerMock.instances[0];
 
     handle.fadeOutAndStop(250);
@@ -420,7 +432,7 @@ describe("media save contracts", () => {
   it("clears fade timers when a handle is stopped immediately", async () => {
     vi.useFakeTimers();
     const port = createHowlerAudioPort();
-    const handle = port.playBgm("bgm:main", "/main.ogg");
+    const handle = port.playBgm("bgm/main", "/main.ogg");
     const howl = howlerMock.instances[0];
 
     handle.fadeOutAndStop(500);
@@ -433,9 +445,9 @@ describe("media save contracts", () => {
 
   it("resolves stopped when handles are replaced or stopAll is called", async () => {
     const port = createHowlerAudioPort();
-    const first = port.playVoice("voice:zh:line", "/first.ogg");
-    const second = port.playVoice("voice:zh:line", "/second.ogg");
-    const bgm = port.playBgm("bgm:main", "/main.ogg");
+    const first = port.playVoice("voice/zh/line", "/first.ogg");
+    const second = port.playVoice("voice/zh/line", "/second.ogg");
+    const bgm = port.playBgm("bgm/main", "/main.ogg");
 
     await expect(first.finished).resolves.toEqual({ reason: "stopped" });
     expect(howlerMock.instances[0]?.stop).toHaveBeenCalledTimes(1);
@@ -450,8 +462,8 @@ describe("media save contracts", () => {
 
   it("resolves failed when Howler reports asynchronous load or play errors", async () => {
     const port = createHowlerAudioPort();
-    const loadFailure = port.playVoice("voice:zh:missing", "/missing.ogg");
-    const playFailure = port.playBgm("bgm:locked", "/locked.ogg");
+    const loadFailure = port.playVoice("voice/zh/missing", "/missing.ogg");
+    const playFailure = port.playBgm("bgm/locked", "/locked.ogg");
 
     howlerMock.instances[0]?.emit("loaderror", 1, "missing asset");
     howlerMock.instances[1]?.emit("playerror", 2, "autoplay denied");
@@ -474,7 +486,7 @@ describe("media save contracts", () => {
     });
     const port = createHowlerAudioPort();
 
-    const handle = port.playVoice("voice:zh:blocked", "/blocked.ogg");
+    const handle = port.playVoice("voice/zh/blocked", "/blocked.ogg");
 
     expect(registeredHowlerEvents(0)).toEqual(["end", "loaderror", "playerror"]);
     await expect(handle.finished).resolves.toEqual({ reason: "failed" });

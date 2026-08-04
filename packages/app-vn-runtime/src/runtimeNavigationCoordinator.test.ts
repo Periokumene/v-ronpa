@@ -10,7 +10,7 @@ const entry: VnEntryDef = {
   initialScriptPath: "game/a.nani",
   startLabel: "Start",
   profile: "vn2d",
-  assetRefs: []
+  requirements: []
 };
 
 describe("runtime script navigation coordinator", () => {
@@ -57,6 +57,26 @@ describe("runtime script navigation coordinator", () => {
     });
     if (result.ok) expect(result.session.story.variables.crossed).toBe(true);
     expect(prepareScript).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops pre-boundary pinp commands and keeps the target script pinp", async () => {
+    const catalog = compile([
+      source("game/a.nani", "#Start\n@pinp props:old effect:none\n@goto game/b.nani#Start"),
+      source("game/b.nani", "#Start\n@pinp props:new effect:none\nNarrator: Done.")
+    ]);
+    const first = advanceVnSession(catalog.recordsByPath.get("game/a.nani")!.bootSession, "start");
+    const result = await coordinateVnScriptNavigation({
+      catalog,
+      isCancelled: () => false,
+      prepareScript: async () => ({ ok: true }),
+      source: "start",
+      step: first
+    });
+
+    expect(result).toMatchObject({ ok: true, crossedScript: true });
+    if (!result.ok) throw new Error(result.message);
+    expect(result.runtimeCommands.filter((command) => command.commandId === "pinp")).toHaveLength(1);
+    expect(result.runtimeCommands.find((command) => command.commandId === "pinp")?.params.assetId).toBe("props:new");
   });
 
   it("rejects loops and cancellation without returning a committable session", async () => {

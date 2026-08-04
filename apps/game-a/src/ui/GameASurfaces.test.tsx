@@ -20,6 +20,7 @@ import {
   GameACommandBar,
   GameACueSurface,
   GameADialogSurface,
+  GameAPinpSurface,
   GameASettingsContent,
   type GameASettingsTab,
   type GameASurfaceNavigation
@@ -40,11 +41,28 @@ describe("game-a interaction surfaces", () => {
       "Dialog",
       "InputPrompt",
       "PauseSurface",
+      "Pinp",
       "SaveLoadOverlay",
       "SettingsOverlay",
       "Title",
       "ToastLayer"
     ]);
+  });
+
+  it("customizes pinp through the formal slot without consuming runtime state directly", () => {
+    const markup = renderToStaticMarkup(<GameAPinpSurface actions={{}} model={{
+      visible: true,
+      assetId: "props:milk-bag",
+      uri: "/assets/milk-bag.png",
+      alt: "牛奶袋",
+      positionPercent: [50, 50],
+      heightPercent: 20,
+      aspectRatio: [16, 9],
+      revision: 1,
+      presentation: { targetVisible: true, mounted: true, opacity: 1, phase: "shown" }
+    }} />);
+    expect(markup).toContain('class="game-a-pinp-surface"');
+    expect(markup).toContain('data-testid="runtime-pinp-image"');
   });
 
   it("renders the resolved title art with six ordered menu entries and preserves existing action dispatch", () => {
@@ -69,13 +87,13 @@ describe("game-a interaction surfaces", () => {
       "title-exit"
     ];
 
-    expect(assets.titleBackgroundUri).toBe("/game-a/backgrounds/title.png");
+    expect(assets.titleBackgroundUri).toBe("/assets/bg/title.png");
     expect(root?.props).toMatchObject({ "data-background": "resolved", className: "game-a-title-surface" });
     expect(background?.props).toMatchObject({
       alt: "",
       "aria-hidden": "true",
       className: "game-a-title-background",
-      src: "/game-a/backgrounds/title.png"
+      src: "/assets/bg/title.png"
     });
     expect(entryTestIds.map((testId) => titleEntryLabel(findElementByTestId(element, testId)))).toEqual([
       "开始故事",
@@ -129,7 +147,7 @@ describe("game-a interaction surfaces", () => {
           code: "asset-missing",
           severity: "error",
           id: input.id,
-          ...(input.kind ? { kind: input.kind } : {}),
+          capability: input.capability,
           message: "missing title background"
         }
       } : registry.resolve(input)
@@ -146,7 +164,7 @@ describe("game-a interaction surfaces", () => {
 
     expect(assets.titleBackgroundUri).toBeUndefined();
     expect(assets.diagnostics).toMatchObject([
-      { code: "asset-missing", id: "bg:title", kind: "background" }
+      { code: "asset-missing", id: "bg/title", capability: "image" }
     ]);
     expect(findElementByTestId(element, "title-surface")?.props).toMatchObject({ "data-background": "fallback" });
     expect(findElementByTestId(element, "title-background")).toBeUndefined();
@@ -163,16 +181,16 @@ describe("game-a interaction surfaces", () => {
     });
     const root = findElementByTestId(element, "vn-dialog-surface");
 
-    expect(assets.dialogFrameUri).toBe("/game-a/ui/game-a-dialog-frame.png");
+    expect(assets.dialogFrameUri).toBe("/assets/ui/dialog-frame.png");
     expect(assets.uiAudio).toEqual({
       cues: {
-        activate: { gain: 1, uri: "/game-a/media/sfx/ui-click-default.ogg" },
-        hover: { gain: 1, uri: "/game-a/media/sfx/ui-hover-default.ogg" }
+        activate: { gain: 1, uri: "/assets/sfx/ui-click-default.ogg" },
+        hover: { gain: 1, uri: "/assets/sfx/ui-hover-default.ogg" }
       },
       defaults: { click: "activate", hover: "hover" },
       hoverThrottleMs: 60
     });
-    expect(gameAUiConfig.dialog.frameAssetId).toBe("texture:ui:game-a-dialog-frame");
+    expect(gameAUiConfig.dialog.frameAssetId).toBe("ui/dialog-frame");
     expect(gameAUiConfig.dialog.appearance).toEqual({ backgroundOpacity: 1 });
     expect(assets.diagnostics).toEqual([]);
     expect(root?.props).toMatchObject({ "data-frame": "resolved" });
@@ -327,12 +345,12 @@ describe("game-a interaction surfaces", () => {
   it("returns diagnostics and keeps the dialog renderable when the texture is missing", () => {
     const registry = createAssetRegistry(gameAContentManifest);
     const missingResolver: AssetResolver = {
-      resolve: (input) => input.kind === "texture" ? {
+      resolve: (input) => input.id === gameAUiConfig.dialog.frameAssetId ? {
         diagnostic: {
           code: "asset-missing",
           severity: "error",
           id: input.id,
-          kind: input.kind,
+          capability: input.capability,
           message: "missing texture"
         }
       } : registry.resolve(input)
@@ -347,7 +365,7 @@ describe("game-a interaction surfaces", () => {
     const root = findElementByTestId(element, "vn-dialog-surface");
 
     expect(assets.dialogFrameUri).toBeUndefined();
-    expect(assets.diagnostics).toMatchObject([{ code: "asset-missing", id: "texture:ui:game-a-dialog-frame" }]);
+    expect(assets.diagnostics).toMatchObject([{ code: "asset-missing", id: "ui/dialog-frame" }]);
     expect(root?.props).toMatchObject({ "data-frame": "fallback" });
     expect(findElementByTestId(element, "vn-dialog-text")).toBeDefined();
   });
@@ -355,12 +373,12 @@ describe("game-a interaction surfaces", () => {
   it("reports missing UI audio without creating an alternate resolver or blocking the dialog texture", () => {
     const registry = createAssetRegistry(gameAContentManifest);
     const missingAudioResolver: AssetResolver = {
-      resolve: (input) => input.kind === "sfx" ? {
+      resolve: (input) => input.capability === "audio" ? {
         diagnostic: {
           code: "asset-missing",
           severity: "error",
           id: input.id,
-          kind: input.kind,
+          capability: input.capability,
           message: "missing UI sound"
         }
       } : registry.resolve(input)
@@ -368,11 +386,11 @@ describe("game-a interaction surfaces", () => {
 
     const assets = resolveGameAUiAssets(missingAudioResolver, gameAUiConfig);
 
-    expect(assets.dialogFrameUri).toBe("/game-a/ui/game-a-dialog-frame.png");
+    expect(assets.dialogFrameUri).toBe("/assets/ui/dialog-frame.png");
     expect(assets.uiAudio.cues).toEqual({});
     expect(assets.diagnostics).toMatchObject([
-      { code: "asset-missing", id: "sfx:ui-hover-default", kind: "sfx" },
-      { code: "asset-missing", id: "sfx:ui-click-default", kind: "sfx" }
+      { code: "asset-missing", id: "sfx/ui-hover-default", capability: "audio" },
+      { code: "asset-missing", id: "sfx/ui-click-default", capability: "audio" }
     ]);
   });
 

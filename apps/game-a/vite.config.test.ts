@@ -5,11 +5,11 @@ import {
   resolveGameANaniDevtoolsProject,
   resolveGameAViteCacheDir
 } from "./vite.config";
-import gameAAssetConfig from "./asset.config.mjs";
+import gameANaniConfig from "./nani.config.mjs";
 
 describe("game-a Vite config", () => {
   it("uses the canonical physical scope directories without changing logical catalog roots", () => {
-    expect(gameAAssetConfig.naniProject.scopes).toEqual({
+    expect(gameANaniConfig.scopes).toEqual({
       production: {
         sourceRoot: "apps/game-a/src/nani",
         scriptRoot: "game-a"

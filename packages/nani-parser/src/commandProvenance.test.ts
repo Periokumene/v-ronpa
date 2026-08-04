@@ -63,10 +63,10 @@ describe("command syntax provenance", () => {
     expect(source.slice(quotedParamSource?.valueSpan?.start, quotedParamSource?.valueSpan?.end)).toBe("A:B,C");
   });
 
-  it("preserves structural lists and multi-colon resource metadata", () => {
+  it("preserves structural lists and multi-colon named metadata", () => {
     const source = [
       "@char Ema.Happy,ArmL1,ArmR2",
-      "@inback bg:framed-room:variant",
+      "@inback variant:framed-room:night",
       '@showUI uINames:"dialog, inventory,toastLayer"'
     ].join("\n");
     const result = parseScenario({ sourceText: source, scriptPath: "structural-list.nani" });
@@ -86,7 +86,7 @@ describe("command syntax provenance", () => {
     expect(result.sourceMap.statements[0]?.command?.arguments[0]?.itemSpans.map((span) => source.slice(span.start, span.end)))
       .toEqual(["Ema.Happy", "ArmL1", "ArmR2"]);
     expect(background.params).toEqual({
-      bg: { type: "string", value: "framed-room:variant" }
+      variant: { type: "string", value: "framed-room:night" }
     });
     expect(showUi.params.uINames).toEqual({
       type: "list",
@@ -98,10 +98,7 @@ describe("command syntax provenance", () => {
     });
     expect(result.sourceMap.statements[2]?.command?.arguments[0]?.itemSpans.map((span) => source.slice(span.start, span.end)))
       .toEqual(["dialog", "inventory", "toastLayer"]);
-    expect(result.scenario.assets).toEqual([
-      { id: "Ema", kind: "character-pack" },
-      { id: "bg:framed-room:variant", kind: "background" }
-    ]);
+    expect("assets" in result.scenario).toBe(false);
   });
 
   it("maps escaped quotes and backslashes to their complete raw escape spans", () => {

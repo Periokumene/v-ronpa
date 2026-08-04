@@ -464,9 +464,8 @@ async function createCharacterPreviewFixture(): Promise<{ bodyPng: vscode.Uri; p
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
   assert.ok(workspaceFolder, "Extension Host test workspace is available");
   const root = workspaceFolder.uri;
-  const pack = vscode.Uri.joinPath(root, "public/example/characters/alice");
+  const pack = vscode.Uri.joinPath(root, "assets/char/alice");
   const layers = vscode.Uri.joinPath(pack, "assets/layers");
-  const generated = vscode.Uri.joinPath(root, "src/generatedAssets.ts");
   const png = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lBY8WQAAAABJRU5ErkJggg==",
     "base64"
@@ -475,26 +474,14 @@ async function createCharacterPreviewFixture(): Promise<{ bodyPng: vscode.Uri; p
   await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "src"));
   await vscode.workspace.fs.createDirectory(layers);
   await writeWorkspaceFile("pnpm-workspace.yaml", "packages: []\n");
-  await writeWorkspaceFile("asset.config.mjs", [
-    "export default {",
-    '  publicRoot: "public/example",',
-    '  publicBaseUri: "/example",',
-    '  runtimeAssetOutputPath: "src/generatedAssets.ts",',
-    '  exportName: "exampleAssets"',
-    "};",
-    ""
-  ].join("\n"));
-  const asset = {
-    id: "alice",
-    kind: "character-pack",
-    optimizedUri: "/example/characters/alice/character.json",
-    format: "json",
-    compression: [],
-    lods: [],
-    collisionProxyIds: [],
-    tags: []
-  };
-  await vscode.workspace.fs.writeFile(generated, Buffer.from(`export const exampleAssets = ${JSON.stringify([asset], null, 2)};\n`));
+  await writeWorkspaceFile("asset.config.mjs", `export default ${JSON.stringify({
+    appId: "example",
+    root: "assets",
+    mount: "assets",
+    generatedModule: "src/generatedAssets.ts",
+    bundleRoots: [{ path: "char", entry: "character.json" }],
+    configDir: root.fsPath
+  }, null, 2)};\n`);
   await writeJson(vscode.Uri.joinPath(pack, "character.json"), {
     id: "alice",
     defaultComposition: ["Default"],
@@ -550,6 +537,7 @@ async function createNavigationFixture(duplicate = false): Promise<{
   const configUri = vscode.Uri.joinPath(root, "asset.config.mjs");
   await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "stories/nani"));
   await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "stories/nani-test"));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "assets"));
   await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "src"));
   await writeWorkspaceFile("pnpm-workspace.yaml", "packages: []\n");
   await vscode.workspace.fs.writeFile(
@@ -561,7 +549,6 @@ async function createNavigationFixture(duplicate = false): Promise<{
     ].join("\n"))
   );
   await vscode.workspace.fs.writeFile(chapterUri, Buffer.from("#Chapter\n@end"));
-  await writeWorkspaceFile("src/generatedAssets.ts", "export const exampleAssets = [];\n");
   if (duplicate) {
     await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, "stories/nani-dev"));
     await vscode.workspace.fs.writeFile(
@@ -572,36 +559,38 @@ async function createNavigationFixture(duplicate = false): Promise<{
   await vscode.workspace.fs.writeFile(
     configUri,
     Buffer.from(`export default ${JSON.stringify({
-      publicRoot: "public/example",
-      publicBaseUri: "/example",
-      runtimeAssetOutputPath: "src/generatedAssets.ts",
-      exportName: "exampleAssets",
-      naniProject: {
-        scopes: {
-          production: { sourceRoot: "stories/nani", scriptRoot: "game" },
-          ...(duplicate
-            ? { development: { sourceRoot: "stories/nani-dev", scriptRoot: "game" } }
-            : {}),
-          test: { sourceRoot: "stories/nani-test", scriptRoot: "game/test" }
-        },
-        mainEntry: {
-          id: "vn:main",
-          scope: "production",
-          initialScriptPath: "game/opening.nani",
-          startLabel: "Start"
-        },
-        testEntries: {
-        smoke: {
-            id: "vn:test-smoke",
-            scope: "test",
-            initialScriptPath: "game/test/smoke.nani",
-            startLabel: "Start"
-          }
-        },
-        voiceLocales: []
-      }
+      appId: "example",
+      root: "assets",
+      mount: "assets",
+      generatedModule: "src/generatedAssets.ts",
+      bundleRoots: [],
+      configDir: root.fsPath
     }, null, 2)};\n`)
   );
+  await writeWorkspaceFile("nani.config.mjs", `export default ${JSON.stringify({
+    scopes: {
+      production: { sourceRoot: "stories/nani", scriptRoot: "game" },
+      ...(duplicate
+        ? { development: { sourceRoot: "stories/nani-dev", scriptRoot: "game" } }
+        : {}),
+      test: { sourceRoot: "stories/nani-test", scriptRoot: "game/test" }
+    },
+    mainEntry: {
+      id: "vn:main",
+      scope: "production",
+      initialScriptPath: "game/opening.nani",
+      startLabel: "Start"
+    },
+    testEntries: {
+      smoke: {
+        id: "vn:test-smoke",
+        scope: "test",
+        initialScriptPath: "game/test/smoke.nani",
+        startLabel: "Start"
+      }
+    },
+    voiceLocales: []
+  }, null, 2)};\n`);
   await vscode.workspace.fs.writeFile(
     smokeUri,
     Buffer.from("#Start\n@goto #Start\n@end\n")

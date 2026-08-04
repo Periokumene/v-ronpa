@@ -19,21 +19,24 @@ outcomes are debug-only types under `app-vn-runtime/debug`; they are not public
 content contracts and are never serialized into SaveData. The workbench does
 not add syntax, parser/IR shapes, RuntimeCommand variants, or save fields.
 
-## ContentManifest v4 and SaveData v9
+## ContentManifest v5 and SaveData v11
 
-ContentManifest has one accepted version: `4`. A `VnEntryDef` identifies one VN
+ContentManifest has one accepted version: `5`. It owns one App-relative
+`AssetDefinition[]` list and explicit MIME-capability requirements. AssetId is a
+lowercase kebab path below the App's `assets/` root, without an extension, App
+name, or colon prefix. A `VnEntryDef` identifies one VN
 experience with `initialScriptPath` and optional `startLabel`; script source and
 revision do not live on the entry. Runtime source is an ordered, path-unique
 `VnRuntimeScriptCatalog` of `{ scriptPath, sourceText, scriptRevision }` records.
 
-SaveData has one accepted version: `9`. It requires top-level `gameId`. A VN
+SaveData has one accepted version: `11`. It requires top-level `gameId`. A VN
 section requires `entryId`, `script: { scriptPath, scriptRevision }`, a `SaveableStorySnapshot`,
 terminal `PixiStageSnapshot`, terminal visibility for `dialog`, `commandBar`, and
-`toastLayer`, and `cue`, plus canonical persistent-media intent. The one current
+`toastLayer`, `cue`, and `pinp`, plus canonical persistent-media intent. The one current
 story-text record carries `channel: "dialog" | "cue"`; backlog entries remain
 presentation-neutral. Media intent is keyed by BGM
-group and looping-SFX tracking key and stores only `sourceRef`, target `volume`,
-and the optional SFX `group`. Tracking keys, source refs, and explicit groups are
+group and looping-SFX tracking key and stores only `assetId`, target `volume`,
+and the optional SFX `group`. Tracking keys, AssetIds, and explicit groups are
 non-empty; volumes are finite numbers. Command reduction normalizes omitted play
 volumes to BGM `0.7` and SFX `1` before checkpoint collection.
 
@@ -44,7 +47,8 @@ saveable. `createVnSaveCheckpoint()` rejects unstable stops rather than deleting
 transient state. Restore rejects mismatched game, entry, or revision before
 stopping live media or mutating app state.
 
-`PixiStageSnapshot.characterTone` is an optional SaveData-v9 target
+`PixiStageSnapshot` has one accepted version, `6`.
+`PixiStageSnapshot.characterTone` is an optional SaveData-v11 target
 state for `@charTone`. It stores the code-owned preset ID, finite non-negative
 artistic amount, owning `scopeScriptPath`, and terminal transition request.
 Save validation requires the scope path to equal `vn.script.scriptPath`.
@@ -53,13 +57,16 @@ Renderer tween progress and fixed easing remain transient.
 The global inventory, evidence, and character sections remain shared across
 VN/Navi/Trial. A VN-focused game may provide valid empty initial gameplay state.
 
-There is no manifest v3 or SaveData v8 migration, legacy database fallback,
-extension bag, or deprecated schema alias. `story` does not duplicate the saved
-script path. Game A and Harness use fresh v11 database namespaces and do not
-open their v10 databases.
+SettingsSnapshot has one accepted version, `3`, and uses `fontFaceId` plus the
+explicit system/asset FontFace source contract. Unsupported settings and save
+versions are reported without conversion or deletion. There is no manifest,
+save, settings, or Pixi migration, legacy database fallback, extension bag, or
+deprecated schema alias. `story` does not duplicate the saved script path. Game
+A and Harness use fresh v13 database namespaces and do not open their v12
+databases.
 
-The change record and supersession scope are defined by
-[Cue story text, StoryText API, and SaveData v9 hard cut](../ccr/cue-story-text-hard-cut.md).
+The asset protocol change record and supersession scope are defined by
+[App-relative asset protocol v5 hard update](../ccr/app-relative-asset-protocol-v5.md).
 
 ## Flow and overlays
 

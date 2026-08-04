@@ -275,7 +275,7 @@ describe("story play", () => {
 });
 
 function runtimeScript(scriptPath: string, commands: RuntimeCommand[], labels: Record<string, number> = { Start: 0 }): RuntimeScript {
-  return { scriptPath, commands, labels, assets: [], dependencies: [] };
+  return { scriptPath, commands, labels, dependencies: [] };
 }
 
 function runtimeCommand(

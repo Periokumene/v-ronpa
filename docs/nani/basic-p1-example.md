@@ -57,7 +57,7 @@ P1 script syntax.
 
 #Start
 @set route:"intro"
-@back bg:harness effect:fade
+@back bg/showcase effect:fade
 @char Ema.Pensive1 pos:50
 @char Ema.Pensive1,ArmR3 pos:50
 @char Ema.Pensive1,ArmR3,ArmR4 pos:50
@@ -94,7 +94,7 @@ Mira.Calm: The keycard belongs to the west door.[>]
 
 #TrialOpening
 @set trialMood:"opening"
-@back bg:classroom effect:fade
+@back bg/classroom effect:fade
 @char Ema.Pensive1 pos:50
 @char Ema.Pensive1,ArmR3 pos:76,0
 @char Ema.Pensive1,ArmR3,ArmR4 pos:76,0

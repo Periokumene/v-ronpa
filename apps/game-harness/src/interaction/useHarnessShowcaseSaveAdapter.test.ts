@@ -40,7 +40,7 @@ describe("harness showcase save adapter", () => {
     };
     const stageWithBackground = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
-      runtimeCommand("back", "scene", { appearance: "bg:harness" })
+      runtimeCommand("back", "scene", { appearance: "bg/harness" })
     ).snapshot;
     const pixiStage: PixiStageSnapshot = {
       ...stageWithBackground,
@@ -60,19 +60,19 @@ describe("harness showcase save adapter", () => {
     });
 
     expect(save).toMatchObject({
-      version: 9,
+      version: 11,
       gameId: "game-harness",
       mode: "navi",
       vn: {
         media: {
-          bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
-          loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+          bgmByGroup: { music: { assetId: "bgm/main", volume: 0.4 } },
+          loopingSfxByKey: { rain: { assetId: "sfx/rain", volume: 0.3, group: "rain" } }
         },
         pixiStage: {
-          version: 5,
+          version: 6,
           revision: 1,
           backgroundsById: {
-            MainBackground: { appearance: "bg:harness" }
+            MainBackground: { appearance: "bg/harness" }
           },
           characterTone: {
             preset: "rain",
@@ -148,7 +148,7 @@ describe("harness showcase save adapter", () => {
   });
 
   it("keeps forty manual slots plus an independent hidden quick slot through the shared media-save policy", () => {
-    expect(HARNESS_SHOWCASE_DB).toBe("v-ronpa-harness-showcase-v11");
+    expect(HARNESS_SHOWCASE_DB).toBe("v-ronpa-harness-showcase-v13");
     expect(harnessShowcaseSaveSlotPolicy.namespace).toBe("harness");
     expect(harnessShowcaseSaveSlotIds).toHaveLength(harnessShowcaseManualSaveSlotCount);
     expect(harnessShowcaseSaveSlotIds.slice(0, 4)).toEqual([
@@ -211,9 +211,9 @@ function createVnCheckpoint(
     story: createSaveableStorySnapshot(story),
     pixiStage,
     media: {
-      bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
-      loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+      bgmByGroup: { music: { assetId: "bgm/main", volume: 0.4 } },
+      loopingSfxByKey: { rain: { assetId: "sfx/rain", volume: 0.3, group: "rain" } }
     },
-    ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+    ui: { dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null }
   };
 }

@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "packages/contracts" },
+    { "path": "packages/asset-project" },
     { "path": "packages/asset-registry" },
     { "path": "packages/layered-character" },
     { "path": "packages/nani-parser" },
@@ -21,7 +22,6 @@
     { "path": "packages/pixi-stage-model" },
     { "path": "packages/pixi-presenter" },
     { "path": "packages/r3f-adapter" },
-    { "path": "packages/runtime-assets-pixi" },
     { "path": "packages/trial-director" },
     { "path": "packages/ui-kit" },
     { "path": "apps/game-a" },

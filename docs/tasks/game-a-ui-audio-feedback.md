@@ -56,7 +56,7 @@ Give every enabled native Game A button default mouse-hover and activation audio
 
 ## Allowed Paths
 
-- `apps/game-a/public/game-a/media/sfx/**`
+- `apps/game-a/assets/sfx/**`
 - `apps/game-a/src/**`
 - `tests/smoke/game-a-vn.spec.ts`
 - `docs/tasks/game-a-ui-audio-feedback.md`

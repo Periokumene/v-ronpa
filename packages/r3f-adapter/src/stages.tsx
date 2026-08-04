@@ -21,7 +21,7 @@ import type {
   InputLockState,
   NaviInteractionSensorReport,
   PlayerPose,
-  RuntimeAssetKind,
+  AssetCapability,
   TrialPresentationProfile,
   Vector3,
   WorldMapDef
@@ -76,7 +76,7 @@ export interface FirstPersonInteractRequest {
 
 export interface R3fAssetResolveInput {
   id: string;
-  kind: RuntimeAssetKind;
+  capability: AssetCapability;
 }
 
 export interface R3fAssetResolver {
@@ -96,7 +96,7 @@ export interface R3fAssetDiagnostic {
   severity: "info" | "warning" | "error";
   message: string;
   assetId?: string;
-  kind?: RuntimeAssetKind;
+  capability?: AssetCapability;
 }
 
 export interface R3fMapModelAssetResolution {
@@ -495,7 +495,7 @@ export function resolveMapModelAsset(
   map: WorldMapDef | undefined,
   assetResolver: R3fAssetResolver | undefined
 ): R3fMapModelAssetResolution {
-  const modelAsset = map?.assetRefs.find((asset) => asset.kind === "glb");
+  const modelAsset = map?.requirements.find((asset) => asset.capability === "model");
   if (!modelAsset) return { fallbackReason: "no-model" };
 
   if (!assetResolver) {
@@ -507,13 +507,13 @@ export function resolveMapModelAsset(
         code: "asset-resolver-missing",
         severity: "error",
         assetId: modelAsset.id,
-        kind: "glb",
+        capability: "model",
         message: `R3F map asset '${modelAsset.id}' could not be resolved because no AssetResolver was provided.`
       }
     };
   }
 
-  const resolved = assetResolver.resolve({ id: modelAsset.id, kind: "glb" });
+  const resolved = assetResolver.resolve({ id: modelAsset.id, capability: "model" });
   if (resolved.uri) return { assetId: modelAsset.id, uri: resolved.uri };
 
   return {
@@ -524,7 +524,7 @@ export function resolveMapModelAsset(
       code: resolved.diagnostic?.code ?? "asset-missing",
       severity: resolved.diagnostic?.severity ?? "error",
       assetId: modelAsset.id,
-      kind: "glb",
+      capability: "model",
       message: resolved.diagnostic?.message ?? `R3F map asset '${modelAsset.id}' could not be resolved.`
     }
   };

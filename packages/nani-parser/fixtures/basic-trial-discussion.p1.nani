@@ -4,7 +4,7 @@
 
 #TrialOpening
 @set trialMood:"opening"
-@back bg:classroom effect:fade
+@back bg/classroom effect:fade
 @char Ema.Pensive1 pos:50
 @char Ema.Pensive1,ArmR3 pos:76,0
 @char Ema.Pensive1,ArmR3,ArmR4 pos:76,0

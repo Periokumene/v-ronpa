@@ -46,7 +46,7 @@ describe("app VN session", () => {
       scriptPath: "session-step.nani",
       sourceText: `#Start
 @set route:"intro"
-@back bg:harness
+@back bg/harness
 Narrator: First.`,
       startLabel: "Start"
     });
@@ -141,7 +141,7 @@ Narrator: First.`,
     const boot = createVnSession({
       scriptPath: "session-wait.nani",
       sourceText: `#Start
-@movie video:session-intro block!
+@movie video/session-intro block!
 Narrator: After movie.
 @input codename type:string summary:"Codename" value:Felix
 Narrator: After input.
@@ -154,7 +154,7 @@ Narrator: After input.
     const inputWaiting = advanceVnSession(afterMovie.session, "manual");
     const submitted = submitVnSessionInput(inputWaiting.session, "Mira");
 
-    expect(waiting.session.story.runtimeWait).toMatchObject({ kind: "movie", moviePath: "video:session-intro" });
+    expect(waiting.session.story.runtimeWait).toMatchObject({ kind: "movie", moviePath: "video/session-intro" });
     expect(completedWait.session.story.runtimeWait).toBeUndefined();
     expect(afterMovie.session.story.backlog.at(-1)?.text).toBe("After movie.");
     expect(inputWaiting.session.story.runtimeWait).toMatchObject({ kind: "input", variableName: "codename" });

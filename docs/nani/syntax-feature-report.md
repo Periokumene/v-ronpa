@@ -176,7 +176,7 @@ text set. Supported tags are:
 | `<br>` | newline in plain text |
 | `<font color='...'>` | safe color token |
 | `<font size='1..7'>`, `<font size='+/-N'>` | bounded HTML-style size scale |
-| `<font face='font:...'>` | registered manifest font id |
+| `<font face='serif'>` | registered FontFace id |
 
 Supported entities are `&nbsp;`, `&lt;`, `&gt;`, `&amp;`, and `&quot;`.
 Attributes are a whitelist: non-`font` tags accept none, while `font` accepts

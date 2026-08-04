@@ -17,12 +17,12 @@ export function RichTextRenderer({ document, fallbackText }: RichTextRendererPro
   return <>{renderRichTextDocument(document)}</>;
 }
 
-export function richTextFontCssVariableName(fontId: string): string {
-  return `--v-ronpa-rich-font-${fontId.replace(/[^a-zA-Z0-9_-]/gu, "_")}`;
+export function richTextFontCssVariableName(fontFaceId: string): string {
+  return `--v-ronpa-rich-font-${fontFaceId.replace(/[^a-zA-Z0-9_-]/gu, "_")}`;
 }
 
-export function richTextFontFamilyValue(fontId: string): string {
-  return `var(${richTextFontCssVariableName(fontId)}, inherit)`;
+export function richTextFontFamilyValue(fontFaceId: string): string {
+  return `var(${richTextFontCssVariableName(fontFaceId)}, inherit)`;
 }
 
 function renderRichTextDocument(document: RichTextDocument): ReactNode[] {
@@ -86,7 +86,7 @@ function mergeStyles(styles: RichTextRunStyle[]): CSSProperties {
     if (style.color) merged.color = style.color;
     if (style.markColor) merged.backgroundColor = style.markColor === "default" ? "rgba(255, 209, 102, 0.34)" : style.markColor;
     if (style.sizeScale) merged.fontSize = `${Math.round(style.sizeScale * 100)}%`;
-    if (style.fontId) merged.fontFamily = richTextFontFamilyValue(style.fontId);
+    if (style.fontFaceId) merged.fontFamily = richTextFontFamilyValue(style.fontFaceId);
     if (style.verticalAlign) {
       merged.verticalAlign = style.verticalAlign;
       merged.fontSize = merged.fontSize ?? "75%";

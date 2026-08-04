@@ -46,7 +46,7 @@ Replace the placeholder Game A title panel with the supplied 1280x720 Daydream P
 
 ## Allowed Paths
 
-- `apps/game-a/public/game-a/backgrounds/title.png`
+- `apps/game-a/assets/bg/title.png`
 - `apps/game-a/src/generatedAssets.ts`
 - `apps/game-a/src/contentManifest.ts`
 - `apps/game-a/src/contentManifest.test.ts`
@@ -120,7 +120,7 @@ pnpm validate:baseline
 ## Programmatic Acceptance
 
 - The focused unit tests cover every regression case above.
-- Generated assets are fresh and `bg:title` resolves to `/game-a/backgrounds/title.png`.
+- Generated assets are fresh and `bg/title` resolves to `/assets/bg/title.png`.
 - Typecheck, asset/boundary validation, Game A build, subsystem, and baseline gates pass.
 
 ## Product-Owner Tuning
@@ -131,7 +131,7 @@ or evidence requirement.
 
 ## Review Packet
 
-- Added the unchanged 1280×720 title image, registered `bg:title`, resolved it through the app-owned registry, and replaced the placeholder title panel with the six-entry DOM menu.
+- Added the unchanged 1280×720 title image, registered `bg/title`, resolved it through the app-owned registry, and replaced the placeholder title panel with the six-entry DOM menu.
 - Source and copied asset share SHA-256 `a417e172122a3521e466a6fef01a57459704a7bed6351380bd720759ce9c5f44`.
 - Passed before the final human-tuning pass: focused UI/manifest Vitest (25), full Vitest (749), asset validation, typecheck, boundary validation, task-boundary validation, and Game A production build/content validation.
 - Title tuning remains human-in-the-loop and non-gating by product-owner decision.

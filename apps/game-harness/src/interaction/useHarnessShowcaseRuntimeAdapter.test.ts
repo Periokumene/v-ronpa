@@ -18,13 +18,7 @@ describe("harness showcase runtime adapter glue", () => {
     const compiled = compileRuntimeScript(parsed);
 
     expect(parsed.diagnostics).toEqual([]);
-    expect(parsed.scenario.assets).toEqual(
-      expect.arrayContaining([
-        { id: "bg:classroom", kind: "background" },
-        { id: "bg:inner-academy-hall", kind: "background" },
-        { id: "bg:inner-snow-outskirts", kind: "background" }
-      ])
-    );
+    expect(parsed.scenario).not.toHaveProperty("assets");
     expect(compiled.diagnostics).toEqual([]);
     const commandIds = new Set(compiled.script.commands.map((command) => command.commandId));
     for (const commandId of [
@@ -74,7 +68,7 @@ describe("harness showcase runtime adapter glue", () => {
         {
           commandId: "bgm",
           params: expect.objectContaining({
-            bgmPath: "bgm:validation-main",
+            bgmPath: "bgm/validation-main",
             group: "music",
             volume: 0.45,
             fadeMs: 200
@@ -83,7 +77,7 @@ describe("harness showcase runtime adapter glue", () => {
         {
           commandId: "sfx",
           params: expect.objectContaining({
-            sfxPath: "sfx:rain-inside-car-loop",
+            sfxPath: "sfx/rain-inside-car-loop",
             group: "rain",
             loop: true,
             volume: 0.35,
@@ -93,7 +87,7 @@ describe("harness showcase runtime adapter glue", () => {
         {
           commandId: "sfx",
           params: expect.objectContaining({
-            sfxPath: "sfx:knock-door",
+            sfxPath: "sfx/knock-door",
             volume: 0.9,
             fadeMs: 100
           })
@@ -119,7 +113,7 @@ describe("harness showcase runtime adapter glue", () => {
         {
           commandId: "bgm",
           params: expect.objectContaining({
-            bgmPath: "bgm:validation-main",
+            bgmPath: "bgm/validation-main",
             group: "music",
             volume: 0.38,
             durationMs: 250
@@ -128,7 +122,7 @@ describe("harness showcase runtime adapter glue", () => {
         {
           commandId: "sfx",
           params: expect.objectContaining({
-            sfxPath: "sfx:rain-inside-car-loop",
+            sfxPath: "sfx/rain-inside-car-loop",
             group: "rain",
             loop: true,
             volume: 0.25,
@@ -138,7 +132,7 @@ describe("harness showcase runtime adapter glue", () => {
         {
           commandId: "bgm",
           params: expect.objectContaining({
-            bgmPath: "bgm:validation-alt",
+            bgmPath: "bgm/validation-alt",
             group: "music",
             volume: 0.45,
             fadeMs: 500
@@ -147,7 +141,7 @@ describe("harness showcase runtime adapter glue", () => {
         {
           commandId: "bgm",
           params: expect.objectContaining({
-            bgmPath: "bgm:validation-layer",
+            bgmPath: "bgm/validation-layer",
             group: "ambient",
             volume: 0.25,
             fadeMs: 100
@@ -188,7 +182,7 @@ describe("harness showcase runtime adapter glue", () => {
       "<font size='7'>",
       "<font size='-1'>",
       "<font size='+1'>",
-      "<font face='font:serif'>",
+      "<font face='serif'>",
       "&nbsp;",
       "&lt;",
       "&gt;",
@@ -214,13 +208,13 @@ describe("harness showcase runtime adapter glue", () => {
         expect.objectContaining({ verticalAlign: "sup" }),
         expect.objectContaining({ color: "red" }),
         expect.objectContaining({ color: "#ff5577" }),
-        expect.objectContaining({ fontId: "font:serif" })
+        expect.objectContaining({ fontFaceId: "serif" })
       ])
     );
 
     const fontFaceComparison = richCommands.find((command) => String(command.params.text ?? "").includes("CHECKPOINT RICH 05"));
     const comparisonSample = "AaGgQq Font ID 123";
-    const fontFaceRun = fontFaceComparison?.richText?.runs.find((run) => run.style.fontId === "font:serif");
+    const fontFaceRun = fontFaceComparison?.richText?.runs.find((run) => run.style.fontFaceId === "serif");
 
     expect(fontFaceComparison?.params.text).toContain(
       `默认 ${comparisonSample} / serif ${comparisonSample}`

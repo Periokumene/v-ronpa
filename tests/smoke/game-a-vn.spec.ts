@@ -16,12 +16,12 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("request", (request) => {
-    if (request.url().includes("/game-a/media/sfx/ui-")) uiAudioRequests.push(request.url());
+    if (request.url().includes("/assets/sfx/ui-")) uiAudioRequests.push(request.url());
   });
 
   await page.addInitScript(() => {
-    localStorage.removeItem("v-ronpa:game-a:settings:v2");
-    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v11");
+    localStorage.removeItem("v-ronpa:game-a:settings:v3");
+    indexedDB.deleteDatabase("v-ronpa-game-a-saves-v13");
   });
   await page.goto("/");
 
@@ -170,7 +170,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("settings-sound-ui-value")).toHaveText("60%");
   await page.waitForTimeout(160);
   await expect.poll(async () => page.evaluate(() => {
-    const raw = localStorage.getItem("v-ronpa:game-a:settings:v2");
+    const raw = localStorage.getItem("v-ronpa:game-a:settings:v3");
     return raw ? (JSON.parse(raw) as { sound?: { uiVolume?: number } }).sound?.uiVolume : undefined;
   })).toBe(0.6);
   await page.screenshot({ path: "test-results/game-a-settings-sound.png", fullPage: true });
@@ -224,10 +224,10 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
       },
       media: {
         bgmByGroup: {
-          music: { sourceRef: "bgm:game-a-main", volume: 0.35 }
+          music: { assetId: "bgm/main", volume: 0.35 }
         },
         loopingSfxByKey: {
-          rain: { sourceRef: "sfx:gentle-rain-loop", group: "rain", volume: 0.2 }
+          rain: { assetId: "sfx/gentle-rain-loop", group: "rain", volume: 0.2 }
         }
       }
     }
@@ -307,6 +307,21 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT SMOKE CUE 03");
   await page.screenshot({ path: "test-results/game-a-cue-fade-complete-dialog.png", fullPage: true });
 
+  await advanceUntilText(page, "CHECKPOINT SMOKE PINP", 6);
+  const pinp = page.getByTestId("runtime-pinp-surface");
+  await expect(pinp).toBeVisible();
+  await expect(pinp).toHaveClass(/game-a-pinp-surface/);
+  await expect(pinp).toHaveAttribute("data-pinp-asset-id", "ui/dialog-frame");
+  await expect(pinp).toHaveCSS("z-index", "10");
+  await expect(pinp).toHaveCSS("pointer-events", "none");
+  await expect(pinp).toHaveCSS("border-top-width", "1px");
+  await expect(page.getByTestId("runtime-pinp-image")).toHaveAttribute("alt", "Game A 对话框装饰纹理");
+  const pinpGeometry = await readNormalizedElementGeometry(page, "runtime-pinp-surface");
+  expect(pinpGeometry.left + pinpGeometry.width / 2).toBeCloseTo(0.5, 2);
+  expect(pinpGeometry.top + pinpGeometry.height / 2).toBeCloseTo(0.5, 2);
+  expect(pinpGeometry.height).toBeCloseTo(0.2, 2);
+  await page.screenshot({ path: "test-results/game-a-pinp-default.png", fullPage: true });
+
   await advanceUntilText(page, "CHECKPOINT SMOKE UI", 10);
   await expect(page.getByTestId("vn-command-bar")).toHaveAttribute("data-ui-phase", "shown");
   await expect(page.getByTestId("vn-command-save")).toBeEnabled();
@@ -317,6 +332,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("vn-dialog-surface")).toHaveCount(0);
   await expect(page.getByTestId("vn-choice-overlay")).toHaveCount(0);
   await expect(page.getByTestId("vn-command-bar")).toHaveCount(0);
+  await expect(pinp).toHaveCount(0);
   await expectPauseToCoverPlayfield(page);
   await page.screenshot({ path: "test-results/game-a-pause.png", fullPage: true });
   await clickByTestId(page, "pause-tab-save");
@@ -328,6 +344,7 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("game-a-mode")).toHaveText("视觉小说");
   await expect(page.getByTestId("vn-dialog-surface")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
+  await expect(pinp).toBeVisible();
 
   await expect(page.getByTestId("vn-command-quick-save")).toBeEnabled();
   await clickByTestId(page, "vn-command-quick-save");
@@ -367,6 +384,12 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
   await expect(page.getByTestId("load-confirmation")).toBeVisible();
   await clickByTestId(page, "load-confirm");
   await expect(page.getByTestId("vn-dialog-text")).toContainText("CHECKPOINT SMOKE UI");
+  await expect(pinp).toBeVisible();
+  await expect(pinp).toHaveAttribute("data-ui-phase", "shown");
+  await expect(page.getByTestId("runtime-pinp-image")).toHaveAttribute("alt", "Game A 对话框装饰纹理");
+
+  await advanceUntilText(page, "CHECKPOINT SMOKE PINP HIDDEN", 5);
+  await expect(pinp).toHaveCount(0, { timeout: 5_000 });
 
   await advanceUntilInputPrompt(page);
   await expect(page.getByTestId("runtime-input-prompt")).toBeVisible();
@@ -673,7 +696,7 @@ async function exerciseNaniSourceSaveFlow(page: Page, workbench: ReturnType<Page
     await expect.poll(() => readDevtoolsStorySession(page)).toBe(beforeSemanticUpdate + 1);
     const lastKnownGood = await readGameSnapshot(page);
 
-    const invalidCompilerSource = `${semanticUpdateSource.trimEnd()}\n@back bg:main time:fast\n`;
+    const invalidCompilerSource = `${semanticUpdateSource.trimEnd()}\n@back bg/main time:fast\n`;
     await writeFile(smokeSourceFile, invalidCompilerSource, "utf8");
     await expect.poll(async () => (await readGameSnapshot(page)).workbench.phase, { timeout: 15_000 }).toBe("ready");
     await expect(page.getByTestId("vn-devtools-bottom-panel")).toHaveAttribute("data-active-panel", "problems");

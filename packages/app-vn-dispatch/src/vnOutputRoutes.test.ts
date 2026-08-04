@@ -24,7 +24,7 @@ describe("VN output routes", () => {
   it("keeps print out of UI and media command streams because dialog and dialogue audio are app-derived", () => {
     const commands: RuntimeCommand[] = [
       runtimeCommand("print", "text", { text: "Line", autoNext: false, textId: "voice_validation_0001" }),
-      runtimeCommand("back", "scene", { appearance: "bg:harness" }),
+      runtimeCommand("back", "scene", { appearance: "bg/harness" }),
       runtimeCommand("char", "actor", { target: "Ema", appearanceExpression: "Pensive1,ArmR3", pos: [50, 0] })
     ];
 
@@ -46,7 +46,7 @@ describe("VN output routes", () => {
 
   it("routes promoted media/UI commands by contract execution authority", () => {
     const commands: RuntimeCommand[] = [
-      runtimeCommand("bgm", "media", { bgmPath: "bgm:investigation" }, "naninovel", "implemented"),
+      runtimeCommand("bgm", "media", { bgmPath: "bgm/investigation" }, "naninovel", "implemented"),
       runtimeCommand("toast", "ui", { text: "Debug" }, "naninovel", "implemented"),
       runtimeCommand("customState", "state", { id: "door" }, "v-ronpa", "implemented")
     ];
@@ -58,7 +58,7 @@ describe("VN output routes", () => {
 
   it("does not route known unpromoted media or story-control commands through category fallback", () => {
     const commands: RuntimeCommand[] = [
-      runtimeCommand("voice", "media", { primary: "voice:zh:voice_validation_0001" }, "naninovel", "stubbed"),
+      runtimeCommand("voice", "media", { primary: "voice/zh/voice_validation_0001" }, "naninovel", "stubbed"),
       runtimeCommand("stopvoice", "media", {}, "naninovel", "stubbed"),
       runtimeCommand("wait", "flow", { waitMode: "i" }, "naninovel", "implemented"),
       runtimeCommand("unknownMedia", "media", { path: "raw" }, "v-ronpa", "implemented")

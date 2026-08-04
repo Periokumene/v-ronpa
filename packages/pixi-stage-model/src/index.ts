@@ -119,7 +119,7 @@ export const INNER_BACKGROUND_ID = PIXI_INNER_BACKGROUND_ID;
 
 export function createInitialPixiStageSnapshot(): PixiStageSnapshot {
   return {
-    version: 5,
+    version: 6,
     revision: 0,
     backgroundsById: {},
     innerBackgroundsById: {},

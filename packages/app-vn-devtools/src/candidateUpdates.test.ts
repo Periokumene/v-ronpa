@@ -78,7 +78,7 @@ describe("Nani devtools candidate update preparation", () => {
       initialScriptPath: "game-a/opening.nani",
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     };
     const opening = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/opening.nani",
@@ -173,7 +173,7 @@ describe("Nani devtools candidate update preparation", () => {
       initialScriptPath: "game-a/opening.nani",
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     };
     const activeOpening = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/opening.nani",
@@ -231,7 +231,7 @@ describe("Nani devtools candidate update preparation", () => {
       initialScriptPath: "game-a/opening.nani",
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     };
     const opening = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/opening.nani",
@@ -338,7 +338,7 @@ async function canonicalEntry(sourceText: string): Promise<VnDevtoolsScriptCandi
     initialScriptPath: "game-a/opening.nani",
     startLabel: "Start",
     profile: "vn2d",
-    assetRefs: []
+    requirements: []
   };
   const declared: VnRuntimeScriptSource = {
     scriptPath: entry.initialScriptPath,

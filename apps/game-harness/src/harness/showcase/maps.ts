@@ -18,7 +18,7 @@ export const harnessShowcaseMaps: WorldMapDef[] = [
       fov: 65
     },
     collisionProxyIds: ["collision:academy-hall:aabb"],
-    assetRefs: [{ id: "model:academy-hall", kind: "glb", tags: ["harness"] }],
+    requirements: [{ id: "model/academy-hall", capability: "model" }],
     interactables: [
       {
         id: "interactable:notebook",
@@ -76,7 +76,7 @@ export const harnessShowcaseMaps: WorldMapDef[] = [
       fov: 65
     },
     collisionProxyIds: ["collision:classroom:aabb"],
-    assetRefs: [{ id: "model:classroom", kind: "glb", tags: ["harness"] }],
+    requirements: [{ id: "model/classroom", capability: "model" }],
     interactables: [
       {
         id: "interactable:hall-door",

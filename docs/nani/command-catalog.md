@@ -246,6 +246,7 @@ order never implies navigation, and `@end` completes the whole entry.
 | `gameplay` | `gameplay` | state | gameplay | type:string, id:string, quantity:integer, item:string, itemId:string, evidence:string, evidenceId:string, character:string, characterId:string, status:string, skill:string, skillId:string, delta:integer, affinityDelta:integer | none | no | implemented |
 | `hideCue` | `hidecue` | ui | ui-output | time:decimal (V-Ronpa), wait:boolean (V-Ronpa) | none | no | implemented |
 | `inback` | `inback` | scene | pixi-presentation | appearanceAndTransition:named string, appearance:string, via:string, effect:string, visible:boolean, easing:string, time:decimal, wait:boolean | none | no | implemented |
+| `pinp` | `pinp` | ui | ui-output | assetId:string (V-Ronpa), pos:decimal list (V-Ronpa), height:decimal (V-Ronpa), ratio:decimal list (V-Ronpa), alt:string (V-Ronpa), effect:string (V-Ronpa), time:decimal (V-Ronpa), visible:boolean (V-Ronpa) | assetId | no | implemented |
 | `trialkeyword` | `trialkeyword` | ui | pixi-presentation | id:string, text:string, speaker:string, evidence:string | none | no | implemented |
 <!-- END GENERATED COMMAND CATALOG -->
 
@@ -271,8 +272,8 @@ Shared shorthand:
   This default does not apply to `@slide`, `@arrange`, or `@hideChars`. Use
   those commands for transform-only changes. `@slide Character.Expression` updates appearance,
   while `@slide Character` is transform-only and does not create a
-  `character-pack` resource reference.
-- Inner backgrounds use project command `@inback bg:id`. V1 writes the reserved
+  `char/<slug>` JSON asset requirement.
+- Inner backgrounds use project command `@inback bg/inner/id`. V1 writes the reserved
   `InnerBackground` actor in `PixiStageSnapshot.innerBackgroundsById` and
   supports only appearance, `effect`/`via`, `time`, `easing`, `visible`, and
   `wait`. It is not a `@back` alias and does not expose `id`, transform, tint,
@@ -344,9 +345,10 @@ text. Current rules:
   diagnostics.
 - The marker is stripped before DOM dialog rendering, backlog storage, and
   search-visible text.
-- The runtime compiler forwards the id on the emitted `print` command so app
-  adapters can plan dialogue audio: resolved `voice:<locale>:<textId>` assets
-  win over configured dialogue bleep fallback.
+- The runtime compiler forwards the original id on the emitted `print` command.
+  Generated `voiceIndex[locale][originalTextId]` performs the optional AssetId
+  lookup; runtime code never constructs an ID from locale and textId. A resolved
+  voice asset wins over configured dialogue bleep fallback.
 - `@print`, `@append`, and `@toast` do not interpret `|#...|` as metadata.
 
 ## Rich Text Markup
@@ -362,9 +364,9 @@ Supported tags are `b/strong`, `i/em`, `u`, `s/strike/del`, `mark`,
 registered `face` values. Supported entities are `&nbsp;`, `&lt;`, `&gt;`,
 `&amp;`, and `&quot;`.
 
-`font face` values must be registered font ids such as
-`<font face='font:serif'>... </font>`. `ContentManifest.fonts` maps those ids to
-font runtime assets. Renderer code uses the id to select a controlled CSS
+`font face` values must be registered FontFace ids such as
+`<font face='serif'>... </font>`. `ContentManifest.fonts` maps those ids to an
+explicit system family or font AssetId. Renderer code uses the id to select a controlled CSS
 variable; scripts cannot inject raw CSS font families, URLs, or `style`
 attributes.
 

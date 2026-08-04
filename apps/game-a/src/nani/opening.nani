@@ -1,6 +1,6 @@
 #Start
 @hideUI dialog
-@sfx sfx:noise-6hz group:noise volume:0.3 loop!
+@sfx sfx/noise-6hz group:noise volume:0.3 loop!
 
 @cue 转眼之间，爱丽丝也跟着跳了下去
 @cue 压根没有想过自己以后该怎样出来
@@ -14,8 +14,8 @@
 @choice "吃下我！" goto:#StoryBegin
 #StoryBegin
 @stopSfx group:noise fade:2
-@sfx sfx:glug-glug-glug group:glug volume:0.2
-@sfx sfx:gentle-rain-loop group:rain loop:true volume:0.1
+@sfx sfx/glug-glug-glug group:glug volume:0.2
+@sfx sfx/gentle-rain-loop group:rain loop:true volume:0.1
 @showUI dialog time:2 wait!
 nar: 最烂的天气我会投雨天一票
 nar: 最烂的城市我大概率会把投票箱敲了全都塞给南方
@@ -31,7 +31,7 @@ nar: 可是尽管，天气会很湿，闷的墙壁上仿佛要渗出血，雨帘
 nar: 可是尽管，路面会很滑，某个地砖会像真正的地雷那样把你从袜子到裤脚全都打湿
 nar: 可是即便如此，我还是
 nar: 我还是最、还是最、最……
-@bgm bgm:dead-fish-riffle group:music volume:0.35 fade:5
+@bgm bgm/dead-fish-riffle group:music volume:0.35 fade:5
 @sfx group:rain volume:0.3 time:2
 @rain power:1 wind:-1 hue:1 tint:0.8 time:5
 nar: 最喜欢雨天了
@@ -44,7 +44,7 @@ nar: 不再有那些聒噪的行人，每个人都行色匆匆，街上只会空
 nar: 至于我……
 nar: 不觉得这是一种很独特的体验吗。更好笑的事情是，还需要一边胆战心惊，害怕自己的耳机被雨淋坏，一边在雨里面展开双臂，幻想自己就是风和雨的天命神选，在这无人的街道上展露自己的恣意
 nar: ……[>]
-@inback bg:home-outside effect:fade time:0.5 wait!
+@inback bg/home effect:fade time:0.5 wait!
 nar: 好吧，我承认，我承认这有时候会变成一种自我陶醉和扮演。但是比起扮演我更喜欢将这视作是一种逃跑。渺小的自己和广袤的世界，人类文明如此繁荣的今天依然无法抗衡的伟大存在
 nar: 如果神明真的存在的话，它大概就会是掌管风雨的形象吧。我只是想融化在这场雨里面，融化在这个世界中那样
 nar: 比起很多努力扮演松弛的活着的人，我只是很想在雨声中寻找一场可以把自己淹没的好梦

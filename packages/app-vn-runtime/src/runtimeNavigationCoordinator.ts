@@ -30,6 +30,7 @@ export type CoordinateVnScriptNavigationResult =
       runtimeCommands: RuntimeCommand[];
       storyDiagnostics: StoryStepperDiagnostic[];
       executedScriptPaths: string[];
+      crossedScript: boolean;
     }
   | { ok: false; cancelled: boolean; code: string; message: string };
 
@@ -47,6 +48,7 @@ export async function coordinateVnScriptNavigation({
   const storyDiagnostics = [...step.playStep.story.diagnostics];
   const executedScriptPaths = [nextSession.script.scriptPath];
   let navigationCount = 0;
+  let crossedScript = false;
 
   while (navigationRequest) {
     navigationCount += 1;
@@ -71,6 +73,10 @@ export async function coordinateVnScriptNavigation({
     if (isCancelled()) return failure("operation-cancelled", "Script navigation was cancelled.", true);
     if (!prepared.ok) return failure("presentation-prepare-failed", prepared.message);
 
+    if (target.script.scriptPath !== nextSession.script.scriptPath) {
+      crossedScript = true;
+      discardPinpCommands(runtimeCommands);
+    }
     nextSession = switchVnSessionScript(nextSession, {
       script: target.script,
       instructionPointer,
@@ -90,8 +96,15 @@ export async function coordinateVnScriptNavigation({
     session: nextSession,
     runtimeCommands,
     storyDiagnostics,
-    executedScriptPaths: [...new Set(executedScriptPaths)]
+    executedScriptPaths: [...new Set(executedScriptPaths)],
+    crossedScript
   };
+}
+
+function discardPinpCommands(commands: RuntimeCommand[]): void {
+  for (let index = commands.length - 1; index >= 0; index -= 1) {
+    if (commands[index]?.commandId === "pinp") commands.splice(index, 1);
+  }
 }
 
 function failure(code: string, message: string, cancelled = false): CoordinateVnScriptNavigationResult {

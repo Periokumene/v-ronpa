@@ -41,7 +41,7 @@ import {
   harnessShowcaseTrial
 } from "../harness/showcase";
 import { harnessShowcaseVnEntry } from "../harness/contentManifest";
-import { harnessScriptCatalog } from "../harness/generatedNaniProduction";
+import { harnessScriptCatalog, harnessVoiceIndex } from "../harness/generatedNaniProduction";
 import { defaultHarnessInputBindings, useKeyboardInputActions } from "../harness/inputActions";
 import { useFirstPersonExplorationBridge } from "../harness/useFirstPersonExplorationBridge";
 import type { AudioPort, VideoPort } from "@v-ronpa/media-save";
@@ -133,6 +133,7 @@ export function useHarnessShowcaseRuntimeAdapter(
     () => ({
       entry: { ...harnessShowcaseVnEntry, profile: options.profile ?? "vn2d" },
       catalog: harnessScriptCatalog,
+      voiceIndex: harnessVoiceIndex,
       sourceDiagnosticPolicy: import.meta.env.DEV
         ? "allow-recoverable-command-errors"
         : "strict"
@@ -147,6 +148,7 @@ export function useHarnessShowcaseRuntimeAdapter(
     ...(options.dialogueBleepSettings ? { dialogueBleepSettings: options.dialogueBleepSettings } : {}),
     entry: runtimeDefinition.entry,
     catalog: runtimeDefinition.catalog,
+    voiceIndex: harnessVoiceIndex,
     sourceDiagnosticPolicy: runtimeDefinition.sourceDiagnosticPolicy,
     gameId: "game-harness",
     onGameplayEvents: applyRuntimeGameplayEvents,
@@ -163,7 +165,7 @@ export function useHarnessShowcaseRuntimeAdapter(
     [runtime.diagnostics.runtimeDiagnostics, trialRuntimeDiagnostics]
   );
   const observeAssetDiagnostic = useCallback(
-    (diagnostic: { code?: string; severity?: "info" | "warning" | "error"; message: string; assetId?: string; kind?: string }) => {
+    (diagnostic: { code?: string; severity?: "info" | "warning" | "error"; message: string; assetId?: string; capability?: string }) => {
       runtime.diagnostics.observeAssetDiagnostic(diagnostic);
     },
     [runtime]
@@ -273,7 +275,7 @@ export function useHarnessShowcaseRuntimeAdapter(
         severity: "error",
         message: `Trial definition '${outcome.trialId}' does not exist.`,
         assetId: outcome.trialId,
-        kind: "trial"
+        capability: "trial"
       });
       setLastAction("trial:start");
       setLastOutcome(`start-trial-missing:${outcome.trialId}`);
@@ -485,6 +487,6 @@ function createFallbackMap(): WorldMapDef {
     spawn: [0, 1.7, 4],
     collisionProxyIds: [],
     interactables: [],
-    assetRefs: []
+    requirements: []
   };
 }

@@ -60,7 +60,7 @@ describe("navi director", () => {
           action: { type: "grant-item", itemId: "tool:notebook", quantity: 1 }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
     const navi: NaviRuntimeState = { ...createInitialNaviState(map.id), playerPose: { position: [0, 0, 0], yaw: 0, pitch: 0 } };
 
@@ -88,7 +88,7 @@ describe("navi director", () => {
           action: { type: "grant-item", itemId: "tool:notebook", quantity: 1 }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
     const walk: NaviRuntimeState = { ...createInitialNaviState(map.id), playerPose: { position: [0, 0, 0], yaw: 0, pitch: 0 } };
     const inventory = naviReducer(walk, { type: "OPEN_INVENTORY" });
@@ -114,7 +114,7 @@ describe("navi director", () => {
           action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
 
     const result = resolveNaviInteractable(createInitialNaviState(map.id), map, createGameplayState(), "i:file");
@@ -154,7 +154,7 @@ describe("navi director", () => {
           action: { type: "start-trial", trialId: "trial:case-01", segmentId: "debate:door" }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
     const gameplay = createGameplayState();
     const noFocus = confirmFocusedNaviInteraction(createInitialNaviState(map.id), map, gameplay);
@@ -219,7 +219,7 @@ describe("navi director", () => {
           action: { type: "grant-item", itemId: "tool:notebook", quantity: 1 }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
     const gameplay = createGameplayState();
     const dialog: NaviRuntimeState = {
@@ -260,7 +260,7 @@ describe("navi director", () => {
           action: { type: "grant-item", itemId: "tool:far", quantity: 1 }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
     const missingPose = createInitialNaviState(map.id);
     const emptySpace: NaviRuntimeState = { ...missingPose, playerPose: { position: [0, 0, 0], yaw: 0, pitch: 0 } };
@@ -297,7 +297,7 @@ describe("navi director", () => {
           action: { type: "grant-item", itemId: "tool:notebook", quantity: 1 }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
 
     const result = focusNaviInteractionFromSensorReport(createInitialNaviState(map.id), map, {
@@ -328,7 +328,7 @@ describe("navi director", () => {
           action: { type: "change-map", mapId: "map:classroom" }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
 
     const away = focusNaviInteractionFromSensorReport(createInitialNaviState(map.id), map, {
@@ -396,7 +396,7 @@ describe("navi director", () => {
           }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
 
     const gameplay = createGameplayState();
@@ -432,7 +432,7 @@ describe("navi director", () => {
           }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
     const classroom: WorldMapDef = {
       id: "map:classroom",
@@ -440,7 +440,7 @@ describe("navi director", () => {
       spawn: [2, 1.7, -3],
       collisionProxyIds: [],
       interactables: [],
-      assetRefs: []
+      requirements: []
     };
 
     const result = resolveNaviInteractable(createInitialNaviState(hall.id), hall, createGameplayState(), "i:door", [

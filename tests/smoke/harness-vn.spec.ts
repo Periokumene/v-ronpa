@@ -36,8 +36,8 @@ test("harness VN shell, save/load, and main interaction branch", async ({ page }
   await advanceUntilText(page, "请选择测试路径");
   await advanceUntilChoices(page);
   await expect(page.getByTestId("vn-dialog-state")).toHaveText("等待选择");
-  await expect(page.getByTestId("harness-showcase-pixi-background")).toHaveText("bg:harness");
-  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg:inner-academy-hall");
+  await expect(page.getByTestId("harness-showcase-pixi-background")).toHaveText("bg/showcase");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg/inner/academy-hall");
   await expect(page.getByTestId("harness-showcase-pixi-characters")).toContainText("Ema/default@0.50,0.00");
   await expect(page.getByTestId("harness-showcase-pixi-tasks")).toBeVisible();
   await expect(page.getByTestId("vn-command-bar")).toBeVisible();
@@ -111,8 +111,8 @@ test("harness VN shell, save/load, and main interaction branch", async ({ page }
   await movementPulse(page, "ArrowUp");
   await expect(page.getByTestId("harness-showcase-substate")).toHaveText("vn2d-overlay");
   await expect(page.getByTestId("vn-dialog-text")).toContainText(savedDialogExcerpt);
-  await expect(page.getByTestId("harness-showcase-pixi-background")).toHaveText("bg:harness");
-  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg:inner-academy-hall");
+  await expect(page.getByTestId("harness-showcase-pixi-background")).toHaveText("bg/showcase");
+  await expect(page.getByTestId("pixi-layer")).toHaveAttribute("data-pixi-inner-background", "bg/inner/academy-hall");
   await expect(page.getByTestId("harness-showcase-pixi-characters")).toContainText("Ema/default@0.50,0.00");
   await expect(page.getByTestId("harness-showcase-pixi-tasks")).toHaveText("empty");
   await expectNoDocumentScroll(page);
@@ -195,7 +195,7 @@ test("harness stages dialogue, print, and Cue through manual, AUTO, SKIP, save, 
   const consoleErrors = watchUnexpectedConsoleErrors(page);
   const voiceRequests: string[] = [];
   page.on("request", (request) => {
-    if (request.url().includes("/voice_validation_0001.ogg")) voiceRequests.push(request.url());
+    if (request.url().includes("/assets/voice/zh/voice-validation-0001.ogg")) voiceRequests.push(request.url());
   });
 
   await bootHarness(page);
@@ -275,6 +275,69 @@ test("harness stages dialogue, print, and Cue through manual, AUTO, SKIP, save, 
   expect(consoleErrors).toEqual([]);
 });
 
+test("harness renders, replaces, saves, restores, and hides the formal Pinp surface", async ({ page }) => {
+  const consoleErrors = watchUnexpectedConsoleErrors(page);
+  await bootHarness(page);
+  await configureTitleDisplay(page, { textSpeed: "0", textSize: "large" });
+  await startNavi(page);
+  await startStoryOverlay(page);
+  await advanceUntilText(page, "请选择测试路径");
+  await advanceUntilChoices(page);
+  await expect(page.getByTestId("vn-choice-7")).toHaveText("分支8：Pinp 画中画验收");
+  await page.getByTestId("vn-choice-7").click();
+  await expect(page.getByTestId("harness-showcase-route")).toHaveText("pinp");
+  await advanceHarnessUntilSurfaceText(page, "vn-dialog-text", "CHECKPOINT PINP 00");
+
+  const pinp = page.getByTestId("runtime-pinp-surface");
+  const image = page.getByTestId("runtime-pinp-image");
+  await expect(pinp).toBeVisible();
+  await expect(pinp).toHaveAttribute("data-pinp-asset-id", "thumb/evidence-keycard");
+  await expect(pinp).toHaveAttribute("data-ui-phase", "shown");
+  await expect(pinp).toHaveCSS("z-index", "8");
+  await expect(pinp).toHaveCSS("pointer-events", "none");
+  await expect(image).toHaveAttribute("alt", "门禁卡证据缩略图");
+  await expectPinpGeometry(page, { centerX: 0.5, centerY: 0.5, height: 0.2, ratio: 16 / 9 });
+  await image.evaluate((element) => { element.setAttribute("data-replay-probe", "old-image"); });
+  await page.screenshot({ path: "test-results/harness-pinp-default.png", fullPage: true });
+
+  await page.getByTestId("vn-command-quick-save").click();
+  await expect(page.getByTestId("vn-command-quick-load")).toBeEnabled();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pause-surface")).toBeVisible();
+  await expect(pinp).toHaveCount(0);
+  await page.getByTestId("pause-surface-close").click();
+  await expect(pinp).toBeVisible();
+
+  await advanceHarnessUntilChoices(page);
+  await page.getByTestId("vn-choice-0").click();
+  await advanceHarnessUntilSurfaceText(page, "vn-dialog-text", "CHECKPOINT PINP 01");
+  await expect(page.getByTestId("runtime-pinp-image")).not.toHaveAttribute("data-replay-probe", "old-image");
+  await expect(page.getByTestId("runtime-pinp-image")).toHaveAttribute("alt", "左上方门禁卡证据");
+  await expectPinpGeometry(page, { centerX: 0.25, centerY: 0.35, height: 0.3, ratio: 4 / 3 });
+  await page.screenshot({ path: "test-results/harness-pinp-custom.png", fullPage: true });
+
+  await advanceHarnessUntilChoices(page);
+  await page.getByTestId("vn-choice-0").click();
+  await advanceHarnessUntilSurfaceText(page, "vn-dialog-text", "CHECKPOINT PINP 02");
+  await expect(pinp).toHaveCount(0, { timeout: 5_000 });
+
+  await page.getByTestId("vn-command-quick-load").click();
+  await expect(page.getByTestId("load-confirmation")).toHaveCount(0);
+  await expect(pinp).toBeVisible();
+  await expect(pinp).toHaveAttribute("data-ui-phase", "shown");
+  await expect(page.getByTestId("runtime-pinp-image")).toHaveAttribute("alt", "门禁卡证据缩略图");
+  await expectPinpGeometry(page, { centerX: 0.5, centerY: 0.5, height: 0.2, ratio: 16 / 9 });
+  await page.screenshot({ path: "test-results/harness-pinp-restored.png", fullPage: true });
+
+  await page.getByTestId("runtime-pinp-image").evaluate((element) => {
+    (element as HTMLImageElement).src = "data:text/plain,not-an-image";
+  });
+  await expect(page.getByTestId("runtime-pinp-missing")).toContainText("thumb/evidence-keycard");
+  await page.screenshot({ path: "test-results/harness-pinp-error.png", fullPage: true });
+  await expectNoRuntimeAssetDiagnostics(page);
+  expect(consoleErrors).toEqual([]);
+});
+
 async function advanceHarnessUntilSurfaceText(page: Page, testId: string, text: string) {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const surface = page.getByTestId(testId);
@@ -302,4 +365,28 @@ async function advanceHarness(page: Page) {
     return;
   }
   await page.getByTestId("harness-showcase-advance").click();
+}
+
+async function expectPinpGeometry(
+  page: Page,
+  expected: { centerX: number; centerY: number; height: number; ratio: number }
+) {
+  const geometry = await page.evaluate(() => {
+    const pinp = document.querySelector<HTMLElement>('[data-testid="runtime-pinp-surface"]');
+    const playfield = document.querySelector<HTMLElement>('[data-testid="playfield"]');
+    if (!pinp || !playfield) return null;
+    const rect = pinp.getBoundingClientRect();
+    const playfieldRect = playfield.getBoundingClientRect();
+    return {
+      centerX: (rect.left + rect.width / 2 - playfieldRect.left) / playfieldRect.width,
+      centerY: (rect.top + rect.height / 2 - playfieldRect.top) / playfieldRect.height,
+      height: rect.height / playfieldRect.height,
+      ratio: rect.width / rect.height
+    };
+  });
+  expect(geometry).not.toBeNull();
+  expect(geometry?.centerX).toBeCloseTo(expected.centerX, 2);
+  expect(geometry?.centerY).toBeCloseTo(expected.centerY, 2);
+  expect(geometry?.height).toBeCloseTo(expected.height, 2);
+  expect(geometry?.ratio).toBeCloseTo(expected.ratio, 2);
 }

@@ -4,7 +4,7 @@
 
 #Start
 @set route:"intro"
-@back bg:harness effect:fade
+@back bg/showcase effect:fade
 @char Ema.Pensive1 pos:50
 @char Ema.Pensive1,ArmR3 pos:50
 @char Ema.Pensive1,ArmR3,ArmR4 pos:50

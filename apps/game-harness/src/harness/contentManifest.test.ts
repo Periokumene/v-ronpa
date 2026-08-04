@@ -1,51 +1,34 @@
 import { describe, expect, it } from "vitest";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
 import { ContentManifestSchema } from "@v-ronpa/contracts";
-import { pixiRuntimeAssetFragment } from "@v-ronpa/runtime-assets-pixi";
 import { harnessContentManifest } from "./contentManifest";
 
 describe("harness content manifest", () => {
-  it("parses as ContentManifest v4 and resolves declared runtime asset references", () => {
+  it("parses as ContentManifest v5 and resolves all declared requirements", () => {
     const manifest = ContentManifestSchema.parse(harnessContentManifest);
     const registry = createAssetRegistry(manifest);
 
-    expect(manifest.version).toBe(4);
-    expect(manifest.audio?.dialogueBleep?.enabled).toBe(true);
-    expect(manifest.audio?.dialogueBleep?.speakerOverrides).toEqual({
-      Felix: { sourceRef: "bleep:dialogue-felix", gain: 0.55 },
-      Narrator: null
+    expect(manifest.version).toBe(5);
+    expect(manifest.audio?.dialogueBleep).toMatchObject({
+      defaultSound: { assetId: "bleep/dialogue-default", gain: 0.45 },
+      speakerOverrides: {
+        Felix: { assetId: "bleep/dialogue-felix", gain: 0.55 },
+        Narrator: null
+      }
     });
     expect(registry.diagnostics).toEqual([]);
     expect(registry.validateReferences()).toEqual([]);
-    expect(registry.resolve({ id: "bg:harness", kind: "background" }).uri).toBe("/harness/backgrounds/harness.png");
-    expect(registry.resolve({ id: "bg:classroom", kind: "background" }).uri).toBe("/harness/backgrounds/classroom.png");
-    expect(registry.resolve({ id: "bg:inner-academy-hall", kind: "background" }).uri).toBe("/harness/backgrounds/inner-academy-hall.png");
-    expect(registry.resolve({ id: "bg:inner-snow-outskirts", kind: "background" }).uri).toBe("/harness/backgrounds/inner-snow-outskirts.png");
-    expect(registry.resolve({ id: "bleep:dialogue-default", kind: "bleep" }).uri).toBe("/harness/media/bleep/dialogue-default.ogg");
-    expect(registry.resolve({ id: "bleep:dialogue-felix", kind: "bleep" }).uri).toBe("/harness/media/bleep/dialogue-felix.ogg");
-    expect(registry.resolve({ id: "Ema", kind: "character-pack" }).uri).toBe("/harness/characters/Ema/character.json");
-    expect(registry.resolve({ id: "font:rich-serif", kind: "font" }).uri).toBe("/harness/fonts/rich-serif.ttf");
-    expect(manifest.fonts).toEqual([
-      {
-        id: "font:serif",
-        family: "V Ronpa Rich Serif",
-        sourceRef: "font:rich-serif",
-        weight: "400",
-        style: "normal"
-      }
-    ]);
-    expect(registry.resolve({ id: "model:academy-hall", kind: "glb" }).uri).toBe("/harness/models/academy-hall.gltf");
-    expect(registry.resolve({ id: "texture:evidence:keycard-thumbnail", kind: "texture" }).uri).toBe("/harness/thumbnails/evidence-keycard.png");
-    expect(registry.resolve({ id: "voice:zh:voice_validation_0001", kind: "voice" }).uri).toBe("/harness/media/voice/zh/voice_validation_0001.ogg");
-    expect(registry.resolve({ id: "voice:zh:0102Adv03_Ema001", kind: "voice" }).uri).toBe("/harness/media/voice/zh/0102Adv03_Ema001.ogg");
-    expect(registry.resolve({ id: "voice:zh:0102Adv04_Sherry004", kind: "voice" }).uri).toBe("/harness/media/voice/zh/0102Adv04_Sherry004.ogg");
+    expect(registry.resolve({ id: "bg/showcase", capability: "image" }).uri).toBe("/assets/bg/showcase.png");
+    expect(registry.resolve({ id: "char/ema", capability: "json" }).uri).toBe("/assets/char/ema/character.json");
+    expect(registry.resolve({ id: "font/rich-serif", capability: "font" }).uri).toBe("/assets/font/rich-serif.ttf");
+    expect(registry.resolve({ id: "model/academy-hall", capability: "model" }).uri).toBe("/assets/model/academy-hall.gltf");
+    expect(registry.resolve({ id: "thumb/evidence-keycard", capability: "image" }).uri).toBe("/assets/thumb/evidence-keycard.png");
+    expect(registry.resolve({ id: "voice/zh/0102-adv03-ema001", capability: "audio" }).uri).toBe(
+      "/assets/voice/zh/0102-adv03-ema001.ogg"
+    );
   });
 
-  it("composes Pixi built-in FX assets into the app manifest", () => {
-    const manifestAssetIds = new Set(harnessContentManifest.runtimeAssets.map((asset) => asset.id));
-
-    for (const asset of pixiRuntimeAssetFragment.runtimeAssets) {
-      expect(manifestAssetIds.has(asset.id)).toBe(true);
-    }
+  it("keeps presenter-private FX out of the App manifest", () => {
+    expect(harnessContentManifest.assets.every(({ id }) => !id.startsWith("fx/"))).toBe(true);
   });
 });

@@ -24,7 +24,7 @@ describe("exploration", () => {
           action: { type: "grant-evidence", evidenceId: "evidence:keycard" }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
 
     const outcome = resolveInteractable(nearestInteractable(map, [1.2, 0, 0]));
@@ -47,7 +47,7 @@ describe("exploration", () => {
           action: { type: "start-trial", trialId: "trial:case-01", segmentId: "debate:door" }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
 
     expect(resolveInteractable(nearestInteractable(map, [0, 0, 0]))).toEqual({
@@ -86,7 +86,7 @@ describe("exploration", () => {
           action: { type: "grant-item", itemId: "tool:second", quantity: 1 }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
 
     const firstTie = map.interactables[0];
@@ -111,7 +111,7 @@ describe("exploration", () => {
           action: { type: "grant-item", itemId: "tool:far", quantity: 1 }
         }
       ],
-      assetRefs: []
+      requirements: []
     };
 
     expect(nearestInteractable(map, [0, 0, 0])).toBeUndefined();

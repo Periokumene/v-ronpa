@@ -46,7 +46,7 @@ Immediately before packaging, rerun the range audit from
 `vscode-nani-v0.6.1` to the release candidate. Any additional commit must be
 classified here and must receive editor regressions when it changes command
 catalogs, parser syntax/IR, compiler policy, project discovery, generated asset
-paths, or character-pack composition inputs.
+paths, or layered-character bundle composition inputs.
 
 ## Release-Candidate Result
 

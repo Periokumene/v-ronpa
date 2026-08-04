@@ -27,13 +27,13 @@ openingCorpus.push({
 const syntheticSource = Array.from({ length: 10_000 }, (_, index) => {
   switch (index % 4) {
     case 0:
-      return `@bgm bgm:validation-${index} volume:0.5 group:music`;
+      return `@bgm bgm/validation-${index} volume:0.5 group:music`;
     case 1:
       return `Narrator: synthetic ${index} 中文😀 [< speed:0.8][>]`;
     case 2:
       return `@showUI dialog time:0.2`;
     default:
-      return `@back bg:synthetic-${index} effect:fade time:0.1`;
+      return `@back bg/synthetic-${index} effect:fade time:0.1`;
   }
 }).join("\n");
 

@@ -24,7 +24,7 @@ describe("project script catalogs", () => {
     const loaded = await loadProjectScriptConfig(
       fixture.configPath,
       fixture.root,
-      async () => ({ default: config() })
+      async (path) => ({ default: path.endsWith("nani.config.mjs") ? naniConfig() : assetConfig(fixture.appRoot) })
     );
 
     expect(loaded.errors).toEqual([]);
@@ -46,13 +46,13 @@ describe("project script catalogs", () => {
 
   it("reports shared discovery failures instead of maintaining extension-only rules", async () => {
     const fixture = createFixture();
-    const invalid = config();
-    invalid.naniProject.scopes.production.sourceRoot = "app/missing";
+    const invalid = naniConfig();
+    invalid.scopes.production.sourceRoot = "app/missing";
 
     const loaded = await loadProjectScriptConfig(
       fixture.configPath,
       fixture.root,
-      async () => ({ default: invalid })
+      async (path) => ({ default: path.endsWith("nani.config.mjs") ? invalid : assetConfig(fixture.appRoot) })
     );
 
     expect(loaded.catalogs).toEqual([]);
@@ -70,54 +70,66 @@ describe("project script catalogs", () => {
     expect(loaded.catalogs.map((catalog) => catalog.catalogId)).toEqual(["development", "test"]);
     expect(loaded.catalogs[0]?.scripts.map((script) => script.scriptPath)).toEqual([
       "game-a/chapter-02.nani",
-      "game-a/dev/draft-home-quarrel.nani",
+      "game-a/dev/home-quarrel.nani",
       "game-a/opening.nani"
     ]);
     expect(loaded.catalogs[1]?.scripts).toHaveLength(2);
   });
 });
 
-function createFixture(): { root: string; configPath: string } {
+function createFixture(): { root: string; appRoot: string; configPath: string } {
   const root = mkdtempSync(join(tmpdir(), "vscode-nani-scripts-"));
   roots.push(root);
+  const appRoot = join(root, "app");
   for (const directory of ["app/nani", "app/nani-dev", "app/nani-test"]) {
     mkdirSync(join(root, directory), { recursive: true });
   }
   writeFileSync(join(root, "pnpm-workspace.yaml"), "packages: []\n");
   const configPath = join(root, "app/asset.config.mjs");
   writeFileSync(configPath, "export default {};\n");
-  return { root, configPath };
+  mkdirSync(join(appRoot, "assets"), { recursive: true });
+  writeFileSync(join(appRoot, "nani.config.mjs"), "export default {};\n");
+  return { root, appRoot, configPath };
 }
 
-function config() {
+function assetConfig(configDir: string) {
   return {
-    naniProject: {
-      scopes: {
-        production: { sourceRoot: "app/nani", scriptRoot: "game" },
-        development: { sourceRoot: "app/nani-dev", scriptRoot: "game/dev" },
-        test: { sourceRoot: "app/nani-test", scriptRoot: "game/test" }
-      },
-      mainEntry: {
-        id: "vn:main",
-        scope: "production",
-        initialScriptPath: "game/opening.nani",
+    appId: "example",
+    root: "assets",
+    mount: "assets",
+    generatedModule: "src/generatedAssets.ts",
+    bundleRoots: [],
+    configDir
+  };
+}
+
+function naniConfig() {
+  return {
+    scopes: {
+      production: { sourceRoot: "app/nani", scriptRoot: "game" },
+      development: { sourceRoot: "app/nani-dev", scriptRoot: "game/dev" },
+      test: { sourceRoot: "app/nani-test", scriptRoot: "game/test" }
+    },
+    mainEntry: {
+      id: "vn:main",
+      scope: "production",
+      initialScriptPath: "game/opening.nani",
+      startLabel: "Start"
+    },
+    testEntries: {
+      smoke: {
+        id: "vn:test-smoke",
+        scope: "test",
+        initialScriptPath: "game/test/smoke.nani",
         startLabel: "Start"
       },
-      testEntries: {
-        smoke: {
-          id: "vn:test-smoke",
-          scope: "test",
-          initialScriptPath: "game/test/smoke.nani",
-          startLabel: "Start"
-        },
-        character: {
-          id: "vn:test-character",
-          scope: "test",
-          initialScriptPath: "game/test/character.nani",
-          startLabel: "Start"
-        }
-      },
-      voiceLocales: []
-    }
+      character: {
+        id: "vn:test-character",
+        scope: "test",
+        initialScriptPath: "game/test/character.nani",
+        startLabel: "Start"
+      }
+    },
+    voiceLocales: []
   };
 }

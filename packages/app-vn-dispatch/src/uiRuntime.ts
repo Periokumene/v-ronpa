@@ -7,6 +7,7 @@ import {
   type RuntimeValue,
   type StoryRuntimeSnapshot,
   type StoryUiPresentationWait,
+  type VnPinpCheckpoint,
   type VnUiCheckpoint,
   type VnUiSurfaceId
 } from "@v-ronpa/contracts";
@@ -52,21 +53,27 @@ export interface RuntimeInputPrompt {
 }
 
 export interface RuntimeMovieOverlay {
-  sourceRef: string;
+  assetId: string;
   uri?: string;
   blocking: boolean;
+}
+
+export interface RuntimePinpContent extends VnPinpCheckpoint {
+  uri?: string;
 }
 
 export interface UiRuntimeState {
   surfaces: UiSurfaceStateMap;
   toasts: RuntimeToast[];
   toastSequence: number;
+  pinpSequence: number;
+  pinp?: RuntimePinpContent;
   inputPrompt?: RuntimeInputPrompt;
   movieOverlay?: RuntimeMovieOverlay;
 }
 
 export interface UiRuntimeDiagnostic {
-  code: "unsupported-ui-target" | "unsupported-ui-command";
+  code: "unsupported-ui-target" | "unsupported-ui-command" | "invalid-pinp-command";
   severity: "info" | "warning" | "error";
   message: string;
   commandId: string;
@@ -89,10 +96,12 @@ export function createInitialUiRuntimeState(): UiRuntimeState {
       dialog: shownSurface(),
       commandBar: shownSurface(),
       toastLayer: shownSurface(),
-      cue: hiddenSurface()
+      cue: hiddenSurface(),
+      pinp: hiddenSurface()
     },
     toasts: [],
-    toastSequence: 0
+    toastSequence: 0,
+    pinpSequence: 0
   };
 }
 
@@ -101,7 +110,10 @@ export function createVnUiCheckpoint(state: UiRuntimeState): VnUiCheckpoint {
     dialog: state.surfaces.dialog.targetVisible,
     commandBar: state.surfaces.commandBar.targetVisible,
     toastLayer: state.surfaces.toastLayer.targetVisible,
-    cue: state.surfaces.cue.targetVisible
+    cue: state.surfaces.cue.targetVisible,
+    pinp: state.surfaces.pinp.targetVisible && state.pinp
+      ? stablePinpContent(state.pinp)
+      : null
   };
 }
 
@@ -111,10 +123,13 @@ export function createUiRuntimeStateFromCheckpoint(checkpoint: VnUiCheckpoint): 
       dialog: terminalSurface(checkpoint.dialog),
       commandBar: terminalSurface(checkpoint.commandBar),
       toastLayer: terminalSurface(checkpoint.toastLayer),
-      cue: terminalSurface(checkpoint.cue)
+      cue: terminalSurface(checkpoint.cue),
+      pinp: terminalSurface(checkpoint.pinp !== null)
     },
     toasts: [],
-    toastSequence: 0
+    toastSequence: 0,
+    pinpSequence: checkpoint.pinp ? 1 : 0,
+    ...(checkpoint.pinp ? { pinp: clonePinpCheckpoint(checkpoint.pinp) } : {})
   };
 }
 
@@ -127,6 +142,7 @@ export function reduceUiRuntimeCommand(
   if (command.commandId === "hideui") return reduceUiVisibilityCommand(state, command, false, options);
   if (command.commandId === "cue") return reduceCueVisibilityCommand(state, command, true, options);
   if (command.commandId === "hidecue") return reduceCueVisibilityCommand(state, command, false, options);
+  if (command.commandId === "pinp") return reducePinpCommand(state, command, options);
   if (command.commandId === "toast") return reduceToastCommand(state, command);
   return {
     state,
@@ -167,7 +183,8 @@ export function advanceUiRuntimeTransitions(state: UiRuntimeState, nowMs: number
       changed = true;
     }
   }
-  return changed ? { ...state, surfaces } : state;
+  const next = changed ? { ...state, surfaces } : state;
+  return clearHiddenPinpContent(next);
 }
 
 export function settleUiRuntimeTransitions(
@@ -182,7 +199,8 @@ export function settleUiRuntimeTransitions(
     surfaces[target] = terminalSurface(current.transition.targetVisible);
     changed = true;
   }
-  return changed ? { ...state, surfaces } : state;
+  const next = changed ? { ...state, surfaces } : state;
+  return clearHiddenPinpContent(next);
 }
 
 export function settleUiRuntimePresentationWait(state: UiRuntimeState, wait: StoryUiPresentationWait): UiRuntimeState {
@@ -249,6 +267,30 @@ export function clearMovieOverlay(state: UiRuntimeState): UiRuntimeState {
   return rest;
 }
 
+export function clearRuntimePinp(state: UiRuntimeState): UiRuntimeState {
+  const { pinp: _pinp, ...rest } = state;
+  void _pinp;
+  const current = state.surfaces.pinp;
+  if (!state.pinp && !current.targetVisible && !current.mounted && !current.transition) return state;
+  return {
+    ...rest,
+    surfaces: { ...state.surfaces, pinp: hiddenSurface() }
+  };
+}
+
+export function hydrateRuntimePinp(
+  state: UiRuntimeState,
+  input: { assetId: string; uri?: string }
+): UiRuntimeState {
+  if (!state.pinp || state.pinp.assetId !== input.assetId) return state;
+  const { uri: _uri, ...pinp } = state.pinp;
+  void _uri;
+  return {
+    ...state,
+    pinp: { ...pinp, ...(input.uri ? { uri: input.uri } : {}) }
+  };
+}
+
 export function dismissToast(state: UiRuntimeState, toastId: string): UiRuntimeState {
   return { ...state, toasts: state.toasts.filter((toast) => toast.id !== toastId) };
 }
@@ -277,6 +319,93 @@ function reduceUiVisibilityCommand(
   const visible = command.commandId === "showui" ? booleanParam(command, "visible") ?? defaultVisible : defaultVisible;
   const durationMs = Math.max(0, Math.round(numberParam(command, "durationMs") ?? 0));
   return reduceUiSurfaceTargets(state, targets.targets, visible, durationMs, nowMs);
+}
+
+function reducePinpCommand(
+  state: UiRuntimeState,
+  command: RuntimeCommand,
+  { nowMs = 0 }: UiRuntimeCommandOptions
+): UiRuntimeResult {
+  const currentState = advanceUiRuntimeTransitions(state, nowMs);
+  const visible = booleanParam(command, "visible");
+  if (visible === false) return hidePinp(currentState, command, nowMs);
+  if (visible !== undefined && visible !== true) return invalidPinp(currentState, command, "visible must be a boolean.");
+
+  const assetId = stringParam(command, "assetId");
+  const positionPercent = numberTupleParam(command, "positionPercent", 2);
+  const aspectRatio = numberTupleParam(command, "aspectRatio", 2);
+  const heightPercent = numberParam(command, "heightPercent");
+  const alt = stringParam(command, "alt");
+  const effect = stringParam(command, "effect") ?? "fade";
+  const durationMs = numberParam(command, "durationMs") ?? 180;
+  if (!assetId?.trim()) return invalidPinp(currentState, command, "show form requires a non-empty assetId.");
+  if (!positionPercent || positionPercent.some((value) => value < 0 || value > 100)) {
+    return invalidPinp(currentState, command, "positionPercent must contain two finite numbers from 0 to 100.");
+  }
+  if (!Number.isFinite(heightPercent) || heightPercent === undefined || heightPercent <= 0 || heightPercent > 100) {
+    return invalidPinp(currentState, command, "heightPercent must be greater than 0 and at most 100.");
+  }
+  if (!aspectRatio || aspectRatio.some((value) => value <= 0)) {
+    return invalidPinp(currentState, command, "aspectRatio must contain two positive finite numbers.");
+  }
+  if (alt === undefined) return invalidPinp(currentState, command, "alt must be a string.");
+  if (effect !== "fade" && effect !== "none") return invalidPinp(currentState, command, "effect must be fade or none.");
+  if (!Number.isFinite(durationMs) || durationMs < 0 || (effect === "none" && durationMs > 0)) {
+    return invalidPinp(currentState, command, "durationMs must be non-negative and zero when effect is none.");
+  }
+
+  const pinpSequence = currentState.pinpSequence + 1;
+  const duration = effect === "none" ? 0 : Math.round(durationMs);
+  const surface = duration === 0
+    ? shownSurface()
+    : transitionUiSurface(hiddenSurface(), true, duration, nowMs);
+  return {
+    state: {
+      ...currentState,
+      surfaces: { ...currentState.surfaces, pinp: surface },
+      pinpSequence,
+      pinp: {
+        assetId,
+        alt,
+        positionPercent: [positionPercent[0]!, positionPercent[1]!],
+        heightPercent,
+        aspectRatio: [aspectRatio[0]!, aspectRatio[1]!]
+      }
+    },
+    diagnostics: []
+  };
+}
+
+function hidePinp(state: UiRuntimeState, command: RuntimeCommand, nowMs: number): UiRuntimeResult {
+  if (command.params.assetId !== undefined || command.params.positionPercent !== undefined ||
+      command.params.heightPercent !== undefined || command.params.aspectRatio !== undefined || command.params.alt !== undefined) {
+    return invalidPinp(state, command, "hide form cannot include source or layout content.");
+  }
+  const effect = stringParam(command, "effect") ?? "fade";
+  const durationMs = numberParam(command, "durationMs") ?? 180;
+  if (effect !== "fade" && effect !== "none") return invalidPinp(state, command, "effect must be fade or none.");
+  if (!Number.isFinite(durationMs) || durationMs < 0 || (effect === "none" && durationMs > 0)) {
+    return invalidPinp(state, command, "durationMs must be non-negative and zero when effect is none.");
+  }
+  if (!state.pinp) return { state, diagnostics: [] };
+  const duration = effect === "none" ? 0 : Math.round(durationMs);
+  const surface = transitionUiSurface(state.surfaces.pinp, false, duration, nowMs);
+  return {
+    state: clearHiddenPinpContent({ ...state, surfaces: { ...state.surfaces, pinp: surface } }),
+    diagnostics: []
+  };
+}
+
+function invalidPinp(state: UiRuntimeState, command: RuntimeCommand, detail: string): UiRuntimeResult {
+  return {
+    state,
+    diagnostics: [{
+      code: "invalid-pinp-command",
+      commandId: command.commandId,
+      severity: "error",
+      message: `@${command.canonicalName} ${detail}`
+    }]
+  };
 }
 
 function reduceUiSurfaceTargets(
@@ -348,7 +477,8 @@ function settleUiRuntimeSurfaces(
       changed = true;
     }
   }
-  return changed ? { ...state, surfaces } : state;
+  const next = changed ? { ...state, surfaces } : state;
+  return clearHiddenPinpContent(next);
 }
 
 function transitionUiSurface(
@@ -420,6 +550,34 @@ function cloneRichText(document: RichTextDocument): RichTextDocument {
     text: document.text,
     runs: document.runs.map((run) => ({ start: run.start, end: run.end, style: { ...run.style } }))
   };
+}
+
+function stablePinpContent(pinp: RuntimePinpContent): VnPinpCheckpoint {
+  return clonePinpCheckpoint(pinp);
+}
+
+function clonePinpCheckpoint(pinp: VnPinpCheckpoint): VnPinpCheckpoint {
+  return {
+    assetId: pinp.assetId,
+    alt: pinp.alt,
+    positionPercent: [pinp.positionPercent[0], pinp.positionPercent[1]],
+    heightPercent: pinp.heightPercent,
+    aspectRatio: [pinp.aspectRatio[0], pinp.aspectRatio[1]]
+  };
+}
+
+function clearHiddenPinpContent(state: UiRuntimeState): UiRuntimeState {
+  if (state.surfaces.pinp.mounted || !state.pinp) return state;
+  const { pinp: _pinp, ...rest } = state;
+  void _pinp;
+  return rest;
+}
+
+function numberTupleParam(command: RuntimeCommand, key: string, length: number): number[] | undefined {
+  const value = command.params[key];
+  if (!Array.isArray(value) || value.length !== length) return undefined;
+  if (!value.every((item): item is number => typeof item === "number" && Number.isFinite(item))) return undefined;
+  return value;
 }
 
 function runtimeUiTargets(command: RuntimeCommand): { valid: true; targets: RuntimeUiGroup[] } | { valid: false; source?: string } {

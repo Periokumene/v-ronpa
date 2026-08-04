@@ -1,12 +1,8 @@
-import { composeContentManifest } from "@v-ronpa/asset-registry";
 import type { ContentManifestInput } from "@v-ronpa/contracts";
+import { ContentManifestSchema } from "@v-ronpa/contracts";
 import { defaultHarnessInputBindings } from "./inputActions";
 import { harnessShowcaseEvidence, harnessShowcaseItem, harnessShowcaseMaps, harnessShowcaseTrial } from "./showcase";
-import {
-  harnessFontFaces,
-  harnessRuntimeAssetFragments,
-  harnessRuntimeAssets
-} from "./generatedRuntimeAssets";
+import { harnessAssets } from "./generatedAssets";
 import {
   harnessVnEntryLocator,
   harnessScriptMetadataByPath
@@ -22,23 +18,29 @@ export const harnessShowcaseVnEntry = {
   ...harnessVnEntryLocator,
   title: "Harness Showcase",
   profile: "vn2d" as const,
-  assetRefs: harnessShowcaseScriptMetadata.assetRefs
+  requirements: harnessShowcaseScriptMetadata.requirements
 };
 
 const harnessContentManifestInput = {
-  version: 4,
+  version: 5,
+  assets: harnessAssets,
+  requirements: [],
   audio: {
     dialogueBleep: {
-      defaultSound: { sourceRef: "bleep:dialogue-default", gain: 0.45 },
+      defaultSound: { assetId: "bleep/dialogue-default", gain: 0.45 },
       speakerOverrides: {
-        Felix: { sourceRef: "bleep:dialogue-felix", gain: 0.55 },
+        Felix: { assetId: "bleep/dialogue-felix", gain: 0.55 },
         Narrator: null
       }
     }
   },
-  assets: [],
-  fonts: harnessFontFaces,
-  runtimeAssets: harnessRuntimeAssets,
+  fonts: [{
+    id: "serif",
+    family: "V Ronpa Rich Serif",
+    source: { type: "asset", assetId: "font/rich-serif" },
+    weight: "400",
+    style: "normal"
+  }],
   collisionProxies: [],
   input: defaultHarnessInputBindings,
   maps: harnessShowcaseMaps,
@@ -48,4 +50,4 @@ const harnessContentManifestInput = {
   vnEntries: [harnessShowcaseVnEntry]
 } satisfies ContentManifestInput;
 
-export const harnessContentManifest = composeContentManifest(harnessContentManifestInput, harnessRuntimeAssetFragments);
+export const harnessContentManifest = ContentManifestSchema.parse(harnessContentManifestInput);

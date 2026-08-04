@@ -28,6 +28,7 @@ export { InspectorLite } from "./surfaces/InspectorLite";
 export {
   RuntimeInputPromptSurface,
   RuntimeMovieOverlaySurface,
+  RuntimePinpSurface,
   RuntimeToastLayer
 } from "./surfaces/RuntimeUiSurfaces";
 export { ScenarioTabs } from "./surfaces/ScenarioTabs";
@@ -50,6 +51,7 @@ export type { SurfaceFrameInteraction, SurfaceFrameProps } from "./surfaces/Surf
 export type {
   RuntimeInputPromptProps,
   RuntimeMovieOverlayProps,
+  RuntimePinpSurfaceProps,
   RuntimeToastLayerProps,
   RuntimeToastView
 } from "./surfaces/RuntimeUiSurfaces";

@@ -12,8 +12,8 @@ export function watchUnexpectedConsoleErrors(page: Page): string[] {
 
 export async function bootHarness(page: Page) {
   await page.addInitScript(() => {
-    localStorage.removeItem("v-ronpa:settings:v2");
-    indexedDB.deleteDatabase("v-ronpa-harness-showcase-v11");
+    localStorage.removeItem("v-ronpa:settings:v3");
+    indexedDB.deleteDatabase("v-ronpa-harness-showcase-v13");
   });
   await page.goto("/");
 

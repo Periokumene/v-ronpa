@@ -3,7 +3,7 @@
   "displayName": "V-Ronpa Nani",
   "description": "VS Code language support for V-Ronpa .nani scripts.",
   "publisher": "v-ronpa",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "main": "./dist/extension.cjs",
@@ -65,6 +65,7 @@
     "package:vsix": "node scripts/package-vsix.mjs"
   },
   "dependencies": {
+    "@v-ronpa/asset-project": "workspace:*",
     "@v-ronpa/contracts": "workspace:*",
     "@v-ronpa/layered-character": "workspace:*",
     "@v-ronpa/nani-parser": "workspace:*",

@@ -1,197 +1,83 @@
 import { describe, expect, it } from "vitest";
-import type { ContentManifest, RuntimeAsset, RuntimeAssetFormat, RuntimeAssetKind } from "@v-ronpa/contracts";
-import { composeContentManifest, createAssetRegistry, defineRuntimeAssetFragment, isRawAssetReference } from "./index";
+import type { ContentManifest } from "@v-ronpa/contracts";
+import {
+  collectManifestAssetRequirements,
+  createAssetRegistry,
+  isRawAssetReference,
+  mimeSupportsCapability
+} from "./index";
 
-describe("asset registry", () => {
-  it("composes provider fragments into one manifest and rejects duplicate authority", () => {
-    const fragment = defineRuntimeAssetFragment({
-      id: "runtime-assets:test",
-      runtimeAssets: [runtimeAsset("fx:noise", "fx")]
-    });
-    const explicit = baseManifest([]);
-    const manifest = composeContentManifest(explicit, [fragment]);
-
-    expect(createAssetRegistry(manifest).resolve({ id: "fx:noise", kind: "fx" }).uri).toBe("/assets/fx-noise");
-    expect(() => composeContentManifest({ ...explicit, runtimeAssets: [runtimeAsset("fx:noise", "fx")] }, [fragment])).toThrow(
-      "Duplicate runtime asset 'fx:noise'"
-    );
-  });
-  it("resolves every runtime asset kind from ContentManifest.runtimeAssets", () => {
-    const manifest = manifestWithKinds(["character-pack", "background", "bgm", "sfx", "bleep", "voice", "video", "font", "glb", "texture", "fx"]);
-    const registry = createAssetRegistry(manifest);
-
-    expect(registry.diagnostics).toEqual([]);
-    for (const asset of manifest.runtimeAssets) {
-      expect(registry.resolve({ id: asset.id, kind: asset.kind })).toMatchObject({
-        asset,
-        uri: asset.optimizedUri
-      });
-    }
+describe("app-owned AssetRegistry", () => {
+  it("resolves App-relative assets against root and subpath base URIs", () => {
+    const manifest = baseManifest();
+    expect(createAssetRegistry(manifest).url({ id: "bg/home", capability: "image" }))
+      .toBe("/assets/bg/home.png");
+    expect(createAssetRegistry(manifest, { baseUri: "/games/a/" }).url({ id: "bg/home", capability: "image" }))
+      .toBe("/games/a/assets/bg/home.png");
+    expect(createAssetRegistry(manifest, { baseUri: "https://cdn.example/game/" }).url({ id: "bg/home", capability: "image" }))
+      .toBe("https://cdn.example/game/assets/bg/home.png");
   });
 
-  it("diagnoses missing assets, kind mismatches, duplicate declarations, and raw URIs", () => {
-    const first = runtimeAsset("bgm:main", "bgm");
-    const manifest = baseManifest([first, runtimeAsset("bgm:main", "bgm"), runtimeAsset("sfx:door", "sfx")]);
-    const registry = createAssetRegistry(manifest);
-
-    expect(registry.diagnostics).toMatchObject([{ code: "duplicate-runtime-asset", id: "bgm:main" }]);
-    expect(registry.resolve({ id: "missing:asset", kind: "bgm" }).diagnostic).toMatchObject({ code: "asset-missing" });
-    expect(registry.resolve({ id: "sfx:door", kind: "bgm" }).diagnostic).toMatchObject({ code: "asset-kind-mismatch" });
-    expect(registry.resolve({ id: "/harness/media/sfx/door.ogg", kind: "sfx" }).diagnostic).toMatchObject({
-      code: "raw-uri-disallowed"
-    });
-  });
-
-  it("diagnoses unsupported manifest versions", () => {
-    const registry = createAssetRegistry({ ...baseManifest([]), version: 2 as 4 });
-
-    expect(registry.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: "manifest-version-unsupported", severity: "error" }),
-        expect.objectContaining({ code: "manifest-invalid", severity: "error" })
-      ])
-    );
-  });
-
-  it("diagnoses malformed manifests without resolving partially declared assets", () => {
+  it("reports missing, invalid, raw URI, duplicate and capability mismatch diagnostics", () => {
     const registry = createAssetRegistry({
-      version: 4,
-      runtimeAssets: [{ id: "bg:harness", kind: "background" }],
-      maps: [],
-      items: [],
-      trials: []
+      ...baseManifest(),
+      assets: [
+        ...baseManifest().assets,
+        { id: "bg/home", uri: "assets/bg/duplicate.png", mimeType: "image/png" }
+      ]
     });
-
-    expect(registry.diagnostics).toMatchObject([{ code: "manifest-invalid", severity: "error" }]);
-    expect(registry.resolve({ id: "bg:harness", kind: "background" }).diagnostic).toMatchObject({ code: "asset-missing" });
+    expect(registry.diagnostics).toEqual([
+      expect.objectContaining({ code: "duplicate-asset", id: "bg/home" })
+    ]);
+    expect(registry.resolve({ id: "missing/asset", capability: "image" }).diagnostic?.code).toBe("asset-missing");
+    expect(registry.resolve({ id: "bg:home", capability: "image" }).diagnostic?.code).toBe("invalid-asset-id");
+    expect(registry.resolve({ id: "/assets/bg/home.png", capability: "image" }).diagnostic?.code).toBe("raw-uri-disallowed");
+    expect(registry.resolve({ id: "bg/home", capability: "audio" }).diagnostic?.code).toBe("asset-capability-mismatch");
   });
 
-  it("validates manifest-level asset references against runtimeAssets", () => {
-    const manifest: ContentManifest = {
-      ...baseManifest([
-        runtimeAsset("texture:evidence:keycard-thumbnail", "texture"),
-        runtimeAsset("model:academy-hall", "glb"),
-        runtimeAsset("bleep:dialogue-default", "bleep"),
-        runtimeAsset("sfx:wrong-kind", "sfx"),
-        runtimeAsset("font:serif-regular", "font")
-      ]),
-      audio: {
-        dialogueBleep: {
-          enabled: true,
-          defaultSound: { sourceRef: "bleep:dialogue-default", gain: 0.5 },
-          speakerOverrides: {
-            Felix: { sourceRef: "bleep:missing", gain: 1 },
-            Narrator: null,
-            Mira: { sourceRef: "sfx:wrong-kind", gain: 1 }
-          }
-        }
-      },
-      runtimeAssets: [
-        runtimeAsset("texture:evidence:keycard-thumbnail", "texture"),
-        runtimeAsset("model:academy-hall", "glb"),
-        runtimeAsset("bleep:dialogue-default", "bleep"),
-        runtimeAsset("sfx:wrong-kind", "sfx"),
-        runtimeAsset("font:serif-regular", "font")
-      ],
-      fonts: [
-        { id: "font:serif", family: "Serif", sourceRef: "font:serif-regular", weight: "400", style: "normal" },
-        { id: "font:missing", family: "Missing", sourceRef: "font:missing", weight: "400", style: "normal" },
-        { id: "font:wrong-kind", family: "Wrong", sourceRef: "sfx:wrong-kind", weight: "400", style: "normal" }
-      ],
-      assets: [{ id: "model:academy-hall", kind: "glb", tags: [] }],
-      vnEntries: [
-        {
-          id: "vn:opening",
-          title: "Opening",
-          initialScriptPath: "opening.nani",
-          profile: "vn2d",
-          assetRefs: [{ id: "texture:missing-vn", kind: "texture", tags: [] }]
-        }
-      ],
-      maps: [
-        {
-          id: "map:academy",
-          name: "Academy",
-          spawn: [0, 1, 2],
-          assetRefs: [{ id: "model:academy-hall", kind: "glb", tags: [] }],
-          interactables: [],
-          collisionProxyIds: []
-        }
-      ],
-      evidence: [
-        {
-          id: "evidence:keycard",
-          name: "Keycard",
-          shortLabel: "Keycard",
-          description: "A keycard.",
-          details: [],
-          visual: { thumbnailAssetId: "texture:evidence:keycard-thumbnail", iconAssetId: "texture:missing-icon" },
-          tags: []
-        }
-      ],
-      collisionProxies: [{ id: "collision:academy", kind: "trimesh", assetId: "model:missing-collision" }]
-    };
-
-    expect(createAssetRegistry(manifest).validateReferences()).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: "asset-missing", id: "bleep:missing", kind: "bleep" }),
-        expect.objectContaining({ code: "asset-kind-mismatch", id: "sfx:wrong-kind", kind: "bleep" }),
-        expect.objectContaining({ code: "asset-missing", id: "font:missing", kind: "font" }),
-        expect.objectContaining({ code: "asset-kind-mismatch", id: "sfx:wrong-kind", kind: "font" }),
-        expect.objectContaining({ code: "asset-missing", id: "texture:missing-vn", kind: "texture" }),
-        expect.objectContaining({ code: "asset-missing", id: "texture:missing-icon", kind: "texture" }),
-        expect.objectContaining({ code: "asset-missing", id: "model:missing-collision", kind: "glb" })
-      ])
-    );
+  it("collects requirements from every manifest consumer and deduplicates by capability", () => {
+    const requirements = collectManifestAssetRequirements(baseManifest());
+    expect(requirements).toEqual(expect.arrayContaining([
+      { id: "bg/home", capability: "image" },
+      { id: "bleep/dialogue", capability: "audio" },
+      { id: "font/default", capability: "font" },
+      { id: "model/hall", capability: "model" }
+    ]));
   });
 
-  it("detects raw asset reference syntax", () => {
-    expect(isRawAssetReference("/harness/foo.png")).toBe(true);
-    expect(isRawAssetReference("https://example.test/foo.png")).toBe(true);
-    expect(isRawAssetReference("Ema.Pensive1")).toBe(false);
+  it("treats capability as MIME loading ability rather than business use", () => {
+    expect(mimeSupportsCapability("image/png", "image")).toBe(true);
+    expect(mimeSupportsCapability("image/png", "audio")).toBe(false);
+    expect(isRawAssetReference("https://example.test/a.png")).toBe(true);
+    const registry = createAssetRegistry(baseManifest());
+    expect(registry.resolve({ id: "bg/home", capability: "image" }).uri).toBeDefined();
+    expect(registry.resolve({ id: "bg/home", capability: "image" }).uri).toBeDefined();
   });
 });
 
-function manifestWithKinds(kinds: RuntimeAssetKind[]): ContentManifest {
-  return baseManifest(kinds.map((kind) => runtimeAsset(`${kind}:sample`, kind)));
-}
-
-function baseManifest(runtimeAssets: RuntimeAsset[]): ContentManifest {
+function baseManifest(): ContentManifest {
   return {
-    version: 4,
-    assets: [],
-    fonts: [],
-    runtimeAssets,
-    collisionProxies: [],
+    version: 5,
+    assets: [
+      { id: "bg/home", uri: "assets/bg/home.png", mimeType: "image/png" },
+      { id: "bleep/dialogue", uri: "assets/bleep/dialogue.ogg", mimeType: "audio/ogg" },
+      { id: "font/default", uri: "assets/font/default.woff2", mimeType: "font/woff2" },
+      { id: "model/hall", uri: "assets/model/hall.gltf", mimeType: "model/gltf+json" }
+    ],
+    requirements: [{ id: "bg/home", capability: "image" }],
+    audio: { dialogueBleep: { enabled: true, defaultSound: { assetId: "bleep/dialogue", gain: 1 }, speakerOverrides: {} } },
+    fonts: [{
+      id: "default",
+      family: "Default",
+      source: { type: "asset", assetId: "font/default" },
+      weight: "400",
+      style: "normal"
+    }],
+    collisionProxies: [{ id: "collision:hall", kind: "trimesh", assetId: "model/hall" }],
     vnEntries: [],
     maps: [],
     items: [],
     evidence: [],
     trials: []
-  };
-}
-
-function runtimeAsset(id: string, kind: RuntimeAssetKind): RuntimeAsset {
-  const format: RuntimeAssetFormat =
-    kind === "bgm" || kind === "sfx" || kind === "bleep" || kind === "voice"
-      ? "ogg"
-      : kind === "video"
-        ? "mp4"
-        : kind === "glb"
-          ? "gltf"
-          : kind === "character-pack"
-            ? "json"
-            : kind === "font"
-              ? "woff2"
-              : "png";
-  return {
-    id,
-    kind,
-    optimizedUri: `/assets/${id.replaceAll(":", "-")}`,
-    format,
-    compression: [],
-    lods: [],
-    collisionProxyIds: [],
-    tags: []
   };
 }

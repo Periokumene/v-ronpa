@@ -31,8 +31,8 @@ the prior design as `alice-kid`, and hard-cut Game A scripts and tests to the ne
 ## Allowed Paths
 
 - `tools/csp-char-unpack/**`
-- `apps/game-a/public/game-a/characters/alice/**`
-- `apps/game-a/public/game-a/characters/alice-kid/**`
+- `apps/game-a/assets/char/alice/**`
+- `apps/game-a/assets/char/alice-kid/**`
 - `apps/game-a/src/nani/**`
 - `apps/game-a/src/nani-test/**`
 - `apps/game-a/src/generatedAssets.ts`
@@ -59,7 +59,7 @@ the prior design as `alice-kid`, and hard-cut Game A scripts and tests to the ne
 - Tool preset v2, `AUTHORING.md`, the tool validator, and tool regression tests jointly define the public authoring
   contract.
 - Existing layered-character schemas and resolver semantics remain unchanged.
-- `gameAVnEntry.assetRefs` continues to reference only production `alice`.
+- `gameAVnEntry.requirements` continues to reference only production `char/alice`.
 
 ## Observability And Acceptance Matrix
 

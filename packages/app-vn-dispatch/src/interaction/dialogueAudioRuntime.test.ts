@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DialogueBleepConfig } from "@v-ronpa/contracts";
 import {
-  createVoiceAssetId,
   planDialogueLineAudio,
   reduceDialogueAudioLifecycle,
   resolveDialogueBleepSound,
@@ -11,19 +10,18 @@ import {
 describe("dialogue audio runtime", () => {
   const config: DialogueBleepConfig = {
     enabled: true,
-    defaultSound: { sourceRef: "bleep:dialogue-default", gain: 0.5 },
+    defaultSound: { assetId: "bleep/dialogue-default", gain: 0.5 },
     speakerOverrides: {
-      Felix: { sourceRef: "bleep:dialogue-felix", gain: 0.75 },
+      Felix: { assetId: "bleep/dialogue-felix", gain: 0.75 },
       Narrator: null
     }
   };
 
-  it("resolves voice ids and exact speaker bleep configuration", () => {
-    expect(createVoiceAssetId("voice_validation_0001", "zh")).toBe("voice:zh:voice_validation_0001");
-    expect(resolveDialogueBleepSound(config, undefined)).toEqual({ sourceRef: "bleep:dialogue-default", gain: 0.5 });
-    expect(resolveDialogueBleepSound(config, "Felix")).toEqual({ sourceRef: "bleep:dialogue-felix", gain: 0.75 });
+  it("resolves exact speaker bleep configuration", () => {
+    expect(resolveDialogueBleepSound(config, undefined)).toEqual({ assetId: "bleep/dialogue-default", gain: 0.5 });
+    expect(resolveDialogueBleepSound(config, "Felix")).toEqual({ assetId: "bleep/dialogue-felix", gain: 0.75 });
     expect(resolveDialogueBleepSound(config, "Narrator")).toBeUndefined();
-    expect(resolveDialogueBleepSound(config, "felix")).toEqual({ sourceRef: "bleep:dialogue-default", gain: 0.5 });
+    expect(resolveDialogueBleepSound(config, "felix")).toEqual({ assetId: "bleep/dialogue-default", gain: 0.5 });
     expect(resolveDialogueBleepSound({ ...config, enabled: false }, "Felix")).toBeUndefined();
   });
 
@@ -33,7 +31,7 @@ describe("dialogue audio runtime", () => {
       lineInput({
         speakerId: "Felix",
         textId: "voice_validation_0001",
-        voiceAssetAvailable: true,
+        voiceAssetId: "voice/zh/voice-validation-0001",
         voiceVolume: 0.25
       })
     );
@@ -45,9 +43,9 @@ describe("dialogue audio runtime", () => {
         { type: "stop-voice" },
         {
           type: "play-voice",
-          key: "voice:zh:voice_validation_0001",
+          key: "voice/zh/voice-validation-0001",
           textId: "voice_validation_0001",
-          sourceRef: "voice:zh:voice_validation_0001",
+          assetId: "voice/zh/voice-validation-0001",
           volume: 0.25
         }
       ]
@@ -61,7 +59,7 @@ describe("dialogue audio runtime", () => {
         lineInput({
           speakerId: "Felix",
           textId: "voice_validation_0001",
-          voiceAssetAvailable: true,
+          voiceAssetId: "voice/zh/voice-validation-0001",
           voiceVolume: 0
         })
       )
@@ -78,27 +76,26 @@ describe("dialogue audio runtime", () => {
         continuation: true,
         lineKey: "line:voice-stage-2",
         textId: "voice_validation_0001",
-        voiceAssetAvailable: true
+        voiceAssetId: "voice/zh/voice-validation-0001"
       }))
     ).toEqual({ state: {}, hasVoiceBoundary: false, effects: [] });
 
     expect(
       planDialogueLineAudio({}, lineInput({
         continuation: true,
-        lineKey: "line:bleep-stage-2",
-        voiceAssetAvailable: false
+        lineKey: "line:bleep-stage-2"
       }))
     ).toEqual({
       state: {
         activeBleepLineKey: "line:bleep-stage-2",
         activeBleepKey: "dialogue-bleep:line:bleep-stage-2",
-        activeBleepSourceRef: "bleep:dialogue-default"
+        activeBleepAssetId: "bleep/dialogue-default"
       },
       hasVoiceBoundary: false,
       effects: [{
         type: "play-dialogue-bleep",
         key: "dialogue-bleep:line:bleep-stage-2",
-        sourceRef: "bleep:dialogue-default",
+        assetId: "bleep/dialogue-default",
         volume: 0.2
       }]
     });
@@ -112,7 +109,6 @@ describe("dialogue audio runtime", () => {
           lineKey: "line:override",
           speakerId: "Felix",
           textId: "planned_voice",
-          voiceAssetAvailable: false,
           voiceVolume: 0.25
         })
       )
@@ -120,7 +116,7 @@ describe("dialogue audio runtime", () => {
       state: {
         activeBleepLineKey: "line:override",
         activeBleepKey: "dialogue-bleep:line:override",
-        activeBleepSourceRef: "bleep:dialogue-felix"
+        activeBleepAssetId: "bleep/dialogue-felix"
       },
       hasVoiceBoundary: true,
       effects: [
@@ -128,7 +124,7 @@ describe("dialogue audio runtime", () => {
         {
           type: "play-dialogue-bleep",
           key: "dialogue-bleep:line:override",
-          sourceRef: "bleep:dialogue-felix",
+          assetId: "bleep/dialogue-felix",
           volume: expect.closeTo(0.3)
         }
       ]
@@ -137,18 +133,18 @@ describe("dialogue audio runtime", () => {
     expect(
       planDialogueLineAudio(
         {},
-        lineInput({ lineKey: "line:null", speakerId: "Narrator", textId: "planned_voice", voiceAssetAvailable: false })
+        lineInput({ lineKey: "line:null", speakerId: "Narrator", textId: "planned_voice" })
       )
     ).toEqual({ state: {}, hasVoiceBoundary: true, effects: [{ type: "stop-voice" }] });
 
     expect(
       planDialogueLineAudio(
         {},
-        lineInput({ lineKey: "line:default", speakerId: "felix", textId: "planned_voice", voiceAssetAvailable: false })
+        lineInput({ lineKey: "line:default", speakerId: "felix", textId: "planned_voice" })
       ).effects
     ).toEqual([
       { type: "stop-voice" },
-      { type: "play-dialogue-bleep", key: "dialogue-bleep:line:default", sourceRef: "bleep:dialogue-default", volume: 0.2 }
+      { type: "play-dialogue-bleep", key: "dialogue-bleep:line:default", assetId: "bleep/dialogue-default", volume: 0.2 }
     ]);
   });
 
@@ -173,7 +169,7 @@ describe("dialogue audio runtime", () => {
     const active: DialogueAudioRuntimeState = {
       activeBleepLineKey: "line:1",
       activeBleepKey: "dialogue-bleep:line:1",
-      activeBleepSourceRef: "bleep:dialogue-default"
+      activeBleepAssetId: "bleep/dialogue-default"
     };
 
     expect(reduceDialogueAudioLifecycle(active, { type: "line-finish", lineKey: "line:2" })).toEqual({
@@ -195,18 +191,18 @@ describe("dialogue audio runtime", () => {
     expect(
       planDialogueLineAudio(
         active,
-        lineInput({ lineKey: "line:2", speakerId: "Mira", textId: "planned_voice", voiceAssetAvailable: false })
+        lineInput({ lineKey: "line:2", speakerId: "Mira", textId: "planned_voice" })
       ).effects
     ).toEqual([
       { type: "stop-dialogue-bleep", key: "dialogue-bleep:line:1" },
       { type: "stop-voice" },
-      { type: "play-dialogue-bleep", key: "dialogue-bleep:line:2", sourceRef: "bleep:dialogue-default", volume: 0.2 }
+      { type: "play-dialogue-bleep", key: "dialogue-bleep:line:2", assetId: "bleep/dialogue-default", volume: 0.2 }
     ]);
 
     expect(
       planDialogueLineAudio(
         active,
-        lineInput({ lineKey: "line:voiced", textId: "voice_validation_0001", voiceAssetAvailable: true, voiceVolume: 0.25 })
+        lineInput({ lineKey: "line:voiced", textId: "voice_validation_0001", voiceAssetId: "voice/zh/voice-validation-0001", voiceVolume: 0.25 })
       )
     ).toEqual({
       state: {},
@@ -216,9 +212,9 @@ describe("dialogue audio runtime", () => {
         { type: "stop-voice" },
         {
           type: "play-voice",
-          key: "voice:zh:voice_validation_0001",
+          key: "voice/zh/voice-validation-0001",
           textId: "voice_validation_0001",
-          sourceRef: "voice:zh:voice_validation_0001",
+          assetId: "voice/zh/voice-validation-0001",
           volume: 0.25
         }
       ]
@@ -233,7 +229,7 @@ describe("dialogue audio runtime", () => {
     revealStatus = "revealing",
     speakerId,
     textId,
-    voiceAssetAvailable = false,
+    voiceAssetId,
     voiceVolume = 1,
     continuation = false
   }: {
@@ -244,7 +240,7 @@ describe("dialogue audio runtime", () => {
     revealStatus?: "revealing" | "complete";
     speakerId?: string;
     textId?: string;
-    voiceAssetAvailable?: boolean;
+    voiceAssetId?: string;
     voiceVolume?: number;
     continuation?: boolean;
   }) {
@@ -257,7 +253,7 @@ describe("dialogue audio runtime", () => {
       ...(speakerId ? { speakerId } : {}),
       ...(textId ? { textId } : {}),
       voice: { locale: "zh", volume: voiceVolume },
-      voiceAssetAvailable,
+      ...(voiceAssetId ? { voiceAssetId } : {}),
       ...(continuation ? { continuation } : {})
     };
   }

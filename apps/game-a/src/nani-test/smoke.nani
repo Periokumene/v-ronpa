@@ -2,11 +2,11 @@
 @showUI dialog
 @showUI commandBar visible:true
 @set route:"smoke-preview"
-@back bg:game-a-academy-hall-fullscreen effect:fade time:0.05
+@back bg/academy-hall effect:fade time:0.05
 @char alice pos:50
 @rain power:0.5 wind:-1 hue:215 tint:0.55
-@bgm bgm:game-a-main group:music volume:0.35
-@sfx sfx:gentle-rain-loop group:rain loop:true volume:0.2
+@bgm bgm/main group:music volume:0.35
+@sfx sfx/gentle-rain-loop group:rain loop:true volume:0.2
 Narrator: CHECKPOINT SMOKE 00 - test-only VN entry is active.|#smoke_preview_00|
 @choice "交互与存档" goto:#Interaction
 @choice "Pixi 与媒体" goto:#Presentation
@@ -22,11 +22,15 @@ Narrator: CHECKPOINT SMOKE CUE 00 - dialog before cue.
 @hideCue time:0.4 wait!
 @showUI dialog time:0.05 wait!
 Narrator: CHECKPOINT SMOKE CUE 03 - dialog after cue fade.
+@pinp ui/dialog-frame alt:"Game A 对话框装饰纹理" effect:fade time:0.18
+Narrator: CHECKPOINT SMOKE PINP - centered DOM picture surface is visible and saveable.
 @hideUI dialog time:0.05 wait!
 @hideUI commandBar time:0.05 wait!
 @showUI dialog time:0.05 wait!
 @showUI commandBar visible:true time:0.05 wait!
 Narrator: CHECKPOINT SMOKE UI - terminal visibility is stable and saveable.
+@pinp visible:false effect:fade time:0.18
+Narrator: CHECKPOINT SMOKE PINP HIDDEN - picture surface exit completed and content is cleared.
 @input playerName type:string summary:"输入测试代号" value:Felix
 Narrator: CHECKPOINT SMOKE INPUT - input wait completed.
 @wait i
@@ -36,8 +40,8 @@ Narrator: CHECKPOINT SMOKE SAVE LOAD SETTINGS - use shared command bar and pause
 
 #Presentation
 @set route:"smoke-presentation"
-@back bg:game-a-academy-hall-fullscreen effect:fade time:0.05
-@inback bg:game-a-snow-outskirts-frame effect:fade time:0.05
+@back bg/academy-hall effect:fade time:0.05
+@inback bg/inner/snow-outskirts effect:fade time:0.05
 @char alice pos:50 time:0.05 wait!
 @rain power:0.5 wind:-1 hue:215 tint:0.55 time:0.05
 @flash color:#ffffff duration:50 wait!
@@ -46,7 +50,7 @@ Narrator: CHECKPOINT SMOKE PIXI - renderer task completed without phantom waits.
 
 #Media
 Mira: CHECKPOINT SMOKE VOICE - textId audio is optional runtime intent. |#game_a_voice_0001|
-@movie video:game-a-intro block:true
+@movie video/intro block:true
 Narrator: CHECKPOINT SMOKE MOVIE - media wait completed and is not saveable playback state.
 @rain power:0 time:0.05 wait!
 @hideChars time:0.05 wait!

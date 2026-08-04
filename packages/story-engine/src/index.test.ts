@@ -22,7 +22,7 @@ import {
 const trialRuntimeScript = runtimeScript(
   "trial.nani",
   [
-    runtimeCommand("back", "scene", { appearance: "bg:court", effect: "fade" }, { source: "naninovel" }),
+    runtimeCommand("back", "scene", { appearance: "bg/court", effect: "fade" }, { source: "naninovel" }),
     runtimeCommand("char", "actor", {
       target: "Ema",
       appearanceExpression: "Pensive1,ArmR3",
@@ -47,7 +47,7 @@ const trialRuntimeScript = runtimeScript(
 const vnStepperRuntimeScript = runtimeScript(
   "story-vn.nani",
   [
-    runtimeCommand("back", "scene", { appearance: "bg:harness", effect: "fade" }, { source: "naninovel" }),
+    runtimeCommand("back", "scene", { appearance: "bg/harness", effect: "fade" }, { source: "naninovel" }),
     runtimeCommand("char", "actor", {
       target: "Ema",
       appearanceExpression: "",
@@ -306,6 +306,7 @@ describe("story engine", () => {
       "focus",
       "hidecue",
       "inback",
+      "pinp",
       "trialkeyword"
     ]);
   });
@@ -734,8 +735,8 @@ describe("story engine", () => {
 
   it("emits media/UI commands while movie block:true creates a runtimeWait", () => {
     const runtimeScript = runtimeScriptFixture("media-ui.nani", [
-      runtimeCommand("bgm", "media", { bgmPath: "bgm:main", group: "music" }),
-      runtimeCommand("sfx", "media", { sfxPath: "sfx:loop", group: "rain", loop: true }),
+      runtimeCommand("bgm", "media", { bgmPath: "bgm/main", group: "music" }),
+      runtimeCommand("sfx", "media", { sfxPath: "sfx/loop", group: "rain", loop: true }),
       runtimeCommand("hideui", "ui", { target: "dialog", visible: false }),
       runtimeCommand("hideui", "ui", { target: "commandBar" }),
       runtimeCommand("toast", "ui", { text: "Ready" }),
@@ -1001,7 +1002,7 @@ function runtimeScript(
   commands: RuntimeCommand[],
   labels: Record<string, number> = {}
 ): RuntimeScript {
-  return { scriptPath, commands, labels, assets: [], dependencies: [] };
+  return { scriptPath, commands, labels, dependencies: [] };
 }
 
 function runtimeCommand(

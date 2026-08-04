@@ -5,6 +5,7 @@ const root = process.cwd();
 
 const packageRoots = {
   "contracts": "packages/contracts",
+  "asset-project": "packages/asset-project",
   "asset-registry": "packages/asset-registry",
   "layered-character": "packages/layered-character",
   "nani-parser": "packages/nani-parser",
@@ -22,7 +23,6 @@ const packageRoots = {
   "trial-director": "packages/trial-director",
   "pixi-presenter": "packages/pixi-presenter",
   "pixi-stage-model": "packages/pixi-stage-model",
-  "runtime-assets-pixi": "packages/runtime-assets-pixi",
   "r3f-adapter": "packages/r3f-adapter",
   "ui-kit": "packages/ui-kit",
   "media-save": "packages/media-save",
@@ -33,6 +33,7 @@ const packageRoots = {
 
 const allowedWorkspaceDeps = {
   "contracts": [],
+  "asset-project": ["contracts"],
   "asset-registry": ["contracts"],
   "layered-character": ["contracts"],
   "nani-parser": [],
@@ -60,8 +61,7 @@ const allowedWorkspaceDeps = {
   "navi-director": ["contracts", "gameplay"],
   "trial-director": ["contracts", "gameplay"],
   "pixi-stage-model": ["contracts"],
-  "runtime-assets-pixi": ["asset-registry", "contracts"],
-  "pixi-presenter": ["contracts", "layered-character", "pixi-stage-model", "runtime-assets-pixi"],
+  "pixi-presenter": ["contracts", "layered-character", "pixi-stage-model"],
   "r3f-adapter": ["contracts"],
   "ui-kit": ["contracts"],
   "media-save": ["contracts"],
@@ -70,18 +70,19 @@ const allowedWorkspaceDeps = {
     "app-vn-devtools",
     "app-vn-runtime",
     "app-vn-shell",
+    "asset-project",
     "asset-registry",
     "contracts",
     "game-flow-machine",
     "gameplay",
     "layered-character",
     "media-save",
-    "runtime-assets-pixi",
     "ui-kit"
   ],
   "game-harness": [
     "app-vn-runtime",
     "app-vn-shell",
+    "asset-project",
     "asset-registry",
     "contracts",
     "game-flow-machine",
@@ -94,7 +95,6 @@ const allowedWorkspaceDeps = {
     "pixi-presenter",
     "pixi-stage-model",
     "r3f-adapter",
-    "runtime-assets-pixi",
     "story-engine",
     "story-play",
     "trial-director",
@@ -116,6 +116,7 @@ const rendererAndBrowserAdapters = [
 
 const forbiddenExternalDeps = {
   "contracts": ["react", "react-dom", "@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
+  "asset-project": rendererAndBrowserAdapters,
   "asset-registry": ["react", "react-dom", "@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
   "layered-character": rendererAndBrowserAdapters,
   "nani-parser": rendererAndBrowserAdapters,
@@ -126,7 +127,6 @@ const forbiddenExternalDeps = {
   "app-vn-session": rendererAndBrowserAdapters,
   "app-vn-dispatch": rendererAndBrowserAdapters,
   "pixi-stage-model": rendererAndBrowserAdapters,
-  "runtime-assets-pixi": rendererAndBrowserAdapters,
   "app-vn-runtime": ["@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
   "app-vn-devtools": ["react-dom", "@react-three/", "three", "pixi.js", "@pixi/", "dexie", "howler", "@radix-ui/"],
   "app-vn-shell": ["@react-three/", "three", "dexie", "howler"],

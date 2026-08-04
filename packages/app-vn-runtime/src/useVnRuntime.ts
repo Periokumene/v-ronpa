@@ -3,6 +3,7 @@ import type { AssetResolver } from "@v-ronpa/asset-registry";
 import {
   advanceStoryTextReveal,
   advanceUiRuntimeTransitions,
+  clearRuntimePinp,
   clearMovieOverlay,
   completeStoryTextReveal,
   countStoryTextRevealUnits,
@@ -16,6 +17,7 @@ import {
   deriveUiRuntimeLifecycleState,
   dismissToast,
   hasActiveUiRuntimeTransitions,
+  hydrateRuntimePinp,
   isUiPresentationWait,
   isUiPresentationWaitComplete,
   planDialogueLineAudio,
@@ -101,6 +103,7 @@ import {
   disposeVnRuntimeMedia,
   resolveVnDialogueVoiceAssetAvailability,
   resolveVnRuntimeMediaSource,
+  resolveVnRuntimeImageSource,
   type VnRuntimeMediaHandleStore
 } from "./runtimeMedia";
 import { createVnRuntimeRestorePlan } from "./runtimeRestore";
@@ -180,6 +183,7 @@ export interface UseVnRuntimeOptions extends VnRuntimeDefinition {
 interface CommitVnSessionStepInput {
   active: boolean;
   forcePixiCommit?: boolean;
+  clearPinpBeforeCommands?: boolean;
   pacing?: StoryPlayPacing;
   previousMediaState?: MediaRuntimeState;
   previousPixiStage: PixiStageSnapshot;
@@ -230,6 +234,7 @@ export function useVnRuntime({
   sourceDiagnosticPolicy,
   storyPlayTiming,
   videoPort: configuredVideoPort,
+  voiceIndex,
   voiceSettings = DEFAULT_VOICE_SETTINGS
 }: UseVnRuntimeOptions): UseVnRuntimeResult {
   const compiledCatalog = useMemo(
@@ -286,7 +291,7 @@ export function useVnRuntime({
   const storyTextRevealRuntimeRef = useRef(storyTextRevealRuntime);
   const dialogueAudioRuntimeRef = useRef<DialogueAudioRuntimeState>({});
   const mediaHandlesRef = useRef<VnRuntimeMediaHandleStore>(createInitialVnRuntimeMediaHandleStore());
-  const pendingMoviePlaybackRef = useRef<{ sourceRef: string; uri: string } | undefined>(undefined);
+  const pendingMoviePlaybackRef = useRef<{ assetId: string; uri: string } | undefined>(undefined);
   const toastTimeoutsRef = useRef<Record<string, number>>({});
   const observedWaitTasksRef = useRef<{ waitKey: string; observed: Set<string> } | undefined>(undefined);
   const completingWaitKeyRef = useRef<string | undefined>(undefined);
@@ -366,7 +371,7 @@ export function useVnRuntime({
   }, []);
 
   const observeAssetDiagnostic = useCallback(
-    (diagnostic: { code?: string; severity?: "info" | "warning" | "error"; message: string; assetId?: string; kind?: string }) => {
+    (diagnostic: { code?: string; severity?: "info" | "warning" | "error"; message: string; assetId?: string; capability?: string }) => {
       appendRuntimeDiagnostics([createVnRuntimeAssetDiagnostic(diagnostic)]);
     },
     [appendRuntimeDiagnostics]
@@ -660,10 +665,10 @@ export function useVnRuntime({
       audioPort,
       effects: step.effects,
       handles: mediaHandlesRef.current,
-      resolver: ({ kind, sourceRef }) =>
+      resolver: ({ kind, assetId }) =>
         resolveVnRuntimeMediaSource({
           kind,
-          sourceRef,
+          assetId,
           ...(assetResolver ? { assetResolver } : {})
         })
     }).then((result) => appendRuntimeDiagnostics(result.diagnostics));
@@ -830,6 +835,7 @@ export function useVnRuntime({
     commitVnSessionStep({
       active: !nextSession.story.ended,
       forcePixiCommit: Boolean(requestedOperation && source === "start"),
+      clearPinpBeforeCommands: coordinated.crossedScript,
       pacing,
       ...(previousMediaState ? { previousMediaState } : {}),
       previousPixiStage,
@@ -1070,6 +1076,19 @@ export function useVnRuntime({
       story: state.story,
       ui: state.ui
     });
+    const restoredPinpDiagnostics: VnRuntimeDiagnostic[] = [];
+    let restoredUiRuntime = plan.uiRuntime;
+    if (restoredUiRuntime.pinp) {
+      const resolved = resolveVnRuntimeImageSource({
+        assetId: restoredUiRuntime.pinp.assetId,
+        ...(assetResolver ? { assetResolver } : {})
+      });
+      if (resolved.diagnostic) restoredPinpDiagnostics.push(resolved.diagnostic);
+      restoredUiRuntime = hydrateRuntimePinp(restoredUiRuntime, {
+        assetId: restoredUiRuntime.pinp.assetId,
+        ...(resolved.uri ? { uri: resolved.uri } : {})
+      });
+    }
     disposeRuntimeMedia();
     setSessionNow(
       restoreVnSession({
@@ -1080,8 +1099,12 @@ export function useVnRuntime({
     );
     setExecutedScriptPathsNow([target.script.scriptPath]);
     setMediaRuntimeNow({ state: plan.mediaRuntime });
-    setUiRuntimeNow({ state: plan.uiRuntime });
-    setRuntimeDiagnostics((current) => limitVnRuntimeDiagnostics([...current, ...plan.diagnostics]));
+    setUiRuntimeNow({ state: restoredUiRuntime });
+    setRuntimeDiagnostics((current) => limitVnRuntimeDiagnostics([
+      ...current,
+      ...plan.diagnostics,
+      ...restoredPinpDiagnostics
+    ]));
     setPixiStageRuntimeNow((current) => ({
       ...plan.pixiStageRuntime,
       hintSequence: current.hintSequence + 1
@@ -1093,10 +1116,10 @@ export function useVnRuntime({
         audioPort,
         effects: plan.mediaEffects,
         handles: mediaHandlesRef.current,
-        resolver: ({ kind, sourceRef }) =>
+        resolver: ({ kind, assetId }) =>
           resolveVnRuntimeMediaSource({
             kind,
-            sourceRef,
+            assetId,
             ...(assetResolver ? { assetResolver } : {})
           })
       }).then((result) => appendRuntimeDiagnostics(result.diagnostics));
@@ -1106,6 +1129,7 @@ export function useVnRuntime({
 
   function commitVnSessionStep({
     active,
+    clearPinpBeforeCommands = false,
     forcePixiCommit = false,
     pacing = "normal",
     previousMediaState = mediaRuntimeRef.current.state,
@@ -1124,7 +1148,7 @@ export function useVnRuntime({
       nowMs,
       previousMediaState,
       previousPixiStage,
-      previousUiState,
+      previousUiState: clearPinpBeforeCommands ? clearRuntimePinp(previousUiState) : previousUiState,
       profile: runtimeProfile,
       runtimeCommands,
       session: nextSession,
@@ -1145,24 +1169,37 @@ export function useVnRuntime({
       storyState: nextStoryState
     });
     let sawMovieEffect = false;
-    let pendingMoviePlayback: { sourceRef: string; uri: string } | undefined;
+    let pendingMoviePlayback: { assetId: string; uri: string } | undefined;
     const movieDiagnostics: VnRuntimeDiagnostic[] = [];
     const nextUiStateFromCommands = transaction.mediaEffects.reduce((current, effect) => {
       if (effect.type !== "play-movie") return current;
       sawMovieEffect = true;
       const resolved = resolveVnRuntimeMediaSource({
         kind: "video",
-        sourceRef: effect.sourceRef,
+        assetId: effect.assetId,
         ...(assetResolver ? { assetResolver } : {})
       });
       if (resolved.diagnostic) movieDiagnostics.push(resolved.diagnostic);
-      if (resolved.uri) pendingMoviePlayback = { sourceRef: effect.sourceRef, uri: resolved.uri };
+      if (resolved.uri) pendingMoviePlayback = { assetId: effect.assetId, uri: resolved.uri };
       return startMovieOverlay(current, {
-        sourceRef: effect.sourceRef,
+        assetId: effect.assetId,
         ...(resolved.uri ? { uri: resolved.uri } : {}),
         blocking: effect.block
       });
     }, projection.runtime.uiState);
+    const pinpDiagnostics: VnRuntimeDiagnostic[] = [];
+    let nextUiState = nextUiStateFromCommands;
+    if (runtimeCommands.some((command) => command.commandId === "pinp") && nextUiState.pinp) {
+      const resolved = resolveVnRuntimeImageSource({
+        assetId: nextUiState.pinp.assetId,
+        ...(assetResolver ? { assetResolver } : {})
+      });
+      if (resolved.diagnostic) pinpDiagnostics.push(resolved.diagnostic);
+      nextUiState = hydrateRuntimePinp(nextUiState, {
+        assetId: nextUiState.pinp.assetId,
+        ...(resolved.uri ? { uri: resolved.uri } : {})
+      });
+    }
     if (sawMovieEffect) pendingMoviePlaybackRef.current = pendingMoviePlayback;
     appendRuntimeDiagnostics(
       collectVnRuntimeDiagnostics({
@@ -1170,10 +1207,10 @@ export function useVnRuntime({
         transactionDiagnostics: transaction.diagnostics,
         mediaDiagnostics: transaction.mediaDiagnostics,
         uiDiagnostics: transaction.uiDiagnostics
-      }).concat(movieDiagnostics, dialogueAudio.diagnostics)
+      }).concat(movieDiagnostics, pinpDiagnostics, dialogueAudio.diagnostics)
     );
     setMediaRuntimeNow({ state: projection.stable.mediaState });
-    setUiRuntimeNow({ state: deriveUiRuntimeLifecycleState(nextUiStateFromCommands, nextStoryState) });
+    setUiRuntimeNow({ state: deriveUiRuntimeLifecycleState(nextUiState, nextStoryState) });
     const audioMediaEffects = transaction.mediaEffects.filter((effect) => effect.type !== "play-movie");
     const voiceBoundaryToken = dialogueAudio.hasVoiceBoundary ? beginVoiceBoundary() : undefined;
     const audioEffects = [...audioMediaEffects, ...dialogueAudio.effects];
@@ -1182,10 +1219,10 @@ export function useVnRuntime({
         audioPort,
         effects: audioEffects,
         handles: mediaHandlesRef.current,
-        resolver: ({ kind, sourceRef }) =>
+        resolver: ({ kind, assetId }) =>
           resolveVnRuntimeMediaSource({
             kind,
-            sourceRef,
+            assetId,
             ...(assetResolver ? { assetResolver } : {})
           })
       }).then((result) => {
@@ -1276,6 +1313,7 @@ export function useVnRuntime({
     const voiceAvailability = resolveVnDialogueVoiceAssetAvailability({
       ...(textId ? { textId } : {}),
       voiceSettings,
+      ...(voiceIndex ? { voiceIndex } : {}),
       ...(assetResolver ? { assetResolver } : {})
     });
     const dialogueAudio = planDialogueLineAudio(dialogueAudioRuntimeRef.current, {
@@ -1290,7 +1328,7 @@ export function useVnRuntime({
       ...(speakerId ? { speakerId } : {}),
       ...(textId ? { textId } : {}),
       voice: voiceSettings,
-      voiceAssetAvailable: voiceAvailability.available,
+      ...(voiceAvailability.assetId ? { voiceAssetId: voiceAvailability.assetId } : {}),
       ...(storyTextCommand.textStage && storyTextCommand.textStage.index > 0
         ? { continuation: true }
         : {})

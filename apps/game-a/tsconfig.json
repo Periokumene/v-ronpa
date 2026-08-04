@@ -10,6 +10,7 @@
     "types": ["vite/client"]
   },
   "references": [
+    { "path": "../../packages/asset-project" },
     { "path": "../../packages/app-vn-devtools" },
     { "path": "../../packages/app-vn-runtime" },
     { "path": "../../packages/app-vn-shell" },
@@ -19,7 +20,6 @@
     { "path": "../../packages/gameplay" },
     { "path": "../../packages/layered-character" },
     { "path": "../../packages/media-save" },
-    { "path": "../../packages/runtime-assets-pixi" },
     { "path": "../../packages/ui-kit" }
   ],
   "include": ["src"]

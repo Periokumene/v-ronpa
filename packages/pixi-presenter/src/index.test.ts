@@ -11,6 +11,11 @@ import { createPixiPresenter } from "./index";
 import { ActorSystem } from "./internal/systems";
 import { resolveRainSettingsFromCommandParams } from "./internal/rain/settings";
 
+vi.mock("./internal/fxAssets", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./internal/fxAssets")>()),
+  preloadBuiltInPixiFxAssets: () => Promise.resolve()
+}));
+
 describe("pixi presenter port", () => {
   beforeEach(() => {
     vi.stubGlobal("document", { createElement: () => ({ getContext: () => null }) });
@@ -29,7 +34,7 @@ describe("pixi presenter port", () => {
         throw new Error("mount should not be required for memory behavior");
       }
     } as unknown as HTMLElement;
-    const presenter = createPixiPresenter({ host, active: true, characterOutlineEnabled: true, characterPreloadPlan: [] });
+    const presenter = createPixiPresenter({ host, active: true, characterOutlineEnabled: true, characterPreloadPlan: [], characterAssetIdByCharacterId: {} });
 
     expect(() => presenter.reconcile(createInitialPixiStageSnapshot())).not.toThrow();
     expect(() => presenter.clear()).not.toThrow();
@@ -79,7 +84,7 @@ describe("pixi presenter port", () => {
       clientHeight: 540,
       appendChild: vi.fn()
     } as unknown as HTMLElement;
-    const presenter = createPixiPresenter({ host, active: true, characterOutlineEnabled: true, characterPreloadPlan: [] });
+    const presenter = createPixiPresenter({ host, active: true, characterOutlineEnabled: true, characterPreloadPlan: [], characterAssetIdByCharacterId: {} });
 
     await presenter.mount();
     presenter.reconcile(createInitialPixiStageSnapshot());
@@ -123,7 +128,7 @@ describe("pixi presenter port", () => {
       appendChild: vi.fn()
     } as unknown as HTMLElement;
     const characterPreloadPlan = [{ characterId: "alice", appearanceExpressions: [""] }] as const;
-    const presenter = createPixiPresenter({ host, active: true, characterOutlineEnabled: true, characterPreloadPlan });
+    const presenter = createPixiPresenter({ host, active: true, characterOutlineEnabled: true, characterPreloadPlan, characterAssetIdByCharacterId: { alice: "char/alice" } });
 
     const ready = presenter.mount();
     presenter.reconcile(createInitialPixiStageSnapshot());
@@ -157,7 +162,7 @@ describe("pixi presenter port", () => {
       clientHeight: 540,
       appendChild: vi.fn()
     } as unknown as HTMLElement;
-    const presenter = createPixiPresenter({ host, active: false, characterOutlineEnabled: true, characterPreloadPlan: [] });
+    const presenter = createPixiPresenter({ host, active: false, characterOutlineEnabled: true, characterPreloadPlan: [], characterAssetIdByCharacterId: {} });
 
     await presenter.mount();
     expect(stop).toHaveBeenCalled();
@@ -191,7 +196,7 @@ describe("pixi presenter port", () => {
       clientHeight: 540,
       appendChild: vi.fn()
     } as unknown as HTMLElement;
-    const presenter = createPixiPresenter({ host, active: false, characterOutlineEnabled: true, characterPreloadPlan: [] });
+    const presenter = createPixiPresenter({ host, active: false, characterOutlineEnabled: true, characterPreloadPlan: [], characterAssetIdByCharacterId: {} });
 
     const ready = presenter.mount();
     await vi.waitFor(() => expect(preload).toHaveBeenCalledOnce());
@@ -205,7 +210,7 @@ describe("pixi presenter port", () => {
 
   it("reduces persistent VN commands into a terminal Pixi stage snapshot", () => {
     const initial = createInitialPixiStageSnapshot();
-    const withBackground = reducePixiRuntimeCommand(initial, runtimeCommand("back", "scene", { appearance: "bg:harness" }));
+    const withBackground = reducePixiRuntimeCommand(initial, runtimeCommand("back", "scene", { appearance: "bg/harness" }));
     const withCharacter = reducePixiRuntimeCommand(
       withBackground.snapshot,
       runtimeCommand("char", "actor", {
@@ -217,10 +222,10 @@ describe("pixi presenter port", () => {
 
     expect(withBackground).toMatchObject({
       snapshot: {
-        version: 5,
+        version: 6,
         revision: 1,
         backgroundsById: {
-          MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness", visible: true }
+          MainBackground: { id: "MainBackground", kind: "background", appearance: "bg/harness", visible: true }
         },
         actorOrder: ["MainBackground"]
       },
@@ -229,10 +234,10 @@ describe("pixi presenter port", () => {
     });
     expect(withBackground.snapshot).not.toHaveProperty("background");
     expect(withCharacter.snapshot).toMatchObject({
-      version: 5,
+      version: 6,
       revision: 2,
       backgroundsById: {
-        MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness" }
+        MainBackground: { id: "MainBackground", kind: "background", appearance: "bg/harness" }
       },
       charactersById: {
         Ema: {
@@ -353,12 +358,12 @@ describe("pixi presenter port", () => {
   it("reduces inback into the reserved inner background actor without touching main backgrounds", () => {
     const withMain = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
-      runtimeCommand("back", "scene", { appearance: "bg:harness" })
+      runtimeCommand("back", "scene", { appearance: "bg/harness" })
     ).snapshot;
     const withInner = reducePixiRuntimeCommand(
       withMain,
       runtimeCommand("inback", "scene", {
-        appearance: "bg:framed-room",
+        appearance: "bg/framed-room",
         transition: "fade",
         durationMs: 200,
         easing: "linear",
@@ -366,11 +371,11 @@ describe("pixi presenter port", () => {
       })
     );
 
-    expect(withInner.snapshot.backgroundsById.MainBackground).toMatchObject({ appearance: "bg:harness" });
+    expect(withInner.snapshot.backgroundsById.MainBackground).toMatchObject({ appearance: "bg/harness" });
     expect(withInner.snapshot.innerBackgroundsById[INNER_BACKGROUND_ID]).toMatchObject({
       id: INNER_BACKGROUND_ID,
       kind: "background",
-      appearance: "bg:framed-room",
+      appearance: "bg/framed-room",
       visible: true,
       transition: { name: "fade", durationMs: 200, easing: "linear", wait: true }
     });
@@ -384,21 +389,21 @@ describe("pixi presenter port", () => {
   it("keeps back wildcard targeting scoped to main background actors, not inner backgrounds", () => {
     let stage = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
-      runtimeCommand("back", "scene", { appearance: "bg:harness" })
+      runtimeCommand("back", "scene", { appearance: "bg/harness" })
     ).snapshot;
     stage = reducePixiRuntimeCommand(stage, runtimeCommand("back", "scene", { target: "Flower", appearance: "Bloomed" })).snapshot;
-    stage = reducePixiRuntimeCommand(stage, runtimeCommand("inback", "scene", { appearance: "bg:framed-room" })).snapshot;
+    stage = reducePixiRuntimeCommand(stage, runtimeCommand("inback", "scene", { appearance: "bg/framed-room" })).snapshot;
 
     const replacedMainBackgrounds = reducePixiRuntimeCommand(
       stage,
-      runtimeCommand("back", "scene", { target: "*", appearance: "bg:replacement" })
+      runtimeCommand("back", "scene", { target: "*", appearance: "bg/replacement" })
     ).snapshot;
 
     expect(Object.values(replacedMainBackgrounds.backgroundsById).map((actor) => actor.appearance)).toEqual([
-      "bg:replacement",
-      "bg:replacement"
+      "bg/replacement",
+      "bg/replacement"
     ]);
-    expect(replacedMainBackgrounds.innerBackgroundsById[INNER_BACKGROUND_ID]?.appearance).toBe("bg:framed-room");
+    expect(replacedMainBackgrounds.innerBackgroundsById[INNER_BACKGROUND_ID]?.appearance).toBe("bg/framed-room");
   });
 
   it("hides existing inner background actors and no-ops when none exists", () => {
@@ -407,14 +412,14 @@ describe("pixi presenter port", () => {
 
     expect(noOpHidden).toEqual({ snapshot: initial, hints: [], waitTasks: [], diagnostics: [] });
 
-    const withInner = reducePixiRuntimeCommand(initial, runtimeCommand("inback", "scene", { appearance: "bg:framed-room" })).snapshot;
+    const withInner = reducePixiRuntimeCommand(initial, runtimeCommand("inback", "scene", { appearance: "bg/framed-room" })).snapshot;
     const hidden = reducePixiRuntimeCommand(
       withInner,
       runtimeCommand("inback", "scene", { visible: false, durationMs: 120, wait: true })
     );
 
     expect(hidden.snapshot.innerBackgroundsById[INNER_BACKGROUND_ID]).toMatchObject({
-      appearance: "bg:framed-room",
+      appearance: "bg/framed-room",
       visible: false,
       transition: { durationMs: 120, wait: true }
     });
@@ -534,7 +539,7 @@ describe("pixi presenter port", () => {
   it("updates layered character expressions independently and preserves unrelated stage state", () => {
     let stage = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
-      runtimeCommand("back", "scene", { appearance: "bg:harness" })
+      runtimeCommand("back", "scene", { appearance: "bg/harness" })
     ).snapshot;
     stage = reducePixiRuntimeCommand(
       stage,
@@ -569,7 +574,7 @@ describe("pixi presenter port", () => {
     ).snapshot;
 
     expect(replacedCenter).toMatchObject({
-      version: 5,
+      version: 6,
       revision: 5,
       charactersById: {
         Ren: {
@@ -597,15 +602,15 @@ describe("pixi presenter port", () => {
   it("uses command-count revision semantics for repeated persistent commands", () => {
     const first = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
-      runtimeCommand("back", "scene", { appearance: "bg:harness" })
+      runtimeCommand("back", "scene", { appearance: "bg/harness" })
     ).snapshot;
-    const second = reducePixiRuntimeCommand(first, runtimeCommand("back", "scene", { appearance: "bg:harness" })).snapshot;
+    const second = reducePixiRuntimeCommand(first, runtimeCommand("back", "scene", { appearance: "bg/harness" })).snapshot;
 
     expect(second).toMatchObject({
-      version: 5,
+      version: 6,
       revision: 2,
       backgroundsById: {
-        MainBackground: { id: "MainBackground", kind: "background", appearance: "bg:harness" }
+        MainBackground: { id: "MainBackground", kind: "background", appearance: "bg/harness" }
       }
     });
     expect(second).not.toHaveProperty("background");
@@ -669,12 +674,12 @@ describe("pixi presenter port", () => {
   it("stores explicitly targeted background actors without legacy compatibility fields", () => {
     let stage = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
-      runtimeCommand("back", "scene", { target: "MainBackground", appearance: "bg:harness" })
+      runtimeCommand("back", "scene", { target: "MainBackground", appearance: "bg/harness" })
     ).snapshot;
     stage = reducePixiRuntimeCommand(stage, runtimeCommand("back", "scene", { target: "Flower", appearance: "Bloomed" })).snapshot;
 
     expect(stage.backgroundsById).toMatchObject({
-      MainBackground: { id: "MainBackground", appearance: "bg:harness" },
+      MainBackground: { id: "MainBackground", appearance: "bg/harness" },
       Flower: { id: "Flower", appearance: "Bloomed" }
     });
     expect(stage).not.toHaveProperty("background");
@@ -867,7 +872,7 @@ describe("pixi presenter port", () => {
   it("removes zero-power blur, bokeh, and weather state instead of leaving inert saved filters", () => {
     let stage = reducePixiRuntimeCommand(
       createInitialPixiStageSnapshot(),
-      runtimeCommand("back", "scene", { appearance: "bg:harness" })
+      runtimeCommand("back", "scene", { appearance: "bg/harness" })
     ).snapshot;
     stage = reducePixiRuntimeCommand(stage, runtimeCommand("blur", "effect", { target: "MainBackground", power: 0.4 })).snapshot;
     stage = reducePixiRuntimeCommand(stage, runtimeCommand("bokeh", "effect", { focus: "MainBackground", power: 0.5 })).snapshot;

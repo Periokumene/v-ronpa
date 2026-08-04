@@ -32,6 +32,21 @@ Narrator: You chose right.
 @end`;
 
 describe("nani parser", () => {
+  it("keeps pinp parsing syntax-only and does not emit asset metadata", () => {
+    const result = parseScenario({
+      scriptPath: "pinp-assets.nani",
+      sourceText: [
+        "@pinp texture/evidence/keycard-thumbnail",
+        "@pinp props:milk-bag pos:50,50",
+        "@pinp assetId:plain-image",
+        "@pinp visible:false"
+      ].join("\n")
+    });
+
+    expect("assets" in result.scenario).toBe(false);
+    expect(result.scenario.statements).toHaveLength(4);
+  });
+
   it("collects the same static cross-script dependencies from goto and choice", () => {
     const result = parseScenario({
       scriptPath: "game-a/opening.nani",
@@ -255,7 +270,7 @@ describe("nani parser", () => {
   it("parses first-pass HTML rich text for dialogue and text commands", () => {
     const result = parseScenario({
       sourceText: [
-        'Felix: <b>Bold</b> and <font color="#ff5577" size="+1" face="font:serif">danger</font><br>next &lt;tag&gt;[>]',
+        'Felix: <b>Bold</b> and <font color="#ff5577" size="+1" face="serif">danger</font><br>next &lt;tag&gt;[>]',
         '@cue "<b>Do not turn around.</b>"',
         '@choice "<mark>Inspect</mark>" goto:#Inspect',
         '@toast "<small>Saved&nbsp;now</small>"',
@@ -273,7 +288,7 @@ describe("nani parser", () => {
       text: "Bold and danger\nnext <tag>",
       runs: [
         { start: 0, end: 4, style: { bold: true } },
-        { start: 9, end: 15, style: { color: "#ff5577", sizeScale: 1.125, fontId: "font:serif" } }
+        { start: 9, end: 15, style: { color: "#ff5577", sizeScale: 1.125, fontFaceId: "serif" } }
       ]
     });
     expect(cue.richTextPrimary).toMatchObject({
@@ -329,7 +344,7 @@ describe("nani parser", () => {
     expect((result.scenario.statements[3] as CommandIR).richTextPrimary).toBeUndefined();
   });
 
-  it("collects layered character pack references from char and slide commands", () => {
+  it("keeps character resource binding out of parser IR", () => {
     const result = parseScenario({
       sourceText: [
         "@char Ema.Pensive1,ArmR3 pos:50",
@@ -340,13 +355,10 @@ describe("nani parser", () => {
     });
 
     expect(result.diagnostics).toEqual([]);
-    expect(result.scenario.assets).toEqual([
-      { id: "Ema", kind: "character-pack" },
-      { id: "Rina", kind: "character-pack" }
-    ]);
+    expect("assets" in result.scenario).toBe(false);
   });
 
-  it("preserves raw actor asset metadata for expression and scalar primaries", () => {
+  it("does not infer actor assets from raw expression primaries", () => {
     const result = parseScenario({
       sourceText: [
         "@char {actor}",
@@ -358,22 +370,17 @@ describe("nani parser", () => {
       scriptPath: "raw-character-assets.nani"
     });
 
-    expect(result.scenario.assets).toEqual([
-      { id: "{actor}", kind: "character-pack" },
-      { id: "{actor", kind: "character-pack" },
-      { id: "50", kind: "character-pack" },
-      { id: "true", kind: "character-pack" }
-    ]);
+    expect("assets" in result.scenario).toBe(false);
   });
 
-  it("collects inner background references from inback commands as background assets", () => {
+  it("parses inner background commands without resource binding", () => {
     const result = parseScenario({
-      sourceText: "@inback bg:framed-room effect:fade time:0.2 wait!",
+      sourceText: "@inback bg/framed-room effect:fade time:0.2 wait!",
       scriptPath: "inner-background-assets.nani"
     });
 
     expect(result.diagnostics).toEqual([]);
-    expect(result.scenario.assets).toEqual([{ id: "bg:framed-room", kind: "background" }]);
+    expect("assets" in result.scenario).toBe(false);
     expect(result.scenario.statements[0]).toMatchObject({
       kind: "command",
       commandId: "inback"
@@ -403,10 +410,9 @@ describe("nani parser", () => {
               "commandId": "back",
               "line": 7,
               "params": {
-                "bg": "harness",
                 "effect": "fade",
               },
-              "primary": undefined,
+              "primary": "bg/showcase",
             },
             {
               "commandId": "char",
@@ -633,10 +639,9 @@ describe("nani parser", () => {
               "commandId": "back",
               "line": 7,
               "params": {
-                "bg": "classroom",
                 "effect": "fade",
               },
-              "primary": undefined,
+              "primary": "bg/classroom",
             },
             {
               "commandId": "char",
@@ -973,7 +978,7 @@ describe("nani parser", () => {
 
   it("preserves ordered args for colon-like primary values, flags, and command conditions", () => {
     const result = parseScenario({
-      sourceText: "@back bg:harness if:{showBg} wait! !lazy",
+      sourceText: "@back theme:harness if:{showBg} wait! !lazy",
       scriptPath: "ordered-args.nani"
     });
     const command = result.scenario.statements[0] as CommandIR;
@@ -981,11 +986,11 @@ describe("nani parser", () => {
     expect(result.diagnostics).toEqual([]);
     expect(command.primary).toBeUndefined();
     expect(command.params).toEqual({
-      bg: { type: "string", value: "harness" }
+      theme: { type: "string", value: "harness" }
     });
     expect(command.condition).toEqual({ source: "showBg" });
     expect(command.args).toEqual([
-      { kind: "param", raw: "bg:harness", key: "bg", value: { type: "string", value: "harness" } },
+      { kind: "param", raw: "theme:harness", key: "theme", value: { type: "string", value: "harness" } },
       { kind: "param", raw: "if:{showBg}", key: "if", value: { type: "expression", source: "showBg" } },
       { kind: "flag", raw: "wait!", key: "wait", value: true },
       { kind: "flag", raw: "!lazy", key: "lazy", value: false }

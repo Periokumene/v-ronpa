@@ -8,6 +8,7 @@ import {
   type LayeredCharacterDefinition,
   type LayeredCharacterLayerMetadata,
   type LayeredCharacterLayers,
+  type AssetId,
   type PixiActorSnapshot
 } from "@v-ronpa/contracts";
 import {
@@ -29,6 +30,7 @@ export interface CharacterSystemOptions {
   width: () => number;
   height: () => number;
   characterOutlineEnabled: boolean;
+  characterAssetIdByCharacterId: Readonly<Record<string, AssetId>>;
   renderer?: Renderer;
   assetResolver?: PixiAssetResolver;
   onDiagnostic?: (diagnostic: PixiPresenterDiagnostic) => void;
@@ -257,7 +259,7 @@ export class CharacterSystem {
           code: "asset-unprepared-character-expression",
           severity: "error",
           assetId: actor.id,
-          kind: "character-pack",
+          capability: "json",
           message: `Layered character ${actor.id} expression '${expression || "default"}' was not included in the active VN entry preload plan.`
         });
       }
@@ -333,9 +335,14 @@ export class CharacterSystem {
   }
 
   private async prepareExpression(characterId: string, expression: string): Promise<PreparedCharacterResult> {
+    const assetId = this.options.characterAssetIdByCharacterId[characterId];
+    if (!assetId) {
+      this.emitLoadFailed(characterId, expression, new Error(`No character asset binding exists for '${characterId}'.`));
+      return { kind: "invalid", characterId, expression };
+    }
     const entryUri = resolvePixiAsset(
       this.options.assetResolver,
-      { id: characterId, kind: "character-pack" },
+      { id: assetId, capability: "json" },
       this.options.onDiagnostic
     );
     if (!entryUri) return { kind: "invalid", characterId, expression };
@@ -451,7 +458,7 @@ export class CharacterSystem {
       code,
       severity: "error",
       assetId: characterId,
-      kind: "character-pack",
+      capability: "json",
       message: `Layered character ${characterId} expression '${expression || "default"}' failed: ${messages.join(" ")}`
     });
   }
@@ -462,8 +469,8 @@ export class CharacterSystem {
       code: "asset-load-failed",
       severity: "error",
       assetId: characterId,
-      kind: "character-pack",
-      message: `Layered character ${characterId} expression '${expression || "default"}' failed to load character-pack asset: ${formatError(error)}`
+      capability: "json",
+      message: `Layered character ${characterId} expression '${expression || "default"}' failed to load its JSON asset: ${formatError(error)}`
     });
   }
 
@@ -479,7 +486,7 @@ export class CharacterSystem {
       code: "asset-invalid-texture-dimensions",
       severity: "error",
       assetId: characterId,
-      kind: "character-pack",
+      capability: "json",
       message: `Layered character ${characterId} expression '${expression || "default"}' layer '${layer.id}' loaded invalid texture dimensions ${texture.width}x${texture.height}: ${textureUri}`
     });
   }
@@ -490,7 +497,7 @@ export class CharacterSystem {
       code: "asset-invalid-character-source-pixel-scale",
       severity: "error",
       assetId: characterId,
-      kind: "character-pack",
+      capability: "json",
       message: `Layered character ${characterId} expression '${expression || "default"}' has invalid source-pixel scale: ${message}`
     });
   }

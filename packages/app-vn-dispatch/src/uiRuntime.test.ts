@@ -3,7 +3,9 @@ import type { NaniCommandCategory, RuntimeCommand, RuntimeValue, StoryRuntimeSna
 import {
   advanceUiRuntimeTransitions,
   clearMovieOverlay,
+  createUiRuntimeStateFromCheckpoint,
   createInitialUiRuntimeState,
+  createVnUiCheckpoint,
   deriveUiRuntimeLifecycleState,
   dismissToast,
   hasActiveUiRuntimeTransitions,
@@ -33,12 +35,84 @@ describe("UI runtime", () => {
     const hidden = reduceUiRuntimeCommand(createInitialUiRuntimeState(), runtimeCommand("hideui", "ui", {}));
     expect((["dialog", "commandBar", "toastLayer"] as const).every((surface) => hidden.state.surfaces[surface].phase === "hidden")).toBe(true);
     expect(hidden.state.surfaces.cue.phase).toBe("hidden");
+    expect(hidden.state.surfaces.pinp.phase).toBe("hidden");
     expect(hidden.diagnostics).toEqual([]);
 
     const shown = reduceUiRuntimeCommand(hidden.state, runtimeCommand("showui", "ui", {}));
     expect((["dialog", "commandBar", "toastLayer"] as const).every((surface) => shown.state.surfaces[surface].phase === "shown")).toBe(true);
     expect(shown.state.surfaces.cue.phase).toBe("hidden");
     expect(shown.diagnostics).toEqual([]);
+  });
+
+  it("shows, replays, checkpoints, hides, and clears pinp content", () => {
+    const command = runtimeCommand("pinp", "ui", {
+      assetId: "props:milk-bag",
+      positionPercent: [50, 50],
+      heightPercent: 20,
+      aspectRatio: [16, 9],
+      alt: "牛奶袋",
+      effect: "fade",
+      durationMs: 180,
+      visible: true
+    });
+    const showing = reduceUiRuntimeCommand(createInitialUiRuntimeState(), command, { nowMs: 1000 }).state;
+    expect(showing.pinpSequence).toBe(1);
+    expect(showing.pinp).toMatchObject({ assetId: "props:milk-bag", alt: "牛奶袋" });
+    expect(showing.surfaces.pinp).toMatchObject({ phase: "showing", opacity: 0, targetVisible: true });
+    expect(createVnUiCheckpoint(showing).pinp).toMatchObject({ assetId: "props:milk-bag" });
+
+    const midway = advanceUiRuntimeTransitions(showing, 1090);
+    expect(midway.surfaces.pinp.opacity).toBeCloseTo(0.5);
+    const replayed = reduceUiRuntimeCommand(midway, command, { nowMs: 1090 }).state;
+    expect(replayed.pinpSequence).toBe(2);
+    expect(replayed.surfaces.pinp).toMatchObject({ phase: "showing", opacity: 0 });
+
+    const hiding = reduceUiRuntimeCommand(replayed, runtimeCommand("pinp", "ui", {
+      visible: false,
+      effect: "fade",
+      durationMs: 180
+    }), { nowMs: 1180 }).state;
+    expect(hiding.surfaces.pinp).toMatchObject({ phase: "hiding", opacity: 0.5, targetVisible: false });
+    expect(createVnUiCheckpoint(hiding).pinp).toBeNull();
+    const hidden = advanceUiRuntimeTransitions(hiding, 1360);
+    expect(hidden.surfaces.pinp.phase).toBe("hidden");
+    expect(hidden.pinp).toBeUndefined();
+  });
+
+  it("restores pinp to a terminal surface and rejects invalid runtime commands without changing state", () => {
+    const restored = createUiRuntimeStateFromCheckpoint({
+      dialog: true,
+      commandBar: true,
+      toastLayer: true,
+      cue: false,
+      pinp: {
+        assetId: "props:milk-bag",
+        alt: "",
+        positionPercent: [40, 45],
+        heightPercent: 25,
+        aspectRatio: [4, 3]
+      }
+    });
+    expect(restored.surfaces.pinp).toMatchObject({ phase: "shown", opacity: 1, mounted: true });
+    const invalid = reduceUiRuntimeCommand(restored, runtimeCommand("pinp", "ui", {
+      assetId: "props:bad",
+      positionPercent: [50, 101],
+      heightPercent: 20,
+      aspectRatio: [16, 9],
+      alt: "",
+      effect: "fade",
+      durationMs: 180,
+      visible: true
+    }));
+    expect(invalid.state).toBe(restored);
+    expect(invalid.diagnostics).toMatchObject([{ code: "invalid-pinp-command", severity: "error" }]);
+
+    const empty = createInitialUiRuntimeState();
+    expect(reduceUiRuntimeCommand(empty, runtimeCommand("pinp", "ui", {
+      visible: false,
+      effect: "none",
+      durationMs: 0
+    })).state).toBe(empty);
   });
 
   it("does not churn state for no-op terminal visibility commands", () => {
@@ -334,11 +408,11 @@ describe("UI runtime", () => {
 
   it("keeps movie overlay lifecycle outside showUI", () => {
     const playing = startMovieOverlay(createInitialUiRuntimeState(), {
-      sourceRef: "video:validation-intro",
+      assetId: "video/validation-intro",
       blocking: true
     });
 
-    expect(playing.movieOverlay).toEqual({ sourceRef: "video:validation-intro", blocking: true });
+    expect(playing.movieOverlay).toEqual({ assetId: "video/validation-intro", blocking: true });
     expect(clearMovieOverlay(playing).movieOverlay).toBeUndefined();
   });
 });

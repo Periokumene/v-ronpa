@@ -40,14 +40,6 @@ import type {
   TextToken
 } from "./types";
 
-const commandAssetKinds: Record<string, string> = {
-  bgm: "bgm",
-  sfx: "sfx",
-  voice: "voice",
-  back: "background",
-  inback: "background",
-  video: "video"
-};
 const textIdPattern = /\|#([^|]*)\|/gu;
 const textIdValuePattern = /^[a-zA-Z0-9_-]+$/u;
 const richTextCommandIds = new Set(["print", "cue", "append", "choice", "toast"]);
@@ -102,7 +94,6 @@ export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
   const statements: StatementIR[] = [];
   const statementSources: NaniStatementSourceMap[] = [];
   const labels: Record<string, number> = {};
-  const assets: ScenarioIR["assets"] = [];
   const dependencies: ScenarioIR["dependencies"] = [];
   const commandMetadata = new WeakMap<CommandIR, NaniValue>();
 
@@ -164,7 +155,7 @@ export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
         diagnostics,
         commandMetadata
       );
-      collectCommandMetadata(parsed, assets, dependencies);
+      collectCommandDependencies(parsed, dependencies);
       statements.push(parsed.command);
       statementSources.push({
         kind: "command",
@@ -196,7 +187,6 @@ export function parseScenario(input: ParseScenarioInput): ParseScenarioResult {
       scriptPath: input.scriptPath,
       statements,
       labels,
-      assets: dedupeAssets(assets),
       dependencies: dedupeDependencies(dependencies)
     },
     sourceMap,
@@ -1024,22 +1014,12 @@ function listItemSpans(
   return spans;
 }
 
-function collectCommandMetadata(
+function collectCommandDependencies(
   parsed: ParsedCommand,
-  assets: ScenarioIR["assets"],
   dependencies: ScenarioIR["dependencies"]
 ): void {
   const command = parsed.command;
-  const assetKind = commandAssetKinds[command.commandId];
   const firstArgValue = parsed.metadataFirstValue ?? firstCommandValue(command);
-  if (assetKind && firstArgValue?.type === "string") {
-    assets.push({ id: firstArgValue.value, kind: assetKind });
-  }
-
-  if (command.commandId === "char" || command.commandId === "slide") {
-    const characterId = characterPackIdForActorAppearanceCommand(command);
-    if (characterId) assets.push({ id: characterId, kind: "character-pack" });
-  }
 
   const endpointValues = [
     ...(command.commandId === "goto" ? [firstArgValue] : []),
@@ -1049,22 +1029,6 @@ function collectCommandMetadata(
     const endpoint = staticNaniEndpointText(value);
     if (endpoint && !endpoint.startsWith("#")) dependencies.push({ endpoint });
   }
-}
-
-function characterPackIdForActorAppearanceCommand(command: CommandIR): string | undefined {
-  const raw = command.args.find((arg) => arg.kind === "value")?.raw;
-  if (command.commandId === "slide" && (!raw || !raw.includes("."))) return undefined;
-  const idParam = command.params.id;
-  const idFromParam = idParam ? stringValue(idParam) : undefined;
-  const idFromPrimary = raw?.split(/[.,]/u)[0];
-  const id = idFromParam ?? idFromPrimary;
-  if (!id || id === "*") return undefined;
-  return id;
-}
-
-function stringValue(value: NaniValue): string | undefined {
-  if (value.type === "string" || value.type === "raw") return value.value;
-  return undefined;
 }
 
 function collectDuplicateTextIdDiagnostics(
@@ -1246,10 +1210,6 @@ function trimSourcedText(source: SourcedText): SourcedText {
   while (start < end && /\s/u.test(source.text[start] ?? "")) start += 1;
   while (end > start && /\s/u.test(source.text[end - 1] ?? "")) end -= 1;
   return sliceSourcedText(source, start, end);
-}
-
-function dedupeAssets(assets: ScenarioIR["assets"]): ScenarioIR["assets"] {
-  return [...new Map(assets.map((asset) => [`${asset.kind}:${asset.id}`, asset])).values()];
 }
 
 function dedupeDependencies(dependencies: ScenarioIR["dependencies"]): ScenarioIR["dependencies"] {

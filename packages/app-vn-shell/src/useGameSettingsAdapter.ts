@@ -11,7 +11,7 @@ import {
 } from "@v-ronpa/story-play";
 import type { VnStoryTextDisplaySettings } from "./GameInteractionViewModels";
 
-export const GAME_SETTINGS_STORAGE_KEY = "v-ronpa:settings:v2";
+export const GAME_SETTINGS_STORAGE_KEY = "v-ronpa:settings:v3";
 export const GAME_SETTINGS_WRITE_DEBOUNCE_MS = 120;
 
 export interface GameSettingsStorage {
@@ -22,6 +22,10 @@ export interface GameSettingsStorage {
 export interface LoadedGameSettings {
   settings: SettingsSnapshot;
   normalized: boolean;
+  issue?: {
+    code: "unsupported-version";
+    message: string;
+  };
 }
 
 export interface DebouncedSettingsWriter {
@@ -141,6 +145,22 @@ export function loadGameSettings(
 
   try {
     const parsed = JSON.parse(raw) as unknown;
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "version" in parsed &&
+      typeof parsed.version === "number" &&
+      parsed.version !== 3
+    ) {
+      return {
+        settings: createDefaultSettingsSnapshot(),
+        normalized: false,
+        issue: {
+          code: "unsupported-version",
+          message: `SettingsSnapshot version ${parsed.version} is unsupported; expected version 3.`
+        }
+      };
+    }
     const result = SettingsSnapshotSchema.safeParse(parsed);
     if (!result.success) return { settings: createDefaultSettingsSnapshot(), normalized: true };
     const settings = result.data;

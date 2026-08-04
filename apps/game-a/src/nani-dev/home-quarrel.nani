@@ -2,8 +2,8 @@
 ;离开本场后 :  人物知道什么 / 失去什么 / 还能做什么
 ;爱丽丝决定三日后去死
 
-@inback bg:home-kitchen
-@bgm bgm:hmg-250504-dark-ambient-home
+@inback bg/home-kitchen
+@bgm bgm/dark-ambient-home
 dad: 回来的太晚了点，药买回来了吗
 
 @char alice.eye1,mouth0,armR0,armL1 pos:50
@@ -76,7 +76,7 @@ alice: 好，那我就先回房间——
 dad: 等下
 @char alice.eye3,mouth6,armR0,armL0
 alice: ……怎么了？
-@stopBgm bgm:hmg-250504-dark-ambient-home
+@stopBgm bgm/dark-ambient-home
 dad: 药买回来了吗
 @char alice.eye0,mouth0,armR4,armL1
 alice: 我买回来了啊，就在我的包里
@@ -88,15 +88,15 @@ dad: 给我看看
 alice: 我都说了我不是小——[>]
 
 @char alice.eye3,mouth3,armR2,armL4 time:0
-@sfx sfx:pixabay-fall-impact
+@sfx sfx/pixabay-fall-impact
 nar: 来不及反应，挎包已经被抓了过去，哐啷哐啷，包里的东西被一股脑的翻出来，散落在茶几上，滚落到地上
 
 ;toast 单独的袋装牛奶
 ;toast 袋装牛奶炸开来
 
-@sfx sfx:pixabay-wet-splat
+@sfx sfx/pixabay-wet-splat
 ;破碎特效和音效
-@bgm bgm:hmg-390-indutrial-rock-beat-tense
+@bgm bgm/industrial-rock-beat-tense
 dad: aslfinaweocinaohf
 @char alice.eye4,mouth3,armR2,armL4
 alice: aceclisadfsef
@@ -125,7 +125,7 @@ dad: 哪有什么精神病！你就是不想上学！[-]还假装买药糊弄家
 dad: 故意不吃药就为了逃课吗？难怪你不想去医院！[-]你知不知道都是为了你好，你怎么能这么辜负家里人的期待！
 dad: 躲房间里算什么，翅膀硬了是不是！[-]你就是在糟蹋你自己的人生，气死我了!
 nar: 或许是累了，垂门声渐渐也弱了下来。可以听到他甩着拖鞋远去的声音，腰间的钥匙串发出喀啦喀啦的声响
-@stopBgm bgm:hmg-390-indutrial-rock-beat-tense fade:5
+@stopBgm bgm/industrial-rock-beat-tense fade:5
 @char alice.eye2,mouth0,armR4,armL1
 alice: ……
 nar: 呃，那个……[>]

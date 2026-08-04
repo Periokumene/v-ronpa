@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  AssetDefinitionSchema,
+  AssetIdSchema,
   CameraRigDefSchema,
   ContentManifestSchema,
+  FontFaceIdSchema,
   GameInteractionContextSchema,
   GameModeSchema,
   GameOverlayKindSchema,
   GamePauseSectionSchema,
   GameUiActionSchema,
   InputBindingMapSchema,
+  IdSchema,
   InputActionStateSchema,
   InteractionCapabilitySnapshotSchema,
   LayeredCharacterDefinitionSchema,
@@ -24,7 +28,6 @@ import {
   PIXI_MAIN_BACKGROUND_ID,
   PixiStageSnapshotSchema,
   RichTextDocumentSchema,
-  RuntimeAssetSchema,
   RuntimeCommandSchema,
   RuntimeScriptSchema,
   RuntimeTextStageSchema,
@@ -51,6 +54,28 @@ import {
 } from "./index";
 
 describe("contracts", () => {
+  it("keeps App-relative AssetId stricter than general identities", () => {
+    expect(AssetIdSchema.parse("bg/home")).toBe("bg/home");
+    expect(AssetIdSchema.parse("voice/zh/voice-0001")).toBe("voice/zh/voice-0001");
+    for (const value of [
+      "bg:home",
+      "bg/Home",
+      "bg/home.png",
+      "/bg/home",
+      "https://example.com/bg/home",
+      "bg//home",
+      "bg/./home",
+      "bg/../home"
+    ]) {
+      expect(AssetIdSchema.safeParse(value).success, value).toBe(false);
+    }
+
+    expect(IdSchema.parse("vn:game-a-main")).toBe("vn:game-a-main");
+    expect(FontFaceIdSchema.parse("default")).toBe("default");
+    expect(FontFaceIdSchema.parse("fusion-pixel-zh-hans")).toBe("fusion-pixel-zh-hans");
+    expect(FontFaceIdSchema.safeParse("font:serif").success).toBe(false);
+  });
+
   it("validates runtime text stage bounds", () => {
     expect(RuntimeTextStageSchema.parse({ index: 1, count: 3 })).toEqual({ index: 1, count: 3 });
     expect(() => RuntimeTextStageSchema.parse({ index: 0, count: 1 })).toThrow();
@@ -60,93 +85,37 @@ describe("contracts", () => {
 
   it("validates the baseline content manifest", () => {
     const manifest = ContentManifestSchema.parse({
-      version: 4,
+      version: 5,
       assets: [
-        { id: "Ema", kind: "character-pack", tags: ["placeholder"] },
-        { id: "texture:evidence:keycard-icon", kind: "texture", tags: ["placeholder", "evidence"] }
+        { id: "char/ema", uri: "assets/char/ema/character.json", mimeType: "application/json" },
+        { id: "thumb/keycard", uri: "assets/thumb/keycard.png", mimeType: "image/png" },
+        { id: "bleep/dialogue-default", uri: "assets/bleep/dialogue-default.ogg", mimeType: "audio/ogg" },
+        { id: "bleep/dialogue-felix", uri: "assets/bleep/dialogue-felix.ogg", mimeType: "audio/ogg" },
+        { id: "font/serif-regular", uri: "assets/font/serif.woff2", mimeType: "font/woff2" },
+        { id: "model/academy-hall", uri: "assets/model/academy-hall.glb", mimeType: "model/gltf-binary" }
       ],
+      requirements: [{ id: "char/ema", capability: "json" }],
       audio: {
         dialogueBleep: {
-          defaultSound: { sourceRef: "bleep:dialogue-default", gain: 0.45 },
+          defaultSound: { assetId: "bleep/dialogue-default", gain: 0.45 },
           speakerOverrides: {
-            Felix: { sourceRef: "bleep:dialogue-felix" },
+            Felix: { assetId: "bleep/dialogue-felix" },
             Narrator: null
           }
         }
       },
-      fonts: [{ id: "font:serif", family: "Serif", sourceRef: "font:serif-regular", weight: "400", style: "normal" }],
-      runtimeAssets: [
-        {
-          id: "Ema",
-          kind: "character-pack",
-          sourceUri: "assets/source/characters/Ema/character.json",
-          optimizedUri: "assets/runtime/characters/Ema/character.json",
-          format: "json",
-          compression: [],
-          lods: [],
-          collisionProxyIds: []
-        },
-        {
-          id: "texture:evidence:keycard-icon",
-          kind: "texture",
-          optimizedUri: "assets/runtime/keycard-icon.png",
-          format: "png",
-          compression: [],
-          lods: [],
-          collisionProxyIds: []
-        },
-        {
-          id: "texture:title:bg",
-          kind: "texture",
-          optimizedUri: "assets/runtime/title-bg.webp",
-          format: "webp",
-          compression: ["webp"],
-          lods: [],
-          collisionProxyIds: []
-        },
-        {
-          id: "bleep:dialogue-default",
-          kind: "bleep",
-          optimizedUri: "assets/runtime/dialogue-default.ogg",
-          format: "ogg",
-          compression: [],
-          lods: [],
-          collisionProxyIds: []
-        },
-        {
-          id: "bleep:dialogue-felix",
-          kind: "bleep",
-          optimizedUri: "assets/runtime/dialogue-felix.ogg",
-          format: "ogg",
-          compression: [],
-          lods: [],
-          collisionProxyIds: []
-        },
-        {
-          id: "font:serif-regular",
-          kind: "font",
-          optimizedUri: "assets/runtime/serif.woff2",
-          format: "woff2",
-          compression: [],
-          lods: [],
-          collisionProxyIds: []
-        },
-        {
-          id: "glb:academy-hall",
-          kind: "glb",
-          sourceUri: "assets/source/academy-hall.glb",
-          optimizedUri: "assets/runtime/academy-hall.glb",
-          format: "glb",
-          compression: ["meshopt"],
-          lods: [{ level: 0, uri: "assets/runtime/academy-hall.glb", maxDistance: 25 }],
-          collisionProxyIds: ["collision:academy-hall"]
-        }
-      ],
+      fonts: [{
+        id: "serif",
+        family: "Serif",
+        source: { type: "asset", assetId: "font/serif-regular" },
+        weight: "400",
+        style: "normal"
+      }],
       collisionProxies: [
         {
           id: "collision:academy-hall",
           kind: "navmesh",
-          assetId: "glb:academy-hall"
+          assetId: "model/academy-hall"
         }
       ],
       input: {
@@ -161,6 +130,7 @@ describe("contracts", () => {
           id: "map:academy-hall",
           name: "Academy Hall",
           spawn: [0, 1.7, 3],
+          requirements: [{ id: "model/academy-hall", capability: "model" }],
           walkBounds: {
             min: [-3, 0, -4],
             max: [3, 2.4, 4]
@@ -225,8 +195,8 @@ describe("contracts", () => {
             { label: "Condition", value: "Scratched magnetic strip" }
           ],
           visual: {
-            iconAssetId: "texture:evidence:keycard-icon",
-            thumbnailAssetId: "texture:evidence:keycard-icon",
+            iconAssetId: "thumb/keycard",
+            thumbnailAssetId: "thumb/keycard",
             accentColor: "#ffe66d"
           },
           tags: ["case-01"]
@@ -238,7 +208,7 @@ describe("contracts", () => {
     expect(manifest.audio?.dialogueBleep).toMatchObject({
       enabled: true,
       speakerOverrides: {
-        Felix: { sourceRef: "bleep:dialogue-felix", gain: 1 },
+        Felix: { assetId: "bleep/dialogue-felix", gain: 1 },
         Narrator: null
       }
     });
@@ -248,7 +218,10 @@ describe("contracts", () => {
     expect(manifest.maps[0]?.interactables[2]?.action.type).toBe("change-map");
     expect(manifest.evidence[0]?.shortLabel).toBe("Keycard");
     expect(manifest.input?.bindings[1]?.action).toBe("fire-truth-bullet");
-    expect(manifest.fonts[0]).toMatchObject({ id: "font:serif", sourceRef: "font:serif-regular" });
+    expect(manifest.fonts[0]).toMatchObject({
+      id: "serif",
+      source: { type: "asset", assetId: "font/serif-regular" }
+    });
   });
 
   it("rejects old content manifest versions and stale uiAssets declarations", () => {
@@ -256,7 +229,7 @@ describe("contracts", () => {
     expect(() =>
       ContentManifestSchema.parse({
         version: 3,
-        uiAssets: [{ id: "ui:title:bg", role: "title-background", assetId: "texture:title:bg" }],
+        uiAssets: [{ id: "ui:title:bg", role: "title-background", assetId: "texture/title/bg" }],
         maps: [],
         items: [],
         trials: []
@@ -268,7 +241,7 @@ describe("contracts", () => {
     expect(
       RichTextDocumentSchema.parse({
         text: "Warning",
-        runs: [{ start: 0, end: 7, style: { bold: true, color: "#ff5577", fontId: "font:serif" } }]
+        runs: [{ start: 0, end: 7, style: { bold: true, color: "#ff5577", fontFaceId: "serif" } }]
       })
     ).toMatchObject({ text: "Warning" });
     expect(() =>
@@ -277,9 +250,9 @@ describe("contracts", () => {
         runs: [{ start: 0, end: 6, style: { bold: true } }]
       })
     ).toThrow();
-    expect(RuntimeAssetSchema.parse({ id: "font:serif-regular", kind: "font", optimizedUri: "assets/serif.woff2", format: "woff2" })).toMatchObject({
-      kind: "font",
-      format: "woff2"
+    expect(AssetDefinitionSchema.parse({ id: "font/serif-regular", uri: "assets/font/serif.woff2", mimeType: "font/woff2" })).toMatchObject({
+      id: "font/serif-regular",
+      mimeType: "font/woff2"
     });
   });
 
@@ -373,13 +346,13 @@ describe("contracts", () => {
     expect(rain?.params.map((param) => param.name)).toEqual(["power", "wind", "hue", "tint", "time", "easing", "wait"]);
 
     const snapshot = PixiStageSnapshotSchema.parse({
-      version: 5,
+      version: 6,
       revision: 3,
       backgroundsById: {
         [PIXI_MAIN_BACKGROUND_ID]: {
           id: PIXI_MAIN_BACKGROUND_ID,
           kind: "background",
-          appearance: "bg:harness"
+          appearance: "bg/harness"
         }
       },
       charactersById: {
@@ -416,13 +389,13 @@ describe("contracts", () => {
     });
 
     expect(snapshot).toMatchObject({
-      version: 5,
+      version: 6,
       revision: 3,
       backgroundsById: {
         [PIXI_MAIN_BACKGROUND_ID]: {
           id: PIXI_MAIN_BACKGROUND_ID,
           kind: "background",
-          appearance: "bg:harness",
+          appearance: "bg/harness",
           visible: true,
           alpha: 1,
           z: 0
@@ -478,26 +451,26 @@ describe("contracts", () => {
     ).toThrow();
     expect(
       PixiStageSnapshotSchema.parse({
-        version: 5,
+        version: 6,
         innerBackgroundsById: {
           [PIXI_INNER_BACKGROUND_ID]: {
             id: PIXI_INNER_BACKGROUND_ID,
             kind: "background",
-            appearance: "bg:framed"
+            appearance: "bg/framed"
           }
         }
       }).innerBackgroundsById[PIXI_INNER_BACKGROUND_ID]
     ).toMatchObject({
       id: PIXI_INNER_BACKGROUND_ID,
       kind: "background",
-      appearance: "bg:framed",
+      appearance: "bg/framed",
       visible: true,
       alpha: 1,
       z: 0
     });
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 5,
+        version: 6,
         innerBackgroundsById: {
           [PIXI_INNER_BACKGROUND_ID]: {
             id: PIXI_INNER_BACKGROUND_ID,
@@ -509,13 +482,13 @@ describe("contracts", () => {
     ).toThrow();
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 5,
+        version: 6,
         slots: { left: { slot: "right", characterId: "character:mira" } }
       })
     ).toThrow();
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 5,
+        version: 6,
         charactersById: {
           Ema: {
             id: "Ema",
@@ -527,7 +500,7 @@ describe("contracts", () => {
     ).toThrow();
   });
 
-  it("validates the optional script-scoped character tone without changing snapshot v5", () => {
+  it("validates the optional script-scoped character tone without changing snapshot v6", () => {
     const command = getNaniCommandDefinition("charTone");
     expect(command).toMatchObject({
       id: "chartone",
@@ -540,7 +513,7 @@ describe("contracts", () => {
     expect(command?.params.some((param) => param.name === "easing")).toBe(false);
 
     const snapshot = PixiStageSnapshotSchema.parse({
-      version: 5,
+      version: 6,
       characterTone: {
         preset: "rain",
         amount: 3.25,
@@ -549,7 +522,7 @@ describe("contracts", () => {
       }
     });
     expect(snapshot).toMatchObject({
-      version: 5,
+      version: 6,
       characterTone: {
         preset: "rain",
         amount: 3.25,
@@ -568,7 +541,7 @@ describe("contracts", () => {
     });
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 5,
+        version: 6,
         characterTone: {
           preset: "unknown",
           amount: 1,
@@ -579,7 +552,7 @@ describe("contracts", () => {
     ).toThrow();
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 5,
+        version: 6,
         characterTone: {
           preset: "rain",
           amount: -1,
@@ -603,7 +576,7 @@ describe("contracts", () => {
     );
 
     const snapshot = PixiStageSnapshotSchema.parse({
-      version: 5,
+      version: 6,
       weather: {
         snow: {
           kind: "snow",
@@ -633,7 +606,7 @@ describe("contracts", () => {
     });
     expect(() =>
       PixiStageSnapshotSchema.parse({
-        version: 5,
+        version: 6,
         weather: { snow: { kind: "snow", density: -1, transition: { durationMs: 0 } } }
       })
     ).toThrow();
@@ -650,7 +623,7 @@ describe("contracts", () => {
     );
 
     const snapshot = PixiStageSnapshotSchema.parse({
-      version: 5,
+      version: 6,
       screenFilters: {
         glitch: {
           power: 0.4,
@@ -837,15 +810,12 @@ describe("contracts", () => {
     ).toMatchObject({ mode: "scripted-focus" });
 
     expect(
-      RuntimeAssetSchema.parse({
-        id: "texture:character:Ema",
-        kind: "texture",
-        optimizedUri: "/assets/characters/Ema/atlas.webp",
-        format: "webp",
-        compression: ["webp"],
-        textureBudget: { maxSizePx: 2048, maxBytes: 1048576 }
+      AssetDefinitionSchema.parse({
+        id: "char/ema-atlas",
+        uri: "assets/char/ema/atlas.webp",
+        mimeType: "image/webp"
       })
-    ).toMatchObject({ collisionProxyIds: [], lods: [] });
+    ).toMatchObject({ id: "char/ema-atlas", mimeType: "image/webp" });
   });
 
   it("validates layered character metadata color ranges", () => {
@@ -988,11 +958,11 @@ describe("contracts", () => {
     expect(InteractionCapabilitySnapshotSchema.parse({ canBack: true })).not.toHaveProperty("canBack");
     expect(InteractionCapabilitySnapshotSchema.parse({ canQuickSave: true })).not.toHaveProperty("canQuickSave");
 
-    expect(SettingsSnapshotSchema.parse({ version: 2 })).toEqual(createDefaultSettingsSnapshot());
+    expect(SettingsSnapshotSchema.parse({ version: 3 })).toEqual(createDefaultSettingsSnapshot());
     expect(createDefaultSettingsSnapshot()).toMatchObject({
-      version: 2,
+      version: 3,
       system: { language: "zh-CN", skipAll: false, preferFullscreen: false },
-      display: { textSpeed: 0.5, textSize: "medium", fontFamilyId: "font:default" },
+      display: { textSpeed: 0.5, textSize: "medium", fontFaceId: "default" },
       sound: {
         masterVolume: 1,
         bgmVolume: 0.25,
@@ -1005,18 +975,18 @@ describe("contracts", () => {
       automation: { autoSpeed: 0.5, skipSpeed: 0.5 }
     });
     expect(() => SettingsSnapshotSchema.parse({ version: 1 })).toThrow();
-    expect(() => SettingsSnapshotSchema.parse({ version: 2, display: { textboxOpacity: 0.75 } })).toThrow();
-    expect(() => SettingsSnapshotSchema.parse({ version: 2, placeholder: true })).toThrow();
-    expect(() => SettingsSnapshotSchema.parse({ version: 2, sound: { masterVolume: 1.2 } })).toThrow();
+    expect(() => SettingsSnapshotSchema.parse({ version: 3, display: { textboxOpacity: 0.75 } })).toThrow();
+    expect(() => SettingsSnapshotSchema.parse({ version: 3, placeholder: true })).toThrow();
+    expect(() => SettingsSnapshotSchema.parse({ version: 3, sound: { masterVolume: 1.2 } })).toThrow();
     expect(
       SettingsSnapshotSchema.parse({
-        version: 2,
+        version: 3,
         sound: { masterVolume: 0.5, bgmVolume: 0.2, sfxVolume: 0.6, voiceVolume: 0.8, uiVolume: 0.7, muted: false }
       }).sound.bleepVolume
     ).toBe(1);
-    expect(RuntimeAssetSchema.parse({ id: "bleep:sample", kind: "bleep", optimizedUri: "assets/sample.ogg", format: "ogg" })).toMatchObject({
-      id: "bleep:sample",
-      kind: "bleep"
+    expect(AssetDefinitionSchema.parse({ id: "bleep/sample", uri: "assets/bleep/sample.ogg", mimeType: "audio/ogg" })).toMatchObject({
+      id: "bleep/sample",
+      mimeType: "audio/ogg"
     });
 
     expect(
@@ -1046,7 +1016,7 @@ describe("contracts", () => {
         scriptPath: "story.nani",
         commands: [],
         labels: {},
-        assets: [{ id: "bg:harness", kind: "background", uri: "/bg.png" }],
+        assets: [{ id: "bg/harness", kind: "background", uri: "/bg.png" }],
         dependencies: []
       })
     ).toThrow();
@@ -1054,14 +1024,13 @@ describe("contracts", () => {
     expect(() =>
       ContentManifestSchema.parse({
         version: 4,
-        assets: [],
         runtimeAssets: [],
         maps: [
           {
             id: "map:harness",
             name: "Harness",
             spawn: [0, 0, 0],
-            assetRefs: [{ id: "model:harness", kind: "glb", uri: "/harness/models/harness.gltf" }]
+            requirements: [{ id: "model/harness", kind: "glb", uri: "/harness/models/harness.gltf" }]
           }
         ],
         items: [],
@@ -1119,7 +1088,7 @@ describe("contracts", () => {
           kind: "movie",
           commandId: "movie",
           commandIndex: 1,
-          moviePath: "video:validation-intro"
+          moviePath: "video/validation-intro"
         },
         text: {
           current: { channel: "dialog", text: "Paused on movie." }
@@ -1135,7 +1104,7 @@ describe("contracts", () => {
     const officialCommands = naniCommandCatalog.filter((command) => command.source === "naninovel");
 
     expect(officialCommands).toHaveLength(78);
-    expect(naniCommandCatalog).toHaveLength(88);
+    expect(naniCommandCatalog).toHaveLength(89);
     expect(() => NaniCommandDefinitionSchema.array().parse(naniCommandCatalog)).not.toThrow();
   });
 
@@ -1156,6 +1125,20 @@ describe("contracts", () => {
       source: "v-ronpa",
       status: "stubbed"
     });
+  });
+
+  it("declares pinp as an opaque, non-blocking UI asset command", () => {
+    expect(getNaniCommandDefinition("pinp")).toMatchObject({
+      canonicalName: "pinp",
+      category: "ui",
+      source: "v-ronpa",
+      status: "implemented",
+      execution: "ui-output",
+      primaryParam: "assetId"
+    });
+    expect(getNaniCommandDefinition("pinp")?.params.map((param) => param.name)).toEqual([
+      "assetId", "pos", "height", "ratio", "alt", "effect", "time", "visible"
+    ]);
   });
 
   it("preserves official Naninovel parameter type names in metadata", () => {
@@ -1304,14 +1287,41 @@ describe("contracts", () => {
 
   it("separates all UI surfaces from the hideUI/showUI runtime group", () => {
     expect(StoryTextChannelSchema.options).toEqual(["dialog", "cue"]);
-    expect(VnUiSurfaceIdSchema.options).toEqual(["dialog", "commandBar", "toastLayer", "cue"]);
-    expect(VnUiCheckpointSchema.parse({ dialog: true, commandBar: true, toastLayer: true, cue: false })).toEqual({
+    expect(VnUiSurfaceIdSchema.options).toEqual(["dialog", "commandBar", "toastLayer", "cue", "pinp"]);
+    expect(VnUiCheckpointSchema.parse({ dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null })).toEqual({
       dialog: true,
       commandBar: true,
       toastLayer: true,
-      cue: false
+      cue: false,
+      pinp: null
     });
     expect(() => VnUiCheckpointSchema.parse({ dialog: true, commandBar: true, toastLayer: true })).toThrow();
+    expect(VnUiCheckpointSchema.parse({
+      dialog: true,
+      commandBar: true,
+      toastLayer: true,
+      cue: false,
+      pinp: {
+        assetId: "props/milk-bag",
+        alt: "牛奶袋",
+        positionPercent: [50, 50],
+        heightPercent: 20,
+        aspectRatio: [16, 9]
+      }
+    }).pinp).toMatchObject({ assetId: "props/milk-bag", heightPercent: 20 });
+    expect(() => VnUiCheckpointSchema.parse({
+      dialog: true,
+      commandBar: true,
+      toastLayer: true,
+      cue: false,
+      pinp: {
+        assetId: "props/milk-bag",
+        alt: "",
+        positionPercent: [50, 101],
+        heightPercent: 20,
+        aspectRatio: [16, 9]
+      }
+    })).toThrow();
   });
 
   it("marks migrated V-Ronpa compatibility params without pretending they are official Naninovel params", () => {
@@ -1377,7 +1387,6 @@ describe("contracts", () => {
         scriptPath: "story.nani",
         commands: [command],
         labels: { Start: 0 },
-        assets: [{ id: "bg:harness", kind: "background" }],
         dependencies: [{ endpoint: "common.nani" }]
       })
     ).toMatchObject({ scriptPath: "story.nani", commands: [{ commandId: "flash" }] });
@@ -1388,14 +1397,14 @@ describe("contracts", () => {
     expect(() => SaveModeSchema.parse("title")).toThrow();
     expect(() =>
       VnMediaCheckpointSchema.parse({
-        bgmByGroup: { music: { sourceRef: "bgm:main", volume: Number.POSITIVE_INFINITY } },
+        bgmByGroup: { music: { assetId: "bgm/main", volume: Number.POSITIVE_INFINITY } },
         loopingSfxByKey: {}
       })
     ).toThrow();
     expect(() =>
       VnMediaCheckpointSchema.parse({
         bgmByGroup: {},
-        loopingSfxByKey: { "": { sourceRef: "sfx:rain", volume: 0.3 } }
+        loopingSfxByKey: { "": { assetId: "sfx/rain", volume: 0.3 } }
       })
     ).toThrow();
 
@@ -1408,13 +1417,13 @@ describe("contracts", () => {
       ended: false
     };
     const pixiStage = {
-      version: 5 as const,
+      version: 6 as const,
       revision: 2,
       backgroundsById: {
         [PIXI_MAIN_BACKGROUND_ID]: {
           id: PIXI_MAIN_BACKGROUND_ID,
           kind: "background" as const,
-          appearance: "bg:harness"
+          appearance: "bg/harness"
         }
       },
       charactersById: {
@@ -1437,7 +1446,7 @@ describe("contracts", () => {
     };
 
     const save = SaveDataSchema.parse({
-      version: 9,
+      version: 11,
       gameId: "game:test",
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "navi",
@@ -1448,15 +1457,15 @@ describe("contracts", () => {
         pixiStage,
         media: {
           bgmByGroup: {
-            music: { sourceRef: "bgm:main", volume: 0.4 },
-            ambient: { sourceRef: "bgm:ambient", volume: 0.2 }
+            music: { assetId: "bgm/main", volume: 0.4 },
+            ambient: { assetId: "bgm/ambient", volume: 0.2 }
           },
           loopingSfxByKey: {
-            rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" },
-            "sfx:hum": { sourceRef: "sfx:hum", volume: 0.8 }
+            rain: { assetId: "sfx/rain", volume: 0.3, group: "rain" },
+            "sfx/hum": { assetId: "sfx/hum", volume: 0.8 }
           }
         },
-        ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+        ui: { dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null }
       },
       navi: { substate: "vn2d-overlay", activeMapId: "map:academy-hall", inputLock: "dialog" },
       trial: null,
@@ -1465,19 +1474,19 @@ describe("contracts", () => {
       characters: {}
     });
 
-    expect(save.version).toBe(9);
+    expect(save.version).toBe(11);
     expect(save.vn?.media).toEqual({
       bgmByGroup: {
-        music: { sourceRef: "bgm:main", volume: 0.4 },
-        ambient: { sourceRef: "bgm:ambient", volume: 0.2 }
+        music: { assetId: "bgm/main", volume: 0.4 },
+        ambient: { assetId: "bgm/ambient", volume: 0.2 }
       },
       loopingSfxByKey: {
-        rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" },
-        "sfx:hum": { sourceRef: "sfx:hum", volume: 0.8 }
+        rain: { assetId: "sfx/rain", volume: 0.3, group: "rain" },
+        "sfx/hum": { assetId: "sfx/hum", volume: 0.8 }
       }
     });
     expect(save.vn?.pixiStage.innerBackgroundsById).toEqual({});
-    expect(save.vn?.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg:harness");
+    expect(save.vn?.pixiStage.backgroundsById[PIXI_MAIN_BACKGROUND_ID]?.appearance).toBe("bg/harness");
     expect(save.vn?.pixiStage.charactersById.Ema?.appearanceExpression).toBe("Pensive1,ArmR3");
     expect(save.vn?.pixiStage.characterTone).toMatchObject({
       preset: "rain",
@@ -1517,7 +1526,7 @@ describe("contracts", () => {
     });
     expect(cueSave.vn?.story.text?.current?.channel).toBe("cue");
     expect(cueSave.vn?.ui.cue).toBe(true);
-    expect(() => SaveDataSchema.parse({ ...cueSave, version: 8 })).toThrow();
+    expect(() => SaveDataSchema.parse({ ...cueSave, version: 9 })).toThrow();
     expect(() =>
       SaveDataSchema.parse({
         ...save,
@@ -1530,7 +1539,7 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 9,
+        version: 11,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "vn",
@@ -1540,7 +1549,7 @@ describe("contracts", () => {
           story,
           pixiStage,
           media: { bgmByGroup: {}, loopingSfxByKey: {} },
-          ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+          ui: { dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null }
         },
         navi: null,
         trial: null,
@@ -1552,7 +1561,7 @@ describe("contracts", () => {
 
     expect(() =>
       SaveDataSchema.parse({
-        version: 9,
+        version: 11,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "vn",
@@ -1561,7 +1570,7 @@ describe("contracts", () => {
           script: { scriptPath: "opening.nani", scriptRevision: "sha256:test" },
           story,
           pixiStage,
-          ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+          ui: { dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null }
         },
         navi: null,
         trial: null,
@@ -1573,7 +1582,7 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 9,
+        version: 11,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "navi",
@@ -1590,7 +1599,7 @@ describe("contracts", () => {
         "slot:contracts:navi",
         "Contracts Navi",
         SaveDataSchema.parse({
-          version: 9,
+          version: 11,
           gameId: "game:test",
           savedAt: "2026-06-14T00:00:00.000Z",
           mode: "navi",
@@ -1611,7 +1620,7 @@ describe("contracts", () => {
 
     expect(
       SaveDataSchema.parse({
-        version: 9,
+        version: 11,
         gameId: "game:test",
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "trial",
@@ -1621,7 +1630,7 @@ describe("contracts", () => {
           story,
           pixiStage,
           media: { bgmByGroup: {}, loopingSfxByKey: {} },
-          ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+          ui: { dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null }
         },
         navi: { substate: "walk", activeMapId: "map:academy-hall", inputLock: "none" },
         trial: { trialId: "trial:case-01", currentSegmentId: "debate:door", presentation: "debate3d" },
@@ -1663,7 +1672,7 @@ describe("contracts", () => {
           pendingChoices: [],
           ended: false
         },
-        pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
+        pixiStage: { version: 6, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
         inventory: { items: {} },
         evidence: { ownedEvidenceIds: [] },
         characters: {}
@@ -1671,7 +1680,7 @@ describe("contracts", () => {
     ).toThrow();
     expect(() =>
       SaveDataSchema.parse({
-        version: 5,
+        version: 6,
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "vn",
         vn: {
@@ -1694,10 +1703,10 @@ describe("contracts", () => {
     ).toThrow();
   });
 
-  it("rejects v5 saves with missing sections, mismatched mode sections, or legacy top-level state", () => {
+  it("rejects legacy saves with missing sections, mismatched mode sections, or legacy top-level state", () => {
     expect(() =>
       SaveDataSchema.parse({
-        version: 5,
+        version: 6,
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "vn",
         vn: null,
@@ -1710,7 +1719,7 @@ describe("contracts", () => {
     ).toThrow();
     expect(() =>
       SaveDataSchema.parse({
-        version: 5,
+        version: 6,
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "navi",
         vn: null,
@@ -1723,7 +1732,7 @@ describe("contracts", () => {
     ).toThrow();
     expect(() =>
       SaveDataSchema.parse({
-        version: 5,
+        version: 6,
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "title",
         vn: null,
@@ -1736,7 +1745,7 @@ describe("contracts", () => {
     ).toThrow();
     expect(() =>
       SaveDataSchema.parse({
-        version: 5,
+        version: 6,
         savedAt: "2026-06-14T00:00:00.000Z",
         mode: "navi",
         vn: null,
@@ -1750,7 +1759,7 @@ describe("contracts", () => {
           pendingChoices: [],
           ended: false
         },
-        pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
+        pixiStage: { version: 6, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
         inventory: { items: {} },
         evidence: { ownedEvidenceIds: [] },
         characters: {}
@@ -1760,7 +1769,7 @@ describe("contracts", () => {
 
   it("does not persist runtime command streams in save data", () => {
     const save = SaveDataSchema.parse({
-      version: 9,
+      version: 11,
       gameId: "game:test",
       savedAt: "2026-06-14T00:00:00.000Z",
       mode: "vn",
@@ -1776,9 +1785,9 @@ describe("contracts", () => {
           ended: false,
           emittedRuntimeCommands: []
         },
-        pixiStage: { version: 5, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
+        pixiStage: { version: 6, revision: 0, backgroundsById: {}, innerBackgroundsById: {}, charactersById: {}, actorOrder: [], weather: {}, screenFilters: {} },
         media: { bgmByGroup: {}, loopingSfxByKey: {} },
-        ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+        ui: { dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null }
       },
       navi: null,
       trial: null,

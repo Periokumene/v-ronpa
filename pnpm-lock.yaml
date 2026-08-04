@@ -44,6 +44,9 @@ importers:
       '@v-ronpa/app-vn-shell':
         specifier: workspace:*
         version: link:../../packages/app-vn-shell
+      '@v-ronpa/asset-project':
+        specifier: workspace:*
+        version: link:../../packages/asset-project
       '@v-ronpa/asset-registry':
         specifier: workspace:*
         version: link:../../packages/asset-registry
@@ -62,9 +65,6 @@ importers:
       '@v-ronpa/media-save':
         specifier: workspace:*
         version: link:../../packages/media-save
-      '@v-ronpa/runtime-assets-pixi':
-        specifier: workspace:*
-        version: link:../../packages/runtime-assets-pixi
       '@v-ronpa/ui-kit':
         specifier: workspace:*
         version: link:../../packages/ui-kit
@@ -95,6 +95,9 @@ importers:
       '@v-ronpa/app-vn-shell':
         specifier: workspace:*
         version: link:../../packages/app-vn-shell
+      '@v-ronpa/asset-project':
+        specifier: workspace:*
+        version: link:../../packages/asset-project
       '@v-ronpa/asset-registry':
         specifier: workspace:*
         version: link:../../packages/asset-registry
@@ -131,9 +134,6 @@ importers:
       '@v-ronpa/r3f-adapter':
         specifier: workspace:*
         version: link:../../packages/r3f-adapter
-      '@v-ronpa/runtime-assets-pixi':
-        specifier: workspace:*
-        version: link:../../packages/runtime-assets-pixi
       '@v-ronpa/story-engine':
         specifier: workspace:*
         version: link:../../packages/story-engine
@@ -306,6 +306,15 @@ importers:
         specifier: ^19.0.0
         version: 19.2.7
 
+  packages/asset-project:
+    dependencies:
+      '@v-ronpa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.5(@types/node@24.13.2)
+
   packages/asset-registry:
     dependencies:
       '@v-ronpa/contracts':
@@ -404,9 +413,6 @@ importers:
       '@v-ronpa/pixi-stage-model':
         specifier: workspace:*
         version: link:../pixi-stage-model
-      '@v-ronpa/runtime-assets-pixi':
-        specifier: workspace:*
-        version: link:../runtime-assets-pixi
       pixi-filters:
         specifier: ^6.1.5
         version: 6.1.5(pixi.js@8.19.0)
@@ -441,15 +447,6 @@ importers:
       '@types/three':
         specifier: ^0.181.0
         version: 0.181.0
-
-  packages/runtime-assets-pixi:
-    dependencies:
-      '@v-ronpa/asset-registry':
-        specifier: workspace:*
-        version: link:../asset-registry
-      '@v-ronpa/contracts':
-        specifier: workspace:*
-        version: link:../contracts
 
   packages/story-engine:
     dependencies:
@@ -507,6 +504,9 @@ importers:
 
   tools/vscode-nani:
     dependencies:
+      '@v-ronpa/asset-project':
+        specifier: workspace:*
+        version: link:../../packages/asset-project
       '@v-ronpa/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

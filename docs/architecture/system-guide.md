@@ -12,7 +12,7 @@ interaction state back into the machine.
 
 ## Package ownership
 
-- `contracts`: public schemas, ContentManifest v4, SaveData v9, and `.nani` runtime IR.
+- `contracts`: public schemas, ContentManifest v5, SaveData v11, and `.nani` runtime IR.
 - `nani-parser`: generic `.nani` ScenarioIR plus a required UTF-16 source-map
   sidecar; owns syntax diagnostics and cooked-to-source projection.
 - `nani-runtime-compiler`: command binding, static endpoint/catalog linking, validation, normalization, and
@@ -35,8 +35,9 @@ interaction state back into the machine.
   playable Dialog/Cue text surfaces, choices, and commands are omitted until
   resume. Dialog and Cue share one StoryText authority and playback clock but
   remain separate mutually exclusive DOM surfaces.
-- `pixi-presenter`: Pixi renderer adapter only; it does not interpret runtime commands.
-- `runtime-assets-pixi`: Pixi-owned AssetRegistry fragment only.
+- `asset-project`: Node-only App asset scanning, generation, validation, and Vite publishing rules.
+- `asset-registry`: App-owned AssetId-to-URL resolution and MIME capability validation.
+- `pixi-presenter`: Pixi renderer adapter only; it does not interpret runtime commands. Its private FX assets are bundled implementation details, not App manifest content.
 - `navi-director` / `trial-director`: mode-specific state and flow.
 - app packages: flow/save/overlay composition, per-game content, manifest, and
   application policy callbacks; reusable runtime/Devtools/Pixi mechanisms stay

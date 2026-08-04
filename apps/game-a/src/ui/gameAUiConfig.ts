@@ -1,7 +1,7 @@
 export const gameAUiConfig = {
   dialog: {
     showSpeakerName: true,
-    frameAssetId: "texture:ui:game-a-dialog-frame",
+    frameAssetId: "ui/dialog-frame",
     appearance: {
       backgroundOpacity: 1
     }
@@ -13,11 +13,11 @@ export const gameAUiConfig = {
     },
     cues: {
       hover: {
-        sourceRef: "sfx:ui-hover-default",
+        assetId: "sfx/ui-hover-default",
         gain: 1
       },
       activate: {
-        sourceRef: "sfx:ui-click-default",
+        assetId: "sfx/ui-click-default",
         gain: 1
       }
     },
@@ -25,7 +25,7 @@ export const gameAUiConfig = {
   },
   title: {
     title: "白昼梦游行 Daydream Parade",
-    backgroundAssetId: "bg:title"
+    backgroundAssetId: "bg/title"
   }
 } as const;
 

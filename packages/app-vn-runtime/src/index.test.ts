@@ -1,11 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { createAssetRegistry } from "@v-ronpa/asset-registry";
-import { createInitialUiRuntimeState, createVoiceAssetId, planDialogueLineAudio, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
+import { createInitialUiRuntimeState, planDialogueLineAudio, type UiRuntimeState } from "@v-ronpa/app-vn-dispatch";
 import type {
+  AssetDefinition,
   ContentManifest,
-  RuntimeAsset,
-  RuntimeAssetFormat,
-  RuntimeAssetKind,
   RuntimeScript
 } from "@v-ronpa/contracts";
 import { parseScenario } from "@v-ronpa/nani-parser";
@@ -18,6 +16,7 @@ import {
   disposeVnRuntimeMedia,
   resolveVnDialogueVoiceAssetAvailability,
   resolveVnRuntimeMediaSource,
+  resolveVnRuntimeImageSource,
   type VnRuntimeMediaHandleStore
 } from "./runtimeMedia";
 import { createVnRuntimeRestorePlan } from "./runtimeRestore";
@@ -101,13 +100,13 @@ describe("app VN runtime helpers", () => {
     const plan = createVnRuntimeRestorePlan({
       active: true,
       media: {
-        bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
-        loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+        bgmByGroup: { music: { assetId: "bgm/main", volume: 0.4 } },
+        loopingSfxByKey: { rain: { assetId: "sfx/rain", volume: 0.3, group: "rain" } }
       },
       pixiStage,
       script: runtimeScript,
       story: storyRuntimeSnapshot(story),
-      ui: { dialog: true, commandBar: true, toastLayer: false, cue: false }
+      ui: { dialog: true, commandBar: true, toastLayer: false, cue: false, pinp: null }
     });
 
     expect(plan.storyRuntime.active).toBe(true);
@@ -132,12 +131,12 @@ describe("app VN runtime helpers", () => {
     expect(plan.diagnostics).toEqual([]);
     expect(plan.uiRuntime.surfaces.toastLayer.targetVisible).toBe(false);
     expect(plan.mediaRuntime).toEqual({
-      bgmByGroup: { music: { sourceRef: "bgm:main", volume: 0.4 } },
-      loopingSfxByKey: { rain: { sourceRef: "sfx:rain", volume: 0.3, group: "rain" } }
+      bgmByGroup: { music: { assetId: "bgm/main", volume: 0.4 } },
+      loopingSfxByKey: { rain: { assetId: "sfx/rain", volume: 0.3, group: "rain" } }
     });
     expect(plan.mediaEffects).toEqual([
-      { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:main", volume: 0.4 },
-      { type: "play-sfx", key: "rain", group: "rain", sourceRef: "sfx:rain", loop: true, fast: false, volume: 0.3 }
+      { type: "play-bgm", key: "music", group: "music", assetId: "bgm/main", volume: 0.4 },
+      { type: "play-sfx", key: "rain", group: "rain", assetId: "sfx/rain", loop: true, fast: false, volume: 0.3 }
     ]);
   });
 
@@ -160,7 +159,7 @@ describe("app VN runtime helpers", () => {
       pixiStage: createInitialPixiStageSnapshot(),
       script: runtimeScript,
       story: storyRuntimeSnapshot(story),
-      ui: { dialog: false, commandBar: true, toastLayer: true, cue: true }
+      ui: { dialog: false, commandBar: true, toastLayer: true, cue: true, pinp: null }
     });
 
     expect(plan.uiRuntime.surfaces.dialog.targetVisible).toBe(false);
@@ -184,7 +183,7 @@ describe("app VN runtime helpers", () => {
       pixiStage: createInitialPixiStageSnapshot(),
       script: runtimeScript,
       story: storyRuntimeSnapshot(second.state),
-      ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+      ui: { dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null }
     });
     expect(plan.storyRuntime.state.text?.current?.text).toBe("AB");
     expect(plan.storyRuntime.state.instructionPointer).toBe(2);
@@ -197,24 +196,51 @@ describe("app VN runtime helpers", () => {
   it("resolves media sources through the asset registry and rejects raw URI fallback", () => {
     const assetResolver = createAssetRegistry(
       manifestWithAssets([
-        runtimeAsset("bgm:main", "bgm", "/runtime-main.ogg"),
-        runtimeAsset("sfx:door", "sfx", "/door.ogg")
+        runtimeAsset("bgm/main", "bgm", "/runtime-main.ogg"),
+        runtimeAsset("sfx/door", "sfx", "/door.ogg")
       ])
     );
 
-    expect(resolveVnRuntimeMediaSource({ sourceRef: "bgm:main", kind: "bgm", assetResolver })).toEqual({
+    expect(resolveVnRuntimeMediaSource({ assetId: "bgm/main", kind: "bgm", assetResolver })).toEqual({
       uri: "/runtime-main.ogg"
     });
-    expect(resolveVnRuntimeMediaSource({ sourceRef: "/raw/sfx.ogg", kind: "sfx", assetResolver }).diagnostic).toMatchObject({
+    expect(resolveVnRuntimeMediaSource({ assetId: "/raw/sfx.ogg", kind: "sfx", assetResolver }).diagnostic).toMatchObject({
       source: "asset",
       code: "raw-uri-disallowed"
+    });
+  });
+
+  it("resolves pinp sources as textures without interpreting the asset ID prefix", () => {
+    const assetResolver = createAssetRegistry(
+      manifestWithAssets([
+        runtimeAsset("props/milk-bag", "texture", "/assets/milk-bag.png"),
+        runtimeAsset("audio/wrong", "sfx", "/assets/wrong.ogg")
+      ])
+    );
+
+    expect(resolveVnRuntimeImageSource({ assetId: "props/milk-bag", assetResolver })).toEqual({
+      uri: "/assets/milk-bag.png"
+    });
+    expect(resolveVnRuntimeImageSource({ assetId: "audio/wrong", assetResolver }).diagnostic).toMatchObject({
+      source: "asset",
+      code: "asset-capability-mismatch",
+      severity: "error"
+    });
+    expect(resolveVnRuntimeImageSource({ assetId: "props/missing", assetResolver }).diagnostic).toMatchObject({
+      source: "asset",
+      code: "asset-missing"
+    });
+    expect(resolveVnRuntimeImageSource({ assetId: "https://example.test/raw.png", assetResolver }).diagnostic).toMatchObject({
+      source: "asset",
+      code: "raw-uri-disallowed",
+      severity: "error"
     });
   });
 
   it("applies audio effects through AudioPort handles with cleanup semantics", async () => {
     const bgmHandle = audioHandle("music");
     const sfxHandle = audioHandle("rain");
-    const voiceHandle = audioHandle("voice:zh:line");
+    const voiceHandle = audioHandle("voice/zh/line");
     const handles: VnRuntimeMediaHandleStore = { bgm: {}, sfx: {}, oneShotSequence: 0 };
     const playBgm = viFn(() => bgmHandle);
     const playSfx = viFn(() => sfxHandle);
@@ -231,26 +257,26 @@ describe("app VN runtime helpers", () => {
       audioPort,
       handles,
       effects: [
-        { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:main", volume: 0.4, fadeInMs: 300 },
-        { type: "play-sfx", key: "rain", group: "rain", sourceRef: "sfx:rain", loop: true, fast: false, volume: 0.3, fadeInMs: 200 },
+        { type: "play-bgm", key: "music", group: "music", assetId: "bgm/main", volume: 0.4, fadeInMs: 300 },
+        { type: "play-sfx", key: "rain", group: "rain", assetId: "sfx/rain", loop: true, fast: false, volume: 0.3, fadeInMs: 200 },
         { type: "set-bgm-volume", key: "music", group: "music", volume: 0.2, durationMs: 500 },
         { type: "set-sfx-volume", key: "rain", group: "rain", volume: 0.1, durationMs: 250 },
         {
           type: "play-voice",
-          key: "voice:zh:line",
+          key: "voice/zh/line",
           textId: "line",
-          sourceRef: "voice:zh:line",
+          assetId: "voice/zh/line",
           volume: 0.6
         },
         { type: "stop-bgm", key: "music", group: "music", fadeMs: 200 },
         { type: "stop-sfx", key: "rain", group: "rain" }
       ],
-      resolver: ({ sourceRef }) => ({ uri: `/resolved/${sourceRef}.ogg` })
+      resolver: ({ assetId }) => ({ uri: `/resolved/${assetId}.ogg` })
     });
 
-    expect(playBgm.calls).toEqual([["music:bgm:fade-in:1", "/resolved/bgm:main.ogg", { loop: true, volume: 0.4, fadeInMs: 300 }]]);
-    expect(playSfx.calls).toEqual([["rain:sfx:fade-in:2", "/resolved/sfx:rain.ogg", { loop: true, volume: 0.3, fadeInMs: 200 }]]);
-    expect(playVoice.calls).toEqual([["voice:zh:line", "/resolved/voice:zh:line.ogg", { volume: 0.6 }]]);
+    expect(playBgm.calls).toEqual([["music:bgm:fade-in:1", "/resolved/bgm/main.ogg", { loop: true, volume: 0.4, fadeInMs: 300 }]]);
+    expect(playSfx.calls).toEqual([["rain:sfx:fade-in:2", "/resolved/sfx/rain.ogg", { loop: true, volume: 0.3, fadeInMs: 200 }]]);
+    expect(playVoice.calls).toEqual([["voice/zh/line", "/resolved/voice/zh/line.ogg", { volume: 0.6 }]]);
     expect((bgmHandle.fade as ReturnType<typeof viFn>).calls).toEqual([[0.2, 500]]);
     expect((sfxHandle.fade as ReturnType<typeof viFn>).calls).toEqual([[0.1, 250]]);
     expect((bgmHandle.fadeOutAndStop as ReturnType<typeof viFn>).calls).toEqual([[200]]);
@@ -305,7 +331,7 @@ describe("app VN runtime helpers", () => {
         { type: "set-bgm-volume", key: "music", group: "music", volume: 0.2, durationMs: 500 },
         { type: "set-sfx-volume", key: "rain", group: "rain", volume: 0.1, durationMs: 250 }
       ],
-      resolver: ({ sourceRef }) => ({ uri: `/resolved/${sourceRef}.ogg` })
+      resolver: ({ assetId }) => ({ uri: `/resolved/${assetId}.ogg` })
     });
 
     expect(result.diagnostics).toEqual([
@@ -325,7 +351,7 @@ describe("app VN runtime helpers", () => {
   });
 
   it("uses dialogue voice availability to suppress bleep and returns a gateable voice handle", async () => {
-    const voiceHandle = audioHandle("voice:zh:voice_validation_0001");
+    const voiceHandle = audioHandle("voice/zh/voice-validation-0001");
     const playVoice = viFn(() => voiceHandle);
     const playDialogueBleep = viFn(() => audioHandle("bleep"));
     const audioPort: AudioPort = {
@@ -337,13 +363,14 @@ describe("app VN runtime helpers", () => {
     };
     const assetResolver = createAssetRegistry(
       manifestWithAssets([
-        runtimeAsset("voice:zh:voice_validation_0001", "voice", "/voice/voice_validation_0001.ogg"),
-        runtimeAsset("bleep:dialogue-felix", "bleep", "/bleep/felix.ogg")
+        runtimeAsset("voice/zh/voice-validation-0001", "voice", "/voice/voice_validation_0001.ogg"),
+        runtimeAsset("bleep/dialogue-felix", "bleep", "/bleep/felix.ogg")
       ])
     );
     const availability = resolveVnDialogueVoiceAssetAvailability({
       assetResolver,
       textId: "voice_validation_0001",
+      voiceIndex: { zh: { voice_validation_0001: "voice/zh/voice-validation-0001" } },
       voiceSettings: { locale: "zh", volume: 0.25 }
     });
     const planned = planDialogueLineAudio(
@@ -352,7 +379,7 @@ describe("app VN runtime helpers", () => {
         bleep: {
           config: {
             enabled: true,
-            defaultSound: { sourceRef: "bleep:dialogue-felix", gain: 1 },
+            defaultSound: { assetId: "bleep/dialogue-felix", gain: 1 },
             speakerOverrides: {}
           },
           volume: 1
@@ -364,7 +391,7 @@ describe("app VN runtime helpers", () => {
         speakerId: "Felix",
         textId: "voice_validation_0001",
         voice: { locale: "zh", volume: 0.25 },
-        voiceAssetAvailable: availability.available
+        ...(availability.available && availability.assetId ? { voiceAssetId: availability.assetId } : {})
       }
     );
 
@@ -372,21 +399,20 @@ describe("app VN runtime helpers", () => {
       audioPort,
       handles: { bgm: {}, sfx: {}, oneShotSequence: 0 },
       effects: planned.effects,
-      resolver: ({ sourceRef, kind }) => resolveVnRuntimeMediaSource({ sourceRef, kind, assetResolver })
+      resolver: ({ assetId, kind }) => resolveVnRuntimeMediaSource({ assetId, kind, assetResolver })
     });
 
-    expect(createVoiceAssetId("voice_validation_0001", "zh")).toBe("voice:zh:voice_validation_0001");
     expect(availability.diagnostics).toEqual([]);
     expect(planned.effects.some((effect) => effect.type === "play-dialogue-bleep")).toBe(false);
     expect(playDialogueBleep.calls).toEqual([]);
     expect(playVoice.calls).toEqual([
-      ["voice:zh:voice_validation_0001", "/voice/voice_validation_0001.ogg", { volume: 0.25 }]
+      ["voice/zh/voice-validation-0001", "/voice/voice_validation_0001.ogg", { volume: 0.25 }]
     ]);
     expect(result).toEqual({ diagnostics: [], voiceHandle });
   });
 
   it("falls back to bleep without warning when planned textId audio is missing", async () => {
-    const bleepHandle = audioHandle("dialogue-bleep:line:missing");
+    const bleepHandle = audioHandle("dialogue-bleep/line:missing");
     const playVoice = viFn(() => audioHandle("voice"));
     const playDialogueBleep = viFn(() => bleepHandle);
     const audioPort: AudioPort = {
@@ -397,7 +423,7 @@ describe("app VN runtime helpers", () => {
       stopAll: viFn()
     };
     const assetResolver = createAssetRegistry(
-      manifestWithAssets([runtimeAsset("bleep:dialogue-default", "bleep", "/bleep/default.ogg")])
+      manifestWithAssets([runtimeAsset("bleep/dialogue-default", "bleep", "/bleep/default.ogg")])
     );
     const availability = resolveVnDialogueVoiceAssetAvailability({
       assetResolver,
@@ -410,7 +436,7 @@ describe("app VN runtime helpers", () => {
         bleep: {
           config: {
             enabled: true,
-            defaultSound: { sourceRef: "bleep:dialogue-default", gain: 1 },
+            defaultSound: { assetId: "bleep/dialogue-default", gain: 1 },
             speakerOverrides: {}
           },
           volume: 0.5
@@ -422,7 +448,7 @@ describe("app VN runtime helpers", () => {
         speakerId: "Mira",
         textId: "planned_future_voice",
         voice: { locale: "zh", volume: 0.25 },
-        voiceAssetAvailable: availability.available
+        ...(availability.available && availability.assetId ? { voiceAssetId: availability.assetId } : {})
       }
     );
 
@@ -430,13 +456,12 @@ describe("app VN runtime helpers", () => {
       audioPort,
       handles: { bgm: {}, sfx: {}, oneShotSequence: 0 },
       effects: planned.effects,
-      resolver: ({ sourceRef, kind }) => resolveVnRuntimeMediaSource({ sourceRef, kind, assetResolver })
+      resolver: ({ assetId, kind }) => resolveVnRuntimeMediaSource({ assetId, kind, assetResolver })
     });
 
     expect(availability).toEqual({
       available: false,
-      diagnostics: [],
-      sourceRef: "voice:zh:planned_future_voice"
+      diagnostics: []
     });
     expect(playVoice.calls).toEqual([]);
     expect(playDialogueBleep.calls).toEqual([
@@ -446,8 +471,8 @@ describe("app VN runtime helpers", () => {
   });
 
   it("reports missing media assets and clears transient dialogue handles", async () => {
-    const staleBleep = audioHandle("dialogue-bleep:stale");
-    const staleVoice = audioHandle("voice:zh:stale");
+    const staleBleep = audioHandle("dialogue-bleep/stale");
+    const staleVoice = audioHandle("voice/zh/stale");
     const playBgm = viFn();
     const playDialogueBleep = viFn();
     const playVoice = viFn();
@@ -471,11 +496,11 @@ describe("app VN runtime helpers", () => {
       audioPort,
       handles,
       effects: [
-        { type: "play-bgm", key: "missing-bgm", group: "music", sourceRef: "bgm:missing", volume: 0.7 },
-        { type: "play-dialogue-bleep", key: "bleep:line", sourceRef: "bleep:missing" },
-        { type: "play-voice", key: "voice:zh:missing", textId: "missing", sourceRef: "voice:zh:missing" }
+        { type: "play-bgm", key: "missing-bgm", group: "music", assetId: "bgm/missing", volume: 0.7 },
+        { type: "play-dialogue-bleep", key: "bleep/line", assetId: "bleep/missing" },
+        { type: "play-voice", key: "voice/zh/missing", textId: "missing", assetId: "voice/zh/missing" }
       ],
-      resolver: ({ sourceRef, kind }) => resolveVnRuntimeMediaSource({ sourceRef, kind, assetResolver })
+      resolver: ({ assetId, kind }) => resolveVnRuntimeMediaSource({ assetId, kind, assetResolver })
     });
 
     expect((staleBleep.stop as ReturnType<typeof viFn>).calls).toEqual([[]]);
@@ -496,7 +521,7 @@ describe("app VN runtime helpers", () => {
     vi.useFakeTimers();
     try {
       const advances: string[] = [];
-      const { handle, resolve } = deferredAudioHandle("voice:zh:line");
+      const { handle, resolve } = deferredAudioHandle("voice/zh/line");
       const controller = createVnVoiceAutoAdvanceGateController({
         advance: (source) => advances.push(source),
         clearTimeoutFn: clearTimeout,
@@ -524,8 +549,8 @@ describe("app VN runtime helpers", () => {
     try {
       const advances: string[] = [];
       const stopVoice = viFn();
-      const stopped = deferredAudioHandle("voice:zh:stopped");
-      const failed = deferredAudioHandle("voice:zh:failed");
+      const stopped = deferredAudioHandle("voice/zh/stopped");
+      const failed = deferredAudioHandle("voice/zh/failed");
       const controller = createVnVoiceAutoAdvanceGateController({
         advance: (source) => advances.push(source),
         clearTimeoutFn: clearTimeout,
@@ -564,7 +589,7 @@ describe("app VN runtime helpers", () => {
     const result = await applyVnRuntimeMediaEffects({
       videoPort,
       handles: { bgm: {}, sfx: {}, oneShotSequence: 0 },
-      effects: [{ type: "play-movie", sourceRef: "video:intro", block: true }],
+      effects: [{ type: "play-movie", assetId: "video/intro", block: true }],
       resolver: () => ({ uri: "/resolved/intro.mp4" })
     });
 
@@ -668,12 +693,12 @@ describe("app VN runtime helpers", () => {
   });
 });
 
-function manifestWithAssets(runtimeAssets: RuntimeAsset[]): ContentManifest {
+function manifestWithAssets(assets: AssetDefinition[]): ContentManifest {
   return {
-    version: 4 as const,
-    assets: [],
+    version: 5,
+    assets,
+    requirements: [],
     fonts: [],
-    runtimeAssets,
     collisionProxies: [],
     vnEntries: [],
     maps: [],
@@ -683,26 +708,25 @@ function manifestWithAssets(runtimeAssets: RuntimeAsset[]): ContentManifest {
   };
 }
 
-function runtimeAsset(id: string, kind: RuntimeAssetKind, optimizedUri: string): RuntimeAsset {
-  const format: RuntimeAssetFormat =
+function runtimeAsset(
+  id: string,
+  kind: "video" | "glb" | "bgm" | "sfx" | "voice" | "bleep" | "character-pack" | "texture",
+  optimizedUri: string
+): AssetDefinition {
+  const mimeType =
     kind === "video"
-      ? "mp4"
+      ? "video/mp4"
       : kind === "glb"
-        ? "gltf"
+        ? "model/gltf-binary"
         : kind === "bgm" || kind === "sfx" || kind === "voice" || kind === "bleep"
-          ? "ogg"
+          ? "audio/ogg"
           : kind === "character-pack"
-            ? "json"
-            : "png";
+            ? "application/json"
+            : "image/png";
   return {
     id,
-    kind,
-    optimizedUri,
-    format,
-    compression: [],
-    lods: [],
-    collisionProxyIds: [],
-    tags: []
+    uri: optimizedUri.replace(/^\//u, ""),
+    mimeType
   };
 }
 

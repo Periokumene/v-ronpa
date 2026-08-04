@@ -3,7 +3,7 @@ import { getNaniHover } from "./hoverProvider";
 
 describe("hover provider logic", () => {
   it("returns command docs on command names", () => {
-    const hover = getNaniHover("@bgm bgm:main volume:0.6", { line: 0, character: 2 });
+    const hover = getNaniHover("@bgm bgm/main volume:0.6", { line: 0, character: 2 });
 
     expect(hover?.contents).toContain("bgm · media · implemented");
     expect(hover?.contents).toContain("播放循环背景音乐");
@@ -14,8 +14,8 @@ describe("hover provider logic", () => {
   });
 
   it("returns parameter docs on command params and boolean flags", () => {
-    const volume = getNaniHover("@bgm bgm:main volume:0.6 wait!", { line: 0, character: "@bgm bgm:main vol".length });
-    const wait = getNaniHover("@bgm bgm:main volume:0.6 wait!", { line: 0, character: "@bgm bgm:main volume:0.6 wai".length });
+    const volume = getNaniHover("@bgm bgm/main volume:0.6 wait!", { line: 0, character: "@bgm bgm/main vol".length });
+    const wait = getNaniHover("@bgm bgm/main volume:0.6 wait!", { line: 0, character: "@bgm bgm/main volume:0.6 wai".length });
     const uiWait = getNaniHover("@hideUI commandBar wait!", { line: 0, character: "@hideUI commandBar wai".length });
 
     expect(volume?.contents).toContain("播放音量倍率");

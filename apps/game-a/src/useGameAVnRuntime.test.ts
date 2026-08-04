@@ -22,7 +22,7 @@ describe("game-a VN runtime wrapper", () => {
 
 function createSave(): SaveData {
   return {
-    version: 9,
+    version: 11,
     gameId: "game-a",
     savedAt: "2026-07-11T00:00:00.000Z",
     mode: "vn",
@@ -37,7 +37,7 @@ function createSave(): SaveData {
         ended: false
       },
       pixiStage: {
-        version: 5,
+        version: 6,
         revision: 0,
         backgroundsById: {},
         innerBackgroundsById: {},
@@ -47,7 +47,7 @@ function createSave(): SaveData {
         screenFilters: {}
       },
       media: { bgmByGroup: {}, loopingSfxByKey: {} },
-      ui: { dialog: true, commandBar: true, toastLayer: true, cue: false }
+      ui: { dialog: true, commandBar: true, toastLayer: true, cue: false, pinp: null }
     },
     navi: null,
     trial: null,

@@ -410,7 +410,7 @@ function createController(
     ],
     summaries: {
       story: [{ label: "pointer", value: 1, tone: "accent" }],
-      pixi: [{ label: "background", value: "bg:rain" }],
+      pixi: [{ label: "background", value: "bg/rain" }],
       ui: [{ label: "dialog", value: true }],
       media: []
     },

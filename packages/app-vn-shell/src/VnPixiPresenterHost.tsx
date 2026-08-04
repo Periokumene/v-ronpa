@@ -1,11 +1,13 @@
 import type { VnDiagnosticsPort, VnPresentationPort, PresentationTaskObservation } from "@v-ronpa/app-vn-runtime";
 import type { PixiAssetResolver, PixiPresentationTaskSnapshot } from "@v-ronpa/pixi-presenter";
 import { PixiLayer, type PixiStageHandle, type VnPixiCharacterPreparationPlan } from "./PixiLayer";
+import type { AssetId } from "@v-ronpa/contracts";
 
 export interface VnPixiPresenterHostProps {
   active: boolean;
   characterOutlineEnabled: boolean;
   characterPreloadPlan: VnPixiCharacterPreparationPlan;
+  characterAssetIdByCharacterId: Readonly<Record<string, AssetId>>;
   presentation: VnPresentationPort;
   diagnostics?: VnDiagnosticsPort;
   assetResolver?: PixiAssetResolver;
@@ -21,6 +23,7 @@ export function VnPixiPresenterHost({
   assetResolver,
   characterOutlineEnabled,
   characterPreloadPlan,
+  characterAssetIdByCharacterId,
   diagnostics,
   onStageHandleChanged,
   presentation
@@ -31,6 +34,7 @@ export function VnPixiPresenterHost({
       animate={stage.animate}
       characterOutlineEnabled={characterOutlineEnabled}
       characterPreloadPlan={characterPreloadPlan}
+      characterAssetIdByCharacterId={characterAssetIdByCharacterId}
       {...(assetResolver ? { assetResolver } : {})}
       hintSequence={stage.hintSequence}
       hints={stage.hints}

@@ -39,8 +39,8 @@ and prove that the shared layered-character runtime needs no body-specific imple
 ## Allowed Paths
 
 - `tools/csp-char-unpack/**`
-- `apps/game-a/public/game-a/characters/alice/**`
-- `apps/game-a/public/game-a/characters/alice-kid/**`
+- `apps/game-a/assets/char/alice/**`
+- `apps/game-a/assets/char/alice-kid/**`
 - `apps/game-a/src/nani-test/character-smoke.nani`
 - `apps/game-a/src/generatedTestScripts.ts`
 - `scripts/nani-semantic-golden.test.ts`

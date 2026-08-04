@@ -22,7 +22,7 @@ describe("game settings adapter helpers", () => {
   it("loads defaults when storage is empty", () => {
     const storage = createMemorySettingsStorage();
 
-    expect(GAME_SETTINGS_STORAGE_KEY).toBe("v-ronpa:settings:v2");
+    expect(GAME_SETTINGS_STORAGE_KEY).toBe("v-ronpa:settings:v3");
     expect(loadGameSettings(storage)).toEqual({
       settings: createDefaultSettingsSnapshot(),
       normalized: false
@@ -43,7 +43,7 @@ describe("game settings adapter helpers", () => {
   it("fills current-schema defaults and writes the normalized snapshot", () => {
     const storage = createMemorySettingsStorage({
       [GAME_SETTINGS_STORAGE_KEY]: JSON.stringify({
-        version: 2,
+        version: 3,
         display: { textSize: "large" }
       })
     });
@@ -56,29 +56,35 @@ describe("game settings adapter helpers", () => {
     expect(JSON.parse(storage.getItem(GAME_SETTINGS_STORAGE_KEY) ?? "")).toEqual(settings);
   });
 
-  it("hard-rejects version 1 settings instead of preserving or migrating them", () => {
+  it("reports and preserves an unsupported settings version without migrating it", () => {
+    const legacyValue = JSON.stringify({
+      version: 2,
+      system: { language: "zh-TW", skipAll: true, preferFullscreen: false },
+      display: { textSpeed: 0.75, textSize: "large", textboxOpacity: 0.4, fontFamilyId: "font:serif" },
+      sound: {
+        masterVolume: 0.5,
+        bgmVolume: 0.2,
+        sfxVolume: 0.6,
+        voiceVolume: 0.8,
+        uiVolume: 0.7,
+        muted: false,
+        voiceInterruption: "interrupt"
+      },
+      automation: { autoSpeed: 0.25, skipSpeed: 0.9 }
+    });
     const storage = createMemorySettingsStorage({
-      [GAME_SETTINGS_STORAGE_KEY]: JSON.stringify({
-        version: 1,
-        system: { language: "zh-TW", skipAll: true, preferFullscreen: false },
-        display: { textSpeed: 0.75, textSize: "large", textboxOpacity: 0.4, fontFamilyId: "font:default" },
-        sound: {
-          masterVolume: 0.5,
-          bgmVolume: 0.2,
-          sfxVolume: 0.6,
-          voiceVolume: 0.8,
-          uiVolume: 0.7,
-          muted: false,
-          voiceInterruption: "interrupt"
-        },
-        automation: { autoSpeed: 0.25, skipSpeed: 0.9 }
-      })
+      [GAME_SETTINGS_STORAGE_KEY]: legacyValue
     });
 
-    const settings = initializeGameSettings(storage);
+    const loaded = loadGameSettings(storage);
 
-    expect(settings).toEqual(createDefaultSettingsSnapshot());
-    expect(JSON.parse(storage.getItem(GAME_SETTINGS_STORAGE_KEY) ?? "")).toEqual(settings);
+    expect(loaded).toMatchObject({
+      settings: createDefaultSettingsSnapshot(),
+      normalized: false,
+      issue: { code: "unsupported-version" }
+    });
+    expect(initializeGameSettings(storage)).toEqual(createDefaultSettingsSnapshot());
+    expect(storage.getItem(GAME_SETTINGS_STORAGE_KEY)).toBe(legacyValue);
   });
 
   it("falls back to defaults and rewrites corrupt settings", () => {

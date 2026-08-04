@@ -10,7 +10,7 @@ describe("VN runtime presentation transaction", () => {
   it("projects emitted runtime commands into Pixi stage snapshot while leaving print in Story UI state", () => {
     const runtimeScript = compileScenario(
       [
-        "@back bg:harness effect:fade",
+        "@back bg/harness effect:fade",
         "@char Ema.Pensive1,ArmR3 pos:50",
         "Felix: Hello."
       ].join("\n"),
@@ -28,13 +28,13 @@ describe("VN runtime presentation transaction", () => {
     expect(advanced.state.backlog).toEqual([{ speaker: "Felix", text: "Hello." }]);
     expect(advanced.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "char", "print"]);
     expect(transaction.pixiStage).toMatchObject({
-      version: 5,
+      version: 6,
       revision: 2,
       backgroundsById: {
         [PIXI_MAIN_BACKGROUND_ID]: {
           id: PIXI_MAIN_BACKGROUND_ID,
           kind: "background",
-          appearance: "bg:harness"
+          appearance: "bg/harness"
         }
       },
       charactersById: {
@@ -75,7 +75,7 @@ describe("VN runtime presentation transaction", () => {
 
   it("routes inback commands into the Pixi inner background snapshot", () => {
     const runtimeScript = compileScenario(
-      ["@back bg:harness", "@inback bg:classroom effect:fade time:0.2", "Felix: Framed."].join("\n"),
+      ["@back bg/harness", "@inback bg/classroom effect:fade time:0.2", "Felix: Framed."].join("\n"),
       "transaction-inback-test.nani"
     );
     const advanced = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
@@ -86,16 +86,16 @@ describe("VN runtime presentation transaction", () => {
 
     expect(advanced.emittedRuntimeCommands.map((command) => command.commandId)).toEqual(["back", "inback", "print"]);
     expect(transaction.pixiStage).toMatchObject({
-      version: 5,
+      version: 6,
       revision: 2,
       backgroundsById: {
-        [PIXI_MAIN_BACKGROUND_ID]: { appearance: "bg:harness" }
+        [PIXI_MAIN_BACKGROUND_ID]: { appearance: "bg/harness" }
       },
       innerBackgroundsById: {
         [PIXI_INNER_BACKGROUND_ID]: {
           id: PIXI_INNER_BACKGROUND_ID,
           kind: "background",
-          appearance: "bg:classroom",
+          appearance: "bg/classroom",
           transition: { name: "fade", durationMs: 200 }
         }
       }
@@ -175,7 +175,7 @@ describe("VN runtime presentation transaction", () => {
 
   it("routes media-output commands into pure media effects without touching Pixi or UI", () => {
     const runtimeScript = compileScenario(
-      ["@bgm bgm:validation-main group:music volume:0.45", "@sfx sfx:rain group:rain loop!"].join("\n"),
+      ["@bgm bgm/validation-main group:music volume:0.45", "@sfx sfx/rain group:rain loop!"].join("\n"),
       "transaction-media-test.nani"
     );
     const advanced = advanceToNextStop(createInitialStoryState(runtimeScript), runtimeScript);
@@ -190,8 +190,8 @@ describe("VN runtime presentation transaction", () => {
     expect(transaction.pixiHints).toEqual([]);
     expect(transaction.uiState).toMatchObject({ toasts: [] });
     expect(transaction.mediaEffects).toEqual([
-      { type: "play-bgm", key: "music", group: "music", sourceRef: "bgm:validation-main", volume: 0.45 },
-      { type: "play-sfx", sourceRef: "sfx:rain", loop: true, fast: false, volume: 1, key: "rain", group: "rain" }
+      { type: "play-bgm", key: "music", group: "music", assetId: "bgm/validation-main", volume: 0.45 },
+      { type: "play-sfx", assetId: "sfx/rain", loop: true, fast: false, volume: 1, key: "rain", group: "rain" }
     ]);
   });
 
@@ -260,7 +260,6 @@ describe("VN runtime presentation transaction", () => {
     const runtimeScript: RuntimeScript = {
       scriptPath: "transaction-story-control-routing.nani",
       labels: {},
-      assets: [],
       dependencies: [],
       commands: [
         {
@@ -287,8 +286,8 @@ describe("VN runtime presentation transaction", () => {
           category: "media",
           source: "naninovel",
           status: "stubbed",
-          params: { primary: "voice:zh:voice_validation_0001" },
-          loc: { scriptPath: "transaction-story-control-routing.nani", line: 3, column: 1, raw: "@voice voice:zh:voice_validation_0001" }
+          params: { primary: "voice/zh/voice_validation_0001" },
+          loc: { scriptPath: "transaction-story-control-routing.nani", line: 3, column: 1, raw: "@voice voice/zh/voice_validation_0001" }
         },
         {
           commandId: "stopvoice",
@@ -317,7 +316,6 @@ describe("VN runtime presentation transaction", () => {
     const runtimeScript: RuntimeScript = {
       scriptPath: "unresolved-app-expression.nani",
       labels: {},
-      assets: [],
       dependencies: [],
       commands: [
         {

@@ -27,7 +27,7 @@ describe("VN devtools controller safety", () => {
       initialScriptPath: "game-a/opening.nani",
       startLabel: "Start",
       profile: "vn2d" as const,
-      assetRefs: []
+      requirements: []
     };
     const source = {
       scriptPath: "game-a/opening.nani",

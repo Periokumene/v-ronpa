@@ -334,6 +334,175 @@ export function diagnoseCharacterToneParams(
   return diagnostics;
 }
 
+const pinpEffects = new Set(["fade", "none"]);
+const pinpLayoutParams = ["pos", "height", "ratio", "alt"] as const;
+
+export function diagnosePinpParams(
+  bound: BoundCommand,
+  definition: NaniCommandDefinition,
+  context: CommandDiagnosticContext
+): RuntimeCompilerDiagnostic[] {
+  if (definition.id !== "pinp") return [];
+
+  const command = bound.shape;
+  const namedAsset = getCommandParam(command, "assetId");
+  const sourceValue = command.primary ?? namedAsset;
+  const visibleValue = getCommandParam(command, "visible");
+  const visible = staticScalarValue(visibleValue);
+  const effectValue = getCommandParam(command, "effect");
+  const effect = staticScalarValue(effectValue);
+  const timeValue = getCommandParam(command, "time");
+  const time = staticScalarValue(timeValue);
+  const diagnostics: RuntimeCompilerDiagnostic[] = [];
+
+  if (command.primary && namedAsset) {
+    diagnostics.push(createArgumentDiagnostic(
+      context,
+      paramOrigin(bound, "assetId"),
+      "whole",
+      "invalid-command-param",
+      "@pinp accepts the asset either as its primary value or as assetId:, but not both.",
+      "error"
+    ));
+  }
+
+  const waitArgumentIndex = context.command.args.findIndex(
+    (argument) => (argument.kind === "flag" || argument.kind === "param") && normalizeParamName(argument.key) === "wait"
+  );
+  if (waitArgumentIndex >= 0) {
+    diagnostics.push(createArgumentDiagnostic(
+      context,
+      { argumentIndex: waitArgumentIndex },
+      "whole",
+      "invalid-command-param",
+      "@pinp is non-blocking and does not accept wait or wait!.",
+      "error"
+    ));
+  }
+
+  if (visible === false) {
+    if (sourceValue) {
+      diagnostics.push(createArgumentDiagnostic(
+        context,
+        bound.origins.primary ?? paramOrigin(bound, "assetId"),
+        "whole",
+        "invalid-command-param",
+        "@pinp visible:false is the hide form and cannot include an asset.",
+        "error"
+      ));
+    }
+    for (const name of pinpLayoutParams) {
+      if (!getCommandParam(command, name)) continue;
+      diagnostics.push(createArgumentDiagnostic(
+        context,
+        paramOrigin(bound, name),
+        "whole",
+        "invalid-command-param",
+        `@pinp visible:false cannot include ${name}.`,
+        "error"
+      ));
+    }
+  } else if (!sourceValue) {
+    diagnostics.push(createCommandDiagnostic(
+      context,
+      "invalid-command-param",
+      "@pinp show form requires a primary asset ID.",
+      "error"
+    ));
+  } else {
+    const source = staticScalarValue(sourceValue);
+    if (source !== undefined && (typeof source !== "string" || source.trim().length === 0)) {
+      diagnostics.push(createArgumentDiagnostic(
+        context,
+        bound.origins.primary ?? paramOrigin(bound, "assetId"),
+        "value",
+        "invalid-command-param",
+        "@pinp asset ID must be a non-empty string.",
+        "error"
+      ));
+    }
+  }
+
+  validatePinpTuple(bound, context, diagnostics, "pos", 2, (value) => value >= 0 && value <= 100,
+    "@pinp pos must contain exactly two finite numbers from 0 to 100.");
+  validatePinpNumber(bound, context, diagnostics, "height", (value) => value > 0 && value <= 100,
+    "@pinp height must be a finite number greater than 0 and at most 100.");
+  validatePinpTuple(bound, context, diagnostics, "ratio", 2, (value) => value > 0,
+    "@pinp ratio must contain exactly two positive finite numbers.");
+  validatePinpNumber(bound, context, diagnostics, "time", (value) => value >= 0,
+    "@pinp time must be a finite non-negative number of seconds.");
+
+  if (effect !== undefined && (typeof effect !== "string" || !pinpEffects.has(effect))) {
+    diagnostics.push(createArgumentDiagnostic(
+      context,
+      paramOrigin(bound, "effect"),
+      "value",
+      "invalid-command-param",
+      "@pinp effect must be fade or none.",
+      "error"
+    ));
+  }
+  if (effect === "none" && typeof time === "number" && time > 0) {
+    diagnostics.push(createArgumentDiagnostic(
+      context,
+      paramOrigin(bound, "time"),
+      "value",
+      "invalid-command-param",
+      "@pinp effect:none cannot be combined with a non-zero time.",
+      "error"
+    ));
+  }
+  return diagnostics;
+}
+
+function validatePinpNumber(
+  bound: BoundCommand,
+  context: CommandDiagnosticContext,
+  diagnostics: RuntimeCompilerDiagnostic[],
+  name: string,
+  accepts: (value: number) => boolean,
+  message: string
+): void {
+  const raw = getCommandParam(bound.shape, name);
+  if (!raw || raw.type === "expression") return;
+  const value = staticScalarValue(raw);
+  if (typeof value === "number" && Number.isFinite(value) && accepts(value)) return;
+  diagnostics.push(createArgumentDiagnostic(
+    context,
+    paramOrigin(bound, name),
+    "value",
+    "invalid-command-param",
+    message,
+    "error"
+  ));
+}
+
+function validatePinpTuple(
+  bound: BoundCommand,
+  context: CommandDiagnosticContext,
+  diagnostics: RuntimeCompilerDiagnostic[],
+  name: string,
+  length: number,
+  accepts: (value: number) => boolean,
+  message: string
+): void {
+  const raw = getCommandParam(bound.shape, name);
+  if (!raw || raw.type === "expression") return;
+  if (
+    raw.type === "list" &&
+    raw.value.length === length &&
+    raw.value.every((item) => item.type === "number" && Number.isFinite(item.value) && accepts(item.value))
+  ) return;
+  diagnostics.push(createArgumentDiagnostic(
+    context,
+    paramOrigin(bound, name),
+    "value",
+    "invalid-command-param",
+    message,
+    "error"
+  ));
+}
+
 function paramOrigin(bound: BoundCommand, name: string): BoundArgumentOrigin | undefined {
   const normalized = normalizeParamName(name);
   return Object.entries(bound.origins.params).find(([candidate]) => normalizeParamName(candidate) === normalized)?.[1];

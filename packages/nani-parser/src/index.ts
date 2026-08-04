@@ -6,7 +6,6 @@ export type {
   StaticNaniEndpointParseResult
 } from "./endpoint.ts";
 export type {
-  AssetRef,
   CommandArgIR,
   CommandIR,
   CommentIR,

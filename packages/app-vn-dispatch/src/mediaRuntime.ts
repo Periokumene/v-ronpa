@@ -15,17 +15,17 @@ export type MediaRuntimeSfxLoop = VnMediaSfxLoop;
 export type MediaRuntimeState = VnMediaCheckpoint;
 
 export type MediaRuntimeEffect =
-  | { type: "play-bgm"; key: string; group: string; sourceRef: string; volume: number; fadeInMs?: number }
+  | { type: "play-bgm"; key: string; group: string; assetId: string; volume: number; fadeInMs?: number }
   | { type: "set-bgm-volume"; key: string; group: string; volume: number; durationMs?: number }
   | { type: "stop-bgm"; key: string; group: string; fadeMs?: number }
-  | { type: "play-sfx"; sourceRef: string; loop: boolean; fast: boolean; volume: number; key?: string; group?: string; fadeInMs?: number }
+  | { type: "play-sfx"; assetId: string; loop: boolean; fast: boolean; volume: number; key?: string; group?: string; fadeInMs?: number }
   | { type: "set-sfx-volume"; key: string; group?: string; volume: number; durationMs?: number }
   | { type: "stop-sfx"; key: string; group?: string; fadeMs?: number }
-  | { type: "play-dialogue-bleep"; key: string; sourceRef: string; volume?: number }
+  | { type: "play-dialogue-bleep"; key: string; assetId: string; volume?: number }
   | { type: "stop-dialogue-bleep"; key: string }
   | { type: "stop-voice" }
-  | { type: "play-voice"; key: string; textId: string; sourceRef: string; volume?: number }
-  | { type: "play-movie"; sourceRef: string; block: boolean; durationMs?: number };
+  | { type: "play-voice"; key: string; textId: string; assetId: string; volume?: number }
+  | { type: "play-movie"; assetId: string; block: boolean; durationMs?: number };
 
 export interface MediaRuntimeDiagnostic {
   code: "media-handle-missing" | "unsupported-media-command";
@@ -57,7 +57,7 @@ export function createVnMediaRestoreEffects(state: MediaRuntimeState): MediaRunt
         type: "play-bgm",
         key: group,
         group,
-        sourceRef: track.sourceRef,
+        assetId: track.assetId,
         volume: track.volume
       };
     });
@@ -68,7 +68,7 @@ export function createVnMediaRestoreEffects(state: MediaRuntimeState): MediaRunt
       return {
         type: "play-sfx",
         key,
-        sourceRef: loop.sourceRef,
+        assetId: loop.assetId,
         loop: true,
         fast: false,
         volume: loop.volume,
@@ -123,7 +123,7 @@ export function reduceMediaRuntimeCommands(state: MediaRuntimeState, commands: R
 }
 
 function reduceBgmCommand(state: MediaRuntimeState, command: RuntimeCommand): MediaRuntimeResult {
-  const sourceRef = stringParam(command, "bgmPath");
+  const assetId = stringParam(command, "bgmPath");
   const fadeMs = numberParam(command, "fadeMs");
   const volume = numberParam(command, "volume");
   const durationMs = numberParam(command, "durationMs");
@@ -131,7 +131,7 @@ function reduceBgmCommand(state: MediaRuntimeState, command: RuntimeCommand): Me
   const group = explicitGroup ?? "bgm";
   const previous = state.bgmByGroup[group];
 
-  if (!sourceRef) {
+  if (!assetId) {
     if (!explicitGroup) {
       return volume === undefined
         ? missingSource(state, command, "bgmPath")
@@ -149,7 +149,7 @@ function reduceBgmCommand(state: MediaRuntimeState, command: RuntimeCommand): Me
     };
   }
 
-  if (previous?.sourceRef === sourceRef) {
+  if (previous?.assetId === assetId) {
     if (volume === undefined) return { state, effects: [], diagnostics: [] };
     return {
       state: {
@@ -161,12 +161,12 @@ function reduceBgmCommand(state: MediaRuntimeState, command: RuntimeCommand): Me
     };
   }
 
-  const nextTrack: MediaRuntimeBgmTrack = { sourceRef, volume: volume ?? DEFAULT_BGM_VOLUME };
+  const nextTrack: MediaRuntimeBgmTrack = { assetId, volume: volume ?? DEFAULT_BGM_VOLUME };
   const playEffect: MediaRuntimeEffect = {
     type: "play-bgm",
     key: group,
     group,
-    sourceRef,
+    assetId,
     volume: nextTrack.volume,
     ...(fadeMs !== undefined ? { fadeInMs: fadeMs } : {})
   };
@@ -198,12 +198,12 @@ function reduceStopBgmCommand(state: MediaRuntimeState, command: RuntimeCommand)
 }
 
 function reduceSfxCommand(state: MediaRuntimeState, command: RuntimeCommand, fast: boolean): MediaRuntimeResult {
-  const sourceRef = stringParam(command, "sfxPath");
+  const assetId = stringParam(command, "sfxPath");
   const group = stringParam(command, "group");
   const volume = numberParam(command, "volume");
   const durationMs = numberParam(command, "durationMs");
   const fadeMs = numberParam(command, "fadeMs");
-  if (!sourceRef) {
+  if (!assetId) {
     if (fast) return missingSource(state, command, "sfxPath");
     if (!group) {
       return volume === undefined
@@ -224,9 +224,9 @@ function reduceSfxCommand(state: MediaRuntimeState, command: RuntimeCommand, fas
   }
 
   const loop = !fast && booleanParam(command, "loop") === true;
-  const key = loop ? group ?? sourceRef : undefined;
+  const key = loop ? group ?? assetId : undefined;
   const previous = key ? state.loopingSfxByKey[key] : undefined;
-  if (previous?.sourceRef === sourceRef) {
+  if (previous?.assetId === assetId) {
     if (volume === undefined) return { state, effects: [], diagnostics: [] };
     return {
       state: {
@@ -239,13 +239,13 @@ function reduceSfxCommand(state: MediaRuntimeState, command: RuntimeCommand, fas
   }
   const targetVolume = volume ?? DEFAULT_SFX_VOLUME;
   const nextLoop: MediaRuntimeSfxLoop | undefined = loop && key
-    ? { sourceRef, volume: targetVolume, ...(group ? { group } : {}) }
+    ? { assetId, volume: targetVolume, ...(group ? { group } : {}) }
     : undefined;
   const nextLoopingSfxByKey =
     nextLoop && key ? { ...state.loopingSfxByKey, [key]: nextLoop } : state.loopingSfxByKey;
   const playEffect: MediaRuntimeEffect = {
     type: "play-sfx",
-    sourceRef,
+    assetId,
     loop,
     fast,
     volume: targetVolume,
@@ -267,9 +267,9 @@ function reduceSfxCommand(state: MediaRuntimeState, command: RuntimeCommand, fas
 }
 
 function reduceStopSfxCommand(state: MediaRuntimeState, command: RuntimeCommand): MediaRuntimeResult {
-  const sourceRef = stringParam(command, "sfxPath");
+  const assetId = stringParam(command, "sfxPath");
   const group = stringParam(command, "group");
-  const key = group ?? sourceRef;
+  const key = group ?? assetId;
   if (!key) {
     return {
       state,
@@ -297,19 +297,19 @@ function reduceStopSfxCommand(state: MediaRuntimeState, command: RuntimeCommand)
 }
 
 function reduceMovieCommand(state: MediaRuntimeState, command: RuntimeCommand): MediaRuntimeResult {
-  const sourceRef = stringParam(command, "moviePath");
-  if (!sourceRef) return missingSource(state, command, "moviePath");
+  const assetId = stringParam(command, "moviePath");
+  if (!assetId) return missingSource(state, command, "moviePath");
   return {
     state,
-    effects: [movieEffect(sourceRef, booleanParam(command, "block") === true, numberParam(command, "durationMs"))],
+    effects: [movieEffect(assetId, booleanParam(command, "block") === true, numberParam(command, "durationMs"))],
     diagnostics: []
   };
 }
 
-function movieEffect(sourceRef: string, block: boolean, durationMs: number | undefined): MediaRuntimeEffect {
+function movieEffect(assetId: string, block: boolean, durationMs: number | undefined): MediaRuntimeEffect {
   return {
     type: "play-movie",
-    sourceRef,
+    assetId,
     block,
     ...(durationMs !== undefined ? { durationMs } : {})
   };

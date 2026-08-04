@@ -31,7 +31,7 @@ describe("Nani devtools initial candidate handshake", () => {
       initialScriptPath: "game-a/opening.nani",
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     };
     const generated = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: runtimeEntry.initialScriptPath,
@@ -126,7 +126,7 @@ describe("Nani devtools initial candidate handshake", () => {
       initialScriptPath: "game-a/opening.nani",
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     };
     const opening = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/opening.nani",
@@ -176,7 +176,7 @@ describe("Nani devtools initial candidate handshake", () => {
       initialScriptPath: "game-a/opening.nani",
       startLabel: "Start",
       profile: "vn2d",
-      assetRefs: []
+      requirements: []
     };
     const opening = await inspectVnDebugScript(runtimeEntry, {
       scriptPath: "game-a/opening.nani",
@@ -250,7 +250,7 @@ async function canonicalEntry(sourceText: string): Promise<VnDevtoolsScriptCandi
     initialScriptPath: "game-a/opening.nani",
     startLabel: "Start",
     profile: "vn2d",
-    assetRefs: []
+    requirements: []
   };
   const source: VnRuntimeScriptSource = {
     scriptPath: entry.initialScriptPath,

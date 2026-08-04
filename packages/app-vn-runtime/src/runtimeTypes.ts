@@ -1,4 +1,5 @@
 import type {
+  AssetId,
   GameUiAction,
   InputLockState,
   PixiStageSnapshot,
@@ -105,7 +106,7 @@ export interface VnDiagnosticsPort {
     severity?: "info" | "warning" | "error";
     message: string;
     assetId?: string;
-    kind?: string;
+    capability?: string;
   }): void;
   runtimeDiagnostics: VnRuntimeDiagnostic[];
 }
@@ -192,6 +193,7 @@ export interface VnRuntimeDefinition {
   readonly entry: VnEntryDef;
   readonly catalog: VnRuntimeScriptCatalog;
   readonly sourceDiagnosticPolicy: NaniSourceDiagnosticPolicy;
+  readonly voiceIndex?: Readonly<Record<string, Readonly<Record<string, AssetId>>>>;
 }
 
 export interface StartVnStoryOptions {
