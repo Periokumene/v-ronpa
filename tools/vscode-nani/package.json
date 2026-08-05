@@ -3,7 +3,7 @@
   "displayName": "V-Ronpa Nani",
   "description": "VS Code language support for V-Ronpa .nani scripts.",
   "publisher": "v-ronpa",
-  "version": "0.8.0",
+  "version": "0.9.1",
   "private": true,
   "type": "module",
   "main": "./dist/extension.cjs",

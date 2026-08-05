@@ -13,7 +13,7 @@ describe("VS Code adapter module boundaries", () => {
   });
 
   it("keeps preview failures out of language diagnostics and Pixi/webviews", () => {
-    for (const file of sourceFiles("character-preview")) {
+    for (const file of [...sourceFiles("character-preview"), ...sourceFiles("asset-preview")]) {
       const source = read(file);
       expect(source, file).not.toMatch(/from\s+["'][^"']*diagnostics["']/u);
       expect(source, file).not.toMatch(/pixi|createWebviewPanel|registerWebview/iu);

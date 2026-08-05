@@ -385,6 +385,80 @@ suite("V-Ronpa Nani exact diagnostics", () => {
     assert.equal(definitionTargetUri(definitions[0]!).toString(), fixture.bgmUri.toString());
   });
 
+  test("lazily previews image assets from arbitrary folders in completion and hover", async () => {
+    const source = [
+      "#Start",
+      "@back ui/dialog-frame",
+      "@back texture/gpu",
+      "@back ui/d",
+      "@back texture/g",
+      "@back "
+    ].join("\n");
+    const fixture = await createResourceFixture("image-preview.nani", source);
+    const document = await vscode.workspace.openTextDocument(fixture.storyUri);
+    await vscode.window.showTextDocument(document);
+
+    const imagePosition = new vscode.Position(3, "@back ui/d".length);
+    const unresolved = await executeCompletions(document.uri, imagePosition, 0);
+    const unresolvedImage = unresolved.items.find((item) => completionLabel(item) === "ui/dialog-frame");
+    assert.ok(unresolvedImage, "image outside bg/ is offered to @back");
+    assert.doesNotMatch(completionDocumentation(unresolvedImage), /<img/u);
+
+    const resolved = await executeCompletions(document.uri, imagePosition, 20);
+    const image = resolved.items.find((item) => completionLabel(item) === "ui/dialog-frame");
+    assert.ok(image);
+    const completionMarkdown = completionDocumentation(image);
+    assert.match(completionMarkdown, /固定框 · 完整显示 · 保持比例/u);
+    const completionArtifact = artifactUrisFromMarkdown(completionMarkdown)[0];
+    assert.ok(completionArtifact);
+    const completionSvg = Buffer.from(await vscode.workspace.fs.readFile(completionArtifact)).toString("utf8");
+    assert.match(completionSvg, /width="320" height="180"/u);
+    assert.match(completionSvg, /preserveAspectRatio="xMidYMid meet"/u);
+
+    const hoverPosition = new vscode.Position(1, "@back ui/".length + 2);
+    const hover = await executeHover(document.uri, hoverPosition);
+    assert.match(hover, /AssetId: `ui\/dialog-frame`/u);
+    assert.match(hover, /<img/u);
+    const firstHoverArtifact = artifactUriFromHover(hover);
+
+    await vscode.workspace.fs.writeFile(fixture.imageUri, Buffer.concat([fixture.png, Buffer.from([0])]));
+    const changedHover = await waitForHover(
+      document.uri,
+      hoverPosition,
+      (value) => artifactUriFromHover(value).toString() !== firstHoverArtifact.toString()
+    );
+    assert.notEqual(artifactUriFromHover(changedHover).toString(), firstHoverArtifact.toString());
+
+    const ktxPosition = new vscode.Position(4, "@back texture/g".length);
+    const ktxCompletions = await executeCompletions(document.uri, ktxPosition, 20);
+    const ktx = ktxCompletions.items.find((item) => completionLabel(item) === "texture/gpu");
+    assert.ok(ktx, "KTX2 remains an image completion");
+    assert.match(completionDocumentation(ktx), /KTX2.*不支持直接显示/su);
+    assert.doesNotMatch(completionDocumentation(ktx), /<img/u);
+
+    const emptyCompletions = await executeCompletions(
+      document.uri,
+      new vscode.Position(5, "@back ".length),
+      0
+    );
+    const lastParam = emptyCompletions.items.reduce(
+      (last, item, index) => item.kind === vscode.CompletionItemKind.Property ? index : last,
+      -1
+    );
+    const firstResource = emptyCompletions.items.findIndex(
+      (item) => item.kind === vscode.CompletionItemKind.File
+    );
+    assert.ok(lastParam >= 0, "@back exposes authored parameters");
+    assert.ok(firstResource > lastParam, "all parameters are displayed before image resources");
+
+    const ktxHover = await executeHover(document.uri, new vscode.Position(2, "@back texture/".length + 2));
+    assert.match(ktxHover, /KTX2.*不支持直接显示/su);
+    assert.equal(
+      vscode.languages.getDiagnostics(document.uri).some((diagnostic) => diagnostic.source === "asset-preview"),
+      false
+    );
+  });
+
   test("refreshes missing-asset diagnostics after create and rename without a command", async () => {
     const fixture = await createResourceFixture("refresh.nani", "#Start\n@back bg/new");
     const document = await vscode.workspace.openTextDocument(fixture.storyUri);
@@ -640,6 +714,9 @@ async function createResourceFixture(fileName: string, source: string): Promise<
   appUri: vscode.Uri;
   storyUri: vscode.Uri;
   bgmUri: vscode.Uri;
+  imageUri: vscode.Uri;
+  ktxUri: vscode.Uri;
+  png: Buffer;
   configUri: vscode.Uri;
   naniConfigUri: vscode.Uri;
   assetConfigSource: string;
@@ -650,17 +727,24 @@ async function createResourceFixture(fileName: string, source: string): Promise<
   const appUri = vscode.Uri.joinPath(workspaceFolder.uri, `resource-${fileName.replace(/\W/gu, "-")}`);
   const storyUri = vscode.Uri.joinPath(appUri, `nani/${fileName}`);
   const bgmUri = vscode.Uri.joinPath(appUri, "assets/bgm/main.ogg");
+  const imageUri = vscode.Uri.joinPath(appUri, "assets/ui/dialog-frame.png");
+  const ktxUri = vscode.Uri.joinPath(appUri, "assets/texture/gpu.ktx2");
   const configUri = vscode.Uri.joinPath(appUri, "asset.config.mjs");
   const naniConfigUri = vscode.Uri.joinPath(appUri, "nani.config.mjs");
   await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "nani"));
   await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "assets/bg"));
   await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "assets/bgm"));
   await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "assets/misc"));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "assets/ui"));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "assets/texture"));
   await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "src"));
   await writeWorkspaceFile("pnpm-workspace.yaml", "packages: []\n");
   await vscode.workspace.fs.writeFile(storyUri, Buffer.from(source));
   await vscode.workspace.fs.writeFile(bgmUri, Buffer.from("ogg"));
-  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(appUri, "assets/misc/not-audio.png"), Buffer.from("png"));
+  const png = onePixelPng();
+  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(appUri, "assets/misc/not-audio.png"), png);
+  await vscode.workspace.fs.writeFile(imageUri, png);
+  await vscode.workspace.fs.writeFile(ktxUri, Buffer.from("ktx2"));
   const assetConfigSource = `export default ${JSON.stringify({
       appId: "example",
       root: "assets",
@@ -683,7 +767,25 @@ async function createResourceFixture(fileName: string, source: string): Promise<
     }, null, 2)};\n`;
   await vscode.workspace.fs.writeFile(naniConfigUri, Buffer.from(naniConfigSource));
   await vscode.commands.executeCommand("v-ronpa-nani.refreshProjectAssets");
-  return { appUri, storyUri, bgmUri, configUri, naniConfigUri, assetConfigSource, naniConfigSource };
+  return {
+    appUri,
+    storyUri,
+    bgmUri,
+    imageUri,
+    ktxUri,
+    png,
+    configUri,
+    naniConfigUri,
+    assetConfigSource,
+    naniConfigSource
+  };
+}
+
+function onePixelPng(): Buffer {
+  return Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lBY8WQAAAABJRU5ErkJggg==",
+    "base64"
+  );
 }
 
 async function createNavigationFixture(duplicate = false): Promise<{

@@ -23,6 +23,12 @@ VS Code language support for V-Ronpa `.nani` scripts.
 - Completes non-loading `@stopBgm` and `@stopSfx` path selectors from authoring-only shared catalog metadata without adding asset requirements.
 - Publishes extension-owned `nani-assets` errors for invalid, missing, wrong-capability, and unbound-character static references; dynamic expressions, media groups, and character wildcards remain unguessed.
 - Resolves valid App asset hover details and Cmd/Ctrl+click definitions to source files.
+- Lazily previews every selected PNG, WebP, or AVIF App image completion in a
+  fixed 320x180 contain frame, regardless of its AssetId folder; KTX2 remains
+  discoverable with an explicit unsupported-preview notice.
+- Shows the same fixed image preview when hovering an authored static image
+  AssetId, while retaining the existing AssetId, MIME, capability, and URI
+  details.
 - Provides PinP-aware completion for show and `visible:false` hide forms, plus current FontFaceId highlighting, snippet, hover, and parser-owned format diagnostics.
 - Completes layered-character expression tokens from the matching `compositions.json`, including comma-separated `@char` and `@slide` expressions.
 - Renders a native 320x420 hover preview when the pointer is over the static identity value of an `@char` command.
@@ -113,6 +119,35 @@ Directories organize AssetIds but do not imply capability. Capability filtering
 uses MIME only. Font files can be scanned by the App asset project, but Nani has
 no FontFace registry slot: the extension supports the existing rich-text
 FontFaceId syntax without inventing registered-face completion or definition.
+
+## Image Asset Preview
+
+Image completion and hover use the current App asset index directly. Commands
+such as `@back`, `@inback`, and `@pinp` request the shared `image` capability;
+they do not require a `bg/`, `ui/`, or other directory prefix. With an empty
+primary value, IntelliSense offers every registered image in the App. Text
+already typed by the author is the only AssetId prefix filter.
+
+At an empty resource position, command parameters are grouped before App
+resources. Once any AssetId prefix is typed, IntelliSense switches to matching
+resources only. This keeps common parameters immediately accessible while a
+short folder prefix such as `ui/` or `bg/` focuses asset lookup without mixed
+parameter rows.
+
+Selecting a PNG, WebP, or AVIF completion lazily creates a content-addressed SVG
+under VS Code extension storage. The preview uses a fixed 320x180 checkerboard
+frame with eight pixels of padding and `contain` placement, so the complete
+image remains centered without stretching or cropping. Hovering the same
+static AssetId reuses that artifact. Creating or filtering the completion list
+does not read image bytes.
+
+KTX2 remains a valid `image` capability and therefore remains in completion and
+diagnostic resolution. VS Code cannot display it as a native image, so its
+completion and hover documentation state that direct preview is unsupported.
+Missing, changed, or malformed preview files produce a warning in the
+**V-Ronpa Nani** output channel and never add a Problems diagnostic. Character
+bundle layer PNGs are opaque bundle internals rather than independent App
+AssetIds and continue to use the separate character assembly preview.
 
 ## Character Assembly Preview
 

@@ -5,9 +5,15 @@ import type { NaniProjectAssetIndex } from "./projectAssets";
 const projectAssets: NaniProjectAssetIndex = {
   assets: [
     { id: "char/alice", mimeType: "application/json", uri: "assets/char/alice/character.json", sourcePath: "/assets/char/alice/character.json" },
+    { id: "home", mimeType: "image/png", uri: "assets/home.png", sourcePath: "/assets/home.png" },
     { id: "bg/hall", mimeType: "image/png", uri: "assets/bg/hall.png", sourcePath: "/assets/bg/hall.png" },
+    { id: "bg/rain", mimeType: "audio/ogg", uri: "assets/bg/rain.ogg", sourcePath: "/assets/bg/rain.ogg" },
     { id: "bgm/main", mimeType: "audio/ogg", uri: "assets/bgm/main.ogg", sourcePath: "/assets/bgm/main.ogg" },
+    { id: "custom/deep/card", mimeType: "image/webp", uri: "assets/custom/deep/card.webp", sourcePath: "/assets/custom/deep/card.webp" },
     { id: "sfx/door", mimeType: "audio/ogg", uri: "assets/sfx/door.ogg", sourcePath: "/assets/sfx/door.ogg" },
+    { id: "sfx/icon", mimeType: "image/avif", uri: "assets/sfx/icon.avif", sourcePath: "/assets/sfx/icon.avif" },
+    { id: "texture/gpu", mimeType: "image/ktx2", uri: "assets/texture/gpu.ktx2", sourcePath: "/assets/texture/gpu.ktx2" },
+    { id: "ui/dialog-frame", mimeType: "image/png", uri: "assets/ui/dialog-frame.png", sourcePath: "/assets/ui/dialog-frame.png" },
     { id: "video/intro", mimeType: "video/mp4", uri: "assets/video/intro.mp4", sourcePath: "/assets/video/intro.mp4" }
   ],
   characters: [{ characterId: "alice", assetId: "char/alice" }],
@@ -44,6 +50,70 @@ describe("project resource completions", () => {
         end: { line: 0, character: named.length }
       }
     });
+  });
+
+  it("offers every image regardless of folder and only applies user-entered prefix filtering", () => {
+    const source = "@back ";
+    const completions = getNaniCompletions(source, { line: 0, character: source.length }, projectAssets);
+    const resources = completions.filter((completion) => completion.kind === "resource");
+
+    expect(resources.map((completion) => completion.label)).toEqual([
+      "home",
+      "bg/hall",
+      "custom/deep/card",
+      "sfx/icon",
+      "texture/gpu",
+      "ui/dialog-frame"
+    ]);
+    expect(resources.map((completion) => completion.label)).not.toContain("bg/rain");
+    expect(resources.every((completion) => completion.deferredDocumentation?.kind === "asset-image")).toBe(true);
+
+    const prefixed = "@back ui/";
+    expect(getNaniCompletions(prefixed, { line: 0, character: prefixed.length }, projectAssets)
+      .map((completion) => completion.label)).toEqual(["ui/dialog-frame"]);
+  });
+
+  it("keeps parameters ahead of resources at an empty resource slot", () => {
+    const source = "@back ";
+    const completions = getNaniCompletions(source, { line: 0, character: source.length }, projectAssets);
+    const displayed = [...completions].sort((left, right) =>
+      (left.sortText ?? left.label).localeCompare(right.sortText ?? right.label)
+    );
+    const lastParam = displayed.reduce(
+      (last, completion, index) => completion.kind === "param" ? index : last,
+      -1
+    );
+    const firstResource = displayed.findIndex((completion) => completion.kind === "resource");
+    const returnedFirstResource = completions.findIndex((completion) => completion.kind === "resource");
+
+    expect(lastParam).toBeGreaterThanOrEqual(0);
+    expect(firstResource).toBeGreaterThan(lastParam);
+    expect(completions.slice(0, returnedFirstResource).every((completion) => completion.kind !== "resource")).toBe(true);
+    expect(displayed.filter((completion) => completion.kind === "param").every((completion) =>
+      completion.sortText?.startsWith("00-param-")
+    )).toBe(true);
+    expect(displayed.filter((completion) => completion.kind === "resource").every((completion) =>
+      completion.sortText?.startsWith("20-resource-")
+    )).toBe(true);
+  });
+
+  it("marks every scanner image MIME for deferred preview without marking non-images", () => {
+    const imageSource = "@back ";
+    const images = getNaniCompletions(imageSource, { line: 0, character: imageSource.length }, projectAssets)
+      .filter((completion) => completion.kind === "resource");
+    expect(images.map((completion) => completion.deferredDocumentation)).toEqual([
+      { kind: "asset-image", assetId: "home" },
+      { kind: "asset-image", assetId: "bg/hall" },
+      { kind: "asset-image", assetId: "custom/deep/card" },
+      { kind: "asset-image", assetId: "sfx/icon" },
+      { kind: "asset-image", assetId: "texture/gpu" },
+      { kind: "asset-image", assetId: "ui/dialog-frame" }
+    ]);
+
+    const audioSource = "@bgm ";
+    const audio = getNaniCompletions(audioSource, { line: 0, character: audioSource.length }, projectAssets)
+      .filter((completion) => completion.kind === "resource");
+    expect(audio.every((completion) => completion.deferredDocumentation === undefined)).toBe(true);
   });
 
   it("completes a primary resource after already-entered named params", () => {

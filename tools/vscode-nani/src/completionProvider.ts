@@ -44,7 +44,8 @@ export function getNaniCompletions(
   const resourceCompletions: NaniCompletion[] = (resources?.completions ?? []).map((completion) => ({
     ...completion,
     kind: "resource",
-    isSnippet: false
+    isSnippet: false,
+    sortText: `20-resource-${completion.sortText}`
   }));
 
   if (resources && !resources.combineWithParams) return resourceCompletions;
@@ -128,7 +129,7 @@ export function getNaniCompletions(
       detail: fact.detail,
       documentation: fact.documentation,
       isSnippet: fact.isSnippet,
-      sortText: fact.sortText
+      sortText: resources ? `00-param-${fact.sortText}` : fact.sortText
     }));
     const primaryFacts = context.primaryCandidate
       ? primaryValueCompletionFacts(context.commandId)
@@ -145,12 +146,14 @@ export function getNaniCompletions(
         detail: `${fact.detail} · primary`,
         documentation: fact.documentation,
         isSnippet: false,
-        sortText: `0-primary-${fact.sortText}`
+        sortText: resources ? `10-primary-${fact.sortText}` : `0-primary-${fact.sortText}`
       }));
     if (context.primaryCandidate?.prefix && primaryFacts.length > 0) {
       return primaryCompletions;
     }
-    return [...resourceCompletions, ...primaryCompletions, ...paramCompletions];
+    return resources
+      ? [...paramCompletions, ...primaryCompletions, ...resourceCompletions]
+      : [...primaryCompletions, ...paramCompletions];
   }
 
   if (context.kind === "param-value") {

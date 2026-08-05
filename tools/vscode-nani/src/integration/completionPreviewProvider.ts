@@ -14,6 +14,22 @@ import type {
 } from "../language/register";
 import type { NaniProjectContextService } from "../project-resources";
 
+export class CompositeCompletionDocumentationProvider
+implements DeferredCompletionDocumentationProvider {
+  constructor(private readonly providers: readonly DeferredCompletionDocumentationProvider[]) {}
+
+  async provideCompletionDocumentation(
+    context: DeferredCompletionDocumentationContext,
+    token: vscode.CancellationToken
+  ): Promise<vscode.MarkdownString | undefined> {
+    for (const provider of this.providers) {
+      const documentation = await provider.provideCompletionDocumentation(context, token);
+      if (documentation || token.isCancellationRequested) return documentation;
+    }
+    return undefined;
+  }
+}
+
 export class CharacterCompletionPreviewProvider
 implements DeferredCompletionDocumentationProvider, vscode.Disposable {
   private resourceGeneration = 0;

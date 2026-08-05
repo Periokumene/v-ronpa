@@ -4,11 +4,13 @@ import { rangeContainsCharacter } from "../character-preview/requestExtractor";
 import { provideLanguageHover } from "../language/hover";
 import { NANI_LANGUAGE_ID } from "../languageFacts";
 import type { NaniProjectContextService } from "../projectContextService";
+import type { NaniAssetHoverPreviewProvider } from "../language/hover";
 
 export function registerHoverCoordinator(
   context: vscode.ExtensionContext,
   characterPreview: CharacterPreviewController,
-  project: NaniProjectContextService
+  project: NaniProjectContextService,
+  assetPreview?: NaniAssetHoverPreviewProvider
 ): void {
   context.subscriptions.push(
     vscode.languages.registerHoverProvider(
@@ -20,7 +22,7 @@ export function registerHoverCoordinator(
           if (target && range && rangeContainsCharacter(range, position.character)) {
             return characterPreview.provideHover(document, target, token);
           }
-          return provideLanguageHover(document, position, project);
+          return provideLanguageHover(document, position, project, assetPreview, token);
         }
       }
     ),

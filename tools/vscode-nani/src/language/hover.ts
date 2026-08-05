@@ -1,17 +1,30 @@
 import * as vscode from "vscode";
 import { getNaniHover } from "../hoverProvider";
 import type { NaniProjectContextService } from "../projectContextService";
+import type { NaniProjectAsset } from "../projectAssets";
 import { resolveNaniAssetReferenceAtOffset } from "../resourceReferences";
+
+export interface NaniAssetHoverPreviewProvider {
+  appendAssetHoverPreview(
+    markdown: vscode.MarkdownString,
+    documentUri: vscode.Uri,
+    asset: NaniProjectAsset,
+    token: vscode.CancellationToken
+  ): Promise<void>;
+}
 
 export async function provideLanguageHover(
   document: vscode.TextDocument,
   position: vscode.Position,
-  project?: NaniProjectContextService
+  project: NaniProjectContextService,
+  assetPreview: NaniAssetHoverPreviewProvider | undefined,
+  token: vscode.CancellationToken
 ): Promise<vscode.Hover | undefined> {
-  const [snapshot, loadedAssets] = project
-    ? await Promise.all([project.getSnapshot(document.uri), project.getLoaded(document.uri)])
-    : [undefined, undefined] as const;
-  const navigation = snapshot && project?.isCurrent(snapshot)
+  const [snapshot, loadedAssets] = await Promise.all([
+    project.getSnapshot(document.uri),
+    project.getLoaded(document.uri)
+  ]);
+  const navigation = snapshot && project.isCurrent(snapshot)
     ? snapshot.analysis.navigation
     : undefined;
   if (loadedAssets) {
@@ -29,14 +42,19 @@ export async function provideLanguageHover(
       const identity = reference.characterId
         ? `Character: \`${reference.characterId}\`\n\nAssetId: \`${reference.assetId}\``
         : `AssetId: \`${reference.assetId}\``;
-      return new vscode.Hover(new vscode.MarkdownString([
+      const markdown = new vscode.MarkdownString([
         `**Nani App asset · ${reference.usage}**`,
         "",
         identity,
         `MIME: \`${reference.asset.mimeType}\``,
         `Capability: \`${reference.capability}\``,
         `URI: \`${reference.asset.uri}\``
-      ].join("\n\n")), range);
+      ].join("\n\n"));
+      if (assetPreview) {
+        await assetPreview.appendAssetHoverPreview(markdown, document.uri, reference.asset, token);
+        if (token.isCancellationRequested) return undefined;
+      }
+      return new vscode.Hover(markdown, range);
     }
   }
   const hover = getNaniHover(document.getText(), {

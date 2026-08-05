@@ -14,12 +14,17 @@ export interface NaniResourceCompletion {
   sortText: string;
 }
 
-export interface NaniDeferredCompletionDocumentation {
-  kind: "character-appearance-token";
-  characterId: string;
-  baseAppearanceExpression: string;
-  candidateToken: string;
-}
+export type NaniDeferredCompletionDocumentation =
+  | {
+      kind: "character-appearance-token";
+      characterId: string;
+      baseAppearanceExpression: string;
+      candidateToken: string;
+    }
+  | {
+      kind: "asset-image";
+      assetId: string;
+    };
 
 export interface NaniResourceCompletionResult {
   completions: NaniResourceCompletion[];
@@ -122,6 +127,12 @@ function resourceResult(
         range: range(line, start, end),
         detail: `${asset.mimeType} · App asset · ${resourceSlot.usage}`,
         documentation: asset.uri,
+        ...(asset.mimeType.startsWith("image/") ? {
+          deferredDocumentation: {
+            kind: "asset-image" as const,
+            assetId: asset.id
+          }
+        } : {}),
         sortText: `0-${assetIndex.toString().padStart(4, "0")}`
       })),
     combineWithParams

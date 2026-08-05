@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.9.1
+
+- Grouped resource-bearing command completions into stable sort bands: normal
+  parameters and flags appear before primary fixed values and App resources.
+- Kept typed resource prefixes focused exclusively on matching assets, so a
+  short folder prefix immediately removes parameters from the completion list.
+- Added unit and Extension Host coverage for the final VS Code display order.
+
+## 0.9.0
+
+- Added lazy native IntelliSense previews for every App image completion without
+  imposing an AssetId folder convention.
+- Added the same fixed 320x180 contain preview to static image AssetId hovers;
+  PNG, WebP, and AVIF render directly while KTX2 remains discoverable with an
+  explicit unsupported-preview notice.
+- Added content-addressed asset preview SVG storage, project invalidation,
+  stale-result rejection, and graceful output-channel failures without adding
+  Problems diagnostics.
+- Kept image discovery MIME-driven: root assets and arbitrary nested folders
+  are treated equally, and opaque character layers remain outside the App asset
+  completion index.
+
 ## 0.8.0
 
 - Added one coherent project context for asset scanning, script analysis,
