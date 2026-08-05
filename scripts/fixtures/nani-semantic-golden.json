@@ -94,13 +94,13 @@
     "harness-showcase": {
       "sourceFile": "apps/game-harness/src/nani/harness-showcase.nani",
       "scriptPath": "harness/harness-showcase.nani",
-      "sourceSha256": "9b9fb7dda57d3e91cc74782f3e2b65e38e445ffb396b9dab2b017892af8a48d0",
-      "sourceUtf16Length": 16702,
+      "sourceSha256": "0bcb863541d80842d9e830a7a71f0cded776ac6bce83607b306fb3477c9cf90a",
+      "sourceUtf16Length": 16703,
       "statementCount": 284,
       "commandCount": 273,
-      "scenarioIRSha256": "bb0464db3bbab7dac9ad757a62350c97e76f597326ab6e4eb0b1ae82836fcef0",
+      "scenarioIRSha256": "3768f204f9876ce14d991c26c058ee6d013b74608df3be3adfc2cb7a08833306",
       "parserDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "runtimeScriptSha256": "b92161fcd0d01892361fbb8b4cb9d4acd0df998e1cc25e517737d9a785ab8f34",
+      "runtimeScriptSha256": "49b06665275dcb66cf8882e0f1098ad0d8cff1e322fe13a1c9577e378304146a",
       "compilerDiagnosticsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "dependenciesSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     }
@@ -135,8 +135,8 @@
       "voiceIndexSha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
     },
     "harness/harness-showcase.nani": {
-      "scriptRevision": "sha256:686da7ba8f1d3f640f1a35e06950b032987e8647a78d111cf96b90e708d8df60",
-      "metadataSha256": "0a4f3398202525ad8427b1516d610cf2956f986773f933f00d4de3f1ae143854",
+      "scriptRevision": "sha256:d7a0a7d10410545a49ce776d6664aacada43251d6407199fb478cc626a1ad69d",
+      "metadataSha256": "ca696656faa1f2fedca3d7d62aed719efee7a877703d626ef90fb7d58eda5e3b",
       "requirementsSha256": "6924136f19195bb763fdc220a50249b650c8f854f46b0f2666c19f8aec93366e",
       "characterPreloadPlanSha256": "7b8efb3d0fffba81c10c7a81362b1206c58f0f3ede2ebd5910e5e6467562b440",
       "voiceIndexSha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
