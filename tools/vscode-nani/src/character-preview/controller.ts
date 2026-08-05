@@ -112,28 +112,31 @@ export class CharacterPreviewController implements vscode.Disposable {
     request: CharacterPreviewRequest
   ): Promise<LastValidPreview | undefined> {
     const key = characterPreviewRequestKey(request);
-    const resourceGeneration = this.resourceGeneration;
-    try {
-      const descriptor = await this.projectAssets.getCharacterPackDescriptor(document.uri, request.characterId);
-      if (!descriptor) {
-        throw new Error(`未在当前项目的生成资产中找到角色 '${request.characterId}'。`);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const resourceGeneration = this.resourceGeneration;
+      try {
+        const descriptor = await this.projectAssets.getCharacterPackDescriptor(document.uri, request.characterId);
+        if (!descriptor) {
+          throw new Error(`未在当前项目的生成资产中找到角色 '${request.characterId}'。`);
+        }
+        if (resourceGeneration !== this.resourceGeneration) continue;
+        const artifact = await this.engine.generate(request, descriptor);
+        if (resourceGeneration !== this.resourceGeneration) continue;
+        if (!this.requestIsCurrent(document, request, key)) return undefined;
+        const current = { request, artifact };
+        this.setLast(document.uri, request.line, current);
+        this.clearFailure(document.uri, request.line);
+        return current;
+      } catch (error) {
+        const message = errorMessage(error);
+        if (resourceGeneration === this.resourceGeneration && this.requestIsCurrent(document, request, key)) {
+          this.setFailure(document.uri, request.line, { key, message });
+        }
+        this.output.appendLine(`[char-preview] ${document.uri.toString()}:${request.line + 1} ${message}`);
+        throw error;
       }
-      if (resourceGeneration !== this.resourceGeneration) return undefined;
-      const artifact = await this.engine.generate(request, descriptor);
-      if (resourceGeneration !== this.resourceGeneration) return undefined;
-      if (!this.requestIsCurrent(document, request, key)) return undefined;
-      const current = { request, artifact };
-      this.setLast(document.uri, request.line, current);
-      this.clearFailure(document.uri, request.line);
-      return current;
-    } catch (error) {
-      const message = errorMessage(error);
-      if (resourceGeneration === this.resourceGeneration && this.requestIsCurrent(document, request, key)) {
-        this.setFailure(document.uri, request.line, { key, message });
-      }
-      this.output.appendLine(`[char-preview] ${document.uri.toString()}:${request.line + 1} ${message}`);
-      throw error;
     }
+    return undefined;
   }
 
   private requestIsCurrent(
