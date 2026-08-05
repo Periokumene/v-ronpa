@@ -11,8 +11,9 @@ import {
 } from "../diagnostics";
 import { NANI_LANGUAGE_ID } from "../languageFacts";
 import { offsetRange } from "../navigationAnalysis";
-import type { NaniProjectAssetService } from "../project-resources";
-import type { NaniProjectScriptService } from "../projectScriptService";
+import type { NaniProjectContextService } from "../projectContextService";
+import { computeNaniAssetDiagnostics } from "../resourceReferences";
+import type { NaniProjectAssetIndex } from "../projectAssets";
 
 export interface DeferredCompletionDocumentationContext {
   documentUri: vscode.Uri;
@@ -31,8 +32,7 @@ export interface DeferredCompletionDocumentationProvider {
 
 export function registerLanguageFeatures(
   context: vscode.ExtensionContext,
-  projectAssets: NaniProjectAssetService,
-  projectScripts: NaniProjectScriptService,
+  project: NaniProjectContextService,
   output: vscode.OutputChannel,
   deferredDocumentationProvider?: DeferredCompletionDocumentationProvider
 ): void {
@@ -42,10 +42,10 @@ export function registerLanguageFeatures(
   const completionProvider: vscode.CompletionItemProvider<NaniVscodeCompletionItem> = {
     async provideCompletionItems(document, position) {
       const [assetIndex, snapshot] = await Promise.all([
-        projectAssets.getIndex(document.uri),
-        projectScripts.getSnapshot(document.uri)
+        project.getIndex(document.uri),
+        project.getSnapshot(document.uri)
       ]);
-      const navigation = snapshot && projectScripts.isCurrent(snapshot)
+      const navigation = snapshot && project.isCurrent(snapshot)
         ? snapshot.analysis.navigation
         : undefined;
       return getNaniCompletions(document.getText(), {
@@ -78,13 +78,13 @@ export function registerLanguageFeatures(
     vscode.languages.registerCompletionItemProvider(
       { language: NANI_LANGUAGE_ID },
       completionProvider,
-      "@", " ", ":", "#", "[", "!", ".", ","
+      "@", " ", ":", "#", "[", "!", ".", ",", "<"
     ),
     vscode.workspace.onDidOpenTextDocument(
       (document) => void refreshDiagnostics(
         document,
         diagnostics,
-        projectScripts,
+        project,
         catalogDiagnosticUris,
         output
       )
@@ -94,7 +94,7 @@ export function registerLanguageFeatures(
         event.document,
         diagnostics,
         timers,
-        projectScripts,
+        project,
         catalogDiagnosticUris,
         output
       )
@@ -104,12 +104,12 @@ export function registerLanguageFeatures(
       void refreshDiagnostics(
         document,
         diagnostics,
-        projectScripts,
+        project,
         catalogDiagnosticUris,
         output
       );
     }),
-    projectScripts.onDidInvalidate(() => {
+    project.onDidInvalidate(() => {
       for (const uri of catalogDiagnosticUris) diagnostics.delete(vscode.Uri.parse(uri));
       catalogDiagnosticUris.clear();
       for (const document of vscode.workspace.textDocuments) {
@@ -117,7 +117,7 @@ export function registerLanguageFeatures(
           document,
           diagnostics,
           timers,
-          projectScripts,
+          project,
           catalogDiagnosticUris,
           output
         );
@@ -128,7 +128,7 @@ export function registerLanguageFeatures(
     void refreshDiagnostics(
       document,
       diagnostics,
-      projectScripts,
+      project,
       catalogDiagnosticUris,
       output
     );
@@ -139,7 +139,7 @@ function scheduleDiagnostics(
   document: vscode.TextDocument,
   diagnostics: vscode.DiagnosticCollection,
   timers: Map<string, ReturnType<typeof setTimeout>>,
-  projectScripts: NaniProjectScriptService,
+  project: NaniProjectContextService,
   catalogDiagnosticUris: Set<string>,
   output: vscode.OutputChannel
 ): void {
@@ -151,7 +151,7 @@ function scheduleDiagnostics(
     void refreshDiagnostics(
       document,
       diagnostics,
-      projectScripts,
+      project,
       catalogDiagnosticUris,
       output
     );
@@ -172,7 +172,7 @@ function clearScheduledDiagnostic(
 async function refreshDiagnostics(
   document: vscode.TextDocument,
   diagnostics: vscode.DiagnosticCollection,
-  projectScripts: NaniProjectScriptService,
+  project: NaniProjectContextService,
   catalogDiagnosticUris: Set<string>,
   output: vscode.OutputChannel
 ): Promise<void> {
@@ -181,11 +181,14 @@ async function refreshDiagnostics(
   const sourceText = document.getText();
   await Promise.resolve();
   try {
-    const snapshot = await projectScripts.getSnapshot(document.uri);
+    const [snapshot, loadedAssets] = await Promise.all([
+      project.getSnapshot(document.uri),
+      project.getLoaded(document.uri)
+    ]);
     if (snapshot) {
-      if (!projectScripts.isCurrent(snapshot)) return;
-      const publications = await mapCatalogDiagnostics(snapshot);
-      if (!projectScripts.isCurrent(snapshot)) return;
+      if (!project.isCurrent(snapshot)) return;
+      const publications = await mapCatalogDiagnostics(snapshot, loadedAssets?.index);
+      if (!project.isCurrent(snapshot)) return;
       for (const [uri, mapped] of publications) {
         diagnostics.set(uri, mapped);
         catalogDiagnosticUris.add(uri.toString());
@@ -197,7 +200,10 @@ async function refreshDiagnostics(
       return;
     }
     const scriptPath = document.uri.fsPath || document.uri.toString();
-    const computed = computeNaniDiagnostics(sourceText, scriptPath);
+    const computed = [
+      ...computeNaniDiagnostics(sourceText, scriptPath),
+      ...(loadedAssets ? computeNaniAssetDiagnostics(sourceText, scriptPath, loadedAssets.index) : [])
+    ];
     if (document.isClosed || document.version !== version) return;
     const mapped = computed.map((diagnostic) => toVscodeDiagnostic(document, diagnostic, sourceText.length));
     if (document.isClosed || document.version !== version) return;
@@ -214,14 +220,19 @@ async function refreshDiagnostics(
 }
 
 async function mapCatalogDiagnostics(
-  snapshot: import("../projectScriptService").NaniCatalogSnapshot
+  snapshot: import("../projectScriptService").NaniCatalogSnapshot,
+  assetIndex?: NaniProjectAssetIndex
 ): Promise<Array<readonly [vscode.Uri, vscode.Diagnostic[]]>> {
   const publications: Array<readonly [vscode.Uri, vscode.Diagnostic[]]> = [];
   for (const [scriptPath, computed] of snapshot.analysis.diagnosticsByScriptPath) {
     const uri = snapshot.sourceUrisByPath.get(scriptPath);
     const sourceText = snapshot.sourceTextsByPath.get(scriptPath);
     if (!uri || sourceText === undefined) continue;
-    const mapped = computed.map((diagnostic) =>
+    const combined = [
+      ...computed,
+      ...(assetIndex ? computeNaniAssetDiagnostics(sourceText, scriptPath, assetIndex) : [])
+    ];
+    const mapped = combined.map((diagnostic) =>
       toVscodeDiagnosticFromSourceText(sourceText, diagnostic)
     );
     publications.push([uri, mapped]);

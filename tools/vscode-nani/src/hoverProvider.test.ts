@@ -85,6 +85,19 @@ describe("hover provider logic", () => {
     expect(escaped).toBeUndefined();
   });
 
+  it("documents current rich-text FontFaceIds without inventing a registry", () => {
+    const source = 'Felix: <font color="#fff" face="serif">Hello</font>';
+    const hover = getNaniHover(source, { line: 0, character: source.indexOf("serif") + 2 });
+
+    expect(hover?.contents).toContain("FontFaceId");
+    expect(hover?.contents).toContain("`serif`");
+    expect(hover?.contents).toContain("App manifest");
+    expect(hover?.range).toEqual({
+      start: { line: 0, character: source.indexOf("serif") },
+      end: { line: 0, character: source.indexOf("serif") + "serif".length }
+    });
+  });
+
   it("derives Cue and HideCue command, primary, and boolean docs from the catalog", () => {
     const cue = getNaniHover('@cue "Hello" autoNext!', { line: 0, character: 2 });
     const primary = getNaniHover('@cue "Hello" autoNext!', { line: 0, character: 8 });

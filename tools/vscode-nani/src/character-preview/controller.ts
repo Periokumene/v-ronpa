@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 import * as vscode from "vscode";
-import type { NaniProjectAssetService } from "../project-resources";
+import type { NaniProjectContextService } from "../project-resources";
 import { CharacterPreviewEngine } from "./engine";
 import {
   characterPreviewRequestKey,
@@ -30,7 +30,7 @@ export class CharacterPreviewController implements vscode.Disposable {
 
   constructor(
     private readonly engine: CharacterPreviewEngine,
-    private readonly projectAssets: NaniProjectAssetService,
+    private readonly projectAssets: NaniProjectContextService,
     private readonly output: vscode.OutputChannel
   ) {
     this.disposables.push(

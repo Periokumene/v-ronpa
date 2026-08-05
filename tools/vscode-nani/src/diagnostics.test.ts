@@ -57,6 +57,17 @@ describe("diagnostics", () => {
     expectExactSlice(source, diagnostic, "not-a-color");
   });
 
+  it("uses the shared FontFaceId diagnostic for legacy colon identities", () => {
+    const source = 'Felix: <font face="font:serif">Legacy</font>';
+    const diagnostic = requiredDiagnostic(
+      computeNaniDiagnostics(source, "font-face.nani"),
+      (candidate) => candidate.message.includes("Invalid rich text font face")
+    );
+
+    expect(diagnostic).toMatchObject({ source: "nani", code: "invalid-rich-text" });
+    expectExactSlice(source, diagnostic, "font:serif");
+  });
+
   it("keeps an unknown-command compiler diagnostic on the command name", () => {
     const source = "@bogus value";
     const diagnostic = requiredDiagnostic(

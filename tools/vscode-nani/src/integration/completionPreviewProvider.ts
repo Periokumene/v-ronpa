@@ -12,7 +12,7 @@ import type {
   DeferredCompletionDocumentationContext,
   DeferredCompletionDocumentationProvider
 } from "../language/register";
-import type { NaniProjectAssetService } from "../project-resources";
+import type { NaniProjectContextService } from "../project-resources";
 
 export class CharacterCompletionPreviewProvider
 implements DeferredCompletionDocumentationProvider, vscode.Disposable {
@@ -21,7 +21,7 @@ implements DeferredCompletionDocumentationProvider, vscode.Disposable {
 
   constructor(
     private readonly engine: CharacterPreviewEngine,
-    private readonly projectAssets: NaniProjectAssetService,
+    private readonly projectAssets: NaniProjectContextService,
     private readonly output: vscode.OutputChannel
   ) {
     this.invalidationSubscription = projectAssets.onDidInvalidate(() => {

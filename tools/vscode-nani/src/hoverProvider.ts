@@ -30,10 +30,29 @@ export function getNaniHover(
   position: NaniPosition,
   navigation?: NaniNavigationIndex
 ): NaniHover | undefined {
+  const line = lineAt(sourceText, position.line);
+  const fontFace = richTextFontFaceHover(line, position);
+  if (fontFace) return fontFace;
   const endpoint = navigationEndpointHover(sourceText, position, navigation);
   if (endpoint) return endpoint;
-  const line = lineAt(sourceText, position.line);
   return inlineHover(line, position) ?? commandLineHover(line, position);
+}
+
+function richTextFontFaceHover(line: string, position: NaniPosition): NaniHover | undefined {
+  for (const match of line.matchAll(/<font\b[^>]*\bface\s*=\s*(?:"([a-z0-9]+(?:-[a-z0-9]+)*)"|'([a-z0-9]+(?:-[a-z0-9]+)*)'|([a-z0-9]+(?:-[a-z0-9]+)*))/giu)) {
+    const face = match[1] ?? match[2] ?? match[3];
+    if (!face) continue;
+    const start = (match.index ?? 0) + match[0].lastIndexOf(face);
+    const end = start + face.length;
+    if (position.character < start || position.character > end) continue;
+    return hover(
+      position.line,
+      start,
+      end,
+      `**FontFaceId** \`${face}\`\n\n使用小写 kebab-case 字体身份；字体来源由 App manifest 注册。`
+    );
+  }
+  return undefined;
 }
 
 function navigationEndpointHover(

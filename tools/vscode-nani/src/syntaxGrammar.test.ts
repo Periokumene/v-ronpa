@@ -55,4 +55,19 @@ describe("Nani TextMate navigation scopes", () => {
       "#inlineCompactStageStop"
     ]));
   });
+
+  it("scopes current rich-text FontFaceIds in every story text surface", () => {
+    const grammar = JSON.parse(
+      readFileSync(join(process.cwd(), "syntaxes/nani.tmLanguage.json"), "utf8")
+    ) as {
+      repository: Record<string, {
+        patterns?: readonly { include?: string; captures?: Record<string, { name: string }> }[];
+      }>;
+    };
+    const fontPatterns = grammar.repository.richTextFontFace?.patterns ?? [];
+    expect(fontPatterns[0]?.captures?.["3"]?.name).toBe("entity.name.type.font-face.nani");
+    for (const key of ["dialogue", "storyString", "storyTextValue"]) {
+      expect(JSON.stringify(grammar.repository[key])).toContain("#richTextFontFace");
+    }
+  });
 });

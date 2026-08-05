@@ -143,6 +143,9 @@
       "end": "$",
       "patterns": [
         {
+          "include": "#richTextFontFace"
+        },
+        {
           "include": "#textId"
         },
         {
@@ -391,6 +394,9 @@
               "name": "constant.character.escape.nani"
             },
             {
+              "include": "#richTextFontFace"
+            },
+            {
               "include": "#inlineStageStop"
             },
             {
@@ -406,6 +412,9 @@
             {
               "match": "\\\\.",
               "name": "constant.character.escape.nani"
+            },
+            {
+              "include": "#richTextFontFace"
             },
             {
               "include": "#inlineStageStop"
@@ -445,6 +454,9 @@
               "name": "constant.character.escape.nani"
             },
             {
+              "include": "#richTextFontFace"
+            },
+            {
               "include": "#inlineStageStop"
             },
             {
@@ -478,12 +490,49 @@
               "name": "constant.character.escape.nani"
             },
             {
+              "include": "#richTextFontFace"
+            },
+            {
               "include": "#inlineStageStop"
             },
             {
               "include": "#expression"
             }
           ]
+        }
+      ]
+    },
+    "richTextFontFace": {
+      "patterns": [
+        {
+          "name": "meta.rich-text.font-face.nani",
+          "match": "(?i)(<font\\b[^>]*\\bface\\s*=\\s*)([\\\"'])([a-z0-9]+(?:-[a-z0-9]+)*)(\\2)",
+          "captures": {
+            "1": {
+              "name": "meta.tag.rich-text.font.nani"
+            },
+            "2": {
+              "name": "punctuation.definition.string.begin.nani"
+            },
+            "3": {
+              "name": "entity.name.type.font-face.nani"
+            },
+            "4": {
+              "name": "punctuation.definition.string.end.nani"
+            }
+          }
+        },
+        {
+          "name": "meta.rich-text.font-face.nani",
+          "match": "(?i)(<font\\b[^>]*\\bface\\s*=\\s*)([a-z0-9]+(?:-[a-z0-9]+)*)",
+          "captures": {
+            "1": {
+              "name": "meta.tag.rich-text.font.nani"
+            },
+            "2": {
+              "name": "entity.name.type.font-face.nani"
+            }
+          }
         }
       ]
     },

@@ -1,4 +1,11 @@
-import { collectLabels, getCompletionContext, type NaniPosition, type NaniRange } from "./documentContext";
+import {
+  collectLabels,
+  getCompletionContext,
+  getInlineTextMode,
+  lineAt,
+  type NaniPosition,
+  type NaniRange
+} from "./documentContext";
 import {
   allowedValueCompletionFacts,
   commandCompletionFacts,
@@ -6,7 +13,7 @@ import {
   primaryValueCompletionFacts
 } from "./languageFacts";
 import { emptyProjectAssetIndex, type NaniProjectAssetIndex } from "./projectAssets";
-import { getNaniResourceCompletions } from "./resourceCompletions";
+import { getNaniResourceCompletions, pinpAuthoringState } from "./resourceCompletions";
 import type { NaniDeferredCompletionDocumentation } from "./resourceCompletions";
 import type { NaniNavigationIndex } from "./navigationAnalysis";
 
@@ -30,6 +37,8 @@ export function getNaniCompletions(
   projectAssets: NaniProjectAssetIndex = emptyProjectAssetIndex,
   navigation?: NaniNavigationIndex
 ): NaniCompletion[] {
+  const fontSnippet = fontFaceSnippetCompletion(sourceText, position);
+  if (fontSnippet) return [fontSnippet];
   const context = getCompletionContext(sourceText, position);
   const resources = getNaniResourceCompletions(sourceText, position, projectAssets);
   const resourceCompletions: NaniCompletion[] = (resources?.completions ?? []).map((completion) => ({
@@ -105,7 +114,13 @@ export function getNaniCompletions(
   }
 
   if (context.kind === "param") {
-    const paramCompletions: NaniCompletion[] = paramCompletionFacts(context.commandId, context.usedParams).map((fact) => ({
+    const pinp = pinpAuthoringState(sourceText, position);
+    const hiddenPinpParams = pinp.hide
+      ? new Set(["assetId:", "pos:", "height:", "ratio:", "alt:", ...(pinp.effectNone ? ["time:"] : [])])
+      : new Set<string>();
+    const paramCompletions: NaniCompletion[] = paramCompletionFacts(context.commandId, context.usedParams)
+      .filter((fact) => !hiddenPinpParams.has(fact.label))
+      .map((fact) => ({
       label: fact.label,
       insertText: fact.insertText,
       kind: "param",
@@ -215,4 +230,29 @@ export function getNaniCompletions(
   }
 
   return [];
+}
+
+function fontFaceSnippetCompletion(
+  sourceText: string,
+  position: NaniPosition
+): NaniCompletion | undefined {
+  const line = lineAt(sourceText, position.line);
+  const before = line.slice(0, Math.min(position.character, line.length));
+  if (!getInlineTextMode(line, position.character)) return undefined;
+  const match = /<(?:f(?:o(?:n(?:t)?)?)?)?$/iu.exec(before);
+  if (!match) return undefined;
+  const start = match.index;
+  return {
+    label: "<font face=\"serif\">…</font>",
+    insertText: "<font face=\"${1:serif}\">${2:text}</font>",
+    kind: "snippet",
+    range: {
+      start: { line: position.line, character: start },
+      end: { line: position.line, character: position.character }
+    },
+    detail: "Rich text FontFaceId",
+    documentation: "使用小写 slash-free FontFaceId；字体注册由 App manifest 管理。",
+    isSnippet: true,
+    sortText: "0-font-face"
+  };
 }

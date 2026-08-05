@@ -278,12 +278,24 @@ export interface NaniCommandParamSpec {
   description?: string;
   docs?: NaniCommandParamDocs;
   resource?: NaniCommandResourceBinding;
+  authoring?: NaniCommandParamAuthoring;
 }
 
 export interface NaniCommandResourceBinding {
   capability: AssetCapability;
   resolution: "asset-id" | "character-id";
   runtimeParam: string;
+}
+
+export interface NaniCommandParamAuthoring {
+  assetReference?: NaniCommandAuthoringAssetReference;
+}
+
+export interface NaniCommandAuthoringAssetReference {
+  capability: AssetCapability;
+  resolution: "asset-id" | "character-id";
+  runtimeParam: string;
+  role: "selector";
 }
 
 export interface NaniCommandDefinition {
@@ -321,6 +333,21 @@ export const NaniCommandResourceBindingSchema = z
   })
   .strict();
 
+export const NaniCommandAuthoringAssetReferenceSchema = z
+  .object({
+    capability: AssetCapabilitySchema,
+    resolution: z.enum(["asset-id", "character-id"]),
+    runtimeParam: z.string().min(1),
+    role: z.literal("selector")
+  })
+  .strict();
+
+export const NaniCommandParamAuthoringSchema = z
+  .object({
+    assetReference: NaniCommandAuthoringAssetReferenceSchema.optional()
+  })
+  .strict();
+
 const NaniCommandDocScalarSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 export const NaniCommandParamDocsSchema = z
@@ -355,7 +382,8 @@ export const NaniCommandParamSpecSchema = z
     aliases: z.array(z.string().min(1)).optional(),
     description: z.string().optional(),
     docs: NaniCommandParamDocsSchema.optional(),
-    resource: NaniCommandResourceBindingSchema.optional()
+    resource: NaniCommandResourceBindingSchema.optional(),
+    authoring: NaniCommandParamAuthoringSchema.optional()
   })
   .strict();
 
@@ -1307,6 +1335,29 @@ const naniResourceBindings: Readonly<Record<string, Readonly<Record<string, Nani
   slide: { idAndAppearance: { capability: "json", resolution: "character-id", runtimeParam: "target" } }
 };
 
+const naniCommandAuthoring: Readonly<Record<string, Readonly<Record<string, NaniCommandParamAuthoring>>>> = {
+  stopbgm: {
+    bgmPath: {
+      assetReference: {
+        capability: "audio",
+        resolution: "asset-id",
+        runtimeParam: "bgmPath",
+        role: "selector"
+      }
+    }
+  },
+  stopsfx: {
+    sfxPath: {
+      assetReference: {
+        capability: "audio",
+        resolution: "asset-id",
+        runtimeParam: "sfxPath",
+        role: "selector"
+      }
+    }
+  }
+};
+
 function applyNaniResourceBindings(definitions: readonly NaniCommandDefinition[]): NaniCommandDefinition[] {
   return definitions.map((definition) => {
     const bindings = naniResourceBindings[definition.id];
@@ -1321,8 +1372,22 @@ function applyNaniResourceBindings(definitions: readonly NaniCommandDefinition[]
   });
 }
 
+function applyNaniCommandAuthoring(definitions: readonly NaniCommandDefinition[]): NaniCommandDefinition[] {
+  return definitions.map((definition) => {
+    const authoring = naniCommandAuthoring[definition.id];
+    if (!authoring) return definition;
+    return {
+      ...definition,
+      params: definition.params.map((paramSpec) => {
+        const metadata = authoring[paramSpec.name];
+        return metadata ? { ...paramSpec, authoring: metadata } : paramSpec;
+      })
+    };
+  });
+}
+
 export const naniCommandCatalog: NaniCommandDefinition[] = applyNaniCommandDocs(
-  applyNaniResourceBindings(baseNaniCommandCatalog)
+  applyNaniCommandAuthoring(applyNaniResourceBindings(baseNaniCommandCatalog))
 );
 
 export const commandCatalog = naniCommandCatalog;
