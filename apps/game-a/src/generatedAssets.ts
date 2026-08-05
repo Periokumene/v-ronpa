@@ -23,6 +23,16 @@ export const gameAAssets = [
       "mimeType": "image/png"
     },
     {
+      "id": "bg/milk-scatter",
+      "uri": "assets/bg/milk-scatter.png",
+      "mimeType": "image/png"
+    },
+    {
+      "id": "bg/milk-scatter-boom",
+      "uri": "assets/bg/milk-scatter-boom.png",
+      "mimeType": "image/png"
+    },
+    {
       "id": "bg/title",
       "uri": "assets/bg/title.png",
       "mimeType": "image/png"

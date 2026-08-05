@@ -17,8 +17,10 @@ dad: 我不是说这个[-]唉你晓得家里花了多少钱吗，要是又出点
 @char alice.eye1,mouth0,armR4,armL1
 alice: 我这两天还好，能自己解决的，只是不想麻烦你们
 nar: 她手攥住袋口向上举起，略微晃了晃。好在牛奶是纸盒装的，没有发出玻璃瓶那种哐当的声响
-@char alice.eye1,mouth1,armR0,armL0
+
+@char alice.eye1,mouth1,armR0,armL0 pos:47
 alice: 那我就先回房间了
+@char alice pos:44
 
 dad: 等会[-]，吃了没，今天你妈上夜班没准备晚饭
 @char alice.eye1,mouth2,armR0,armL2
@@ -33,6 +35,7 @@ alice: 好吧
 nar: 她的目光看向我，多少有些无奈
 @char alice.eye1,mouth0,armR0,armL1
 alice: 那吃饭的时候喊我——
+@char alice pos:40
 
 dad: 还有件事
 @char alice.eye3,mouth6,armR0,armL0
@@ -72,11 +75,12 @@ alice: ……[-]哦
 dad: 先不要急着换衣服，迟点去楼下吃饭
 @char alice.eye1,mouth1,armR0,armL4
 alice: 好，那我就先回房间——
+@char alice pos:30
 
 dad: 等下
-@char alice.eye3,mouth6,armR0,armL0
 alice: ……怎么了？
 @stopBgm bgm/dark-ambient-home
+@char alice.eye3,mouth6,armR0,armL0
 dad: 药买回来了吗
 @char alice.eye0,mouth0,armR4,armL1
 alice: 我买回来了啊，就在我的包里
@@ -87,22 +91,24 @@ dad: 给我看看
 @char alice.eye5,mouth3,armR5,armL1
 alice: 我都说了我不是小——[>]
 
-@char alice.eye3,mouth3,armR2,armL4 time:0
+@char alice.eye3,mouth3,armR2,armL4
+@inback bg/milk-scatter
 @sfx sfx/pixabay-fall-impact
 nar: 来不及反应，挎包已经被抓了过去，哐啷哐啷，包里的东西被一股脑的翻出来，散落在茶几上，滚落到地上
 
 ;toast 单独的袋装牛奶
 ;toast 袋装牛奶炸开来
-
+@inback bg/milk-scatter-boom
+@flash
 @sfx sfx/pixabay-wet-splat
 ;破碎特效和音效
 @bgm bgm/industrial-rock-beat-tense
+@char alice visible:false
 dad: aslfinaweocinaohf
-@char alice.eye4,mouth3,armR2,armL4
+
 alice: aceclisadfsef
 nar: 那袋牛奶就这样炸开来，就像是雨后出来透气的蜗牛，被路过的路人一脚踩死那样。我能听到它壳碎裂的声音
 dad: asfwe! safsadflij!sa!aaaaaaaaaaaaaaaa!
-@char alice.eye5,mouth3,armR5,armL2
 alice: asflimvosc!swefvb!asdfff……
 nar: 蜗牛做错了什么呢，可是路人又做错什么呢？可能唯一的错就是不该在这个雨天出门
 nar: 我能感受到它的内脏被压碎，牛奶嗞嗞的溅满一地，流到了我的脚边，溅到了我的腿上
@@ -117,7 +123,7 @@ alice: asflimvosc![-]caseefsefef——[>]
 ;sfx 耳鸣声
 ;bg 画面逐渐清晰，cg，主人公坐在门后的特写
 ;@sfx 敲门声
-@char alice.eye2,mouth2,armR4,armL1 time:0
+@char alice.eye2,mouth2,armR4,armL1
 dad: afesfaesfasl 我就知道你在装病！
 ;@sfx 敲门声
 ;@sfx 耳鸣声减弱
