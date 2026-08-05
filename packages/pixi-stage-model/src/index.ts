@@ -1,26 +1,27 @@
 import {
-  CHARACTER_TONE_PRESET_IDS,
+  naniCommandCatalog,
   PIXI_INNER_BACKGROUND_ID,
   PIXI_MAIN_BACKGROUND_ID,
-  type CharacterTonePresetId,
   type PixiActorSnapshot,
-  type PixiRainCommandParams,
   type PixiStageSnapshot,
-  type PixiWeatherKind,
   type RuntimeCommand,
   type RuntimeValue,
   type StoryPresentationWaitTask
 } from "@v-ronpa/contracts";
+import { resolvePixiActorTarget } from "./actorTargets";
+import { reduceBlur as reduceBlurEffect } from "./effects/blur";
+import { reduceBokeh as reduceBokehEffect } from "./effects/bokeh";
+import { reduceCharacterTone as reduceCharacterToneEffect } from "./effects/characterTone";
+import { reduceFlash as reduceFlashEffect } from "./effects/flash";
 import {
-  DEFAULT_RAIN_COMMAND_PARAMS,
-  RAIN_HUE_WRAP,
-  RAIN_POWER_MAX,
-  RAIN_POWER_MIN,
-  RAIN_TINT_MAX,
-  RAIN_TINT_MIN,
-  RAIN_WIND_MAX,
-  RAIN_WIND_MIN
-} from "./rainCommandParams";
+  reduceGlitchFilter as reduceGlitchFilterEffect,
+  reduceTransientGlitch as reduceTransientGlitchEffect
+} from "./effects/glitch";
+import { reduceRain as reduceRainEffect } from "./effects/rain";
+import type { PixiRuntimeCommandReduction, PixiStageRenderHint } from "./effects/reduction";
+import { reduceShake as reduceShakeEffect } from "./effects/shake";
+import { reduceSnow as reduceSnowEffect } from "./effects/snow";
+import { reduceSun as reduceSunEffect } from "./effects/sun";
 
 export {
   DEFAULT_RAIN_COMMAND_PARAMS,
@@ -32,77 +33,12 @@ export {
   RAIN_WIND_MAX,
   RAIN_WIND_MIN
 } from "./rainCommandParams";
-
-export type PixiStageRenderHint =
-  | { type: "flash"; color: string; durationMs: number; wait?: boolean }
-  | {
-      type: "character-tone-remove";
-      durationMs: number;
-      scopeScriptPath: string;
-      wait?: boolean;
-    }
-  | { type: "screen-filter-remove"; kind: "bokeh" | "glitch"; durationMs: number; easing?: string; wait?: boolean }
-  | { type: "weather-remove"; kind: PixiWeatherKind; durationMs: number; easing?: string; wait?: boolean }
-  | {
-      type: "shake";
-      target: string;
-      intensity: number;
-      durationMs: number;
-      count?: number;
-      loop?: boolean;
-      deltaTimeMs?: number;
-      deltaPower?: number;
-      hor?: boolean;
-      ver?: boolean;
-      wait?: boolean;
-    }
-  | {
-      type: "glitch";
-      power: number;
-      durationMs: number;
-      blockJump?: number;
-      burstJump?: number;
-      pixelScatter?: number;
-      colorNoise?: number;
-      speed?: number;
-      seed?: number;
-      wait?: boolean;
-    }
-  | {
-      type: "trial-keyword";
-      keywordId: string;
-      text: string;
-      evidenceId?: string;
-      speakerId?: string;
-    }
-  | {
-      type: "trial-subtitle";
-      subtitleId: string;
-      text: string;
-      style: "dialog" | "barrage" | "keyword";
-      speakerId?: string;
-      keywordId?: string;
-      evidenceId?: string;
-    };
-
-export type PixiRuntimeCommandDiagnosticCode =
-  | "unresolved-runtime-expression"
-  | "unsupported-pixi-command"
-  | "unsupported-pixi-params"
-  | "normalized-pixi-params";
-
-export interface PixiRuntimeCommandDiagnostic {
-  code: PixiRuntimeCommandDiagnosticCode;
-  message: string;
-  commandId: string;
-}
-
-export interface PixiRuntimeCommandReduction {
-  snapshot: PixiStageSnapshot;
-  hints: PixiStageRenderHint[];
-  waitTasks: StoryPresentationWaitTask[];
-  diagnostics: PixiRuntimeCommandDiagnostic[];
-}
+export type {
+  PixiRuntimeCommandDiagnostic,
+  PixiRuntimeCommandDiagnosticCode,
+  PixiRuntimeCommandReduction,
+  PixiStageRenderHint
+} from "./effects/reduction";
 
 export interface NormalizedActorTransform {
   pos?: [number, number];
@@ -130,6 +66,49 @@ export function createInitialPixiStageSnapshot(): PixiStageSnapshot {
   };
 }
 
+type PixiCommandReducer = (
+  snapshot: PixiStageSnapshot,
+  command: RuntimeCommand
+) => PixiRuntimeCommandReduction;
+
+const pixiCommandReducerRegistry: Readonly<Record<string, PixiCommandReducer>> = Object.freeze({
+  arrange: reduceArrange,
+  back: reduceBack,
+  blur: reduceBlurEffect,
+  bokeh: reduceBokehEffect,
+  char: reduceChar,
+  chartone: reduceCharacterToneEffect,
+  flash: reduceFlashEffect,
+  glitch: reduceTransientGlitchEffect,
+  glitchfilter: reduceGlitchFilterEffect,
+  hidechars: reduceHideChars,
+  inback: reduceInback,
+  rain: reduceRainEffect,
+  shake: reduceShakeEffect,
+  slide: reduceSlide,
+  snow: reduceSnowEffect,
+  sun: reduceSunEffect,
+  trialkeyword: reduceTrialKeyword
+});
+
+function assertPixiCommandReducerRegistry(): void {
+  const catalogIds = naniCommandCatalog
+    .filter((definition) => definition.status === "implemented" && definition.execution === "pixi-presentation")
+    .map((definition) => definition.id)
+    .sort();
+  const registeredIds = Object.keys(pixiCommandReducerRegistry).sort();
+  const missing = catalogIds.filter((id) => !registeredIds.includes(id));
+  const orphaned = registeredIds.filter((id) => !catalogIds.includes(id));
+  if (missing.length === 0 && orphaned.length === 0) return;
+  throw new Error([
+    "Pixi command reducer registry invariant failed:",
+    ...(missing.length > 0 ? [`- missing reducers: ${missing.join(", ")}`] : []),
+    ...(orphaned.length > 0 ? [`- orphaned reducers: ${orphaned.join(", ")}`] : [])
+  ].join("\n"));
+}
+
+assertPixiCommandReducerRegistry();
+
 export function reducePixiRuntimeCommand(
   snapshot: PixiStageSnapshot,
   command: RuntimeCommand
@@ -149,181 +128,8 @@ export function reducePixiRuntimeCommand(
     };
   }
 
-  switch (command.commandId) {
-    case "back":
-      return reduceBack(snapshot, command);
-    case "char":
-      return reduceChar(snapshot, command);
-    case "chartone":
-      return reduceCharacterTone(snapshot, command);
-    case "arrange":
-      return reduceArrange(snapshot, command);
-    case "hidechars":
-      return reduceHideChars(snapshot, command);
-    case "slide":
-      return reduceSlide(snapshot, command);
-    case "blur":
-      return reduceBlur(snapshot, command);
-    case "bokeh":
-      return reduceBokeh(snapshot, command);
-    case "rain":
-      return reduceRain(snapshot, command);
-    case "snow":
-    case "sun":
-      return reduceWeather(snapshot, command, command.commandId);
-    case "flash":
-      return {
-        snapshot,
-        hints: [
-          {
-            type: "flash",
-            color: stringParam(command, "color") ?? "#ffffff",
-            durationMs: durationMsParam(command, 160),
-            wait: booleanParam(command, "wait", false)
-          }
-        ],
-        waitTasks: waitTask(command, "flash", "screen", snapshot.revision),
-        diagnostics: []
-      };
-    case "shake":
-      {
-        if (booleanParam(command, "loop", false)) {
-          return unsupportedPixiParams(snapshot, command, "@shake loop! is not implemented by this Pixi runtime; disable loop or issue a finite shake");
-        }
-        const deltaTimeMs = numberParam(command, "deltaTime");
-        const deltaPower = numberParam(command, "deltaPower");
-        const hint: Extract<PixiStageRenderHint, { type: "shake" }> = {
-          type: "shake",
-          target: stringParam(command, "target") ?? "stage",
-          intensity: numberParam(command, "power", 0.5),
-          durationMs: durationMsParam(command, 150),
-          count: numberParam(command, "count", 3),
-          loop: booleanParam(command, "loop", false),
-          hor: booleanParam(command, "hor", false),
-          ver: booleanParam(command, "ver", true),
-          wait: booleanParam(command, "wait", false)
-        };
-        if (deltaTimeMs !== undefined) hint.deltaTimeMs = deltaTimeMs;
-        if (deltaPower !== undefined) hint.deltaPower = deltaPower;
-        return {
-          snapshot,
-          hints: [hint],
-          waitTasks: waitTask(command, "shake", hint.target, snapshot.revision),
-          diagnostics: []
-        };
-      }
-    case "glitch":
-      {
-        const blockJump = numberParam(command, "blockJump");
-        const burstJump = numberParam(command, "burstJump");
-        const pixelScatter = numberParam(command, "pixelScatter");
-        const colorNoise = numberParam(command, "colorNoise");
-        const speed = numberParam(command, "speed");
-        const seed = numberParam(command, "seed");
-        const hint: Extract<PixiStageRenderHint, { type: "glitch" }> = {
-          type: "glitch",
-          power: numberParam(command, "power", 1),
-          durationMs: durationMsParam(command, 1000),
-          wait: booleanParam(command, "wait", false)
-        };
-        if (blockJump !== undefined) hint.blockJump = blockJump;
-        if (burstJump !== undefined) hint.burstJump = burstJump;
-        if (pixelScatter !== undefined) hint.pixelScatter = pixelScatter;
-        if (colorNoise !== undefined) hint.colorNoise = colorNoise;
-        if (speed !== undefined) hint.speed = speed;
-        if (seed !== undefined) hint.seed = seed;
-        return {
-          snapshot,
-          hints: [hint],
-          waitTasks: waitTask(command, "glitch", "screen", snapshot.revision),
-          diagnostics: []
-        };
-      }
-    case "glitchfilter":
-      return reduceGlitchFilter(snapshot, command);
-    case "inback":
-      return reduceInback(snapshot, command);
-    case "trialkeyword":
-      return reduceTrialKeyword(snapshot, command);
-    default:
-      return unsupportedPixiCommand(snapshot, command);
-  }
-}
-
-const characterTonePresetIds = new Set<string>(CHARACTER_TONE_PRESET_IDS);
-
-function reduceCharacterTone(
-  snapshot: PixiStageSnapshot,
-  command: RuntimeCommand
-): PixiRuntimeCommandReduction {
-  const requestedPreset = stringParam(command, "preset");
-  const requestedAmount = numberParam(command, "amount");
-  const durationMs = durationMsParam(command, 0);
-  const wait = booleanParam(command, "wait", false);
-  const scopeScriptPath = command.loc.scriptPath;
-
-  if (requestedPreset && requestedPreset !== "none" && !characterTonePresetIds.has(requestedPreset)) {
-    return unsupportedPixiParams(snapshot, command, `unknown character tone preset: ${requestedPreset}`);
-  }
-  if (requestedAmount !== undefined && (!Number.isFinite(requestedAmount) || requestedAmount < 0)) {
-    return unsupportedPixiParams(snapshot, command, "amount must be a finite non-negative number");
-  }
-  if (!Number.isFinite(durationMs) || durationMs < 0) {
-    return unsupportedPixiParams(snapshot, command, "durationMs must be a finite non-negative number");
-  }
-  if (requestedPreset === "none" && requestedAmount !== undefined && requestedAmount > 0) {
-    return unsupportedPixiParams(snapshot, command, "none cannot be combined with a positive amount");
-  }
-
-  const remove = requestedPreset === "none" || requestedAmount === 0;
-  if (remove) {
-    if (!snapshot.characterTone) return emptyReduction(snapshot);
-    const { characterTone: _characterTone, ...withoutTone } = snapshot;
-    const reduction = changedSnapshot(withoutTone);
-    if (durationMs <= 0) return reduction;
-    return {
-      ...withWaitTasks(command, reduction, "character-tone-transition", ["character-tone"]),
-      hints: [{
-        type: "character-tone-remove",
-        durationMs,
-        scopeScriptPath,
-        wait
-      }]
-    };
-  }
-
-  const preset = requestedPreset
-    ? requestedPreset as CharacterTonePresetId
-    : snapshot.characterTone?.preset;
-  if (!preset) {
-    return unsupportedPixiParams(snapshot, command, "a positive amount requires an active preset");
-  }
-  const amount = requestedAmount ?? (requestedPreset ? 1 : snapshot.characterTone?.amount);
-  if (amount === undefined) {
-    return unsupportedPixiParams(snapshot, command, "missing amount and active preset");
-  }
-  if (
-    snapshot.characterTone?.preset === preset &&
-    snapshot.characterTone.amount === amount &&
-    snapshot.characterTone.scopeScriptPath === scopeScriptPath
-  ) {
-    return emptyReduction(snapshot);
-  }
-
-  return withWaitTasks(
-    command,
-    changedSnapshot({
-      ...snapshot,
-      characterTone: {
-        preset,
-        amount,
-        scopeScriptPath,
-        transition: { durationMs, wait }
-      }
-    }),
-    "character-tone-transition",
-    ["character-tone"]
-  );
+  const reducer = pixiCommandReducerRegistry[command.commandId];
+  return reducer ? reducer(snapshot, command) : unsupportedPixiCommand(snapshot, command);
 }
 
 export function reconcilePixiStageScriptScope(
@@ -359,18 +165,7 @@ export function reconcilePixiStageScriptScope(
   };
 }
 
-export function resolvePixiActorTarget(target: string | undefined, stage: PixiStageSnapshot): string[] {
-  if (!target || target === MAIN_BACKGROUND_ID) return stage.backgroundsById[MAIN_BACKGROUND_ID] ? [MAIN_BACKGROUND_ID] : [];
-  if (target === "*") {
-    return [
-      ...Object.values(stage.backgroundsById).filter((actor) => actor.visible).map((actor) => actor.id),
-      ...Object.values(stage.charactersById).filter((actor) => actor.visible).map((actor) => actor.id)
-    ];
-  }
-  if (target === "stage" || target === "camera") return ["stage"];
-  if (stage.backgroundsById[target] || stage.charactersById[target]) return [target];
-  return [];
-}
+export { resolvePixiActorTarget } from "./actorTargets";
 
 export function normalizeActorTransformParams(command: RuntimeCommand): NormalizedActorTransform {
   const transform: NormalizedActorTransform = {
@@ -566,268 +361,6 @@ function reduceSlide(snapshot: PixiStageSnapshot, command: RuntimeCommand): Pixi
       ? { ...snapshot, backgroundsById: { ...snapshot.backgroundsById, [target]: nextActor } }
       : { ...snapshot, charactersById: { ...snapshot.charactersById, [target]: nextActor } };
   return withWaitTasks(command, changedSnapshot(next), "actor-transition", [target]);
-}
-
-function reduceBlur(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
-  const targets = resolvePixiActorTarget(stringParam(command, "target"), snapshot);
-  if (targets.length === 0) return unsupportedPixiParams(snapshot, command, `unknown actor target: ${stringParam(command, "target") ?? MAIN_BACKGROUND_ID}`);
-  const power = numberParam(command, "power", 0);
-  let next = snapshot;
-  for (const target of targets) {
-    const actor = next.backgroundsById[target] ?? next.charactersById[target];
-    if (!actor) continue;
-    const filters = { ...actor.filters };
-    if (power <= 0) delete filters.blur;
-    else filters.blur = power;
-    const updated: PixiActorSnapshot = {
-      ...actor,
-      filters,
-      transition: timingTransition(command)
-    };
-    next =
-      actor.kind === "background"
-        ? { ...next, backgroundsById: { ...next.backgroundsById, [target]: updated } }
-        : { ...next, charactersById: { ...next.charactersById, [target]: updated } };
-  }
-  return withWaitTasks(command, changedSnapshot(next), "actor-transition", targets);
-}
-
-function reduceBokeh(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
-  const power = numberParam(command, "power", 0);
-  if (power <= 0) {
-    const hadBokeh = Boolean(snapshot.screenFilters.bokeh);
-    const { bokeh: _bokeh, ...screenFilters } = snapshot.screenFilters;
-    const reduction = changedSnapshot({ ...snapshot, screenFilters });
-    const durationMs = durationMsParam(command, 0);
-    if (!hadBokeh) return reduction;
-    const easing = stringParam(command, "easing");
-    return {
-      ...withWaitTasks(command, reduction, "screen-filter-transition", ["bokeh"]),
-      hints:
-        durationMs > 0
-          ? [
-              {
-                type: "screen-filter-remove",
-                kind: "bokeh",
-                durationMs,
-                ...(easing ? { easing } : {}),
-                wait: booleanParam(command, "wait", false)
-              }
-            ]
-          : []
-    };
-  }
-  return withWaitTasks(command, changedSnapshot({
-    ...snapshot,
-    screenFilters: {
-      ...snapshot.screenFilters,
-      bokeh: {
-        focus: stringParam(command, "focus"),
-        dist: numberParam(command, "dist", 0),
-        power,
-        transition: timingTransition(command)
-      }
-    }
-  }), "screen-filter-transition", ["bokeh"]);
-}
-
-function reduceGlitchFilter(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
-  const power = numberParam(command, "power", 0);
-  if (power <= 0) {
-    const hadGlitch = Boolean(snapshot.screenFilters.glitch);
-    const { glitch: _glitch, ...screenFilters } = snapshot.screenFilters;
-    const reduction = changedSnapshot({ ...snapshot, screenFilters });
-    const durationMs = durationMsParam(command, 0);
-    if (!hadGlitch) return reduction;
-    const easing = stringParam(command, "easing");
-    return {
-      ...withWaitTasks(command, reduction, "screen-filter-transition", ["glitch"]),
-      hints: durationMs > 0
-        ? [
-            {
-              type: "screen-filter-remove",
-              kind: "glitch",
-              durationMs,
-              ...(easing ? { easing } : {}),
-              wait: booleanParam(command, "wait", false)
-            }
-          ]
-        : []
-    };
-  }
-
-  const blockJump = numberParam(command, "blockJump");
-  const burstJump = numberParam(command, "burstJump");
-  const pixelScatter = numberParam(command, "pixelScatter");
-  const colorNoise = numberParam(command, "colorNoise");
-  const speed = numberParam(command, "speed");
-  const seed = numberParam(command, "seed");
-  const glitch: NonNullable<PixiStageSnapshot["screenFilters"]["glitch"]> = {
-    power,
-    transition: timingTransition(command)
-  };
-  if (blockJump !== undefined) glitch.blockJump = blockJump;
-  if (burstJump !== undefined) glitch.burstJump = burstJump;
-  if (pixelScatter !== undefined) glitch.pixelScatter = pixelScatter;
-  if (colorNoise !== undefined) glitch.colorNoise = colorNoise;
-  if (speed !== undefined) glitch.speed = speed;
-  if (seed !== undefined) glitch.seed = seed;
-
-  return withWaitTasks(command, changedSnapshot({
-    ...snapshot,
-    screenFilters: {
-      ...snapshot.screenFilters,
-      glitch
-    }
-  }), "screen-filter-transition", ["glitch"]);
-}
-
-function reduceRain(snapshot: PixiStageSnapshot, command: RuntimeCommand): PixiRuntimeCommandReduction {
-  const { params, diagnostics } = normalizeRainCommandParams(command);
-  const kind: PixiWeatherKind = "rain";
-  if (params.power <= 0) {
-    const hadWeather = Boolean(snapshot.weather.rain);
-    const weather = { ...snapshot.weather };
-    delete weather.rain;
-    const reduction = changedSnapshot({ ...snapshot, weather });
-    const durationMs = durationMsParam(command, 0);
-    const withDiagnostics = { ...reduction, diagnostics: [...reduction.diagnostics, ...diagnostics] };
-    if (!hadWeather) return withDiagnostics;
-    const easing = stringParam(command, "easing");
-    return {
-      ...withWaitTasks(command, withDiagnostics, "weather-transition", [kind]),
-      hints:
-        durationMs > 0
-          ? [
-              {
-                type: "weather-remove",
-                kind,
-                durationMs,
-                ...(easing ? { easing } : {}),
-                wait: booleanParam(command, "wait", false)
-              }
-            ]
-          : []
-    };
-  }
-
-  return withWaitTasks(
-    command,
-    {
-      ...changedSnapshot({
-        ...snapshot,
-        weather: {
-          ...snapshot.weather,
-          rain: {
-            kind,
-            commandParams: params,
-            transition: timingTransition(command)
-          }
-        }
-      }),
-      diagnostics
-    },
-    "weather-transition",
-    [kind]
-  );
-}
-
-function reduceWeather(snapshot: PixiStageSnapshot, command: RuntimeCommand, kind: PixiWeatherKind): PixiRuntimeCommandReduction {
-  const power = numberParam(command, "power", 1);
-  if (power <= 0) {
-    const hadWeather = Boolean(snapshot.weather[kind]);
-    const weather = { ...snapshot.weather };
-    delete weather[kind];
-    const reduction = changedSnapshot({ ...snapshot, weather });
-    const durationMs = durationMsParam(command, 0);
-    if (!hadWeather) return reduction;
-    const easing = stringParam(command, "easing");
-    return {
-      ...withWaitTasks(command, reduction, "weather-transition", [kind]),
-      hints: durationMs > 0
-        ? [
-            {
-              type: "weather-remove",
-              kind,
-              durationMs,
-              ...(easing ? { easing } : {}),
-              wait: booleanParam(command, "wait", false)
-            }
-          ]
-        : []
-    };
-  }
-  return withWaitTasks(command, changedSnapshot({
-    ...snapshot,
-    weather: {
-      ...snapshot.weather,
-      [kind]: {
-        kind,
-        power,
-        xSpeed: numberParam(command, "xSpeed"),
-        ySpeed: numberParam(command, "ySpeed"),
-        ...(kind === "snow"
-          ? {
-              density: numberParam(command, "density"),
-              flakeScale: numberParam(command, "flakeScale"),
-              sway: numberParam(command, "sway"),
-              fog: numberParam(command, "fog"),
-              noise: numberParam(command, "noise"),
-              seed: numberParam(command, "seed")
-            }
-          : {}),
-        pos: sceneVector2Param(command, "pos"),
-        position: vector3Param(command, "position"),
-        rotation: vector3Param(command, "rotation"),
-        scale: vector3Param(command, "scale"),
-        transition: timingTransition(command)
-      }
-    }
-  }), "weather-transition", [kind]);
-}
-
-function normalizeRainCommandParams(command: RuntimeCommand): { params: PixiRainCommandParams; diagnostics: PixiRuntimeCommandDiagnostic[] } {
-  const diagnostics: PixiRuntimeCommandDiagnostic[] = [];
-  const power = clampRainNumber(command, "power", DEFAULT_RAIN_COMMAND_PARAMS.power, RAIN_POWER_MIN, RAIN_POWER_MAX, diagnostics);
-  const wind = clampRainNumber(command, "wind", DEFAULT_RAIN_COMMAND_PARAMS.wind, RAIN_WIND_MIN, RAIN_WIND_MAX, diagnostics);
-  const hue = normalizeRainHue(command, diagnostics);
-  const tint = clampRainNumber(command, "tint", DEFAULT_RAIN_COMMAND_PARAMS.tint, RAIN_TINT_MIN, RAIN_TINT_MAX, diagnostics);
-  return { params: { power, wind, hue, tint }, diagnostics };
-}
-
-function clampRainNumber(
-  command: RuntimeCommand,
-  key: keyof PixiRainCommandParams,
-  fallback: number,
-  min: number,
-  max: number,
-  diagnostics: PixiRuntimeCommandDiagnostic[]
-): number {
-  const value = numberParam(command, key);
-  if (value === undefined) return fallback;
-  const normalized = Math.min(max, Math.max(min, value));
-  if (normalized !== value) {
-    diagnostics.push({
-      code: "normalized-pixi-params",
-      commandId: command.commandId,
-      message: `@${command.canonicalName} ${key}:${value} was clamped to ${normalized}.`
-    });
-  }
-  return normalized;
-}
-
-function normalizeRainHue(command: RuntimeCommand, diagnostics: PixiRuntimeCommandDiagnostic[]): number {
-  const value = numberParam(command, "hue");
-  if (value === undefined) return DEFAULT_RAIN_COMMAND_PARAMS.hue;
-  const normalized = ((value % RAIN_HUE_WRAP) + RAIN_HUE_WRAP) % RAIN_HUE_WRAP;
-  if (normalized !== value) {
-    diagnostics.push({
-      code: "normalized-pixi-params",
-      commandId: command.commandId,
-      message: `@${command.canonicalName} hue:${value} was normalized to ${normalized}.`
-    });
-  }
-  return normalized;
 }
 
 function buildCharacterActor(

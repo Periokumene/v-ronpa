@@ -175,6 +175,7 @@ for (const pkg of Object.keys(packageRoots)) {
   validateTsconfigReferences(pkg);
 }
 validateVnRuntimeWrapperImports();
+validatePixiEffectIsolation();
 
 if (violations.length > 0) {
   console.error("Boundary violations:");
@@ -257,6 +258,88 @@ function validateVnRuntimeWrapperImports() {
       }
     }
   }
+}
+
+function validatePixiEffectIsolation() {
+  const presenterRoot = resolve(root, "packages/pixi-presenter/src");
+  const effectsRoot = join(presenterRoot, "internal/effects");
+  const sharedModules = new Set([
+    "animation.ts",
+    "glitchShader.ts",
+    "registries.ts",
+    "rootFilterStack.ts",
+    "transient/types.ts",
+    "weather/types.ts"
+  ]);
+  const dispatcherImports = new Map([
+    ["persistentScreen.ts", new Set(["bokeh.ts", "persistentGlitch.ts"])],
+    ["transient/system.ts", new Set(["transient/flash.ts", "transient/glitch.ts", "transient/shake.ts"])],
+    ["weather/system.ts", new Set(["weather/rain.ts", "weather/snow.ts", "weather/sun.ts"])]
+  ]);
+
+  for (const file of collectFiles(effectsRoot)) {
+    if (/\.(test|spec)\.(ts|tsx|js|jsx)$/u.test(file)) continue;
+    const source = relative(effectsRoot, file);
+    const text = stripComments(readFileSync(file, "utf8"));
+    for (const specifier of collectImportSpecifiers(text)) {
+      const target = resolveRelativeTsImport(file, specifier);
+      if (target === join(presenterRoot, "internal/systems.ts")) {
+        violations.push(
+          `${relative(root, file)}: effect implementations must not import ActorSystem internals; ` +
+          "use the supplied family mechanics or actor target resolver."
+        );
+        continue;
+      }
+      if (!target || !target.startsWith(`${effectsRoot}/`)) continue;
+      const destination = relative(effectsRoot, target);
+      if (sharedModules.has(destination)) continue;
+      if (dispatcherImports.get(source)?.has(destination)) continue;
+      violations.push(
+        `${relative(root, file)}: effect implementation '${source}' must not import sibling effect '${destination}'; ` +
+        "only family dispatchers may import effect implementations."
+      );
+    }
+  }
+
+  validatePixiPresenterEffectImports(
+    join(presenterRoot, "internal/systems.ts"),
+    new Set(["animation.ts", "blur.ts", "characterToneController.ts"]),
+    "ActorSystem"
+  );
+  validatePixiPresenterEffectImports(
+    join(presenterRoot, "index.ts"),
+    new Set([
+      "animation.ts",
+      "persistentScreen.ts",
+      "rootFilterStack.ts",
+      "transient/system.ts",
+      "trialOverlay.ts",
+      "weather/system.ts"
+    ]),
+    "Pixi Presenter entry"
+  );
+
+  function validatePixiPresenterEffectImports(file, allowed, label) {
+    const text = stripComments(readFileSync(file, "utf8"));
+    for (const specifier of collectImportSpecifiers(text)) {
+      const target = resolveRelativeTsImport(file, specifier);
+      if (!target || !target.startsWith(`${effectsRoot}/`)) continue;
+      const destination = relative(effectsRoot, target);
+      if (allowed.has(destination)) continue;
+      violations.push(
+        `${relative(root, file)}: ${label} must import family boundaries or shared mechanics, not '${destination}'.`
+      );
+    }
+  }
+}
+
+function resolveRelativeTsImport(sourceFile, specifier) {
+  if (!specifier.startsWith(".")) return undefined;
+  const target = resolve(dirname(sourceFile), specifier);
+  if (existsSync(target) && statSync(target).isFile()) return target;
+  if (existsSync(`${target}.ts`)) return `${target}.ts`;
+  if (existsSync(join(target, "index.ts"))) return join(target, "index.ts");
+  return undefined;
 }
 
 function validateSpecifier({ pkg, specifier, location, source }) {

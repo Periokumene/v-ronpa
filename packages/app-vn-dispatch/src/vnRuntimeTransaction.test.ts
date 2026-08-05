@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { PIXI_INNER_BACKGROUND_ID, PIXI_MAIN_BACKGROUND_ID, type RuntimeScript } from "@v-ronpa/contracts";
+import {
+  PIXI_INNER_BACKGROUND_ID,
+  PIXI_MAIN_BACKGROUND_ID,
+  type RuntimeCommand,
+  type RuntimeScript
+} from "@v-ronpa/contracts";
 import { parseScenario } from "@v-ronpa/nani-parser";
 import { compileRuntimeScript } from "@v-ronpa/nani-runtime-compiler";
 import { createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
@@ -127,18 +132,28 @@ describe("VN runtime presentation transaction", () => {
   });
 
   it("reports unsupported Pixi-routed runtime commands without changing stage state", () => {
-    const runtimeScript = compileScenario(
-      ["Felix: First.", "@focus Ema duration:420", "Felix: Second."].join("\n"),
-      "transaction-unsupported-pixi-test.nani"
-    );
-    const initialStory = createInitialStoryState(runtimeScript);
-    const firstStop = advanceToNextStop(initialStory, runtimeScript).state;
     const initialPixiStage = createInitialPixiStageSnapshot();
-
-    const secondStop = advanceToNextStop(firstStop, runtimeScript);
+    const customPulse: RuntimeCommand = {
+      commandId: "custompulse",
+      canonicalName: "customPulse",
+      category: "effect",
+      source: "v-ronpa",
+      status: "implemented",
+      params: { power: 0.5 },
+      loc: {
+        scriptPath: "transaction-unsupported-pixi-test.nani",
+        line: 1,
+        column: 1,
+        raw: "@customPulse power:0.5"
+      }
+    };
     const transaction = createVnRuntimePresentationTransaction({
-      runtimeCommands: secondStop.emittedRuntimeCommands,
-      previousPixiStage: initialPixiStage
+      runtimeCommands: [customPulse],
+      previousPixiStage: initialPixiStage,
+      routeTable: {
+        commands: { custompulse: ["pixi"] },
+        categories: {}
+      }
     });
 
     expect(transaction.pixiStage).toBe(initialPixiStage);
@@ -147,8 +162,8 @@ describe("VN runtime presentation transaction", () => {
     expect(transaction.diagnostics).toEqual([
       {
         code: "unsupported-pixi-command",
-        commandId: "focus",
-        message: "@focus is routed to Pixi but is not consumed by pixi-presenter yet."
+        commandId: "custompulse",
+        message: "@customPulse is routed to Pixi but is not consumed by pixi-presenter yet."
       }
     ]);
   });

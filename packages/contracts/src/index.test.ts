@@ -1105,7 +1105,8 @@ describe("contracts", () => {
     const officialCommands = naniCommandCatalog.filter((command) => command.source === "naninovel");
 
     expect(officialCommands).toHaveLength(78);
-    expect(naniCommandCatalog).toHaveLength(89);
+    expect(naniCommandCatalog).toHaveLength(88);
+    expect(naniCommandCatalog.map((command) => command.id)).not.toContain("focus");
     expect(() => NaniCommandDefinitionSchema.array().parse(naniCommandCatalog)).not.toThrow();
   });
 

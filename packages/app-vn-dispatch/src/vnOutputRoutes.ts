@@ -21,7 +21,6 @@ export const defaultVnOutputRouteTable: VnOutputRouteTable = {
     charenter: ["debug"],
     shake: ["pixi"],
     flash: ["pixi"],
-    focus: ["pixi"],
     trialkeyword: ["pixi"],
     gameplay: ["gameplay"]
   },

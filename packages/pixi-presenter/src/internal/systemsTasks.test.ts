@@ -4,17 +4,18 @@ import type { PixiActorSnapshot, PixiStageSnapshot, PixiWeatherSnapshot } from "
 import { INNER_BACKGROUND_ID, createInitialPixiStageSnapshot } from "@v-ronpa/pixi-stage-model";
 import {
   ActorSystem,
-  FilterSystem,
-  RootFilterStack,
-  ScreenOverlaySystem,
-  TransientEffectSystem,
-  TweenSystem,
-  WeatherSystem,
+  ActorFilterSystem,
   resolveInnerBackgroundFrameRect
 } from "./systems";
 import { PresentationTaskController } from "./presentationTasks";
 import type { PixiAssetResolver, PixiPresenterDiagnostic } from "./assetResolver";
 import { CharacterSystem } from "./characters";
+import { TrialOverlaySystem } from "./effects/trialOverlay";
+import { PersistentScreenEffectSystem } from "./effects/persistentScreen";
+import { TweenSystem } from "./effects/animation";
+import { RootFilterStack } from "./effects/rootFilterStack";
+import { TransientEffectSystem } from "./effects/transient/system";
+import { WeatherSystem } from "./effects/weather/system";
 
 describe("pixi presentation task system integration", () => {
   const innerBackgroundImageInsetPx = 8;
@@ -1006,8 +1007,8 @@ describe("pixi presentation task system integration", () => {
   });
 
   it("relayouts bokeh overlays for the resized viewport without a new reconcile", () => {
-    const { root, screenOverlays, viewport } = createSystems();
-    screenOverlays.reconcile(stageWithBokeh(0.8, 1), false);
+    const { root, screen, viewport } = createSystems();
+    screen.reconcile(stageWithBokeh(0.8, 1), false, []);
     const layer = findDescendant(root, "screen-filter-overlays", Container);
     const firstBefore = layer?.children[0] as Sprite | undefined;
     expect(firstBefore).toBeDefined();
@@ -1015,7 +1016,7 @@ describe("pixi presentation task system integration", () => {
 
     viewport.width = 1280;
     viewport.height = 720;
-    screenOverlays.relayoutViewport();
+    screen.relayoutViewport();
 
     const firstAfter = layer?.children[0] as Sprite | undefined;
     expect(firstAfter).toBeDefined();
@@ -1026,14 +1027,12 @@ describe("pixi presentation task system integration", () => {
   });
 
   it("interpolates bokeh blur and overlay power without repopulating during tween", () => {
-    const { filters, root, screenOverlays, tweens } = createSystems();
-    screenOverlays.reconcile(stageWithBokeh(0.2, 1), false);
-    filters.applyScreenFilters(stageWithBokeh(0.2, 1), false);
+    const { root, screen, tweens } = createSystems();
+    screen.reconcile(stageWithBokeh(0.2, 1), false, []);
     const layer = findDescendant(root, "screen-filter-overlays", Container);
     expect(layer?.children).toHaveLength(3);
 
-    screenOverlays.reconcile(stageWithBokeh(0.8, 2, 100), true);
-    filters.applyScreenFilters(stageWithBokeh(0.8, 2, 100), true);
+    screen.reconcile(stageWithBokeh(0.8, 2, 100), true, []);
     const firstAfterLayoutSwitch = layer?.children[0];
 
     expect(layer?.children).toHaveLength(6);
@@ -1054,15 +1053,13 @@ describe("pixi presentation task system integration", () => {
   });
 
   it("fades bokeh overlays and root blur to zero before cleanup", () => {
-    const { filters, root, screenOverlays, tweens } = createSystems();
-    screenOverlays.reconcile(stageWithBokeh(0.8, 1), false);
-    filters.applyScreenFilters(stageWithBokeh(0.8, 1), false);
+    const { root, screen, tweens } = createSystems();
+    screen.reconcile(stageWithBokeh(0.8, 1), false, []);
     const layer = findDescendant(root, "screen-filter-overlays", Container);
     const removalHints = [{ type: "screen-filter-remove" as const, kind: "bokeh" as const, durationMs: 100, easing: "linear", wait: true }];
     const empty = { ...createInitialPixiStageSnapshot(), revision: 2 };
 
-    screenOverlays.reconcile(empty, true, removalHints);
-    filters.applyScreenFilters(empty, true, removalHints);
+    screen.reconcile(empty, true, removalHints);
 
     expect(layer?.children.length).toBeGreaterThan(0);
     expect(root.filters).not.toBeNull();
@@ -1079,7 +1076,7 @@ describe("pixi presentation task system integration", () => {
   });
 
   it("composes persistent and one-shot glitch filters without stale cleanup", () => {
-    const { effects, filters: filterSystem, root, tasks, tweens } = createSystems();
+    const { effects, screen, root, tasks, tweens } = createSystems();
     const stage = {
       ...createInitialPixiStageSnapshot(),
       revision: 1,
@@ -1097,7 +1094,7 @@ describe("pixi presentation task system integration", () => {
       }
     };
 
-    filterSystem.applyScreenFilters(stage, true);
+    screen.reconcile(stage, true, []);
 
     expect(tasks.snapshot()).toMatchObject([{ kind: "screen-filter-transition", target: "glitch", revision: 1, status: "running" }]);
     const initialFilters = root.filters as unknown as GlitchTestFilter[];
@@ -1116,7 +1113,7 @@ describe("pixi presentation task system integration", () => {
     });
 
     const persistentTime = persistentUniforms.uTime;
-    filterSystem.tick({ deltaMS: 50 } as Ticker);
+    screen.tick({ deltaMS: 50 } as Ticker);
 
     expect(persistentUniforms.uTime).toBeGreaterThan(persistentTime);
 
@@ -1174,11 +1171,11 @@ describe("pixi presentation task system integration", () => {
     expect(root.filters).toHaveLength(1);
     expect((root.filters as unknown as GlitchTestFilter[])[0]).toBe(persistent);
     const settledPersistentTime = persistentUniforms.uTime;
-    filterSystem.tick({ deltaMS: 1200 } as Ticker);
+    screen.tick({ deltaMS: 1200 } as Ticker);
 
     expect(persistentUniforms.uTime).toBeGreaterThan(settledPersistentTime + 1);
 
-    filterSystem.applyScreenFilters(
+    screen.reconcile(
       { ...createInitialPixiStageSnapshot(), revision: 3 },
       true,
       [{ type: "screen-filter-remove", kind: "glitch", durationMs: 100, easing: "linear", wait: true }]
@@ -1200,7 +1197,7 @@ describe("pixi presentation task system integration", () => {
   });
 
   it("interpolates persistent glitch filter params and switches seed immediately", () => {
-    const { filters: filterSystem, root, tweens } = createSystems();
+    const { screen, root, tweens } = createSystems();
     const initial: PixiStageSnapshot = {
       ...createInitialPixiStageSnapshot(),
       revision: 1,
@@ -1214,12 +1211,12 @@ describe("pixi presentation task system integration", () => {
         }
       }
     };
-    filterSystem.applyScreenFilters(initial, false);
+    screen.reconcile(initial, false, []);
     const uniforms = ((root.filters as unknown as GlitchTestFilter[])[0]?.resources.glitchUniforms.uniforms);
     expect(uniforms).toBeDefined();
     if (!uniforms) throw new Error("expected glitch uniforms");
 
-    filterSystem.applyScreenFilters(
+    screen.reconcile(
       {
         ...createInitialPixiStageSnapshot(),
         revision: 2,
@@ -1233,7 +1230,8 @@ describe("pixi presentation task system integration", () => {
           }
         }
       },
-      true
+      true,
+      []
     );
 
     expect(uniforms.uSeed).toBe(9);
@@ -1553,7 +1551,7 @@ describe("pixi presentation task system integration", () => {
   });
 
   it("relayouts transient viewport effects without cancelling active tasks", () => {
-    const { effects, root, tasks, viewport } = createSystems();
+    const { effects, root, tasks, trial, viewport } = createSystems();
     effects.run(
       [
         { type: "flash", color: "#ffffff", durationMs: 100, wait: true },
@@ -1568,15 +1566,16 @@ describe("pixi presentation task system integration", () => {
           speed: 1,
           seed: 7,
           wait: true
-        },
-        { type: "trial-keyword", keywordId: "kw:test", text: "resize", evidenceId: "ev:test" }
+        }
       ],
       3
     );
+    trial.run([{ type: "trial-keyword", keywordId: "kw:test", text: "resize", evidenceId: "ev:test" }]);
 
     viewport.width = 1280;
     viewport.height = 720;
     effects.relayoutViewport();
+    trial.relayoutViewport();
 
     const transientLayer = findDescendant(root, "transient-effects", Container);
     const flash = findDescendant(transientLayer, "flash-overlay", Graphics);
@@ -1615,12 +1614,13 @@ function createSystems(overrides: {
   const tweens = new TweenSystem();
   const tasks = new PresentationTaskController();
   const rootFilters = new RootFilterStack(options);
-  const filters = new FilterSystem(options, rootFilters, tweens, tasks);
+  const filters = new ActorFilterSystem(options);
   const actors = new ActorSystem(options, filters, tweens, tasks);
-  const weather = new WeatherSystem(options, filters, tweens, tasks);
-  const screenOverlays = new ScreenOverlaySystem(options, tweens, tasks);
+  const weather = new WeatherSystem(options, tweens, tasks);
+  const screen = new PersistentScreenEffectSystem(options, rootFilters, tweens, tasks);
   const effects = new TransientEffectSystem(options, actors, rootFilters, tweens, tasks);
-  return { actors, effects, filters, root, screenOverlays, tasks, tweens, viewport, weather };
+  const trial = new TrialOverlaySystem(options);
+  return { actors, effects, filters, root, screen, tasks, trial, tweens, viewport, weather };
 }
 
 type GlitchTestFilter = Filter & {

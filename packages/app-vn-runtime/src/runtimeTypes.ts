@@ -2,6 +2,7 @@ import type {
   AssetId,
   GameUiAction,
   InputLockState,
+  PixiPresentationTaskKind,
   PixiStageSnapshot,
   RichTextDocument,
   RuntimeCommand,
@@ -43,7 +44,7 @@ export interface VnPixiStageRuntime {
 }
 
 export interface PresentationTaskObservation {
-  kind: string;
+  kind: PixiPresentationTaskKind;
   target: string;
   revision: number;
   status: "running" | "completed" | "cancelled" | "settled";

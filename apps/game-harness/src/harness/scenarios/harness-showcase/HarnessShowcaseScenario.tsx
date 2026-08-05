@@ -159,10 +159,13 @@ export function HarnessShowcaseScenario() {
                 mapId={runtime.navi.activeMapId ?? "none"}
                 mode={flow.mode}
                 pixiBackground={runtime.presentation.pixiStageRuntime.snapshot.backgroundsById.MainBackground?.appearance ?? "none"}
+                pixiActorEffects={formatPixiActorEffects(runtime.presentation.pixiStageRuntime.snapshot)}
                 pixiCharacterTone={formatPixiCharacterTone(runtime.presentation.pixiStageRuntime.snapshot)}
                 pixiCharacters={formatPixiStageCharacters(runtime.presentation.pixiStageRuntime.snapshot)}
                 pixiRevision={String(runtime.presentation.pixiStageRuntime.snapshot.revision)}
+                pixiScreenFilters={formatPixiScreenFilters(runtime.presentation.pixiStageRuntime.snapshot)}
                 pixiTasks={formatPixiPresentationTasks(runtime.presentation.pixiStageRuntime.presentationTasks)}
+                pixiWeather={formatPixiWeather(runtime.presentation.pixiStageRuntime.snapshot)}
                 pointerLockStatus={runtime.firstPersonBridge.pointerLockStatus}
                 route={String(runtime.shell.storyRuntime.state.variables.route ?? "none")}
                 substate={runtime.navi.substate}
@@ -383,11 +386,14 @@ function HarnessShowcaseReadout({
   lastOutcome,
   mapId,
   mode,
+  pixiActorEffects,
   pixiBackground,
   pixiCharacterTone,
   pixiCharacters,
   pixiRevision,
+  pixiScreenFilters,
   pixiTasks,
+  pixiWeather,
   pointerLockStatus,
   route,
   substate,
@@ -410,11 +416,14 @@ function HarnessShowcaseReadout({
   lastOutcome: string;
   mapId: string;
   mode: string;
+  pixiActorEffects: string;
   pixiBackground: string;
   pixiCharacterTone: string;
   pixiCharacters: string;
   pixiRevision: string;
+  pixiScreenFilters: string;
   pixiTasks: string;
+  pixiWeather: string;
   pointerLockStatus: string;
   route: string;
   substate: string;
@@ -446,6 +455,9 @@ function HarnessShowcaseReadout({
         <Readout label="Route" testId="harness-showcase-route" value={route} />
         <Readout label="Pixi BG" testId="harness-showcase-pixi-background" value={pixiBackground} />
         <Readout label="Pixi Rev" testId="harness-showcase-pixi-revision" value={pixiRevision} />
+        <Readout label="Weather" testId="harness-showcase-pixi-weather" value={pixiWeather} />
+        <Readout label="Screen FX" testId="harness-showcase-pixi-screen-filters" value={pixiScreenFilters} />
+        <Readout label="Actor FX" testId="harness-showcase-pixi-actor-effects" value={pixiActorEffects} />
         <Readout label="Tone" testId="harness-showcase-character-tone" value={pixiCharacterTone} />
         <Readout label="Pixi Chars" testId="harness-showcase-pixi-characters" value={pixiCharacters} wide />
         <Readout label="Pixi Tasks" testId="harness-showcase-pixi-tasks" value={pixiTasks} wide />
@@ -477,6 +489,31 @@ function countAssetDiagnostics(diagnostics: HarnessShowcaseRuntimeDiagnostic[]):
 function formatPixiCharacterTone(snapshot: PixiStageSnapshot): string {
   const tone = snapshot.characterTone;
   return tone ? `${tone.preset}@${tone.amount}` : "none";
+}
+
+function formatPixiWeather(snapshot: PixiStageSnapshot): string {
+  const entries = Object.entries(snapshot.weather).flatMap(([kind, weather]) => {
+    if (!weather) return [];
+    const power = weather.kind === "rain" ? weather.commandParams.power : weather.power;
+    return [`${kind}@${power}`];
+  });
+  return entries.length > 0 ? entries.join(", ") : "empty";
+}
+
+function formatPixiScreenFilters(snapshot: PixiStageSnapshot): string {
+  const entries = Object.entries(snapshot.screenFilters).flatMap(([kind, effect]) =>
+    effect ? [`${kind}@${effect.power}`] : []
+  );
+  return entries.length > 0 ? entries.join(", ") : "empty";
+}
+
+function formatPixiActorEffects(snapshot: PixiStageSnapshot): string {
+  const actors = { ...snapshot.backgroundsById, ...snapshot.charactersById };
+  const entries = snapshot.actorOrder.flatMap((id) => {
+    const blur = actors[id]?.filters.blur;
+    return blur !== undefined && blur > 0 ? [`${id}:blur@${blur}`] : [];
+  });
+  return entries.length > 0 ? entries.join(", ") : "empty";
 }
 
 function Readout({ label, testId, value, wide = false }: { label: string; testId: string; value: string; wide?: boolean }) {

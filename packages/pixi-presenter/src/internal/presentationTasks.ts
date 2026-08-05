@@ -1,11 +1,4 @@
-export type PixiPresentationTaskKind =
-  | "actor-transition"
-  | "character-tone-transition"
-  | "screen-filter-transition"
-  | "weather-transition"
-  | "flash"
-  | "shake"
-  | "glitch";
+import type { PixiPresentationTaskKind } from "@v-ronpa/contracts";
 
 export type PixiPresentationTaskStatus = "running" | "completed" | "cancelled" | "settled";
 

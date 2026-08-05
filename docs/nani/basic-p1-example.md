@@ -37,7 +37,6 @@ The fixture command set is intentionally small:
 - `@gameplay grant-evidence`
 - `@shake`
 - `@flash`
-- `@focus`
 - `@end`
 
 Excluded source-material features include input prompts, save/unlock/toast
@@ -102,7 +101,6 @@ Mira.Calm: The keycard belongs to the west door.[>]
 @char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Sweat01+Sweat01_01 pos:76,0
 @char Ema.Pensive1,ArmR4,Angle01/Head01/Facial01/Sweat01+Sweat01_01,Angle01/Head01/Facial01/Sweat01- pos:76,0
 Felix.Serious: The testimony starts before the evidence does.[>]
-@focus Ema duration:420
 Mira.Calm: Then listen for the contradiction before naming it.[< speed:0.8][>]
 
 @choice "Press the question" goto:#PressQuestion

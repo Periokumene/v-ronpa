@@ -117,7 +117,6 @@ baseline and downstream StoryEngine expectations:
 - `@gameplay grant-evidence`
 - `@shake`
 - `@flash`
-- `@focus`
 - `@end`
 
 The parser still preserves command IDs generically, but P1 fixtures and tests

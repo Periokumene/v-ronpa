@@ -454,15 +454,15 @@ describe("pixi presenter port", () => {
   it("diagnoses unsupported Pixi-routed runtime commands without changing the snapshot", () => {
     const initial = createInitialPixiStageSnapshot();
 
-    expect(reducePixiRuntimeCommand(initial, runtimeCommand("focus", "effect", { target: "stage", duration: 500 }))).toEqual({
+    expect(reducePixiRuntimeCommand(initial, runtimeCommand("custompulse", "effect", { power: 0.5 }))).toEqual({
       snapshot: initial,
       hints: [],
       waitTasks: [],
       diagnostics: [
         {
           code: "unsupported-pixi-command",
-          commandId: "focus",
-          message: "@focus is routed to Pixi but is not consumed by pixi-presenter yet."
+          commandId: "custompulse",
+          message: "@custompulse is routed to Pixi but is not consumed by pixi-presenter yet."
         }
       ]
     });

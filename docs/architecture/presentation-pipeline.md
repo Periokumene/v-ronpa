@@ -38,6 +38,11 @@ tasks are narrowed by `VnPixiPresenterHost` to `PresentationTaskObservation`
 before runtime sees them. `observedTasks` are diagnostic display data, never
 renderer input.
 
+Effect reducer registration, Presenter family ownership, lifecycle isolation,
+and test responsibilities are specified in [Pixi effects](pixi-effects.md).
+The bounded implementation checklist for a new effect is
+[Adding a Pixi effect](adding-pixi-effect.md).
+
 Restore remounts the story presentation session, reconciles the terminal Pixi
 snapshot with `animate: false`, and starts with no task, hint, tween, or phantom
 wait state. A saved global character tone therefore restores its target preset

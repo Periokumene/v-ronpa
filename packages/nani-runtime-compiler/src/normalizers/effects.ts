@@ -81,15 +81,6 @@ export const effectNormalizers: Readonly<Record<string, CommandNormalizerDescrip
         durationMs: runtimeParam(command, "duration") ?? 160,
         wait: runtimeParam(command, "wait") ?? false
       })
-  },
-  focus: {
-    acceptsPrimary: true,
-    consumedParams: ["target", "duration"],
-    normalize: (command) =>
-      compactParams({
-        target: runtimeCommandValue(command.primary) ?? runtimeParam(command, "target") ?? "stage",
-        durationMs: runtimeParam(command, "duration") ?? 500
-      })
   }
 };
 

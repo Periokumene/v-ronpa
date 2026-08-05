@@ -37,7 +37,7 @@ interaction state back into the machine.
   remain separate mutually exclusive DOM surfaces.
 - `asset-project`: Node-only App asset scanning, generation, validation, and Vite publishing rules.
 - `asset-registry`: App-owned AssetId-to-URL resolution and MIME capability validation.
-- `pixi-presenter`: Pixi renderer adapter only; it does not interpret runtime commands. Its private FX assets are bundled implementation details, not App manifest content.
+- `pixi-presenter`: Pixi renderer adapter only; it does not interpret runtime commands. Its top level owns only Actor, Weather, Persistent screen, Transient, and Trial families; effect leaves own their private resources. Its private FX assets are bundled implementation details, not App manifest content.
 - `navi-director` / `trial-director`: mode-specific state and flow.
 - app packages: flow/save/overlay composition, per-game content, manifest, and
   application policy callbacks; reusable runtime/Devtools/Pixi mechanisms stay
@@ -52,6 +52,8 @@ packages cannot depend on any renderer, browser storage, or audio implementation
 an app-owned overlay.
 
 See [VN integration](app-vn-integration.md), [presentation](presentation-pipeline.md),
+[Pixi effects](pixi-effects.md),
+[adding a Pixi effect](adding-pixi-effect.md),
 [assets](asset-pipeline.md), [contracts](contracts.md), and
 [Nani source diagnostics](nani-source-diagnostics.md), and
 [Nani devtools](vn-devtools.md). Browser-native interaction hardening is defined

@@ -54,6 +54,15 @@ Pixi presenter remains mounted and prepared but its ticker is paused whenever
 the VN surface is hidden. Smoke asserts these states through
 `data-r3f-rendering` and `data-pixi-rendering`.
 
+The Pixi scenario must also assert terminal Stage snapshot readouts for weather,
+persistent screen filters, and actor effects; wait tasks must reach zero at
+settled checkpoints and all effect readouts must be empty at final cleanup.
+Frame-difference checks for continuous weather/filter animation prove motion is
+active without becoming pixel-style baselines. Static effects use precise
+Presenter unit assertions and terminal readouts, while retained checkpoint
+screenshots remain human visual evidence and failure screenshots remain the
+diagnostic fallback.
+
 Trace recording is opt-in (`--trace on`) for a focused reproduction. The
 default gate keeps traces off because recording a long WebGL interaction
 materially changes its timing and can create hundreds of MiB of artifacts.

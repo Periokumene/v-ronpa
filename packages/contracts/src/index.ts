@@ -461,7 +461,6 @@ const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
   char: "pixi-presentation",
   chartone: "pixi-presentation",
   flash: "pixi-presentation",
-  focus: "pixi-presentation",
   glitch: "pixi-presentation",
   glitchfilter: "pixi-presentation",
   hidechars: "pixi-presentation",
@@ -953,7 +952,6 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
     "stubbed"
   ),
   vRonpa("flash", "effect", [param("color", "string"), param("duration", "decimal"), param("wait", "boolean")]),
-  vRonpa("focus", "effect", [param("target", "string"), param("duration", "decimal")]),
   {
     ...vRonpa("hidecue", "ui", [
       param("time", "decimal", false, "v-ronpa"),
@@ -1008,7 +1006,6 @@ const implementedCommandDocs: Record<string, NaniCommandDocs> = {
   clearchoice: { zh: "清除当前待选项；提供 id 时只清除对应选项。", examples: ["@clearChoice id:door"] },
   end: { zh: "结束当前脚本执行。", examples: ["@end"] },
   flash: { zh: "播放一次屏幕闪光效果，可指定颜色、持续时间和是否等待。", examples: ["@flash color:#ffffff duration:160 wait!"] },
-  focus: { zh: "切换舞台焦点目标，供表现层做相机或滤镜聚焦。", examples: ["@focus target:Felix duration:500"] },
   gameplay: { zh: "发出玩法状态事件，例如物品、证据、角色状态或亲密度变化。", examples: ["@gameplay grant-item item:keycard quantity:1"] },
   glitch: { zh: "播放一次故障干扰效果，适合快速冲击演出。", examples: ["@glitch power:0.8 time:0.25"] },
   glitchfilter: { zh: "设置持久故障滤镜参数，适合一段场景内持续干扰；time 会插值连续参数，seed 等离散参数在 transition start 切换，power:0 time:x 会淡出移除。", examples: ["@glitchFilter power:0.35 speed:1.2 time:0.25 wait!", "@glitchFilter power:0 time:0.3 wait!"] },
@@ -1056,7 +1053,6 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   clearchoice: ["id"],
   end: [],
   flash: ["color", "duration", "wait"],
-  focus: ["target", "duration"],
   gameplay: ["type", "quantity", "item", "itemId", "id", "evidence", "evidenceId", "character", "characterId", "status", "skill", "skillId", "delta", "affinityDelta"],
   glitch: ["time", "power", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"],
   glitchfilter: ["time", "easing", "power", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"],
@@ -1232,10 +1228,6 @@ const commandParamDocOverrides: Record<string, Record<string, Partial<NaniComman
   flash: {
     duration: { defaultValue: 160, recommendedRange: { min: 0, unit: "ms" } },
     wait: { defaultValue: false }
-  },
-  focus: {
-    duration: { defaultValue: 500, recommendedRange: { min: 0, unit: "ms" } },
-    target: { defaultValue: "stage" }
   },
   input: {
     type: { defaultValue: "string", allowedValues: ["string", "number", "boolean"] }

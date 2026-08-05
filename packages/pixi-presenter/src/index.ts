@@ -1,16 +1,14 @@
 import "pixi.js/prepare";
 import { Application, Container, Rectangle, type Ticker } from "pixi.js";
 import type { PixiStageSnapshot } from "@v-ronpa/contracts";
-import {
-  ActorSystem,
-  FilterSystem,
-  RootFilterStack,
-  ScreenOverlaySystem,
-  TransientEffectSystem,
-  TweenSystem,
-  WeatherSystem
-} from "./internal/systems";
+import { ActorFilterSystem, ActorSystem } from "./internal/systems";
+import { TweenSystem } from "./internal/effects/animation";
+import { RootFilterStack } from "./internal/effects/rootFilterStack";
+import { TransientEffectSystem } from "./internal/effects/transient/system";
+import { WeatherSystem } from "./internal/effects/weather/system";
 import { preloadBuiltInPixiFxAssets } from "./internal/fxAssets";
+import { TrialOverlaySystem } from "./internal/effects/trialOverlay";
+import { PersistentScreenEffectSystem } from "./internal/effects/persistentScreen";
 import type { PixiAssetResolver, PixiPresenterDiagnostic } from "./internal/assetResolver";
 import { PresentationTaskController, type PixiPresentationTaskSnapshot } from "./internal/presentationTasks";
 import { type PixiStageRenderHint } from "@v-ronpa/pixi-stage-model";
@@ -93,8 +91,9 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
   const tasks = new PresentationTaskController(options.onTasksChanged);
   let actors: ActorSystem | undefined;
   let weather: WeatherSystem | undefined;
-  let screenOverlays: ScreenOverlaySystem | undefined;
-  let effects: TransientEffectSystem | undefined;
+  let persistentScreen: PersistentScreenEffectSystem | undefined;
+  let transient: TransientEffectSystem | undefined;
+  let trial: TrialOverlaySystem | undefined;
   let pendingReconcile: PendingReconcile | undefined;
   let mountStarted = false;
   let initialized = false;
@@ -113,12 +112,12 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     height: () => Math.max(1, options.host.clientHeight || (initialized ? app.renderer.height : 0) || options.height || 540)
   };
   const rootFilters = new RootFilterStack({ root: stageRoot, width: size.width, height: size.height });
-  const filters = new FilterSystem({ root: stageRoot, width: size.width, height: size.height }, rootFilters, tweens, tasks);
+  const actorFilters = new ActorFilterSystem({ root: stageRoot, width: size.width, height: size.height });
 
   const tick = (ticker: Ticker) => {
     tweens.tick(ticker);
     tasks.tick(ticker.deltaMS);
-    filters.tick(ticker);
+    persistentScreen?.tick(ticker);
     weather?.tick(ticker);
   };
 
@@ -168,10 +167,11 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
       ...(options.assetResolver ? { assetResolver: options.assetResolver } : {}),
       ...(options.onDiagnostic ? { onDiagnostic: options.onDiagnostic } : {})
     };
-    actors = new ActorSystem(systemOptions, filters, tweens, tasks);
-    weather = new WeatherSystem(systemOptions, filters, tweens, tasks);
-    screenOverlays = new ScreenOverlaySystem(systemOptions, tweens, tasks);
-    effects = new TransientEffectSystem(systemOptions, actors, rootFilters, tweens, tasks);
+    actors = new ActorSystem(systemOptions, actorFilters, tweens, tasks);
+    weather = new WeatherSystem(systemOptions, tweens, tasks);
+    persistentScreen = new PersistentScreenEffectSystem(systemOptions, rootFilters, tweens, tasks);
+    transient = new TransientEffectSystem(systemOptions, actors, rootFilters, tweens, tasks);
+    trial = new TrialOverlaySystem(systemOptions);
     await actors.preloadCharacters(options.characterPreloadPlan);
     if (destroyed) return;
     app.ticker.add(tick);
@@ -226,7 +226,8 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     if (!animate) {
       tweens.clear();
       tasks.settleAllNonHold();
-      effects?.clear();
+      transient?.clear();
+      trial?.clear();
     }
     actors?.reconcile(
       snapshot,
@@ -234,10 +235,12 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
       reconcileOptions.hints ?? []
     );
     weather?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision, reconcileOptions.hints ?? []);
-    screenOverlays?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision, reconcileOptions.hints ?? []);
-    filters.applyScreenFilters(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision, reconcileOptions.hints ?? []);
-    effects?.clearTrialOverlays();
-    if (animate) effects?.run(reconcileOptions.hints ?? [], snapshot.revision);
+    persistentScreen?.reconcile(snapshot, animate && snapshot.revision !== lastRenderedSnapshot?.revision, reconcileOptions.hints ?? []);
+    trial?.clear();
+    if (animate) {
+      transient?.run(reconcileOptions.hints ?? [], snapshot.revision);
+      trial?.run(reconcileOptions.hints ?? []);
+    }
     lastRenderedSnapshot = snapshot;
     viewportKey = currentViewportKey();
   }
@@ -296,10 +299,10 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     if (nextViewportKey === viewportKey) return;
     viewportKey = nextViewportKey;
     actors?.relayoutViewport();
-    filters.relayoutViewport();
+    persistentScreen?.relayoutViewport();
     weather?.relayoutViewport();
-    screenOverlays?.relayoutViewport();
-    effects?.relayoutViewport();
+    transient?.relayoutViewport();
+    trial?.relayoutViewport();
   }
 
   function currentViewportKey(): string {
@@ -344,11 +347,11 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     pendingReconcile = undefined;
     tasks.cancelAll();
     tweens.clear();
-    filters.clear();
     actors?.clear();
     weather?.clear();
-    screenOverlays?.clear();
-    effects?.clear();
+    persistentScreen?.clear();
+    transient?.clear();
+    trial?.clear();
     lastRenderedSnapshot = undefined;
     viewportKey = currentViewportKey();
   }
@@ -361,6 +364,14 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
     app.ticker.remove(tick);
     actors?.destroy();
     actors = undefined;
+    weather?.destroy();
+    weather = undefined;
+    persistentScreen?.destroy();
+    persistentScreen = undefined;
+    transient?.destroy();
+    transient = undefined;
+    trial?.destroy();
+    trial = undefined;
     app.destroy(true);
     initialized = false;
     mounted = false;

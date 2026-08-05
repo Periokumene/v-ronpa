@@ -1271,6 +1271,22 @@ describe("nani runtime compiler", () => {
     ]);
   });
 
+  it("hard-rejects the removed @focus command without emitting runtime output", () => {
+    const result = compileRuntimeScript(parseScenario({
+      sourceText: "@focus Ema duration:420",
+      scriptPath: "removed-focus.nani"
+    }));
+
+    expect(result.script.commands).toEqual([]);
+    expect(diagnosticSummaries(result.diagnostics)).toEqual([
+      {
+        code: "unknown-command",
+        message: "Unknown .nani command: @focus.",
+        severity: "error"
+      }
+    ]);
+  });
+
   it("diagnoses only @set parameters that its selected dynamic assignment does not consume", () => {
     const sourceText = [
       "@set expression:value",

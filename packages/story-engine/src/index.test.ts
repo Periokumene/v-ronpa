@@ -303,7 +303,6 @@ describe("story engine", () => {
       "end",
       "gameplay",
       "flash",
-      "focus",
       "hidecue",
       "inback",
       "pinp",

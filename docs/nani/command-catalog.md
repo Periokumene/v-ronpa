@@ -242,7 +242,6 @@ order never implies navigation, and `@end` completes the whole entry.
 | `cue` | `cue` | text | story-control | text:string (V-Ronpa), author:string (V-Ronpa), speed:decimal (V-Ronpa), textId:string (V-Ronpa), autoNext:boolean (V-Ronpa) | text | no | implemented |
 | `end` | `end` | flow | story-control | none | none | no | implemented |
 | `flash` | `flash` | effect | pixi-presentation | color:string, duration:decimal, wait:boolean | none | no | implemented |
-| `focus` | `focus` | effect | pixi-presentation | target:string, duration:decimal | none | no | implemented |
 | `gameplay` | `gameplay` | state | gameplay | type:string, id:string, quantity:integer, item:string, itemId:string, evidence:string, evidenceId:string, character:string, characterId:string, status:string, skill:string, skillId:string, delta:integer, affinityDelta:integer | none | no | implemented |
 | `hideCue` | `hidecue` | ui | ui-output | time:decimal (V-Ronpa), wait:boolean (V-Ronpa) | none | no | implemented |
 | `inback` | `inback` | scene | pixi-presentation | appearanceAndTransition:named string, appearance:string, via:string, effect:string, visible:boolean, easing:string, time:decimal, wait:boolean | none | no | implemented |

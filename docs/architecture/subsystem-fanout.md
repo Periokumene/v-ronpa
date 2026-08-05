@@ -12,10 +12,11 @@ Use this after the contract and harness baseline is frozen.
 | app-vn-dispatch | `packages/app-vn-dispatch/**` | route/transaction/media/UI/reveal/audio tests |
 | app-vn-runtime | `packages/app-vn-runtime/**`, app VN wrapper when assigned | shared VN loop, media/voice/reveal/wait/restore tests |
 | app-vn-shell | `packages/app-vn-shell/**` | shell rendering, hit plane, settings, and overlay action tests |
+| pixi-stage-model | `packages/pixi-stage-model/**` | pure registry, snapshot, hint, wait, diagnostic, and restore-state tests |
 | gameplay | `packages/gameplay/**` | trial and inventory outcome tests |
 | navi-director | `packages/navi-director/**` | Navi substate and interaction tests |
 | trial-director | `packages/trial-director/**` | Trial segment/profile/outcome tests |
-| pixi-presenter | `packages/pixi-presenter/**`, harness route when assigned | screenshot evidence |
+| pixi-presenter | `packages/pixi-presenter/**`, harness route when assigned | effect/family lifecycle and import-isolation checks plus Harness state/motion/visual evidence |
 | r3f-adapter | `packages/r3f-adapter/**`, harness route when assigned | 3D smoke evidence |
 | ui-kit | `packages/ui-kit/**`, app CSS when assigned | DOM interaction smoke |
 | game-a | `apps/game-a/**`, `tests/smoke/game-a-*.spec.ts` | VN app build and smoke |

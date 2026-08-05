@@ -72,12 +72,12 @@ describe("VN output routes", () => {
   });
 
   it("requires explicit command or category routes for every runtime command", () => {
-    const command = runtimeCommand("focus", "effect", { target: "Ema", duration: 320 });
+    const command = runtimeCommand("customPulse", "effect", { power: 0.5 });
     const routeTable: VnOutputRouteTable = {
       ...defaultVnOutputRouteTable,
       commands: {
         ...defaultVnOutputRouteTable.commands,
-        focus: ["pixi", "debug"]
+        customPulse: ["pixi", "debug"]
       }
     };
 

@@ -727,16 +727,8 @@ describe("nani parser", () => {
               ],
             },
             {
-              "commandId": "focus",
-              "line": 15,
-              "params": {
-                "duration": 420,
-              },
-              "primary": "Ema",
-            },
-            {
               "commandId": "choice",
-              "line": 18,
+              "line": 17,
               "params": {
                 "goto": "#PressQuestion",
               },
@@ -744,7 +736,7 @@ describe("nani parser", () => {
             },
             {
               "commandId": "choice",
-              "line": 19,
+              "line": 18,
               "params": {
                 "goto": "#ListenLonger",
               },
@@ -752,7 +744,7 @@ describe("nani parser", () => {
             },
             {
               "commandId": "flash",
-              "line": 22,
+              "line": 21,
               "params": {
                 "color": "#ffe66d",
                 "duration": 160,
@@ -761,13 +753,13 @@ describe("nani parser", () => {
             },
             {
               "commandId": "goto",
-              "line": 24,
+              "line": 23,
               "params": {},
               "primary": "#TrialEnd",
             },
             {
               "commandId": "shake",
-              "line": 27,
+              "line": 26,
               "params": {
                 "actorId": "Ema",
                 "duration": 180,
@@ -777,13 +769,13 @@ describe("nani parser", () => {
             },
             {
               "commandId": "goto",
-              "line": 29,
+              "line": 28,
               "params": {},
               "primary": "#TrialEnd",
             },
             {
               "commandId": "end",
-              "line": 32,
+              "line": 31,
               "params": {},
               "primary": undefined,
             },
@@ -801,7 +793,7 @@ describe("nani parser", () => {
               "appearance": "Calm",
               "commandId": "<",
               "inlineIndex": 1,
-              "line": 16,
+              "line": 15,
               "params": {
                 "speed": 0.8,
               },
@@ -811,7 +803,7 @@ describe("nani parser", () => {
               "appearance": "Calm",
               "commandId": ">",
               "inlineIndex": 2,
-              "line": 16,
+              "line": 15,
               "params": {},
               "speaker": "Mira",
             },
@@ -819,7 +811,7 @@ describe("nani parser", () => {
               "appearance": undefined,
               "commandId": ">",
               "inlineIndex": 1,
-              "line": 23,
+              "line": 22,
               "params": {},
               "speaker": "Narrator",
             },
@@ -827,15 +819,15 @@ describe("nani parser", () => {
               "appearance": "Serious",
               "commandId": ">",
               "inlineIndex": 1,
-              "line": 28,
+              "line": 27,
               "params": {},
               "speaker": "Felix",
             },
           ],
           "labels": {
-            "ListenLonger": 21,
-            "PressQuestion": 17,
-            "TrialEnd": 25,
+            "ListenLonger": 20,
+            "PressQuestion": 16,
+            "TrialEnd": 24,
             "TrialOpening": 3,
           },
           "scriptPath": "basic-trial-discussion.p1.nani",
@@ -853,7 +845,6 @@ describe("nani parser", () => {
             "command",
             "command",
             "text",
-            "command",
             "text",
             "command",
             "command",
