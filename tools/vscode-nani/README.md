@@ -19,7 +19,11 @@ VS Code language support for V-Ronpa `.nani` scripts.
 - Completes local labels before discovered logical script paths, then completes labels from the selected target after `path.nani#`.
 - Publishes exact shared-linker diagnostics for malformed, dynamic, relative, wildcard, unknown-script, and unknown-label endpoints.
 - Resolves navigation endpoint hovers and Cmd/Ctrl+click definitions across discovered `.nani` source files.
-- Discovers the nearest `asset.config.mjs` for an opened `.nani` file and completes scanner-derived image, audio, video, model, font, JSON, and layered-character resources.
+- Discovers the nearest `asset.config.mjs` for an opened `.nani` file and completes catalog-bound image, audio, video, JSON, and layered-character resources from the scanner result.
+- Completes non-loading `@stopBgm` and `@stopSfx` path selectors from authoring-only shared catalog metadata without adding asset requirements.
+- Publishes extension-owned `nani-assets` errors for invalid, missing, wrong-capability, and unbound-character static references; dynamic expressions, media groups, and character wildcards remain unguessed.
+- Resolves valid App asset hover details and Cmd/Ctrl+click definitions to source files.
+- Provides PinP-aware completion for show and `visible:false` hide forms, plus current FontFaceId highlighting, snippet, hover, and parser-owned format diagnostics.
 - Completes layered-character expression tokens from the matching `compositions.json`, including comma-separated `@char` and `@slide` expressions.
 - Renders a native 320x420 hover preview when the pointer is over the static identity value of an `@char` command.
 - Lazily renders native IntelliSense details for a selected `@char` appearance-token candidate, showing its local image and the complete projected character without adding a persistent panel.
@@ -82,13 +86,15 @@ source `nani-project`.
 
 Project-aware completion is enabled only in a [trusted VS Code workspace](https://code.visualstudio.com/docs/editor/workspace-trust). Starting at the current `.nani` file, the extension finds the closest ancestor `asset.config.mjs`, resolves its paths from the closest `pnpm-workspace.yaml` root, and dynamically loads the config.
 
-The extension calls the shared `@v-ronpa/asset-project` scanner directly. It
+The extension calls the shared `@v-ronpa/asset-project` scanner directly. One
+project context shares that scan with completion, diagnostics, navigation,
+hover, definition, and character preview. It
 does not parse a generated TypeScript module or reproduce filename-to-ID, MIME,
 bundle, or CharacterId rules. After adding or renaming source assets, filesystem
 watching refreshes the same scanner view; `pnpm generate:assets` remains the
 repository's committed-output writer.
 
-Layered-character token names are read directly from each generated character pack's sibling `compositions.json`. Those files are watched independently, so token edits become available without regenerating or reinstalling the extension.
+Layered-character token names are read directly from each generated character pack's sibling `compositions.json`. Recursive App asset-root watching makes token edits available without regenerating or reinstalling the extension.
 
 Use **V-Ronpa Nani: Refresh Project Assets** from the Command Palette if an
 external tool changes files without producing a filesystem notification. The
@@ -97,9 +103,16 @@ extension watches `**/*.nani` below every managed root, so new, renamed, and
 deleted scripts are reindexed without editing config. Missing or malformed
 project metadata is reported in the **V-Ronpa Nani** output channel; single-file
 parser/compiler diagnostics and command hover remain available while
-project-derived completion falls back. The asset index is completion-only:
-unknown IDs are not diagnosed because external paths and dynamic IDs remain
-valid authoring inputs.
+project-derived completion falls back. Static App AssetIds are checked by the
+extension against the current scanner snapshot. These VS Code Errors do not
+alter `nani-project` fatal disposition, requirements, generation, or runtime
+behavior. When project metadata is unavailable, the extension does not publish
+source asset diagnostics from a stale snapshot.
+
+Directories organize AssetIds but do not imply capability. Capability filtering
+uses MIME only. Font files can be scanned by the App asset project, but Nani has
+no FontFace registry slot: the extension supports the existing rich-text
+FontFaceId syntax without inventing registered-face completion or definition.
 
 ## Character Assembly Preview
 

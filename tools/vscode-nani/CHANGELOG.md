@@ -2,13 +2,21 @@
 
 ## 0.8.0
 
+- Added one coherent project context for asset scanning, script analysis,
+  recursive asset/Nani/config watching, and stale-generation rejection.
 - Split project discovery between App-owned `asset.config.mjs` and sibling
   `nani.config.mjs` without changing logical entry or script identities.
 - Switched asset completion and character previews to the shared App-relative
   asset scanner, slash AssetIds, MIME capabilities, and explicit CharacterId
   bindings; removed generated-module and business-kind parsing.
-- Added catalog-driven resource binding completion for image, audio, video,
-  model, font, JSON, PinP, and character parameters.
+- Added extension-owned exact errors, hover, and source definition for static
+  App asset references without changing shared project fatal behavior.
+- Added catalog-driven non-loading `stopBgm` / `stopSfx` selector completion
+  without generating requirements.
+- Added context-correct PinP show/hide completion and current FontFaceId grammar,
+  snippet, hover, and parser-diagnostic coverage.
+- Asset completion follows actual catalog slots; FontFace registry completion
+  and model command slots are intentionally not claimed.
 
 ## 0.7.0
 

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { loadProjectScriptConfig } from "./projectScripts";
+import { loadProjectAssets } from "./projectAssetLoader";
 
 const roots: string[] = [];
 
@@ -24,6 +25,7 @@ describe("project script catalogs", () => {
     const loaded = await loadProjectScriptConfig(
       fixture.configPath,
       fixture.root,
+      emptyAssetBindings,
       async (path) => ({ default: path.endsWith("nani.config.mjs") ? naniConfig() : assetConfig(fixture.appRoot) })
     );
 
@@ -52,6 +54,7 @@ describe("project script catalogs", () => {
     const loaded = await loadProjectScriptConfig(
       fixture.configPath,
       fixture.root,
+      emptyAssetBindings,
       async (path) => ({ default: path.endsWith("nani.config.mjs") ? invalid : assetConfig(fixture.appRoot) })
     );
 
@@ -61,9 +64,11 @@ describe("project script catalogs", () => {
 
   it("indexes the real Game A managed roots without per-file registration", async () => {
     const root = resolve(process.cwd(), "../..");
+    const assets = await loadProjectAssets(join(root, "apps/game-a/asset.config.mjs"), root);
     const loaded = await loadProjectScriptConfig(
       join(root, "apps/game-a/asset.config.mjs"),
-      root
+      root,
+      assets.assetBindings
     );
 
     expect(loaded.errors).toEqual([]);
@@ -76,6 +81,12 @@ describe("project script catalogs", () => {
     expect(loaded.catalogs[1]?.scripts).toHaveLength(2);
   });
 });
+
+const emptyAssetBindings = {
+  appId: "example",
+  assets: [],
+  characterAssetIdByCharacterId: {}
+} as const;
 
 function createFixture(): { root: string; appRoot: string; configPath: string } {
   const root = mkdtempSync(join(tmpdir(), "vscode-nani-scripts-"));

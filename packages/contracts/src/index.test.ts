@@ -18,6 +18,7 @@ import {
   LayeredCharacterLayerRefSchema,
   LayeredCharacterLayerMetadataSchema,
   NaniCommandDefinitionSchema,
+  NaniCommandParamAuthoringSchema,
   NaniCommandExecutionSchema,
   NaniCommandStatusSchema,
   NaviInteractionConfirmRequestSchema,
@@ -1138,6 +1139,76 @@ describe("contracts", () => {
     });
     expect(getNaniCommandDefinition("pinp")?.params.map((param) => param.name)).toEqual([
       "assetId", "pos", "height", "ratio", "alt", "effect", "time", "visible"
+    ]);
+  });
+
+  it("exposes non-loading media selectors as authoring-only asset references", () => {
+    expect(NaniCommandParamAuthoringSchema.parse({
+      assetReference: {
+        capability: "audio",
+        resolution: "asset-id",
+        runtimeParam: "bgmPath",
+        role: "selector"
+      }
+    })).toEqual({
+      assetReference: {
+        capability: "audio",
+        resolution: "asset-id",
+        runtimeParam: "bgmPath",
+        role: "selector"
+      }
+    });
+    expect(() => NaniCommandParamAuthoringSchema.parse({
+      assetReference: {
+        capability: "audio",
+        resolution: "asset-id",
+        runtimeParam: "bgmPath",
+        role: "selector",
+        requirement: true
+      }
+    })).toThrow();
+
+    const stopBgmPath = getNaniCommandDefinition("stopBgm")?.params.find((param) => param.name === "bgmPath");
+    const stopSfxPath = getNaniCommandDefinition("stopSfx")?.params.find((param) => param.name === "sfxPath");
+    expect(stopBgmPath?.resource).toBeUndefined();
+    expect(stopBgmPath).toMatchObject({
+      authoring: {
+        assetReference: {
+          capability: "audio",
+          resolution: "asset-id",
+          runtimeParam: "bgmPath",
+          role: "selector"
+        }
+      }
+    });
+    expect(stopSfxPath?.resource).toBeUndefined();
+    expect(stopSfxPath).toMatchObject({
+      authoring: {
+        assetReference: {
+          capability: "audio",
+          resolution: "asset-id",
+          runtimeParam: "sfxPath",
+          role: "selector"
+        }
+      }
+    });
+
+    expect(naniCommandCatalog.flatMap((command) => command.params.flatMap((param) =>
+      param.authoring ? [`${command.id}.${param.name}`] : []
+    ))).toEqual(["stopbgm.bgmPath", "stopsfx.sfxPath"]);
+
+    expect(naniCommandCatalog.flatMap((command) => command.params.flatMap((param) =>
+      param.resource ? [`${command.id}.${param.name}`] : []
+    ))).toEqual([
+      "back.appearanceAndTransition",
+      "bgm.bgmPath",
+      "char.idAndAppearance",
+      "movie.moviePath",
+      "sfx.sfxPath",
+      "sfxfast.sfxPath",
+      "slide.idAndAppearance",
+      "inback.appearanceAndTransition",
+      "pinp.assetId"
     ]);
   });
 

@@ -5,7 +5,7 @@ export interface NaniDiagnostic {
   message: string;
   severity: "info" | "warning" | "error";
   span: TextSpan;
-  source: "nani";
+  source: "nani" | "nani-assets";
   code: string;
 }
 

@@ -20,10 +20,17 @@ describe("project asset loading", () => {
   it("finds the closest config and the workspace package root", () => {
     const fixture = createAssetFixture();
     const script = join(fixture.appRoot, "src/nani/story.nani");
+    const siblingRoot = join(fixture.root, "apps/other");
+    const siblingConfig = join(siblingRoot, "asset.config.mjs");
+    const siblingScript = join(siblingRoot, "nani/story.nani");
     mkdirSync(dirname(script), { recursive: true });
+    mkdirSync(dirname(siblingScript), { recursive: true });
     writeFileSync(script, "@end\n");
+    writeFileSync(siblingConfig, "export default {};\n");
+    writeFileSync(siblingScript, "@end\n");
 
     expect(findNearestAssetConfig(script, fixture.root)).toBe(fixture.configPath);
+    expect(findNearestAssetConfig(siblingScript, fixture.root)).toBe(siblingConfig);
     expect(findNaniProjectRoot(fixture.configPath, fixture.root)).toBe(fixture.root);
     expect(findNearestAssetConfig(join(fixture.root, "other/story.nani"), fixture.root)).toBeUndefined();
   });
@@ -39,8 +46,18 @@ describe("project asset loading", () => {
     const loaded = await loadProjectAssets(fixture.configPath, fixture.root);
 
     expect(loaded.index.assets).toEqual([
-      { id: "bgm/main", uri: "assets/bgm/main.ogg", mimeType: "audio/ogg" },
-      { id: "char/alice", uri: "assets/char/alice/character.json", mimeType: "application/json" }
+      {
+        id: "bgm/main",
+        uri: "assets/bgm/main.ogg",
+        mimeType: "audio/ogg",
+        sourcePath: join(fixture.appRoot, "assets/bgm/main.ogg")
+      },
+      {
+        id: "char/alice",
+        uri: "assets/char/alice/character.json",
+        mimeType: "application/json",
+        sourcePath: join(fixture.appRoot, "assets/char/alice/character.json")
+      }
     ]);
     expect(loaded.index.characters).toEqual([{ characterId: "alice", assetId: "char/alice" }]);
     expect(loaded.assetBindings.characterAssetIdByCharacterId).toEqual({ alice: "char/alice" });
@@ -50,12 +67,9 @@ describe("project asset loading", () => {
       rootPath: dirname(fixture.compositionsPath),
       characterPath: join(dirname(fixture.compositionsPath), "character.json")
     });
-    expect(loaded.watchedPaths).toEqual(expect.arrayContaining([
-      fixture.configPath,
-      fixture.compositionsPath,
-      join(dirname(fixture.compositionsPath), "character.json")
-    ]));
+    expect(loaded.watchedPaths).toEqual([fixture.configPath]);
     expect(loaded.warnings).toEqual([]);
+    expect(loaded.watchedRoots).toEqual([join(fixture.appRoot, "assets")]);
   });
 
   it("degrades malformed character compositions to warnings while retaining assets", async () => {
@@ -77,6 +91,7 @@ describe("project asset loading", () => {
         index: { assets: [], characters: [], characterTokens: {} },
         characterPacks: {},
         watchedPaths: [],
+        watchedRoots: [],
         warnings: [],
         assetBindings: { appId: "test", assets: [], characterAssetIdByCharacterId: {} }
       };

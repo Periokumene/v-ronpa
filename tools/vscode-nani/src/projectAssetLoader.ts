@@ -4,20 +4,19 @@ import { pathToFileURL } from "node:url";
 import {
   assetProjectRoot,
   scanAssetProject,
-  type AssetProjectConfig
+  type AssetProjectConfig,
+  type AssetProjectScan
 } from "@v-ronpa/asset-project";
+import type { NaniAssetBindings } from "@v-ronpa/nani-project";
 import { emptyProjectAssetIndex, parseCompositionTokens, type NaniProjectAssetIndex } from "./projectAssets";
 
 export interface LoadedProjectAssets {
   index: NaniProjectAssetIndex;
   characterPacks: Readonly<Record<string, NaniCharacterPackDescriptor>>;
   watchedPaths: string[];
+  watchedRoots: string[];
   warnings: string[];
-  assetBindings: {
-    appId: string;
-    assets: NaniProjectAssetIndex["assets"];
-    characterAssetIdByCharacterId: Readonly<Record<string, string>>;
-  };
+  assetBindings: NaniAssetBindings;
 }
 
 export interface NaniCharacterPackDescriptor {
@@ -27,7 +26,12 @@ export interface NaniCharacterPackDescriptor {
 }
 
 export class ProjectAssetLoadError extends Error {
-  constructor(message: string, readonly watchedPaths: string[], options?: ErrorOptions) {
+  constructor(
+    message: string,
+    readonly watchedPaths: string[],
+    readonly watchedRoots: string[] = [],
+    options?: ErrorOptions
+  ) {
     super(message, options);
     this.name = "ProjectAssetLoadError";
   }
@@ -77,17 +81,31 @@ export async function loadProjectAssets(
       throw new Error("Asset config must be created by defineAssetProject().");
     }
   } catch (error) {
-    throw new ProjectAssetLoadError(`Could not load asset project: ${errorMessage(error)}`, [configPath], { cause: error });
+    throw new ProjectAssetLoadError(`Could not load asset project: ${errorMessage(error)}`, [configPath], [], { cause: error });
   }
 
-  const scan = await scanAssetProject(config);
   const root = assetProjectRoot(config);
+  let scan: AssetProjectScan;
+  try {
+    scan = await scanAssetProject(config);
+  } catch (error) {
+    throw new ProjectAssetLoadError(
+      `Could not scan asset project: ${errorMessage(error)}`,
+      [configPath],
+      [root],
+      { cause: error }
+    );
+  }
+  const indexedAssets = scan.assets.map((asset) => ({
+    ...asset,
+    sourcePath: resolve(root, asset.uri.slice(`${config.mount}/`.length))
+  }));
   const characterTokens: Record<string, readonly string[]> = {};
   const characterPacks: Record<string, NaniCharacterPackDescriptor> = {};
   const warnings: string[] = [];
   const characters = Object.entries(scan.characterAssetIdByCharacterId).map(([characterId, assetId]) => ({ characterId, assetId }));
   for (const { characterId, assetId } of characters) {
-    const asset = scan.assets.find((candidate) => candidate.id === assetId);
+    const asset = indexedAssets.find((candidate) => candidate.id === assetId);
     if (!asset) continue;
     const relativeEntry = asset.uri.slice(`${config.mount}/`.length);
     const characterPath = resolve(root, relativeEntry);
@@ -110,9 +128,10 @@ export async function loadProjectAssets(
   }
 
   return {
-    index: { assets: [...scan.assets], characters, characterTokens },
+    index: { assets: indexedAssets, characters, characterTokens },
     characterPacks,
-    watchedPaths: [configPath, ...scan.files.map((file) => file.absolutePath)],
+    watchedPaths: [configPath],
+    watchedRoots: [root],
     warnings,
     assetBindings: {
       appId: config.appId,
@@ -140,6 +159,7 @@ export function disabledProjectAssets(): LoadedProjectAssets {
     index: emptyProjectAssetIndex,
     characterPacks: {},
     watchedPaths: [],
+    watchedRoots: [],
     warnings: [],
     assetBindings: { appId: "disabled", assets: [], characterAssetIdByCharacterId: {} }
   };

@@ -4,7 +4,9 @@ import {
   type AssetDefinition
 } from "@v-ronpa/contracts";
 
-export type NaniProjectAsset = AssetDefinition;
+export interface NaniProjectAsset extends AssetDefinition {
+  sourcePath: string;
+}
 
 export interface NaniProjectCharacterAsset {
   characterId: string;
@@ -29,10 +31,10 @@ export function parseCompositionTokens(sourceText: string): string[] {
 }
 
 export function assetsOfCapability(index: NaniProjectAssetIndex, capability: AssetCapability): NaniProjectAsset[] {
-  return index.assets.filter((asset) => mimeSupports(asset.mimeType, capability));
+  return index.assets.filter((asset) => mimeSupportsCapability(asset.mimeType, capability));
 }
 
-function mimeSupports(mimeType: string, capability: AssetCapability): boolean {
+export function mimeSupportsCapability(mimeType: string, capability: AssetCapability): boolean {
   if (capability === "json") return mimeType === "application/json";
   return mimeType.startsWith(`${capability}/`);
 }

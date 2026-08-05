@@ -2,6 +2,7 @@ import type { AssetCapability } from "@v-ronpa/contracts";
 import { getNaniCommandDefinition } from "@v-ronpa/contracts";
 import { lineAt, type NaniPosition, type NaniRange } from "./documentContext";
 import { assetsOfCapability, type NaniProjectAssetIndex } from "./projectAssets";
+import { assetReferenceSlot, type NaniAssetReferenceUsage } from "./resourceReferences";
 
 export interface NaniResourceCompletion {
   label: string;
@@ -25,10 +26,16 @@ export interface NaniResourceCompletionResult {
   combineWithParams: boolean;
 }
 
+export interface PinpAuthoringState {
+  hide: boolean;
+  effectNone: boolean;
+}
+
 interface ResourceSlot {
   capability: AssetCapability;
   character: boolean;
   characterCompletionPreview: boolean;
+  usage: NaniAssetReferenceUsage;
 }
 
 export function getNaniResourceCompletions(
@@ -42,6 +49,7 @@ export function getNaniResourceCompletions(
   const commandId = normalize(match?.[1] ?? "");
   const primary = resourceSlot(commandId);
   if (!commandId || !primary) return undefined;
+  if (commandId === "pinp" && pinpAuthoringState(sourceText, position).hide) return undefined;
 
   const args = match?.[2];
   const tokenStart = currentTokenStart(before);
@@ -56,6 +64,16 @@ export function getNaniResourceCompletions(
   const hasCompletedPrimary = containsCompletedPrimary(commandId, completedPrefix);
   if (hasCompletedPrimary) return undefined;
   return resourceResult(index, primary, token, position.line, tokenStart, before.length, token.length === 0);
+}
+
+export function pinpAuthoringState(sourceText: string, position: NaniPosition): PinpAuthoringState {
+  const line = lineAt(sourceText, position.line);
+  const before = line.slice(0, Math.min(position.character, line.length));
+  if (!/^\s*@pinp\b/iu.test(before)) return { hide: false, effectNone: false };
+  return {
+    hide: /(?:^|\s)visible:false(?:\s|$)/iu.test(before),
+    effectNone: /(?:^|\s)effect:none(?:\s|$)/iu.test(before)
+  };
 }
 
 function containsCompletedPrimary(commandId: string, source: string): boolean {
@@ -102,7 +120,7 @@ function resourceResult(
         label: asset.id,
         insertText: asset.id,
         range: range(line, start, end),
-        detail: `${asset.mimeType} · App asset`,
+        detail: `${asset.mimeType} · App asset · ${resourceSlot.usage}`,
         documentation: asset.uri,
         sortText: `0-${assetIndex.toString().padStart(4, "0")}`
       })),
@@ -176,12 +194,14 @@ function paramSlot(commandId: string, token: string): { slot: ResourceSlot; pref
 
 function resourceSlot(commandId: string): ResourceSlot | undefined {
   const definition = getNaniCommandDefinition(commandId);
-  const param = definition?.params.find((candidate) => candidate.resource);
-  if (!param?.resource) return undefined;
+  const param = definition?.params.find((candidate) => assetReferenceSlot(candidate));
+  const reference = param && assetReferenceSlot(param);
+  if (!reference) return undefined;
   return {
-    capability: param.resource.capability,
-    character: param.resource.resolution === "character-id",
-    characterCompletionPreview: commandId === "char"
+    capability: reference.capability,
+    character: reference.resolution === "character-id",
+    characterCompletionPreview: commandId === "char",
+    usage: reference.usage
   };
 }
 
@@ -191,11 +211,13 @@ function resourceSlotForParam(commandId: string, paramName: string): ResourceSlo
   const param = definition?.params.find((candidate) =>
     [candidate.name, ...(candidate.aliases ?? [])].some((name) => normalize(name) === normalized)
   );
-  if (!param?.resource) return undefined;
+  const reference = param && assetReferenceSlot(param);
+  if (!reference) return undefined;
   return {
-    capability: param.resource.capability,
-    character: param.resource.resolution === "character-id",
-    characterCompletionPreview: commandId === "char"
+    capability: reference.capability,
+    character: reference.resolution === "character-id",
+    characterCompletionPreview: commandId === "char",
+    usage: reference.usage
   };
 }
 

@@ -4,11 +4,11 @@ import type { NaniProjectAssetIndex } from "./projectAssets";
 
 const projectAssets: NaniProjectAssetIndex = {
   assets: [
-    { id: "char/alice", mimeType: "application/json", uri: "assets/char/alice/character.json" },
-    { id: "bg/hall", mimeType: "image/png", uri: "assets/bg/hall.png" },
-    { id: "bgm/main", mimeType: "audio/ogg", uri: "assets/bgm/main.ogg" },
-    { id: "sfx/door", mimeType: "audio/ogg", uri: "assets/sfx/door.ogg" },
-    { id: "video/intro", mimeType: "video/mp4", uri: "assets/video/intro.mp4" }
+    { id: "char/alice", mimeType: "application/json", uri: "assets/char/alice/character.json", sourcePath: "/assets/char/alice/character.json" },
+    { id: "bg/hall", mimeType: "image/png", uri: "assets/bg/hall.png", sourcePath: "/assets/bg/hall.png" },
+    { id: "bgm/main", mimeType: "audio/ogg", uri: "assets/bgm/main.ogg", sourcePath: "/assets/bgm/main.ogg" },
+    { id: "sfx/door", mimeType: "audio/ogg", uri: "assets/sfx/door.ogg", sourcePath: "/assets/sfx/door.ogg" },
+    { id: "video/intro", mimeType: "video/mp4", uri: "assets/video/intro.mp4", sourcePath: "/assets/video/intro.mp4" }
   ],
   characters: [{ characterId: "alice", assetId: "char/alice" }],
   characterTokens: {
@@ -55,6 +55,30 @@ describe("project resource completions", () => {
       start: { line: 0, character: "@bgm group:music ".length },
       end: { line: 0, character: source.length }
     });
+  });
+
+  it("completes catalog-declared stop selectors without treating groups as assets", () => {
+    const primary = "@stopBgm bgm/m";
+    const named = "@stopSfx group:rain sfxPath:sfx/d";
+
+    expect(getNaniCompletions(primary, { line: 0, character: primary.length }, projectAssets)[0])
+      .toMatchObject({ label: "bgm/main", detail: "audio/ogg · App asset · selector" });
+    expect(getNaniCompletions(named, { line: 0, character: named.length }, projectAssets)[0])
+      .toMatchObject({ label: "sfx/door", detail: "audio/ogg · App asset · selector" });
+  });
+
+  it("does not suggest PinP assets or layout parameters in the hide form", () => {
+    const hide = "@pinp visible:false ";
+    const hiddenLabels = getNaniCompletions(hide, { line: 0, character: hide.length }, projectAssets)
+      .map((completion) => completion.label);
+    expect(hiddenLabels).not.toEqual(expect.arrayContaining([
+      "bg/hall", "assetId:", "pos:", "height:", "ratio:", "alt:"
+    ]));
+    expect(hiddenLabels).toEqual(expect.arrayContaining(["effect:", "time:"]));
+
+    const none = "@pinp visible:false effect:none ";
+    expect(getNaniCompletions(none, { line: 0, character: none.length }, projectAssets)
+      .map((completion) => completion.label)).not.toContain("time:");
   });
 
   it("completes character IDs and comma-separated composition tokens", () => {

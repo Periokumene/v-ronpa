@@ -3,19 +3,44 @@ import { parseStaticNaniEndpoint } from "@v-ronpa/nani-parser";
 import { getEndpointTokenAtPosition } from "../documentContext";
 import { offsetRange, resolveNavigationTarget } from "../navigationAnalysis";
 import { NANI_LANGUAGE_ID } from "../languageFacts";
-import type { NaniProjectScriptService } from "../projectScriptService";
+import type { NaniProjectContextService } from "../projectContextService";
+import { resolveNaniAssetReferenceAtOffset } from "../resourceReferences";
 
 export function registerDefinitionProvider(
   context: vscode.ExtensionContext,
-  scripts: NaniProjectScriptService
+  project: NaniProjectContextService
 ): void {
   context.subscriptions.push(
     vscode.languages.registerDefinitionProvider(
       { language: NANI_LANGUAGE_ID },
       {
         async provideDefinition(document, position) {
-          const snapshot = await scripts.getSnapshot(document.uri);
-          if (!snapshot || !scripts.isCurrent(snapshot)) return undefined;
+          const [snapshot, loadedAssets] = await Promise.all([
+            project.getSnapshot(document.uri),
+            project.getLoaded(document.uri)
+          ]);
+          const currentScriptPath = snapshot?.analysis.navigation.currentScriptPath ?? document.uri.fsPath;
+          if (loadedAssets) {
+            const reference = resolveNaniAssetReferenceAtOffset(
+              document.getText(),
+              currentScriptPath,
+              document.offsetAt(position),
+              loadedAssets.index
+            );
+            if (reference) {
+              const target = new vscode.Range(0, 0, 0, 0);
+              return [{
+                originSelectionRange: new vscode.Range(
+                  document.positionAt(reference.span.start),
+                  document.positionAt(reference.span.end)
+                ),
+                targetUri: vscode.Uri.file(reference.asset.sourcePath),
+                targetRange: target,
+                targetSelectionRange: target
+              } satisfies vscode.LocationLink];
+            }
+          }
+          if (!snapshot || !project.isCurrent(snapshot)) return undefined;
           const token = getEndpointTokenAtPosition(document.getText(), {
             line: position.line,
             character: position.character

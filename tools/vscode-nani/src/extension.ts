@@ -7,33 +7,30 @@ import { CharacterCompletionPreviewProvider } from "./integration/completionPrev
 import { registerHoverCoordinator } from "./integration/hoverCoordinator";
 import { registerLanguageFeatures } from "./language/register";
 import { registerDefinitionProvider } from "./language/definition";
-import { NaniProjectAssetService } from "./project-resources";
-import { NaniProjectScriptService } from "./projectScriptService";
+import { NaniProjectContextService } from "./project-resources";
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("V-Ronpa Nani");
-  const projectAssets = new NaniProjectAssetService(output);
-  const projectScripts = new NaniProjectScriptService(output);
+  const project = new NaniProjectContextService(output);
   const artifactCache = new CharacterPreviewArtifactCache(
     join(context.globalStorageUri.fsPath, "character-preview")
   );
   const previewEngine = new CharacterPreviewEngine(artifactCache);
-  const characterPreview = new CharacterPreviewController(previewEngine, projectAssets, output);
-  const completionPreview = new CharacterCompletionPreviewProvider(previewEngine, projectAssets, output);
+  const characterPreview = new CharacterPreviewController(previewEngine, project, output);
+  const completionPreview = new CharacterCompletionPreviewProvider(previewEngine, project, output);
 
-  context.subscriptions.push(output, projectAssets, projectScripts, characterPreview, completionPreview);
+  context.subscriptions.push(output, project, characterPreview, completionPreview);
   context.subscriptions.push(
     vscode.commands.registerCommand("v-ronpa-nani.refreshProjectAssets", () => {
-      projectAssets.refreshAll();
-      projectScripts.refreshAll();
+      project.refreshAll();
       void vscode.window.showInformationMessage(
         "V-Ronpa Nani project assets and script catalogs refreshed."
       );
     })
   );
-  registerLanguageFeatures(context, projectAssets, projectScripts, output, completionPreview);
-  registerHoverCoordinator(context, characterPreview, projectScripts);
-  registerDefinitionProvider(context, projectScripts);
+  registerLanguageFeatures(context, project, output, completionPreview);
+  registerHoverCoordinator(context, characterPreview, project);
+  registerDefinitionProvider(context, project);
   void characterPreview.initialize().catch((error) => {
     output.appendLine(`[char-preview] Failed to initialize artifact cache: ${errorMessage(error)}`);
   });

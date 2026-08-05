@@ -157,6 +157,19 @@ describe("completion provider logic", () => {
     expect(completions[1]?.isSnippet).toBe(true);
   });
 
+  it("suggests the current FontFaceId rich-text form", () => {
+    const dialogue = "Felix: Hello <fo";
+    const explicit = '@print "Hello <font';
+    for (const source of [dialogue, explicit]) {
+      expect(getNaniCompletions(source, { line: 0, character: source.length })[0]).toMatchObject({
+        label: '<font face="serif">…</font>',
+        insertText: '<font face="${1:serif}">${2:text}</font>',
+        kind: "snippet",
+        isSnippet: true
+      });
+    }
+  });
+
   it("limits explicit staged-text completions to the supported static body forms", () => {
     const labels = (source: string) => getNaniCompletions(source, {
       line: 0,

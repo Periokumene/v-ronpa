@@ -344,6 +344,120 @@ suite("V-Ronpa Nani exact diagnostics", () => {
     assert.ok(diagnostic.message.includes("produced by both"));
   });
 
+  test("publishes exact editor-only asset errors and provides selector authoring features", async () => {
+    const source = [
+      "#Start",
+      "@back bg/missing",
+      "@stopBgm misc/not-audio",
+      "@stopSfx sfx:legacy",
+      "@stopBgm bgm/main"
+    ].join("\n");
+    const fixture = await createResourceFixture("authoring.nani", source);
+    const document = await vscode.workspace.openTextDocument(fixture.storyUri);
+    await vscode.window.showTextDocument(document);
+
+    const diagnostics = await waitForDiagnostics(document.uri, (values) =>
+      ["asset-missing", "asset-capability-mismatch", "invalid-asset-id"].every((code) =>
+        values.some((diagnostic) => diagnostic.code === code && diagnostic.source === "nani-assets")
+      )
+    );
+    assert.deepEqual(
+      diagnostics
+        .filter((diagnostic) => diagnostic.source === "nani-assets")
+        .map((diagnostic) => document.getText(diagnostic.range)),
+      ["bg/missing", "misc/not-audio", "sfx:legacy"]
+    );
+
+    const selectorLine = 4;
+    const selectorPosition = new vscode.Position(selectorLine, "@stopBgm bgm/ma".length);
+    const completions = await executeCompletions(document.uri, selectorPosition, 0);
+    assert.ok(completions.items.some((item) => completionLabel(item) === "bgm/main"));
+
+    const hover = await executeHover(document.uri, new vscode.Position(selectorLine, "@stopBgm bgm/".length + 2));
+    assert.match(hover, /Nani App asset · selector/u);
+    assert.match(hover, /audio\/ogg/u);
+
+    const definitions = await waitForDefinitions(
+      document.uri,
+      new vscode.Position(selectorLine, "@stopBgm bgm/".length + 2),
+      (values) => values.length === 1
+    );
+    assert.equal(definitionTargetUri(definitions[0]!).toString(), fixture.bgmUri.toString());
+  });
+
+  test("refreshes missing-asset diagnostics after create and rename without a command", async () => {
+    const fixture = await createResourceFixture("refresh.nani", "#Start\n@back bg/new");
+    const document = await vscode.workspace.openTextDocument(fixture.storyUri);
+    await vscode.window.showTextDocument(document);
+    await waitForDiagnostic(document.uri, (diagnostic) => diagnostic.code === "asset-missing");
+
+    const created = vscode.Uri.joinPath(fixture.appUri, "assets/bg/new.png");
+    await vscode.workspace.fs.writeFile(created, Buffer.from("png"));
+    await waitForDiagnostics(document.uri, (values) =>
+      !values.some((diagnostic) => diagnostic.code === "asset-missing")
+    );
+
+    await vscode.workspace.fs.rename(created, vscode.Uri.joinPath(fixture.appUri, "assets/bg/renamed.png"));
+    const missing = await waitForDiagnostic(document.uri, (diagnostic) => diagnostic.code === "asset-missing");
+    assert.equal(document.getText(missing.range), "bg/new");
+  });
+
+  test("recovers project indexing when nani.config.mjs is broken, deleted, and repaired", async () => {
+    const fixture = await createResourceFixture("config-repair.nani", "#Start\n@stopBgm bgm/main");
+    const document = await vscode.workspace.openTextDocument(fixture.storyUri);
+    await vscode.window.showTextDocument(document);
+    await executeCompletions(document.uri, new vscode.Position(1, "@stopBgm bgm/ma".length), 0);
+
+    await vscode.workspace.fs.writeFile(fixture.naniConfigUri, Buffer.from("export default {};\n"));
+    await waitForDiagnostic(
+      fixture.configUri,
+      (diagnostic) => diagnostic.code === "invalid-project-script-config"
+    );
+
+    await vscode.workspace.fs.delete(fixture.naniConfigUri);
+    await waitForDiagnostic(
+      fixture.configUri,
+      (diagnostic) => diagnostic.code === "invalid-project-script-config"
+        && /cannot find|no such file|module not found/iu.test(diagnostic.message)
+    );
+
+    await vscode.workspace.fs.writeFile(fixture.naniConfigUri, Buffer.from(fixture.naniConfigSource));
+    await waitForDiagnostics(
+      fixture.configUri,
+      (diagnostics) => !diagnostics.some((diagnostic) => diagnostic.code === "invalid-project-script-config")
+    );
+    const completions = await waitForCompletions(
+      document.uri,
+      new vscode.Position(1, "@stopBgm bgm/ma".length),
+      (items) => items.some((item) => completionLabel(item) === "bgm/main")
+    );
+    assert.ok(completions.items.some((item) => completionLabel(item) === "bgm/main"));
+  });
+
+  test("clears source asset errors while asset configuration is invalid and restores them after repair", async () => {
+    const fixture = await createResourceFixture("asset-config-repair.nani", "#Start\n@back bg/missing");
+    const document = await vscode.workspace.openTextDocument(fixture.storyUri);
+    await vscode.window.showTextDocument(document);
+    await waitForDiagnostic(document.uri, (diagnostic) => diagnostic.code === "asset-missing");
+
+    await vscode.workspace.fs.writeFile(fixture.configUri, Buffer.from("export default {};\n"));
+    await waitForDiagnostic(
+      fixture.configUri,
+      (diagnostic) => diagnostic.source === "nani-assets" && diagnostic.code === "invalid-project-assets"
+    );
+    await waitForDiagnostics(
+      document.uri,
+      (diagnostics) => !diagnostics.some((diagnostic) => diagnostic.source === "nani-assets")
+    );
+
+    await vscode.workspace.fs.writeFile(fixture.configUri, Buffer.from(fixture.assetConfigSource));
+    await waitForDiagnostics(
+      fixture.configUri,
+      (diagnostics) => !diagnostics.some((diagnostic) => diagnostic.code === "invalid-project-assets")
+    );
+    await waitForDiagnostic(document.uri, (diagnostic) => diagnostic.code === "asset-missing");
+  });
+
   test("renders a real layered character artifact only on the @char identity hover", async () => {
     const fixture = await createCharacterPreviewFixture();
     const source = "@char alice.EYE1 time:not-a-number";
@@ -520,6 +634,56 @@ async function createCharacterPreviewFixture(): Promise<{ bodyPng: vscode.Uri; p
   await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(layers, "MOUTH2.png"), png);
   await vscode.commands.executeCommand("v-ronpa-nani.refreshProjectAssets");
   return { bodyPng, png };
+}
+
+async function createResourceFixture(fileName: string, source: string): Promise<{
+  appUri: vscode.Uri;
+  storyUri: vscode.Uri;
+  bgmUri: vscode.Uri;
+  configUri: vscode.Uri;
+  naniConfigUri: vscode.Uri;
+  assetConfigSource: string;
+  naniConfigSource: string;
+}> {
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+  assert.ok(workspaceFolder);
+  const appUri = vscode.Uri.joinPath(workspaceFolder.uri, `resource-${fileName.replace(/\W/gu, "-")}`);
+  const storyUri = vscode.Uri.joinPath(appUri, `nani/${fileName}`);
+  const bgmUri = vscode.Uri.joinPath(appUri, "assets/bgm/main.ogg");
+  const configUri = vscode.Uri.joinPath(appUri, "asset.config.mjs");
+  const naniConfigUri = vscode.Uri.joinPath(appUri, "nani.config.mjs");
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "nani"));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "assets/bg"));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "assets/bgm"));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "assets/misc"));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(appUri, "src"));
+  await writeWorkspaceFile("pnpm-workspace.yaml", "packages: []\n");
+  await vscode.workspace.fs.writeFile(storyUri, Buffer.from(source));
+  await vscode.workspace.fs.writeFile(bgmUri, Buffer.from("ogg"));
+  await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(appUri, "assets/misc/not-audio.png"), Buffer.from("png"));
+  const assetConfigSource = `export default ${JSON.stringify({
+      appId: "example",
+      root: "assets",
+      mount: "assets",
+      generatedModule: "src/generatedAssets.ts",
+      bundleRoots: [],
+      configDir: appUri.fsPath
+    }, null, 2)};\n`;
+  await vscode.workspace.fs.writeFile(configUri, Buffer.from(assetConfigSource));
+  const naniConfigSource = `export default ${JSON.stringify({
+      scopes: { production: { sourceRoot: `${appUri.path.split("/").pop()}/nani`, scriptRoot: "game" } },
+      mainEntry: {
+        id: "vn:main",
+        scope: "production",
+        initialScriptPath: `game/${fileName}`,
+        startLabel: "Start"
+      },
+      testEntries: {},
+      voiceLocales: []
+    }, null, 2)};\n`;
+  await vscode.workspace.fs.writeFile(naniConfigUri, Buffer.from(naniConfigSource));
+  await vscode.commands.executeCommand("v-ronpa-nani.refreshProjectAssets");
+  return { appUri, storyUri, bgmUri, configUri, naniConfigUri, assetConfigSource, naniConfigSource };
 }
 
 async function createNavigationFixture(duplicate = false): Promise<{
@@ -711,6 +875,10 @@ function completionDocumentation(item: vscode.CompletionItem): string {
   const documentation = item.documentation;
   assert.ok(documentation, `Expected resolved documentation for ${completionLabel(item)}`);
   return typeof documentation === "string" ? documentation : documentation.value;
+}
+
+function definitionTargetUri(value: vscode.Location | vscode.LocationLink): vscode.Uri {
+  return "targetUri" in value ? value.targetUri : value.uri;
 }
 
 function artifactUrisFromMarkdown(markdown: string): vscode.Uri[] {
