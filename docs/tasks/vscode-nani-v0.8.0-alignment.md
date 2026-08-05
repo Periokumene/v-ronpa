@@ -14,7 +14,7 @@
 - Owner: `Codex`
 - Created: `2026-08-05`
 - Updated: `2026-08-05`
-- Completed Commit: `TBD`
+- Completed Commit: `cd84670`
 - Archive Target: `docs/archive/completed-tasks/vscode-nani-v0.8.0-alignment.md`
 
 ## Goal
@@ -140,6 +140,19 @@ BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tas
 - Changed-files and strict-boundary summary.
 - Tests, gates, VSIX filename, and SHA-256.
 - Remaining editor-only validation limitations.
+
+Validation notes:
+
+- Extension unit tests, typecheck, production build, and three consecutive
+  Extension Host runs pass from an isolated worktree.
+- Contracts, CCR, command-doc, boundary, task-boundary, asset, diagnostics, and
+  both App build gates pass without changing their source files.
+- `pnpm test`, `validate:subsystem`, and `validate:baseline` stop only on the two
+  existing `scripts/nani-semantic-golden.test.ts` harness-showcase expectations.
+  The same source/IR/revision hash mismatch reproduces at the untouched base
+  commit `9a956b7`; the task does not update App content or golden snapshots.
+- Packaged artifact: `v-ronpa-nani-0.8.0.vsix` (8 files), SHA-256
+  `795ad78726f1c42d5451fdc4a5518845356edf9d5113769f6a950df5e00f7135`.
 
 ## Merge Target
 
