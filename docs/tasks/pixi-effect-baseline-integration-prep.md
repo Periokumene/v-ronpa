@@ -10,11 +10,11 @@
 
 ## Status
 
-- State: `Review`
+- State: `Done`
 - Owner: `Codex`
 - Created: `2026-08-08`
 - Updated: `2026-08-09`
-- Completed Commit: `TBD`
+- Completed Commit: `42e3bde`
 - Archive Target: `docs/archive/completed-tasks/pixi-effect-baseline-integration-prep.md`
 
 ## Goal
@@ -134,5 +134,5 @@ rollback is required.
 ## Done When
 
 - Full gates and final naming audit pass.
-- The prep branch contains one independent integration-preparation commit and
-  is not pushed or merged automatically.
+- Integration preparation was finalized in `42e3bde`; an explicit merge into
+  `integration/v-ronpa-baseline` was requested on 2026-08-09.
