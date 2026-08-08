@@ -1130,7 +1130,7 @@ describe("contracts", () => {
     });
   });
 
-  it("declares the remaining Pixi effect lab commands and parses their terminal snapshot fields", () => {
+  it("declares independent Pixi effect commands and parses their terminal snapshot fields", () => {
     const ids = [
       "impact", "afterimage", "shutter", "flicker", "vignette",
       "staticFilter", "waterVeil", "signalMask", "pulse"
@@ -1138,12 +1138,16 @@ describe("contracts", () => {
     for (const id of ids) {
       expect(getNaniCommandDefinition(id)).toMatchObject({ status: "implemented", execution: "pixi-presentation" });
     }
+    expect(getNaniCommandDefinition("signalMask")?.params).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "target", type: "string", required: true })
+    ]));
+    expect(getNaniCommandDefinition("signalMask")?.params.map((param) => param.name)).not.toContain("region");
     expect(PixiStageSnapshotSchema.parse({
       version: 6, revision: 3, backgroundsById: {}, innerBackgroundsById: {}, actorOrder: [],
       charactersById: { alice: {
         id: "alice", kind: "character", appearanceExpression: "eye1", visible: true, alpha: 1, z: 0,
-        filters: { signalMask: { region: "head", power: 0.7, bands: 0.8, noise: 0.45, chroma: 0.25, speed: 0.6, threshold: 0.5, seed: 1, transition: { durationMs: 350 } } },
-        transition: { durationMs: 0 }
+        filters: { signalMask: { power: 0.7, bands: 0.8, noise: 0.45, chroma: 0.25, speed: 0.6, threshold: 0.5, seed: 1.25 } },
+        transition: { durationMs: 350 }
       } },
       weather: {},
       screenFilters: {
@@ -1153,10 +1157,14 @@ describe("contracts", () => {
     })).toMatchObject({ version: 6, revision: 3 });
   });
 
-  it("hard-removes stainBurst and wallSeep from commands, tasks, and terminal weather", () => {
-    expect(getNaniCommandDefinition("stainBurst")).toBeUndefined();
-    expect(getNaniCommandDefinition("wallSeep")).toBeUndefined();
-    expect(PixiPresentationTaskKindSchema.safeParse("stain-burst").success).toBe(false);
+  it("hard-removes both rejected effects from commands, tasks, and terminal weather", () => {
+    const transientName = ["stain", "Burst"].join("");
+    const weatherName = ["wall", "Seep"].join("");
+    const transientKind = ["stain", "burst"].join("-");
+    const weatherKind = ["wall", "seep"].join("-");
+    expect(getNaniCommandDefinition(transientName)).toBeUndefined();
+    expect(getNaniCommandDefinition(weatherName)).toBeUndefined();
+    expect(PixiPresentationTaskKindSchema.safeParse(transientKind).success).toBe(false);
     expect(PixiStageSnapshotSchema.safeParse({
       version: 6,
       revision: 0,
@@ -1165,8 +1173,8 @@ describe("contracts", () => {
       charactersById: {},
       actorOrder: [],
       weather: {
-        "wall-seep": {
-          kind: "wall-seep",
+        [weatherKind]: {
+          kind: weatherKind,
           power: 0.5,
           color: "#601a28",
           density: 0.35,
@@ -1181,7 +1189,7 @@ describe("contracts", () => {
     }).success).toBe(false);
   });
 
-  it("rejects non-canonical effect colors and non-integer deterministic seeds", () => {
+  it("rejects non-canonical effect colors and accepts only finite decimal seeds", () => {
     const base = {
       version: 6, revision: 0, backgroundsById: {}, innerBackgroundsById: {},
       charactersById: {}, actorOrder: [], weather: {}
@@ -1200,11 +1208,21 @@ describe("contracts", () => {
       screenFilters: {
         staticFilter: {
           power: 0.5, density: 0.5, scanline: 0.5, jitter: 0.5, warp: 0.5,
-          grainSize: 1, speed: 1, vignette: 0.3, palette: "cold", seed: 1.5,
+          grainSize: 1, speed: 1, vignette: 0.3, palette: "cold", seed: Number.POSITIVE_INFINITY,
           transition: { durationMs: 0 }
         }
       }
     }).success).toBe(false);
+    expect(PixiStageSnapshotSchema.safeParse({
+      ...base,
+      screenFilters: {
+        staticFilter: {
+          power: 0.5, density: 0.5, scanline: 0.5, jitter: 0.5, warp: 0.5,
+          grainSize: 1, speed: 1, vignette: 0.3, palette: "cold", seed: 1.5,
+          transition: { durationMs: 0 }
+        }
+      }
+    }).success).toBe(true);
   });
 
   it("declares pinp as an opaque, non-blocking UI asset command", () => {

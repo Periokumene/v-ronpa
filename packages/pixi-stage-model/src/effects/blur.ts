@@ -3,6 +3,7 @@ import { PIXI_MAIN_BACKGROUND_ID } from "@v-ronpa/contracts";
 import { resolvePixiActorTarget } from "../actorTargets";
 import {
   changedSnapshot,
+  emptyReduction,
   numberParam,
   stringParam,
   timingTransition,
@@ -19,9 +20,12 @@ export function reduceBlur(snapshot: PixiStageSnapshot, command: RuntimeCommand)
   }
   const power = numberParam(command, "power", 0);
   let next = snapshot;
+  const changedTargets: string[] = [];
   for (const target of targets) {
     const actor = next.backgroundsById[target] ?? next.charactersById[target];
     if (!actor) continue;
+    const currentPower = actor.filters.blur;
+    if ((power <= 0 && currentPower === undefined) || (power > 0 && currentPower === power)) continue;
     const filters = { ...actor.filters };
     if (power <= 0) delete filters.blur;
     else filters.blur = power;
@@ -29,6 +33,8 @@ export function reduceBlur(snapshot: PixiStageSnapshot, command: RuntimeCommand)
     next = actor.kind === "background"
       ? { ...next, backgroundsById: { ...next.backgroundsById, [target]: updated } }
       : { ...next, charactersById: { ...next.charactersById, [target]: updated } };
+    changedTargets.push(target);
   }
-  return withWaitTasks(command, changedSnapshot(next), "actor-transition", targets);
+  if (changedTargets.length === 0) return emptyReduction(snapshot);
+  return withWaitTasks(command, changedSnapshot(next), "actor-transition", changedTargets);
 }

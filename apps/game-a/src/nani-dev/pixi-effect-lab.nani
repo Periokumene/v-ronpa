@@ -61,10 +61,10 @@ nar: CHECKPOINT LAB 15 WATER VEIL
 nar: WATER VEIL ACTIVE — 当前只有水幕效果；观察完成后会先移除，再进入下一种效果。
 @waterVeil power:0 time:0.45 wait!
 
-nar: SIGNAL MASK（信号遮罩）：只破坏目标角色的指定区域；条带、噪声和色差会跟随角色，并在表情切换的交叉淡化期间保持连续。
+nar: SIGNAL MASK（信号遮罩）：对目标角色合成后的完整立绘应用条带、噪声和色差；表情层和交叉淡化结果共用同一个外层效果。
 nar: CHECKPOINT LAB 16 SIGNAL MASK
-@signalMask target:alice region:head power:0.82 bands:0.88 noise:0.64 chroma:0.52 speed:1.1 threshold:0.42 seed:9 time:0.6 wait!
-nar: SIGNAL MASK ACTIVE — 当前只有角色头部信号遮罩，不在此脚本叠加表情切换或其他效果。
+@signalMask target:alice power:0.82 bands:0.88 noise:0.64 chroma:0.52 speed:1.1 threshold:0.42 seed:9.25 time:0.6 wait!
+nar: SIGNAL MASK ACTIVE — 当前只有完整角色信号遮罩，不在此脚本叠加表情切换或其他效果。
 @signalMask target:alice power:0 time:0.35 wait!
 
 nar: PULSE（脉冲）：从 origin 周期性向外扩散环形回波，并对历史画面产生折射和色差；rate 控制频率，echoes 控制同屏回波数量。

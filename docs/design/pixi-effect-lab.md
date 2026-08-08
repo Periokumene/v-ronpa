@@ -63,7 +63,7 @@ guide. The concrete sequence proven by this lab is:
 2. Add semantic contract params. Do not expose shader uniforms, texture sizes,
    pass counts, or renderer-specific blend modes.
 3. Add one compiler normalizer with defaults and strict authoring validation.
-   Preserve replay determinism with integer seeds and canonical color/vector
+   Preserve replay determinism with finite decimal seeds and canonical color/vector
    forms.
 4. Add one pure Stage reducer. Decide terminal snapshot versus finite hint,
    emit the matching wait descriptor, and add restore/no-op/invalid tests.
@@ -131,8 +131,8 @@ Processing chain:
 4. A damped overshoot restores the scene after the main deformation.
 
 The visual envelope spends roughly 12% on compression/exposure, 26% on smear
-and chroma, and the remainder on an over-shooting recovery. `outExpo` is the
-authoring default. This combines ideas from Adobe's
+and chroma, and the remainder on an over-shooting recovery. Baseline `easeOut`
+is the authoring default. This combines ideas from Adobe's
 [Directional/Radial Blur and Sharpen](https://helpx.adobe.com/after-effects/desktop/apply-effects-and-animation-presets/list-of-effects/blur-sharpen-effects.html)
 without applying a costly full blur pass.
 
@@ -163,7 +163,8 @@ Intent: an eyelid, iris, or slicing occlusion that feels bodily and lens-bound.
 Processing chain:
 
 1. Total seconds are partitioned into close, authored hold, and open intervals.
-2. Close uses `inCubic`; open uses `outQuint` so the two directions do not mirror.
+2. Close and open are partitioned inside the shader while the command uses only
+   the baseline easing vocabulary.
 3. Shape distance fields are anti-aliased at viewport pixel scale. Eyelid edges
    receive a small low-frequency skew disturbance.
 4. Near closure, a localized lens pinch, desaturation, and cool black bias build
@@ -245,10 +246,11 @@ control separate perceptual stages. The processing vocabulary follows Adobe's
 Intent: corrupt a character's identity while keeping the white silhouette
 recognizable.
 
-The effect is installed after tone and before outline on every active expression
-carrier. A feathered head ellipse or full-body matte gates held horizontal bands,
-local sample replacement, mosaic/posterization, threshold noise, and opposing
-R/B delay. Both sides of a crossfade share one integrated phase. Processing is
+The effect is installed once on the actor's outer composited container, after
+character-internal tone/outline and before Blur and actor-local transients. It
+processes the complete character with held horizontal bands, local sample
+replacement, mosaic/posterization, threshold noise, and opposing R/B delay.
+Both sides of a crossfade therefore share one filter and phase. Processing is
 performed in straight RGB and re-premultiplied by the original actor alpha, so
 transparent pixels cannot emit rectangular noise or colored fringes.
 
@@ -291,8 +293,8 @@ they provide:
 - full filter-stack stress, weather coexistence, isolation removal, and final
   cleanup in both scripts.
 
-The development text snapshot exposes terminal screen/weather/actor effects,
-hints, animation state, and active presentation tasks. This is read-only harness
+The development text snapshot exposes one canonical `pixi.snapshot` plus
+runtime hints, animation state, and active presentation tasks. This is read-only harness
 observability; none of it is added to the product VN runtime boundary.
 
 ## Performance Validation
@@ -301,10 +303,9 @@ The browser smoke always records profiles and only enforces hardware budgets
 when `PIXIEFFECT_PERF_ASSERT=1`. This avoids treating SwiftShader, energy-saving
 CI, or a remote VM as the declared high-end desktop target.
 
-The smoke records 90 samples for stable scenes after 20 warm-up frames and 30
-samples for finite Afterimage after five warm-up frames. The generated
-`test-results/game-a-effects-lab-performance.json` contains the current Pulse,
-Afterimage, Domestic Pressure, and full persistent-stack measurements.
+Performance sampling is separate from functional assertions. The generated
+`test-results/game-a-effects-performance.json` contains Domestic Pressure and
+full persistent-stack measurements; budgets remain opt-in.
 
 These are `requestAnimationFrame` frame intervals, not disjoint GPU timer-query
 results. They validate delivery cadence and the requested median budgets but

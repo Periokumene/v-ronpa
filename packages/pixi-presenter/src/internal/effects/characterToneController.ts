@@ -11,6 +11,7 @@ export class CharacterToneController {
   private live: CharacterToneLiveState | undefined;
   private target: PixiCharacterToneSnapshot | undefined;
   private enabled = false;
+  private removing = false;
 
   constructor(tweens: TweenSystem, private readonly tasks: PresentationTaskController) {
     this.transition = new LiveParamTransition(tweens, tasks);
@@ -31,6 +32,8 @@ export class CharacterToneController {
       return;
     }
     if (animate && sameSnapshot(this.target, next)) return;
+    if (this.removing) this.transition.cancel(false);
+    this.removing = false;
     const targetLive = characterToneTarget(next.preset, next.amount);
     const scopeChanged = this.target !== undefined && this.target.scopeScriptPath !== next.scopeScriptPath;
     if (!this.live || !this.enabled || (scopeChanged && animate && next.transition.durationMs > 0)) {
@@ -59,6 +62,7 @@ export class CharacterToneController {
     this.presentations.clear();
     this.live = undefined;
     this.target = undefined;
+    if (this.removing) return;
   }
 
   private remove(animate: boolean, revision: number, hints: PixiStageRenderHint[]): void {
@@ -74,6 +78,7 @@ export class CharacterToneController {
       return;
     }
     const live = this.live;
+    this.removing = true;
     this.transition.start({
       state: live,
       to: { ...live, amount: 0 },
@@ -94,6 +99,7 @@ export class CharacterToneController {
 
   private disable(): void {
     this.enabled = false;
+    this.removing = false;
     for (const presentation of this.presentations) presentation.setTone(undefined);
   }
 }

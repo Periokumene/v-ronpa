@@ -166,15 +166,11 @@ export function durationMsParam(command: RuntimeCommand, fallback: number): numb
 
 export function sceneVector2Param(
   command: RuntimeCommand,
-  key: string,
-  fallback?: [number, number]
+  key: string
 ): [number, number] | undefined {
   const list = numericList(command.params[key]);
-  if (list.length === 0) return fallback;
-  const x = list[0] !== undefined ? list[0] / 100 : fallback?.[0];
-  const y = list[1] !== undefined ? list[1] / 100 : fallback?.[1];
-  if (x === undefined || y === undefined) return undefined;
-  return [x, y];
+  if (list.length !== 2) return undefined;
+  return [list[0]! / 100, list[1]! / 100];
 }
 
 export function vector3Param(command: RuntimeCommand, key: string): [number, number, number] | undefined {

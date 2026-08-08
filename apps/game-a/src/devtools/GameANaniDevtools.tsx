@@ -123,6 +123,7 @@ export function GameANaniDevtools({
           materializationModeLocked: current.controller.materializationModeLocked,
           viewedScriptPath: current.controller.viewedScriptPath,
           runtimeScriptPath: current.controller.runtimeScriptPath,
+          scriptPaths: current.controller.scripts.map((script) => script.scriptPath),
           revision: current.controller.scripts.find((script) => script.viewed)?.revision ?? null,
           lineCount: current.controller.lines.length,
           previewableLineCount: current.controller.lines.filter(canPreviewVnDevtoolsLine).length,
@@ -137,18 +138,8 @@ export function GameANaniDevtools({
           choices: current.runtime.shell.storyRuntime.state.pendingChoices.map((choice) => choice.text)
         },
         pixi: {
-          revision: pixiSnapshot.revision,
+          snapshot: pixiSnapshot,
           animate: pixiRuntime.animate,
-          backgrounds: Object.keys(pixiSnapshot.backgroundsById),
-          characters: Object.keys(pixiSnapshot.charactersById),
-          weather: Object.keys(pixiSnapshot.weather),
-          weatherEffects: pixiSnapshot.weather,
-          screenFilters: pixiSnapshot.screenFilters,
-          actorEffects: Object.fromEntries(
-            Object.entries(pixiSnapshot.charactersById)
-              .filter(([, actor]) => Object.keys(actor.filters).length > 0)
-              .map(([actorId, actor]) => [actorId, actor.filters])
-          ),
           hints: pixiRuntime.hints,
           hintSequence: pixiRuntime.hintSequence,
           presentationTasks: pixiRuntime.presentationTasks

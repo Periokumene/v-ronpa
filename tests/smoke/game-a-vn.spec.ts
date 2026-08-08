@@ -212,9 +212,11 @@ test("game-a ships product UI while exercising the test-only VN entry", async ({
       choices: []
     },
     pixi: {
-      backgrounds: ["MainBackground"],
-      characters: ["alice"],
-      weather: ["rain"]
+      snapshot: {
+        backgroundsById: { MainBackground: expect.any(Object) },
+        charactersById: { alice: expect.any(Object) },
+        weather: { rain: expect.any(Object) }
+      }
     },
     stableCheckpoint: {
       ui: {
@@ -643,10 +645,12 @@ interface GameATextSnapshot {
     choices: string[];
   };
   pixi: {
-    revision: number;
-    backgrounds: string[];
-    characters: string[];
-    weather: string[];
+    snapshot: {
+      revision: number;
+      backgroundsById: Record<string, unknown>;
+      charactersById: Record<string, unknown>;
+      weather: Record<string, unknown>;
+    };
   };
   [key: string]: unknown;
 }
@@ -680,7 +684,7 @@ async function exerciseNaniSourceSaveFlow(page: Page, workbench: ReturnType<Page
       .toContain("Source mapping updated");
     const afterNoOp = await readGameSnapshot(page);
     expect(afterNoOp.story.storySession).toBe(beforeNoOp.story.storySession);
-    expect(afterNoOp.pixi.revision).toBe(beforeNoOp.pixi.revision);
+    expect(afterNoOp.pixi.snapshot.revision).toBe(beforeNoOp.pixi.snapshot.revision);
     expect(await page.evaluate(() =>
       (window as Window & { __naniPixiLayer?: Element | null }).__naniPixiLayer
         === document.querySelector('[data-testid="pixi-layer"]')

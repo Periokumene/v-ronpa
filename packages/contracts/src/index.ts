@@ -656,8 +656,6 @@ const effectTimingParams = [
   param("wait", "boolean")
 ];
 
-const seededEffectParams = [param("seed", "decimal")];
-
 const audioParams = [
   param("volume", "decimal"),
   param("loop", "boolean"),
@@ -951,7 +949,7 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
   vRonpa("flicker", "effect", [
     param("power", "decimal"), param("bursts", "integer"), param("irregularity", "decimal"),
     param("invert", "decimal"), param("white", "decimal"), param("tear", "decimal"),
-    param("chroma", "decimal"), ...seededEffectParams, ...effectTimingParams
+    param("chroma", "decimal"), param("seed", "decimal"), ...effectTimingParams
   ]),
   vRonpa("impact", "effect", [
     param("power", "decimal"), param("origin", "decimal list"), param("direction", "decimal"),
@@ -972,9 +970,9 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
   ]),
   {
     ...vRonpa("signalmask", "effect", [
-      param("target", "string"), param("region", "string"), param("power", "decimal"),
+      param("target", "string", true), param("power", "decimal"),
       param("bands", "decimal"), param("noise", "decimal"), param("chroma", "decimal"),
-      param("speed", "decimal"), param("threshold", "decimal"), ...seededEffectParams, ...effectTimingParams
+      param("speed", "decimal"), param("threshold", "decimal"), param("seed", "decimal"), ...effectTimingParams
     ]),
     canonicalName: "signalMask"
   },
@@ -983,7 +981,7 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
       param("power", "decimal"), param("density", "decimal"), param("scanline", "decimal"),
       param("jitter", "decimal"), param("warp", "decimal"), param("grainSize", "decimal"),
       param("speed", "decimal"), param("vignette", "decimal"), param("palette", "string"),
-      ...seededEffectParams, ...effectTimingParams
+      param("seed", "decimal"), ...effectTimingParams
     ]),
     canonicalName: "staticFilter"
   },
@@ -996,7 +994,7 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
     ...vRonpa("waterveil", "effect", [
       param("power", "decimal"), param("level", "decimal"), param("ripple", "decimal"),
       param("drift", "decimal"), param("blur", "decimal"), param("tint", "string"),
-      param("droplets", "decimal"), ...seededEffectParams, ...effectTimingParams
+      param("droplets", "decimal"), param("seed", "decimal"), ...effectTimingParams
     ]),
     canonicalName: "waterVeil"
   },
@@ -1109,7 +1107,7 @@ const implementedCommandDocs: Record<string, NaniCommandDocs> = {
   sfxfast: { zh: "播放快速音效，适合高频反馈；当前 runtime 只消费路径、音量和分组。", examples: ["@sfxFast sfx/click volume:0.8"] },
   shake: { zh: "对舞台或目标播放震动效果，可设置次数、强度、方向和等待。", examples: ["@shake target:stage power:0.5 count:3 duration:150 wait!"] },
   shutter: { zh: "播放一次眼睑、虹膜或切片形态的非对称闭合快门。", examples: ["@shutter shape:eyelid hold:0.08 time:0.48 wait!"] },
-  signalmask: { zh: "为目标角色的头部或全身设置持续信号遮罩破坏。", examples: ["@signalMask target:alice region:head power:0.7 time:0.35", "@signalMask target:alice power:0 time:0.3 wait!"] },
+  signalmask: { zh: "对目标角色合成后的完整立绘、表情层与交叉淡化结果应用持续信号遮罩破坏。", examples: ["@signalMask target:alice power:0.7 time:0.35", "@signalMask target:alice power:0 time:0.3 wait!"] },
   showprinter: { zh: "显示文本框或切换到指定文本打印器。", examples: ["@showPrinter default time:0.2"] },
   showui: { zh: "显示 runtime UI 组；未指定目标时显示所有 v1 UI 组。", examples: ["@showUI commandBar visible:true"] },
   slide: { zh: "让角色从一个位置滑动到另一个位置，并可控制可见性、缓动和等待。", examples: ["@slide Felix.Happy from:-0.5,0 to:0.5,0 wait!"] },
@@ -1162,7 +1160,7 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   sfxfast: ["sfxPath", "volume", "group"],
   shake: ["actorId", "target", "count", "loop", "time", "deltaTime", "power", "deltaPower", "hor", "ver", "wait", "intensity", "duration"],
   shutter: ["power", "shape", "color", "hold", "skew", "time", "easing", "wait"],
-  signalmask: ["target", "region", "power", "bands", "noise", "chroma", "speed", "threshold", "seed", "time", "easing", "wait"],
+  signalmask: ["target", "power", "bands", "noise", "chroma", "speed", "threshold", "seed", "time", "easing", "wait"],
   showprinter: ["printerId", "time"],
   showui: ["uINames", "target", "visible", "time", "wait"],
   slide: ["idAndAppearance", "from", "to", "visible", "easing", "time", "lazy", "wait"],
@@ -1920,15 +1918,13 @@ export const PixiActorFilterSnapshotSchema = z
     blur: z.number().nonnegative().optional(),
     bokeh: z.number().nonnegative().optional(),
     signalMask: z.object({
-      region: z.enum(["head", "full"]).default("head"),
       power: z.number().min(0).max(1),
       bands: z.number().min(0).max(1),
       noise: z.number().min(0).max(1),
       chroma: z.number().min(0).max(1),
       speed: z.number().nonnegative(),
       threshold: z.number().min(0).max(1),
-      seed: z.number().int(),
-      transition: z.lazy(() => PixiActorTransitionSnapshotSchema)
+      seed: z.number().finite()
     }).strict().optional()
   })
   .default({});
@@ -2010,7 +2006,7 @@ export const PixiSnowWeatherSnapshotSchema = z.object({
   sway: z.number().nonnegative().optional(),
   fog: z.number().nonnegative().optional(),
   noise: z.number().nonnegative().optional(),
-  seed: z.number().optional(),
+  seed: z.number().finite().optional(),
   pos: PixiVector2Schema.optional(),
   position: PixiVector3Schema.optional(),
   rotation: PixiVector3Schema.optional(),
@@ -2065,7 +2061,7 @@ export const PixiScreenFiltersSnapshotSchema = z
         pixelScatter: z.number().nonnegative().optional(),
         colorNoise: z.number().nonnegative().optional(),
         speed: z.number().nonnegative().optional(),
-        seed: z.number().optional(),
+        seed: z.number().finite().optional(),
         transition: PixiActorTransitionSnapshotSchema
       })
       .optional(),
@@ -2080,12 +2076,12 @@ export const PixiScreenFiltersSnapshotSchema = z
       scanline: z.number().min(0).max(1), jitter: z.number().min(0).max(1),
       warp: z.number().min(0).max(1), grainSize: z.number().positive(), speed: z.number().nonnegative(),
       vignette: z.number().min(0).max(1), palette: z.enum(["cold", "sepia", "green", "mono"]),
-      seed: z.number().int(), transition: PixiActorTransitionSnapshotSchema
+      seed: z.number().finite(), transition: PixiActorTransitionSnapshotSchema
     }).strict().optional(),
     waterVeil: z.object({
       power: z.number().min(0).max(1), level: z.number().min(0).max(1),
       ripple: z.number().min(0).max(1), drift: z.number().finite(), blur: z.number().min(0).max(1),
-      tint: PixiEffectColorSchema, droplets: z.number().min(0).max(1), seed: z.number().int(),
+      tint: PixiEffectColorSchema, droplets: z.number().min(0).max(1), seed: z.number().finite(),
       transition: PixiActorTransitionSnapshotSchema
     }).strict().optional(),
     pulse: z.object({

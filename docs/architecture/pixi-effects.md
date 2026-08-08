@@ -45,12 +45,11 @@ The private implementation map is intentionally concrete:
 
 | Scope | Owner |
 |---|---|
-| Actor composition | `systems.ts`, `characters.ts`, and dedicated blur/tone/signal-mask integration |
+| Actor composition | `systems.ts`, `characters.ts`, `effects/actorFilters.ts`, and independent blur, tone, and signal-mask leaves |
 | Weather family | `effects/weather/system.ts`, with separate rain/snow/sun renderers |
 | Persistent screen | `effects/persistentScreen.ts` and its fixed controller registry |
 | Transient family | `effects/transient/system.ts` and per-family finite controllers |
 | Shared glitch mechanics | `effects/glitchShader.ts`; it contains no persistent or transient lifecycle |
-| Effect-lab mechanics | `effects/effectLabShader.ts`; Presenter-private shader/history construction only |
 | Trial | `effects/trialOverlay.ts`; it is not registered as an effect |
 
 The bokeh controller owns root blur and overlay together, so both consume one
@@ -90,6 +89,22 @@ filter. Reconciliation must preserve actor-local transient filters and other
 controller-owned filters. Persistent controllers must also avoid replaying the
 transition stored in an unchanged terminal snapshot when an unrelated Stage
 family advances the global revision.
+
+The fixed actor processing order is:
+
+```text
+character-internal tone/outline -> SignalMask -> Blur -> actor-local transient
+```
+
+SignalMask is attached once to the actor's outer composited container. Expression
+crossfade carriers do not own copies, so outgoing and incoming expression layers
+share one continuous full-character effect.
+
+Every persistent controller uses the same lifecycle contract: typed terminal
+comparison, strict no-op reconciliation, live-value interruption, timed removal
+that survives unrelated revisions, reversal when re-enabled during removal,
+immediate `animate:false` restore, and idempotent owned-resource cleanup. Pure
+waiting is not synthesized from an identical terminal command.
 
 ## Dependencies And Risk Removal
 

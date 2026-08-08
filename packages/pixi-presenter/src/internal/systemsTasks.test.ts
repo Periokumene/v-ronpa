@@ -87,6 +87,29 @@ describe("pixi presentation task system integration", () => {
     expect(container.filters).toEqual([transient]);
   });
 
+  it("applies one outer SignalMask before Blur and actor-local transient filters", () => {
+    const root = new Container();
+    const filters = new ActorFilterSystem({ root, width: () => 960, height: () => 540 });
+    const actor = {
+      ...characterActor("Ema", "Pensive1"),
+      filters: {
+        blur: 0.4,
+        signalMask: { power: 0.7, bands: 0.8, noise: 0.45, chroma: 0.25, speed: 0.6, threshold: 0.5, seed: 1.25 }
+      }
+    };
+    const container = new Container();
+    const transient = { destroy: vi.fn() } as unknown as Filter;
+    container.filters = [transient];
+
+    filters.applyActorFilters(container, actor);
+    expect(container.filters).toHaveLength(3);
+    expect(allFilterResourceNames(container)[0]).toBe("signalMaskUniforms");
+    expect(container.filters?.[2]).toBe(transient);
+    filters.releaseActorFilters(container);
+    expect(container.filters).toEqual([transient]);
+    expect(() => filters.destroy()).not.toThrow();
+  });
+
   it("preloads character packs before ActorSystem starts synchronous reconciliation", async () => {
     const load = vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
     const fetch = installCharacterPackFetch();
@@ -1224,6 +1247,51 @@ describe("pixi presentation task system integration", () => {
     expect(root.filterArea).toBeUndefined();
   });
 
+  it("owns every new persistent screen effect as an independent semantic filter", () => {
+    const { root, screen, tasks, tweens } = createSystems();
+    const stage = {
+      ...createInitialPixiStageSnapshot(),
+      revision: 1,
+      screenFilters: {
+        waterVeil: { power: 0.5, level: 0.18, ripple: 0.35, drift: -0.1, blur: 0.12, tint: "#6c8390", droplets: 0.5, seed: 1.25, transition: { durationMs: 100, lazy: false, wait: true } },
+        pulse: { power: 0.6, rate: 92, origin: [0.5, 0.52] as [number, number], echoes: 3, expansion: 0.035, edge: 0.65, distortion: 0.35, chroma: 0.18, decay: 0.72, color: "#b8d6d8", transition: { durationMs: 100, lazy: false, wait: true } },
+        staticFilter: { power: 0.6, density: 0.7, scanline: 0.65, jitter: 0.45, warp: 0.35, grainSize: 1, speed: 1, vignette: 0.35, palette: "cold" as const, seed: 2.5, transition: { durationMs: 100, lazy: false, wait: true } },
+        vignette: { power: 0.5, radius: 0.62, softness: 0.3, color: "#160a10", breathe: 0.06, grain: 0.03, transition: { durationMs: 100, lazy: false, wait: true } }
+      }
+    };
+    screen.reconcile(stage, true, []);
+    expect(allFilterResourceNames(root)).toEqual([
+      "waterVeilUniforms", "pulseUniforms", "staticFilterUniforms", "vignetteUniforms"
+    ]);
+    expect(tasks.snapshot().map((task) => task.target)).toEqual(["waterVeil", "pulse", "staticFilter", "vignette"]);
+    tick(tweens, 120);
+    expect(tasks.snapshot()).toEqual([]);
+
+    screen.reconcile({ ...stage, revision: 2 }, true, []);
+    expect(tasks.snapshot()).toEqual([]);
+    const { staticFilter: _staticFilter, ...remainingFilters } = stage.screenFilters;
+    screen.reconcile({ ...stage, revision: 3, screenFilters: remainingFilters }, true,
+      [{ type: "screen-filter-remove", kind: "staticFilter", durationMs: 100, easing: "linear", wait: true }]);
+    expect(allFilterResourceNames(root)).toEqual([
+      "waterVeilUniforms", "pulseUniforms", "staticFilterUniforms", "vignetteUniforms"
+    ]);
+    expect(tasks.snapshot()).toEqual([expect.objectContaining({ target: "staticFilter", status: "running" })]);
+    tick(tweens, 40);
+    const restartedStatic = { ...stage.screenFilters.staticFilter, power: 0.8, transition: { durationMs: 100, lazy: false, wait: true } };
+    screen.reconcile({ ...stage, revision: 4, screenFilters: { ...stage.screenFilters, staticFilter: restartedStatic } }, true, []);
+    expect(tasks.snapshot()).toEqual([expect.objectContaining({ target: "staticFilter", revision: 4, status: "running" })]);
+    tick(tweens, 120);
+    expect(allFilterResourceNames(root)).toEqual([
+      "waterVeilUniforms", "pulseUniforms", "staticFilterUniforms", "vignetteUniforms"
+    ]);
+    screen.reconcile({ ...stage, revision: 5, screenFilters: remainingFilters }, true,
+      [{ type: "screen-filter-remove", kind: "staticFilter", durationMs: 100, easing: "linear", wait: true }]);
+    tick(tweens, 120);
+    expect(allFilterResourceNames(root)).toEqual(["waterVeilUniforms", "pulseUniforms", "vignetteUniforms"]);
+    screen.destroy();
+    expect(() => screen.destroy()).not.toThrow();
+  });
+
   it("interpolates persistent glitch filter params and switches seed immediately", () => {
     const { screen, root, tweens } = createSystems();
     const initial: PixiStageSnapshot = {
@@ -2051,6 +2119,16 @@ function filterResourceNames(composition: Container): string[] {
     if ("characterOutlineUniforms" in filter.resources) return ["characterOutlineUniforms"];
     if ("characterOpacityUniforms" in filter.resources) return ["characterOpacityUniforms"];
     return [];
+  });
+}
+
+function allFilterResourceNames(container: Container): string[] {
+  const known = [
+    "signalMaskUniforms", "waterVeilUniforms", "pulseUniforms", "staticFilterUniforms", "vignetteUniforms"
+  ];
+  return (container.filters ?? []).flatMap((filter) => {
+    const resources = (filter as unknown as { resources?: Record<string, unknown> }).resources;
+    return resources ? known.filter((key) => key in resources) : [];
   });
 }
 

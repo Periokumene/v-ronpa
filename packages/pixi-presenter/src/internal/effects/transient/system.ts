@@ -8,7 +8,10 @@ import type { RootFilterStack } from "../rootFilterStack";
 import { FlashEffectController } from "./flash";
 import { TransientGlitchEffectController } from "./glitch";
 import { ShakeEffectController } from "./shake";
-import { EffectLabTransientController } from "./effectLab";
+import { AfterimageEffectController } from "./afterimage";
+import { FlickerEffectController } from "./flicker";
+import { ImpactEffectController } from "./impact";
+import { ShutterEffectController } from "./shutter";
 import type { TransientActorTargetResolver, TransientEffectController } from "./types";
 
 type FlashHint = Extract<PixiStageRenderHint, { type: "flash" }>;
@@ -44,10 +47,10 @@ export class TransientEffectSystem {
     const flash = new FlashEffectController(options, this.layer, tweens, tasks);
     const shake = new ShakeEffectController(options, actors, tweens, tasks);
     const glitch = new TransientGlitchEffectController(options, rootFilters, tweens, tasks);
-    const impact = new EffectLabTransientController("impact", options, actors, rootFilters, tweens, tasks);
-    const afterimage = new EffectLabTransientController("afterimage", options, actors, rootFilters, tweens, tasks);
-    const shutter = new EffectLabTransientController("shutter", options, actors, rootFilters, tweens, tasks);
-    const flicker = new EffectLabTransientController("flicker", options, actors, rootFilters, tweens, tasks);
+    const impact = new ImpactEffectController(options, rootFilters, tweens, tasks);
+    const afterimage = new AfterimageEffectController(options, actors, rootFilters, tweens, tasks);
+    const shutter = new ShutterEffectController(options, rootFilters, tweens, tasks);
+    const flicker = new FlickerEffectController(rootFilters, tweens, tasks);
     this.registry = Object.freeze({
       flash: { controller: flash, run: (hint, revision) => flash.run(hint as FlashHint, revision) },
       shake: { controller: shake, run: (hint, revision) => shake.run(hint as ShakeHint, revision) },

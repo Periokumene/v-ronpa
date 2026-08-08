@@ -109,6 +109,7 @@ export class WeatherSystem {
     const isUpdate = isNew || record.snapshot.transition !== snapshot.transition ||
       !sameTerminalWeather(record.snapshot, snapshot);
     if (!isUpdate) return;
+    if (record.removing) record.transition.cancel(false);
     record.snapshot = snapshot;
     record.removing = false;
     record.transition.start({
@@ -193,7 +194,23 @@ function weatherLiveParams(snapshot: PixiWeatherSnapshot): NumericLiveState {
 function clamp01(value: number): number { return Math.max(0, Math.min(1, value)); }
 
 function sameTerminalWeather(left: PixiWeatherSnapshot, right: PixiWeatherSnapshot): boolean {
-  const { transition: _leftTransition, ...leftVisual } = left;
-  const { transition: _rightTransition, ...rightVisual } = right;
-  return JSON.stringify(leftVisual) === JSON.stringify(rightVisual);
+  if (left.kind !== right.kind) return false;
+  if (left.kind === "rain" && right.kind === "rain") {
+    return left.commandParams.power === right.commandParams.power && left.commandParams.wind === right.commandParams.wind &&
+      left.commandParams.hue === right.commandParams.hue && left.commandParams.tint === right.commandParams.tint;
+  }
+  if (left.kind === "sun" && right.kind === "sun") {
+    return left.power === right.power && sameVector(left.pos, right.pos) && sameVector(left.position, right.position) &&
+      sameVector(left.rotation, right.rotation) && sameVector(left.scale, right.scale);
+  }
+  return left.kind === "snow" && right.kind === "snow" && left.power === right.power && left.xSpeed === right.xSpeed &&
+    left.ySpeed === right.ySpeed && left.density === right.density && left.flakeScale === right.flakeScale &&
+    left.sway === right.sway && left.fog === right.fog && left.noise === right.noise && left.seed === right.seed &&
+    sameVector(left.pos, right.pos) && sameVector(left.position, right.position) &&
+    sameVector(left.rotation, right.rotation) && sameVector(left.scale, right.scale);
+}
+
+function sameVector(left: readonly number[] | undefined, right: readonly number[] | undefined): boolean {
+  if (!left || !right) return left === right;
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }

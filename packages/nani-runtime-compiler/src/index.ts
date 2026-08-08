@@ -20,7 +20,6 @@ import type { CommandDiagnosticContext } from "./types";
 import {
   createCommandDiagnostic,
   diagnoseCharacterToneParams,
-  diagnoseEffectLabParams,
   diagnoseExecutionBoundaryParams,
   diagnoseIgnoredPromotedPrimary,
   diagnosePinpParams,
@@ -285,8 +284,8 @@ function compileCommand(
   const validationDiagnostics = [
     ...validateCommandAgainstCatalog(bound, definition, diagnosticContext),
     ...diagnoseCharacterToneParams(bound, definition, diagnosticContext),
-    ...diagnoseEffectLabParams(bound, definition, diagnosticContext),
-    ...diagnosePinpParams(bound, definition, diagnosticContext)
+    ...diagnosePinpParams(bound, definition, diagnosticContext),
+    ...diagnoseExecutionBoundaryParams(bound, definition, diagnosticContext)
   ];
   const commandMigratedDiagnostics = [
     ...diagnoseIgnoredPromotedPrimary(bound, definition, normalizer, diagnosticContext),
@@ -304,8 +303,6 @@ function compileCommand(
   diagnostics.push(
     ...diagnoseUnsupportedImplementedParams(bound, definition, normalizer, diagnosticContext)
   );
-  diagnostics.push(...diagnoseExecutionBoundaryParams(bound, definition, diagnosticContext));
-
   const sourceCommand = {
     rawCommandId: command.commandId,
     ...(shape.primary ? { rawPrimary: plainCommandValue(shape.primary) } : {}),

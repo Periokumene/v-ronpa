@@ -27,6 +27,7 @@ composed usage.
 
 - Follow `docs/ccr/pixi-effect-lab.md` for the public command, IR, stage snapshot, and wait-task additions.
 - Preserve the `.nani -> compiler -> session/dispatch -> pixi-stage-model -> presentation port -> pixi-presenter` ownership chain.
+- Treat “lab” only as the development-script/task grouping; production code uses independent peer effect leaves and no batch wrapper.
 - The effect lab targets high-end desktop presentation and intentionally contains an opt-in high-frequency flicker sequence.
 
 ## Constraints
@@ -54,7 +55,9 @@ composed usage.
 - `apps/game-a/src/nani-dev/pixi-effect-compositions.nani`
 - `apps/game-a/src/devtools/**`
 - `apps/game-a/src/generatedAssets.test.ts`
-- `tests/smoke/game-a-effects-lab.spec.ts`
+- `tests/smoke/game-a-effects-individual.spec.ts`
+- `tests/smoke/game-a-effects-compositions.spec.ts`
+- `tests/smoke/game-a-effects-helpers.ts`
 - `tests/smoke/game-a-multi-nani.spec.ts`
 - `playwright.config.ts`
 - `scripts/validate-boundaries.mjs`
@@ -69,7 +72,7 @@ composed usage.
 ## Contracts
 
 - Add the nine commands and their semantic authoring params to the Nani catalog.
-- Extend Pixi terminal snapshots for vignette, staticFilter, waterVeil, pulse, and signalMask.
+- Extend Pixi terminal snapshots for vignette, staticFilter, waterVeil, pulse, and full-character signalMask. SignalMask requires target and uses the actor transition only.
 - Extend render hints and Pixi presentation wait-task kinds for impact, afterimage, shutter, and flicker.
 - Preserve `PixiStageSnapshot.version === 6` and SaveData compatibility.
 
@@ -108,7 +111,7 @@ pnpm typecheck
 pnpm validate:contracts
 pnpm validate:boundaries
 pnpm --filter @v-ronpa/game-a build
-pnpm test:smoke -- --project game-a-product tests/smoke/game-a-effects-lab.spec.ts
+pnpm test:smoke -- --project game-a-product tests/smoke/game-a-effects-individual.spec.ts tests/smoke/game-a-effects-compositions.spec.ts
 BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tasks/pixi-effect-lab.md
 ```
 
@@ -129,8 +132,8 @@ BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tas
 
 - Nine typed semantic commands, compiler validation/defaults, pure Stage reducers,
   snapshots/hints/waits, and fixed Presenter-family integrations.
-- Half-resolution captured history for Pulse and Afterimage and actor crossfade
-  SignalMask.
+- Separately owned bounded history for Pulse and Afterimage, plus one outer
+  full-composition SignalMask shared by actor crossfade carriers.
 - Separate development-only `pixi-effect-lab.nani` and
   `pixi-effect-compositions.nani` scenes, read-only Devtools diagnostics,
   generated command documentation, CCR, architecture updates, and the detailed
@@ -151,14 +154,11 @@ BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tas
 
 ### Visual And Performance Evidence
 
-- Representative images: `test-results/game-a-effects-lab-impact.png`,
-  `game-a-effects-lab-afterimage.png`,
-  `game-a-effects-lab-flicker-frame-3.png`, `game-a-effects-lab-pulse-frame-4.png`,
-  `game-a-effects-lab-signalMask.png`, `game-a-effects-lab-stress-stack.png`, and
-  `game-a-effects-lab-cleanup.png`.
-- The smoke records current Pulse, Afterimage, Domestic Pressure, and full
-  persistent-stack frame profiles in
-  `test-results/game-a-effects-lab-performance.json`; methodology is documented
+- Representative images are emitted by the individual and composition specs
+  under `test-results/game-a-effects-individual-*` and
+  `test-results/game-a-effects-composition-*`.
+- The smoke records Domestic Pressure and full persistent-stack frame profiles
+  in `test-results/game-a-effects-performance.json`; methodology is documented
   in `docs/design/pixi-effect-lab.md`.
 - Browser console/page errors were empty; final screen/weather/actor snapshots,
   hints, and presentation tasks were empty.

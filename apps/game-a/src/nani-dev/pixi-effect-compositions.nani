@@ -21,9 +21,9 @@ alice: 你能不能不要再问了。
 @pulse power:0 time:0.3 wait!
 
 nar: CHECKPOINT COMPOSITION 02 BROKEN TELEVISION
-nar: 损坏电视组合：全屏静电干扰和角色头部信号遮罩同时运行，让环境与人物共享失真语汇；对白后用故障闪烁完成信号崩溃。
+nar: 损坏电视组合：全屏静电干扰和完整角色信号遮罩同时运行，让环境与人物共享失真语汇；对白后用故障闪烁完成信号崩溃。
 @staticFilter power:0.74 density:0.82 scanline:0.78 jitter:0.68 warp:0.58 grainSize:1 speed:1.35 vignette:0.46 palette:green seed:23 time:0.45
-@signalMask target:alice region:head power:0.9 bands:0.92 noise:0.72 chroma:0.62 speed:1.25 threshold:0.38 seed:29 time:0.45 wait!
+@signalMask target:alice power:0.9 bands:0.92 noise:0.72 chroma:0.62 speed:1.25 threshold:0.38 seed:29.5 time:0.45 wait!
 alice: 在身边的人变成都市怪谈里的电波头之前。
 @flicker power:0.8 bursts:6 irregularity:0.85 invert:0.75 white:0.62 tear:0.9 chroma:0.65 seed:31 time:0.52 wait!
 @signalMask target:alice power:0 time:0.3

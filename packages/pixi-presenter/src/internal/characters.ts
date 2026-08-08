@@ -25,22 +25,6 @@ import {
   type CharacterToneFilter,
   type CharacterToneLiveState
 } from "./characterTone";
-import {
-  createEffectLabFilter,
-  setEffectLabResolution,
-  type EffectLabShaderRecord
-} from "./effects/effectLabShader";
-
-export interface CharacterSignalMaskState {
-  region: "head" | "full";
-  power: number;
-  bands: number;
-  noise: number;
-  chroma: number;
-  speed: number;
-  threshold: number;
-  seed: number;
-}
 
 export interface CharacterSystemOptions {
   width: () => number;
@@ -107,7 +91,6 @@ interface CharacterOpacityState {
 interface MountedCharacterComposition extends CharacterCompositionInstance {
   opacity: CharacterOpacityState;
   tone?: CharacterToneFilter;
-  signalMask?: EffectLabShaderRecord;
   outline?: CharacterOutlineFilter;
   opacityFilter?: CharacterOpacityFilter;
 }
@@ -527,8 +510,6 @@ export class CharacterPresentation {
   private activeTransition: { outgoing: MountedCharacterComposition; incoming: MountedCharacterComposition } | undefined;
   private crossfadeIsolation?: CharacterOpacityFilter;
   private toneLive: CharacterToneLiveState | undefined;
-  private signalMaskLive: CharacterSignalMaskState | undefined;
-  private signalMaskPhase = 0;
   private destroyed = false;
 
   constructor(actorId: string, private readonly options: CharacterSystemOptions) {
@@ -582,9 +563,6 @@ export class CharacterPresentation {
 
   relayout(): void {
     this.root.scale.set(this.options.height() / 540);
-    for (const instance of this.activeInstances()) {
-      if (instance.signalMask) setEffectLabResolution(instance.signalMask, this.options.width(), this.options.height());
-    }
     this.syncOutlineTransform();
   }
 
@@ -598,25 +576,6 @@ export class CharacterPresentation {
     if (this.destroyed) return;
     this.toneLive = state;
     for (const instance of this.activeInstances()) this.syncInstanceTone(instance);
-  }
-
-  setSignalMask(state: CharacterSignalMaskState | undefined): void {
-    if (this.destroyed) return;
-    if (!state || state.power <= 0.001) this.signalMaskPhase = 0;
-    this.signalMaskLive = state && state.power > 0.001 ? state : undefined;
-    for (const instance of this.activeInstances()) this.syncInstanceSignalMask(instance);
-  }
-
-  tick(deltaMs: number): void {
-    if (this.destroyed || deltaMs <= 0) return;
-    const deltaSeconds = deltaMs / 1000;
-    if (this.signalMaskLive) this.signalMaskPhase += deltaSeconds * Math.max(0, this.signalMaskLive.speed);
-    for (const instance of this.activeInstances()) {
-      if (instance.signalMask) {
-        instance.signalMask.uniforms.uTime += deltaSeconds;
-        instance.signalMask.uniforms.uPhase = this.signalMaskPhase;
-      }
-    }
   }
 
   syncOutlineTransform(): void {
@@ -657,7 +616,6 @@ export class CharacterPresentation {
       opacity: { value: 1 }
     };
     if (this.toneLive) mounted.tone = createCharacterToneFilter(this.toneLive);
-    if (this.signalMaskLive) mounted.signalMask = createSignalMaskFilter(this.signalMaskLive, this.signalMaskPhase, this.options);
     if (this.options.characterOutlineEnabled && instance.sourcePixelStep !== undefined) {
       mounted.outline = createCharacterOutlineFilter();
     }
@@ -707,7 +665,6 @@ export class CharacterPresentation {
     if (!instance || instance.container.destroyed) return;
     instance.container.filters = null;
     instance.tone?.filter.destroy();
-    instance.signalMask?.filter.destroy();
     instance.outline?.filter.destroy();
     instance.opacityFilter?.filter.destroy();
     instance.container.removeFromParent();
@@ -759,23 +716,9 @@ export class CharacterPresentation {
   private syncInstanceFilterStack(instance: MountedCharacterComposition): void {
     const filters = [
       instance.tone?.filter,
-      instance.signalMask?.filter as unknown as Filter | undefined,
       instance.outline?.filter ?? instance.opacityFilter?.filter
     ].filter((filter): filter is Filter => Boolean(filter));
     instance.container.filters = filters.length > 0 ? filters : null;
-  }
-
-  private syncInstanceSignalMask(instance: MountedCharacterComposition): void {
-    if (!this.signalMaskLive) {
-      if (!instance.signalMask) return;
-      instance.signalMask.filter.destroy();
-      delete instance.signalMask;
-      this.syncInstanceFilterStack(instance);
-      return;
-    }
-    instance.signalMask ??= createSignalMaskFilter(this.signalMaskLive, this.signalMaskPhase, this.options);
-    applySignalMaskState(instance.signalMask, this.signalMaskLive, this.signalMaskPhase);
-    this.syncInstanceFilterStack(instance);
   }
 
   private syncCrossfadeIsolationPadding(): void {
@@ -785,29 +728,6 @@ export class CharacterPresentation {
       this.outputFilter(this.activeTransition.incoming)?.filter.padding ?? 0
     );
   }
-}
-
-function createSignalMaskFilter(
-  state: CharacterSignalMaskState,
-  phase: number,
-  options: CharacterSystemOptions
-): EffectLabShaderRecord {
-  const record = createEffectLabFilter("signalMask", options.width(), options.height());
-  applySignalMaskState(record, state, phase);
-  return record;
-}
-
-function applySignalMaskState(record: EffectLabShaderRecord, state: CharacterSignalMaskState, phase: number): void {
-  const u = record.uniforms;
-  u.uPower = state.power;
-  u.uA = state.region === "head" ? 0 : 1;
-  u.uB = state.bands;
-  u.uC = state.noise;
-  u.uD = state.speed;
-  u.uE = state.chroma;
-  u.uF = state.threshold;
-  u.uSeed = state.seed;
-  u.uPhase = phase;
 }
 
 function createCharacterOutlineFilter(): CharacterOutlineFilter {

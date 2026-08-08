@@ -100,7 +100,7 @@ describe("TransientEffectSystem", () => {
     expect(suite.tasks.snapshot()).toEqual([]);
   });
 
-  it("runs and cleans every remaining effect-lab transient with distinct shader programs", () => {
+  it("runs and cleans every independent transient with semantic shader resources", () => {
     const suite = createTransientSuite(() => undefined);
     suite.effects.run([
       { type: "impact", power: 1, origin: [0.5, 0.5], direction: 0, smear: 0.6, chroma: 0.25, durationMs: 60, wait: true },
@@ -109,14 +109,15 @@ describe("TransientEffectSystem", () => {
       { type: "flicker", power: 1, bursts: 4, irregularity: 0.65, invert: 0.75, white: 0.7, tear: 0.65, chroma: 0.35, seed: 1, durationMs: 60, wait: true }
     ], 9);
     expect(suite.tasks.snapshot().map((task) => task.kind)).toEqual(["impact", "afterimage", "shutter", "flicker"]);
-    const filters = suite.root.filters as unknown as Array<{ resources: { effectLabUniforms: { uniforms: { uMode: number } } } }>;
-    expect(filters.map((filter) => filter.resources.effectLabUniforms.uniforms.uMode)).toEqual([4, 5, 6, 7]);
+    expect(effectResourceNames(suite.root.filters)).toEqual([
+      "impactUniforms", "afterimageUniforms", "shutterUniforms", "flickerUniforms"
+    ]);
     for (let index = 0; index < 8; index += 1) suite.tweens.tick({ deltaMS: 20 } as never);
     expect(suite.tasks.snapshot()).toEqual([]);
     expect(suite.root.filters).toBeNull();
   });
 
-  it("replaces a same-family lab transient while preserving different families", () => {
+  it("replaces one transient family while preserving independent families", () => {
     const suite = createTransientSuite(() => undefined);
     const impact = {
       type: "impact" as const, power: 0.8, origin: [0.5, 0.5] as [number, number],
@@ -133,10 +134,7 @@ describe("TransientEffectSystem", () => {
       expect.objectContaining({ kind: "impact", revision: 2 })
     ]));
     expect(suite.tasks.snapshot().filter((task) => task.kind === "impact")).toHaveLength(1);
-    const modes = (suite.root.filters as unknown as Array<{
-      resources: { effectLabUniforms: { uniforms: { uMode: number } } };
-    }>).map((filter) => filter.resources.effectLabUniforms.uniforms.uMode);
-    expect(modes).toEqual([7, 4]);
+    expect(effectResourceNames(suite.root.filters)).toEqual(["flickerUniforms", "impactUniforms"]);
     suite.effects.destroy();
   });
 
@@ -155,6 +153,11 @@ describe("TransientEffectSystem", () => {
     expect(actor.filters).toBeNull();
   });
 });
+
+function effectResourceNames(filters: Container["filters"]): string[] {
+  return (filters ?? []).flatMap((filter) => Object.keys((filter as unknown as { resources: object }).resources)
+    .filter((key) => key.endsWith("Uniforms")));
+}
 
 function createTransientSuite(resolve: (id: string) => Container | undefined) {
   const root = new Container();

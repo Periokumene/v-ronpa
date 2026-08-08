@@ -13,19 +13,24 @@ import { reduceBlur as reduceBlurEffect } from "./effects/blur";
 import { reduceBokeh as reduceBokehEffect } from "./effects/bokeh";
 import { reduceCharacterTone as reduceCharacterToneEffect } from "./effects/characterTone";
 import { reduceFlash as reduceFlashEffect } from "./effects/flash";
-import {
-  reduceAfterimage, reduceFlicker, reduceImpact, reducePulse, reduceShutter, reduceSignalMask,
-  reduceStaticFilter, reduceVignette, reduceWaterVeil
-} from "./effects/effectLab";
+import { reduceAfterimage } from "./effects/afterimage";
+import { reduceFlicker } from "./effects/flicker";
 import {
   reduceGlitchFilter as reduceGlitchFilterEffect,
   reduceTransientGlitch as reduceTransientGlitchEffect
 } from "./effects/glitch";
+import { reduceImpact } from "./effects/impact";
+import { reducePulse } from "./effects/pulse";
 import { reduceRain as reduceRainEffect } from "./effects/rain";
 import type { PixiRuntimeCommandReduction, PixiStageRenderHint } from "./effects/reduction";
 import { reduceShake as reduceShakeEffect } from "./effects/shake";
+import { reduceShutter } from "./effects/shutter";
+import { reduceSignalMask } from "./effects/signalMask";
 import { reduceSnow as reduceSnowEffect } from "./effects/snow";
+import { reduceStaticFilter } from "./effects/staticFilter";
 import { reduceSun as reduceSunEffect } from "./effects/sun";
+import { reduceVignette } from "./effects/vignette";
+import { reduceWaterVeil } from "./effects/waterVeil";
 
 export {
   DEFAULT_RAIN_COMMAND_PARAMS,

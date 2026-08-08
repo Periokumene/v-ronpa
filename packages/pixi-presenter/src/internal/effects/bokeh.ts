@@ -21,6 +21,8 @@ export class BokehEffectController {
   private live: NumericLiveState = { power: 0 };
   private layoutKey = "";
   private layoutPower = 0;
+  private snapshot: NonNullable<PixiStageSnapshot["screenFilters"]["bokeh"]> | undefined;
+  private removing = false;
 
   constructor(
     private readonly options: PixiPresenterSystemsOptions,
@@ -42,7 +44,9 @@ export class BokehEffectController {
         hint.type === "screen-filter-remove" && hint.kind === "bokeh"
     );
     if (!bokeh || power <= 0) {
+      if (this.removing) return;
       if (this.filter && animate && removal && removal.durationMs > 0) {
+        this.removing = true;
         this.transition.start({
           state: this.live,
           to: { power: 0 },
@@ -61,6 +65,11 @@ export class BokehEffectController {
       this.clear();
       return;
     }
+
+    if (!this.removing && this.snapshot && sameBokeh(this.snapshot, bokeh)) return;
+    if (this.removing) this.transition.cancel(false);
+    this.snapshot = bokeh;
+    this.removing = false;
 
     const isNew = !this.filter;
     if (!this.filter) {
@@ -113,6 +122,8 @@ export class BokehEffectController {
     this.live = { power: 0 };
     this.layoutKey = "";
     this.layoutPower = 0;
+    this.snapshot = undefined;
+    this.removing = false;
   }
 
   destroy(): void {
@@ -164,3 +175,9 @@ function createBokehBlurFilter(power: number): BokehBlurFilter {
 
 function bokehBlurStrength(power: number): number { return Math.max(0, power) * 8; }
 function clamp01(value: number): number { return Math.max(0, Math.min(1, value)); }
+function sameBokeh(
+  left: NonNullable<PixiStageSnapshot["screenFilters"]["bokeh"]>,
+  right: NonNullable<PixiStageSnapshot["screenFilters"]["bokeh"]>
+): boolean {
+  return left.power === right.power && left.focus === right.focus && left.dist === right.dist;
+}

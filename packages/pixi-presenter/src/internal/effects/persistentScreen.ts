@@ -6,9 +6,12 @@ import type { PixiPresenterSystemsOptions } from "../systemTypes";
 import type { TweenSystem } from "./animation";
 import { BokehEffectController } from "./bokeh";
 import { PersistentGlitchEffectController } from "./persistentGlitch";
-import { EffectLabPersistentScreenController } from "./effectLabPersistent";
+import { PulseEffectController } from "./pulse";
 import { PERSISTENT_SCREEN_EFFECT_KEYS } from "./registries";
 import type { RootFilterStack } from "./rootFilterStack";
+import { StaticFilterEffectController } from "./staticFilter";
+import { VignetteEffectController } from "./vignette";
+import { WaterVeilEffectController } from "./waterVeil";
 
 /** Owns persistent registration and the fixed bokeh -> glitch root-filter order. */
 export class PersistentScreenEffectSystem {
@@ -22,11 +25,11 @@ export class PersistentScreenEffectSystem {
   ) {
     this.registry = Object.freeze({
       bokeh: new BokehEffectController(options, rootFilters, tweens, tasks),
-      waterVeil: new EffectLabPersistentScreenController("waterVeil", options, rootFilters, tweens, tasks),
-      pulse: new EffectLabPersistentScreenController("pulse", options, rootFilters, tweens, tasks),
-      staticFilter: new EffectLabPersistentScreenController("staticFilter", options, rootFilters, tweens, tasks),
+      waterVeil: new WaterVeilEffectController(options, rootFilters, tweens, tasks),
+      pulse: new PulseEffectController(options, rootFilters, tweens, tasks),
+      staticFilter: new StaticFilterEffectController(options, rootFilters, tweens, tasks),
       glitch: new PersistentGlitchEffectController(options, rootFilters, tweens, tasks),
-      vignette: new EffectLabPersistentScreenController("vignette", options, rootFilters, tweens, tasks)
+      vignette: new VignetteEffectController(options, rootFilters, tweens, tasks)
     } satisfies Record<PersistentScreenEffectKey, PersistentScreenEffectController>);
   }
 

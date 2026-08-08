@@ -16,7 +16,7 @@ export const effectNormalizers: Readonly<Record<string, CommandNormalizerDescrip
       count: runtimeParam(command, "count") ?? 4, offset: runtimeParam(command, "offset") ?? [-1.5, 0],
       decay: runtimeParam(command, "decay") ?? 0.7, tint: runtimeParam(command, "tint") ?? "#9fc2c7",
       edge: runtimeParam(command, "edge") ?? 0.55, ...normalizeTimingParams(command, { easing: true }, 0.65),
-      easing: runtimeParam(command, "easing") ?? "outExpo"
+      easing: runtimeParam(command, "easing") ?? "easeOut"
     })
   },
   blur: {
@@ -111,13 +111,26 @@ export const effectNormalizers: Readonly<Record<string, CommandNormalizerDescrip
       power: runtimeParam(command, "power") ?? 1, origin: runtimeParam(command, "origin") ?? [50, 50],
       direction: runtimeParam(command, "direction") ?? 0, smear: runtimeParam(command, "smear") ?? 0.6,
       chroma: runtimeParam(command, "chroma") ?? 0.25, ...normalizeTimingParams(command, { easing: true }, 0.22),
-      easing: runtimeParam(command, "easing") ?? "outExpo"
+      easing: runtimeParam(command, "easing") ?? "easeOut"
     })
   },
-  pulse: persistentNormalizer({
-    power: 0.6, rate: 92, origin: [50, 52], echoes: 3, expansion: 0.035, edge: 0.65,
-    distortion: 0.35, chroma: 0.18, decay: 0.72, color: "#b8d6d8"
-  }),
+  pulse: {
+    acceptsPrimary: false,
+    consumedParams: ["power", "rate", "origin", "echoes", "expansion", "edge", "distortion", "chroma", "decay", "color", "time", "easing", "wait"],
+    normalize: (command) => compactParams({
+      power: runtimeParam(command, "power") ?? 0.6,
+      rate: runtimeParam(command, "rate") ?? 92,
+      origin: runtimeParam(command, "origin") ?? [50, 52],
+      echoes: runtimeParam(command, "echoes") ?? 3,
+      expansion: runtimeParam(command, "expansion") ?? 0.035,
+      edge: runtimeParam(command, "edge") ?? 0.65,
+      distortion: runtimeParam(command, "distortion") ?? 0.35,
+      chroma: runtimeParam(command, "chroma") ?? 0.18,
+      decay: runtimeParam(command, "decay") ?? 0.72,
+      color: runtimeParam(command, "color") ?? "#b8d6d8",
+      ...normalizeTimingParams(command, { easing: true })
+    })
+  },
   shutter: {
     acceptsPrimary: false,
     consumedParams: ["power", "shape", "color", "hold", "skew", "time", "easing", "wait"],
@@ -127,34 +140,67 @@ export const effectNormalizers: Readonly<Record<string, CommandNormalizerDescrip
       skew: runtimeParam(command, "skew") ?? 0.18, ...normalizeTimingParams(command, { easing: true }, 0.48)
     })
   },
-  signalmask: persistentNormalizer({
-    target: "alice", region: "head", power: 0.7, bands: 0.8, noise: 0.45,
-    chroma: 0.25, speed: 0.6, threshold: 0.5, seed: 1
-  }),
-  staticfilter: persistentNormalizer({
-    power: 0.6, density: 0.7, scanline: 0.65, jitter: 0.45, warp: 0.35,
-    grainSize: 1, speed: 1, vignette: 0.35, palette: "cold", seed: 1
-  }),
-  vignette: persistentNormalizer({
-    power: 0.5, radius: 0.62, softness: 0.3, color: "#160a10", breathe: 0.06, grain: 0.03
-  }),
-  waterveil: persistentNormalizer({
-    power: 0.5, level: 0.18, ripple: 0.35, drift: -0.1, blur: 0.12,
-    tint: "#6c8390", droplets: 0.5, seed: 1
-  })
-};
-
-function persistentNormalizer(defaults: Record<string, RuntimeValue>): CommandNormalizerDescriptor {
-  const params = [...Object.keys(defaults), "time", "easing", "wait"];
-  return {
+  signalmask: {
     acceptsPrimary: false,
-    consumedParams: params,
+    consumedParams: ["target", "power", "bands", "noise", "chroma", "speed", "threshold", "seed", "time", "easing", "wait"],
     normalize: (command) => compactParams({
-      ...Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => [key, runtimeParam(command, key) ?? fallback])),
+      target: runtimeParam(command, "target"),
+      power: runtimeParam(command, "power") ?? 0.7,
+      bands: runtimeParam(command, "bands") ?? 0.8,
+      noise: runtimeParam(command, "noise") ?? 0.45,
+      chroma: runtimeParam(command, "chroma") ?? 0.25,
+      speed: runtimeParam(command, "speed") ?? 0.6,
+      threshold: runtimeParam(command, "threshold") ?? 0.5,
+      seed: runtimeParam(command, "seed") ?? 1,
       ...normalizeTimingParams(command, { easing: true })
     })
-  };
-}
+  },
+  staticfilter: {
+    acceptsPrimary: false,
+    consumedParams: ["power", "density", "scanline", "jitter", "warp", "grainSize", "speed", "vignette", "palette", "seed", "time", "easing", "wait"],
+    normalize: (command) => compactParams({
+      power: runtimeParam(command, "power") ?? 0.6,
+      density: runtimeParam(command, "density") ?? 0.7,
+      scanline: runtimeParam(command, "scanline") ?? 0.65,
+      jitter: runtimeParam(command, "jitter") ?? 0.45,
+      warp: runtimeParam(command, "warp") ?? 0.35,
+      grainSize: runtimeParam(command, "grainSize") ?? 1,
+      speed: runtimeParam(command, "speed") ?? 1,
+      vignette: runtimeParam(command, "vignette") ?? 0.35,
+      palette: runtimeParam(command, "palette") ?? "cold",
+      seed: runtimeParam(command, "seed") ?? 1,
+      ...normalizeTimingParams(command, { easing: true })
+    })
+  },
+  vignette: {
+    acceptsPrimary: false,
+    consumedParams: ["power", "radius", "softness", "color", "breathe", "grain", "time", "easing", "wait"],
+    normalize: (command) => compactParams({
+      power: runtimeParam(command, "power") ?? 0.5,
+      radius: runtimeParam(command, "radius") ?? 0.62,
+      softness: runtimeParam(command, "softness") ?? 0.3,
+      color: runtimeParam(command, "color") ?? "#160a10",
+      breathe: runtimeParam(command, "breathe") ?? 0.06,
+      grain: runtimeParam(command, "grain") ?? 0.03,
+      ...normalizeTimingParams(command, { easing: true })
+    })
+  },
+  waterveil: {
+    acceptsPrimary: false,
+    consumedParams: ["power", "level", "ripple", "drift", "blur", "tint", "droplets", "seed", "time", "easing", "wait"],
+    normalize: (command) => compactParams({
+      power: runtimeParam(command, "power") ?? 0.5,
+      level: runtimeParam(command, "level") ?? 0.18,
+      ripple: runtimeParam(command, "ripple") ?? 0.35,
+      drift: runtimeParam(command, "drift") ?? -0.1,
+      blur: runtimeParam(command, "blur") ?? 0.12,
+      tint: runtimeParam(command, "tint") ?? "#6c8390",
+      droplets: runtimeParam(command, "droplets") ?? 0.5,
+      seed: runtimeParam(command, "seed") ?? 1,
+      ...normalizeTimingParams(command, { easing: true })
+    })
+  }
+};
 
 function normalizeCharacterToneCommand(command: CommandShape): Record<string, RuntimeValue> {
   const preset = runtimeCommandValue(command.primary) ?? runtimeParam(command, "preset");

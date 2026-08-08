@@ -152,6 +152,7 @@ export class LiveParamTransition {
     if (!record) return;
     record.handle.stop();
     this.active = undefined;
+    if (record.task?.isCurrent()) record.task.cancel();
     if (applyTarget) {
       assignLiveState(record.state, record.to);
       record.onUpdate?.();
@@ -179,10 +180,8 @@ export class LiveParamTransition {
 
 function resolveEasing(name: string | undefined): (amount: number) => number {
   if (name === "linear") return Easing.Linear.None;
-  if (name === "easeIn" || name === "inCubic") return Easing.Cubic.In;
-  if (name === "easeInOut" || name === "inOutCubic") return Easing.Cubic.InOut;
-  if (name === "outExpo") return Easing.Exponential.Out;
-  if (name === "outQuint") return Easing.Quintic.Out;
+  if (name === "easeIn") return Easing.Cubic.In;
+  if (name === "easeInOut") return Easing.Cubic.InOut;
   return Easing.Cubic.Out;
 }
 
