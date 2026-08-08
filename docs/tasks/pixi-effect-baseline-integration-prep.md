@@ -10,11 +10,11 @@
 
 ## Status
 
-- State: `Done`
+- State: `Review`
 - Owner: `Codex`
 - Created: `2026-08-08`
-- Updated: `2026-08-08`
-- Completed Commit: `This task's preparation commit`
+- Updated: `2026-08-09`
+- Completed Commit: `TBD`
 - Archive Target: `docs/archive/completed-tasks/pixi-effect-baseline-integration-prep.md`
 
 ## Goal
@@ -47,12 +47,14 @@ applying the baseline lifecycle contract to every persistent effect.
 - `tests/smoke/game-a-multi-nani.spec.ts`
 - `tests/smoke/game-a-vn.spec.ts`
 - `scripts/validate-boundaries.mjs`
+- `scripts/generate-command-catalog-doc.mjs`
+- `scripts/generate-command-catalog-doc.test.ts`
 - `playwright.config.ts`
 - `docs/architecture/**`
 - `docs/ccr/pixi-effect-lab.md`
 - `docs/ccr/pixi-effect-lab-*-hard-delete.md`
 - `docs/ccr/pixi-persistent-effect-lifecycle.md`
-- `docs/design/pixi-effect-lab.md`
+- `docs/**/pixi-effect-lab.md`
 - `docs/nani/command-catalog.md`
 - `docs/tasks/pixi-effect-lab.md`
 - `docs/tasks/pixi-effect-lab-*-hard-delete.md`
@@ -63,7 +65,7 @@ applying the baseline lifecycle contract to every persistent effect.
 - `package.json`
 - `pnpm-lock.yaml`
 - `apps/game-a/src/nani/**`
-- `docs/archive/**`
+- `docs/archive/completed-tasks/**`
 
 ## Contracts
 
@@ -83,6 +85,7 @@ applying the baseline lifecycle contract to every persistent effect.
 | Full-character SignalMask | Actor filter-order and crossfade ownership tests |
 | Individual versus composed authoring | Separate Playwright specs and screenshots |
 | Canonical observations | Devtools exposes one `pixi.snapshot` plus runtime hints/tasks |
+| Formal command authoring docs | Catalog metadata and generated all-effect reference |
 
 ## Regression Requirements
 
@@ -94,6 +97,9 @@ applying the baseline lifecycle contract to every persistent effect.
   destroy settle tasks and release only owned resources.
 - Smoke: exact five-script catalog, isolated single effects, exact compositions,
   motion fingerprints, precise task kind/target, and empty final state.
+- Docs: all nine commands have concrete Chinese parameter metadata and appear in
+  the same generated effect reference as existing commands; the temporary Lab
+  design note exists only under `docs/archive`.
 
 ## Dependency Changes
 

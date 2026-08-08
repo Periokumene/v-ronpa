@@ -151,4 +151,54 @@ function parseColor(v: string): [number, number, number] {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 const VERTEX = `in vec2 aPosition;out vec2 vTextureCoord;out vec2 vLocalCoord;uniform vec4 uInputSize;uniform vec4 uOutputFrame;uniform vec4 uOutputTexture;void main(void){vec2 p=aPosition*uOutputFrame.zw+uOutputFrame.xy;p.x=p.x*(2.0/uOutputTexture.x)-1.0;p.y=p.y*(2.0*uOutputTexture.z/uOutputTexture.y)-uOutputTexture.z;gl_Position=vec4(p,0,1);vTextureCoord=aPosition*(uOutputFrame.zw*uInputSize.zw);vLocalCoord=aPosition;}`;
-const FRAGMENT = `precision highp float;in vec2 vTextureCoord;in vec2 vLocalCoord;out vec4 finalColor;uniform sampler2D uTexture;uniform float uTime;uniform float uDuration;uniform vec2 uResolution;uniform float uPower;uniform float uShape;uniform vec3 uColor;uniform float uHold;uniform float uSkew;void main(void){vec4 s=texture(uTexture,vTextureCoord);float motion=max(.001,uDuration-min(uHold,uDuration*.8));float close=pow(clamp(uTime/(motion*.44),0.,1.),3.);float open=1.-pow(1.-clamp((uTime-motion*.44-min(uHold,uDuration*.8))/max(.001,uDuration-motion*.44-min(uHold,uDuration*.8)),0.,1.),5.);float a=clamp(close-open,0.,1.)*uPower;vec2 p=vLocalCoord-.5;float d=uShape<.5?abs(p.y)-.5+a*.52:uShape<1.5?length(p*vec2(1.,1.55))-.92*(1.-a):abs(p.x+p.y*uSkew)-(.5+uSkew*.5)+a*(.55+uSkew*.5);float mask=smoothstep(-1.5/max(1.,min(uResolution.x,uResolution.y)),1.5/max(1.,min(uResolution.x,uResolution.y)),d);finalColor=vec4(mix(s.rgb,uColor,mask),s.a);}`;
+export const SHUTTER_FRAGMENT_SOURCE = `
+precision highp float;
+in vec2 vTextureCoord;
+in vec2 vLocalCoord;
+out vec4 finalColor;
+uniform sampler2D uTexture;
+uniform vec4 uInputClamp;
+uniform float uTime;
+uniform float uDuration;
+uniform vec2 uResolution;
+uniform float uPower;
+uniform float uShape;
+uniform vec3 uColor;
+uniform float uHold;
+uniform float uSkew;
+float luminance(vec3 color) { return dot(color, vec3(0.2126, 0.7152, 0.0722)); }
+vec2 inputUv(vec2 localUv) {
+  vec2 frameScale = uInputClamp.xy + uInputClamp.zw;
+  return clamp(localUv * frameScale, uInputClamp.xy, uInputClamp.zw);
+}
+vec3 currentAt(vec2 localUv) { return texture(uTexture, inputUv(localUv)).rgb; }
+void main(void) {
+  vec2 uv = vLocalCoord;
+  vec4 source = texture(uTexture, vTextureCoord);
+  float motion = max(0.001, uDuration - min(uHold, uDuration * 0.8));
+  float closeDuration = motion * 0.44;
+  float openStart = closeDuration + min(uHold, uDuration * 0.8);
+  float close = pow(clamp(uTime / closeDuration, 0.0, 1.0), 3.0);
+  float openTime = clamp((uTime - openStart) / max(0.001, uDuration - openStart), 0.0, 1.0);
+  float open = 1.0 - pow(1.0 - openTime, 5.0);
+  float amount = clamp(close - open, 0.0, 1.0) * uPower;
+  vec2 point = uv - 0.5;
+  float shapeDistance = 0.0;
+  if (uShape < 0.5) {
+    shapeDistance = abs(point.y) - 0.5 + amount * 0.52
+      - sin(uv.x * 9.0 + uTime * 7.0) * uSkew * 0.012;
+  } else if (uShape < 1.5) {
+    shapeDistance = length(point * vec2(1.0, 1.55)) - 0.92 * (1.0 - amount);
+  } else {
+    shapeDistance = abs(point.x + point.y * uSkew)
+      - (0.5 + uSkew * 0.5) + amount * (0.55 + uSkew * 0.5);
+  }
+  float antialias = 1.5 / max(1.0, min(uResolution.x, uResolution.y));
+  float mask = smoothstep(-antialias, antialias, shapeDistance);
+  vec2 pinched = 0.5 + point * (1.0 - amount * 0.025);
+  vec3 lens = currentAt(pinched);
+  float lightness = luminance(lens);
+  lens = mix(lens, vec3(lightness) * vec3(0.86, 0.9, 0.96), amount * 0.62);
+  finalColor = vec4(mix(lens, uColor, mask), source.a);
+}`;
+const FRAGMENT = SHUTTER_FRAGMENT_SOURCE;

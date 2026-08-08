@@ -1,5 +1,5 @@
 import type { PixiActorFilterSnapshot } from "@v-ronpa/contracts";
-import { Container, Filter, GlProgram, Rectangle, type Ticker } from "pixi.js";
+import { Container, Filter, GlProgram, type Ticker } from "pixi.js";
 import type { PixiPresenterSystemsOptions } from "../systemTypes";
 
 type SignalMaskSnapshot = NonNullable<PixiActorFilterSnapshot["signalMask"]>;
@@ -49,7 +49,6 @@ export class SignalMaskEffectController {
     record.uniforms.uSeed = snapshot.seed;
     const siblings = (container.filters ?? []).filter((filter) => filter !== previous?.filter as unknown as Filter);
     container.filters = [record.filter as unknown as Filter, ...siblings];
-    container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
   }
 
   tick(ticker: Ticker): void {
@@ -62,7 +61,6 @@ export class SignalMaskEffectController {
     if (!record) return;
     record.uniforms.uResolution[0] = Math.max(1, this.options.width());
     record.uniforms.uResolution[1] = Math.max(1, this.options.height());
-    container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
   }
 
   release(container: Container): void {
@@ -110,7 +108,8 @@ function createSignalMaskFilter(width: number, height: number): SignalMaskRecord
         uThreshold: { value: uniforms.uThreshold, type: "f32" },
         uSeed: { value: uniforms.uSeed, type: "f32" }
       }
-    }
+    },
+    padding: 32
   });
   return { filter: filter as unknown as SignalMaskFilter, uniforms: filter.resources.signalMaskUniforms.uniforms as SignalMaskUniforms };
 }
@@ -131,7 +130,7 @@ void main(void) {
   vLocalCoord = aPosition;
 }`;
 
-const FRAGMENT = `
+export const SIGNAL_MASK_FRAGMENT_SOURCE = `
 precision highp float;
 in vec2 vTextureCoord;
 in vec2 vLocalCoord;
@@ -144,10 +143,12 @@ uniform float uPower;
 uniform float uBands;
 uniform float uNoise;
 uniform float uChroma;
-uniform float uSpeed;
 uniform float uThreshold;
 uniform float uSeed;
 float hash11(float p) { return fract(sin(p * 127.1 + uSeed * 311.7) * 43758.5453123); }
+float hash21(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed * 73.13) * 43758.5453123);
+}
 vec2 inputUv(vec2 localUv) {
   vec2 frameScale = uInputClamp.xy + uInputClamp.zw;
   return clamp(localUv * frameScale, uInputClamp.xy, uInputClamp.zw);
@@ -158,15 +159,19 @@ void main(void) {
   vec2 uv = vLocalCoord;
   vec4 source = texture(uTexture, vTextureCoord);
   float band = floor(uv.y * (18.0 + uBands * 70.0));
-  float phase = floor(uTime * (8.0 + uSpeed * 18.0));
-  float gate = step(uThreshold, hash11(band + phase));
-  float dx = (hash11(band + phase * 0.37) - 0.5) * uBands * 0.07 * gate * uPower;
+  float gate = step(uThreshold, hash11(band + floor(uTime * 18.0)));
+  float dx = (hash11(band + uTime) - 0.5) * uBands * 0.07 * gate * uPower;
   vec2 shiftedUv = clamp(uv + vec2(dx, 0.0), 0.0, 1.0);
   vec3 shifted = straight(sampleAt(shiftedUv));
-  float noiseValue = hash11(floor(uv.x * uResolution.x * 0.7) + floor(uv.y * uResolution.y * 0.7) + phase);
+  float noiseValue = hash21(floor(uv * uResolution * 0.7) + floor(uTime * 31.0));
   shifted = mix(shifted, vec3(noiseValue), uNoise * gate * uPower);
+  float mosaic = mix(96.0, 28.0, uNoise * gate);
+  shifted = mix(shifted, straight(sampleAt(floor(shiftedUv * mosaic) / mosaic)), gate * uNoise * 0.42);
+  float levels = mix(20.0, 5.0, uNoise * gate);
+  shifted = floor(shifted * levels + 0.5) / levels;
   shifted.r = straight(sampleAt(shiftedUv + vec2(uChroma * 0.012, 0.0))).r;
   shifted.b = straight(sampleAt(shiftedUv - vec2(uChroma * 0.009, 0.0))).b;
   vec3 sourceStraight = straight(source);
   finalColor = vec4(mix(sourceStraight, shifted, uPower) * source.a, source.a);
 }`;
+const FRAGMENT = SIGNAL_MASK_FRAGMENT_SOURCE;

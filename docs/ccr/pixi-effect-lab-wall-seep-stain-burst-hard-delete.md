@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: `Active`
+- State: `Accepted`
 - Date: `2026-08-08`
 
 ## Requested Change

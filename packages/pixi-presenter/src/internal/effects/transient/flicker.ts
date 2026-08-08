@@ -140,4 +140,58 @@ function createFilter(): RecordState {
   };
 }
 const VERTEX = `in vec2 aPosition;out vec2 vTextureCoord;out vec2 vLocalCoord;uniform vec4 uInputSize;uniform vec4 uOutputFrame;uniform vec4 uOutputTexture;void main(void){vec2 p=aPosition*uOutputFrame.zw+uOutputFrame.xy;p.x=p.x*(2.0/uOutputTexture.x)-1.0;p.y=p.y*(2.0*uOutputTexture.z/uOutputTexture.y)-uOutputTexture.z;gl_Position=vec4(p,0,1);vTextureCoord=aPosition*(uOutputFrame.zw*uInputSize.zw);vLocalCoord=aPosition;}`;
-const FRAGMENT = `precision highp float;in vec2 vTextureCoord;in vec2 vLocalCoord;out vec4 finalColor;uniform sampler2D uTexture;uniform float uProgress;uniform float uPower;uniform float uBursts;uniform float uIrregularity;uniform float uInvert;uniform float uWhite;uniform float uTear;uniform float uChroma;uniform float uSeed;float hash(float p){return fract(sin(p*127.1+uSeed*311.7)*43758.5453);}void main(void){float scaled=min(uProgress,.999999)*max(1.,uBursts);float event=floor(scaled),local=fract(scaled);float center=mix(.34,.66,hash(event*5.17+2.));float width=mix(.1,.34,hash(event*9.31+7.))*(1.+uIrregularity*.42);float pulse=1.-smoothstep(width,width+.055,abs(local-center));float band=floor(vLocalCoord.y*(9.+uTear*31.));float tear=(hash(band+event)-.5)*uTear*.12*pulse*uPower;vec4 s=texture(uTexture,vTextureCoord+vec2(tear,0));vec3 c=s.rgb;c.r=texture(uTexture,vTextureCoord+vec2(tear+uChroma*.018*pulse,0)).r;c.b=texture(uTexture,vTextureCoord+vec2(tear-uChroma*.015*pulse,0)).b;float op=mod(event+floor(abs(uSeed)),3.);if(op<1.)c=mix(c,vec3(1.)-c,pulse*uInvert);else if(op<2.)c=mix(c,vec3(1.),pulse*uWhite);else c*=1.-pulse*.94;finalColor=vec4(mix(texture(uTexture,vTextureCoord).rgb,c,uPower),s.a);}`;
+export const FLICKER_FRAGMENT_SOURCE = `
+precision highp float;
+in vec2 vTextureCoord;
+in vec2 vLocalCoord;
+out vec4 finalColor;
+uniform sampler2D uTexture;
+uniform vec4 uInputClamp;
+uniform float uProgress;
+uniform float uPower;
+uniform float uBursts;
+uniform float uIrregularity;
+uniform float uInvert;
+uniform float uWhite;
+uniform float uTear;
+uniform float uChroma;
+uniform float uSeed;
+float hash11(float value) {
+  return fract(sin(value * 127.1 + uSeed * 311.7) * 43758.5453123);
+}
+vec2 inputUv(vec2 localUv) {
+  vec2 frameScale = uInputClamp.xy + uInputClamp.zw;
+  return clamp(localUv * frameScale, uInputClamp.xy, uInputClamp.zw);
+}
+vec3 currentAt(vec2 localUv) { return texture(uTexture, inputUv(localUv)).rgb; }
+void main(void) {
+  vec2 uv = vLocalCoord;
+  vec4 source = texture(uTexture, vTextureCoord);
+  float burstCount = max(1.0, uBursts);
+  float scaled = min(uProgress, 0.999999) * burstCount;
+  float event = floor(scaled);
+  float localTime = fract(scaled);
+  float center = mix(0.34, 0.66, hash11(event * 5.17 + 2.0));
+  float width = mix(0.10, 0.34, hash11(event * 9.31 + 7.0)) * (1.0 + uIrregularity * 0.42);
+  float pulse = 1.0 - smoothstep(width, width + 0.055, abs(localTime - center));
+  float band = floor(uv.y * (9.0 + uTear * 31.0));
+  float tear = (hash11(band + event) - 0.5) * uTear * 0.12 * pulse * uPower;
+  vec2 tornUv = clamp(uv + vec2(tear, 0.0), 0.0, 1.0);
+  float afterburn = smoothstep(0.76, 0.82, uProgress) * (1.0 - smoothstep(0.82, 1.0, uProgress));
+  float chromaPulse = max(pulse, afterburn);
+  vec3 color = currentAt(tornUv);
+  vec3 shifted = color;
+  shifted.r = currentAt(tornUv + vec2(uChroma * 0.018 * chromaPulse, 0.0)).r;
+  shifted.b = currentAt(tornUv - vec2(uChroma * 0.015 * chromaPulse, 0.0)).b;
+  color = mix(color, shifted, uChroma * chromaPulse);
+  float operationClass = mod(event + floor(abs(uSeed)), 4.0);
+  if (operationClass < 0.5) color *= 1.0 - pulse * 0.94;
+  else if (operationClass < 1.5) color = mix(color, vec3(1.0) - color, pulse * uInvert);
+  else if (operationClass < 2.5) color = mix(color, vec3(1.0), pulse * uWhite);
+  else color = mix(color, abs(color * 2.0 - 1.0), pulse * mix(0.45, 0.9, uTear));
+  float levels = mix(14.0, 3.0, uTear);
+  vec3 posterized = floor(color * levels + 0.5) / levels;
+  color = mix(color, posterized, pulse * uTear);
+  finalColor = vec4(mix(source.rgb, color, uPower), source.a);
+}`;
+const FRAGMENT = FLICKER_FRAGMENT_SOURCE;

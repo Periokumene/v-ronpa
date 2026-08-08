@@ -231,5 +231,57 @@ function parseColor(value: string): [number, number, number] {
 }
 
 const VERTEX = `in vec2 aPosition;out vec2 vTextureCoord;out vec2 vLocalCoord;uniform vec4 uInputSize;uniform vec4 uOutputFrame;uniform vec4 uOutputTexture;void main(void){vec2 p=aPosition*uOutputFrame.zw+uOutputFrame.xy;p.x=p.x*(2.0/uOutputTexture.x)-1.0;p.y=p.y*(2.0*uOutputTexture.z/uOutputTexture.y)-uOutputTexture.z;gl_Position=vec4(p,0,1);vTextureCoord=aPosition*(uOutputFrame.zw*uInputSize.zw);vLocalCoord=aPosition;}`;
-const FRAGMENT = `precision highp float;in vec2 vTextureCoord;in vec2 vLocalCoord;out vec4 finalColor;uniform sampler2D uTexture;uniform sampler2D uHistoryTexture;uniform vec4 uHistoryClamp;uniform float uProgress;uniform float uPower;uniform float uCount;uniform vec2 uOffset;uniform float uDecay;uniform vec3 uTint;uniform float uEdge;vec4 hist(vec2 uv){vec2 s=uHistoryClamp.xy+uHistoryClamp.zw;return texture(uHistoryTexture,clamp(uv*s,uHistoryClamp.xy,uHistoryClamp.zw));}void main(void){vec4 source=texture(uTexture,vTextureCoord);vec3 c=source.rgb;float alpha=source.a;for(int i=1;i<=6;i++){float f=float(i);if(f>uCount)break;vec4 h=hist(vLocalCoord-uOffset*f*(.75+.22*f)*uProgress);float weight=pow(max(.01,uDecay),f-1.)*(1.-uProgress)*uEdge*uPower;c+=mix(uTint*h.a,h.rgb,.25)*weight;alpha=max(alpha,h.a*weight);}alpha=clamp(alpha,0.,1.);finalColor=vec4(min(clamp(c,0.,1.),vec3(alpha)),alpha);}`;
+export const AFTERIMAGE_FRAGMENT_SOURCE = `
+precision highp float;
+in vec2 vTextureCoord;
+in vec2 vLocalCoord;
+out vec4 finalColor;
+uniform sampler2D uTexture;
+uniform sampler2D uHistoryTexture;
+uniform vec4 uHistoryClamp;
+uniform float uProgress;
+uniform vec2 uResolution;
+uniform float uPower;
+uniform float uCount;
+uniform vec2 uOffset;
+uniform float uDecay;
+uniform vec3 uTint;
+uniform float uEdge;
+float luminance(vec3 color) { return dot(color, vec3(0.2126, 0.7152, 0.0722)); }
+vec4 historyAt(vec2 localUv) {
+  vec2 frameScale = uHistoryClamp.xy + uHistoryClamp.zw;
+  return texture(uHistoryTexture, clamp(localUv * frameScale, uHistoryClamp.xy, uHistoryClamp.zw));
+}
+void main(void) {
+  vec2 uv = vLocalCoord;
+  vec4 source = texture(uTexture, vTextureCoord);
+  vec3 result = source.rgb;
+  float outputAlpha = source.a;
+  for (int index = 1; index <= 6; index++) {
+    float echoIndex = float(index);
+    if (echoIndex > uCount) break;
+    float spacing = echoIndex * (0.75 + 0.22 * echoIndex);
+    vec2 echoUv = clamp(uv - uOffset * spacing * uProgress, 0.0, 1.0);
+    vec2 pixelStep = vec2(1.0 + echoIndex * 0.4) / max(vec2(1.0), uResolution);
+    vec4 history0 = historyAt(echoUv + pixelStep);
+    vec4 history1 = historyAt(echoUv - pixelStep);
+    vec4 history2 = historyAt(echoUv + vec2(pixelStep.x, -pixelStep.y));
+    vec4 history3 = historyAt(echoUv + vec2(-pixelStep.x, pixelStep.y));
+    vec4 historyColor = (history0 + history1 + history2 + history3) * 0.25;
+    float gradientX = luminance(history0.rgb) - luminance(history1.rgb);
+    float gradientY = luminance(history2.rgb) - luminance(history3.rgb);
+    float edge = clamp(
+      length(vec2(gradientX, gradientY)) * 4.2
+        + max(0.0, luminance(historyColor.rgb) - 0.7 * historyColor.a),
+      0.0,
+      1.0
+    ) * pow(max(0.01, uDecay), echoIndex - 1.0) * (1.0 - uProgress);
+    float echoWeight = edge * uEdge * uPower;
+    result += mix(uTint * historyColor.a, historyColor.rgb, 0.25) * echoWeight;
+    outputAlpha = max(outputAlpha, historyColor.a * echoWeight);
+  }
+  outputAlpha = clamp(outputAlpha, 0.0, 1.0);
+  finalColor = vec4(min(clamp(result, 0.0, 1.0), vec3(outputAlpha)), outputAlpha);
+}`;
+const FRAGMENT = AFTERIMAGE_FRAGMENT_SOURCE;
 const COPY_FRAGMENT = `precision highp float;in vec2 vTextureCoord;out vec4 finalColor;uniform sampler2D uTexture;void main(void){finalColor=texture(uTexture,vTextureCoord);}`;

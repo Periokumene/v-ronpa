@@ -114,6 +114,125 @@ export async function frameFingerprint(page: Page): Promise<string> {
   return createHash("sha256").update(image).digest("hex");
 }
 
+export interface NormalizedFrameRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface FrameRegionMetrics {
+  meanLuminance: number;
+  luminanceDeviation: number;
+  brightPixelRatio: number;
+}
+
+export interface FrameRegionDifference {
+  meanChannelDelta: number;
+  changedPixelRatio: number;
+}
+
+export async function captureCanvasFrame(page: Page): Promise<Buffer> {
+  return page.locator('canvas[data-testid="pixi-canvas"]').screenshot({ animations: "allow" });
+}
+
+export async function frameRegionMetrics(
+  page: Page,
+  frame: Buffer,
+  region: NormalizedFrameRegion,
+): Promise<FrameRegionMetrics> {
+  return page.evaluate(async ({ source, sampleRegion }) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${source}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("2D canvas context unavailable for frame analysis");
+    context.drawImage(image, 0, 0);
+    const x = Math.floor(canvas.width * sampleRegion.x);
+    const y = Math.floor(canvas.height * sampleRegion.y);
+    const width = Math.max(1, Math.floor(canvas.width * sampleRegion.width));
+    const height = Math.max(1, Math.floor(canvas.height * sampleRegion.height));
+    const pixels = context.getImageData(x, y, width, height).data;
+    let luminanceTotal = 0;
+    let luminanceSquaredTotal = 0;
+    let brightPixels = 0;
+    const pixelCount = pixels.length / 4;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      const luminance = (pixels[offset] ?? 0) * 0.2126
+        + (pixels[offset + 1] ?? 0) * 0.7152
+        + (pixels[offset + 2] ?? 0) * 0.0722;
+      luminanceTotal += luminance;
+      luminanceSquaredTotal += luminance * luminance;
+      if (luminance >= 150) brightPixels += 1;
+    }
+    const meanLuminance = luminanceTotal / pixelCount;
+    return {
+      meanLuminance,
+      luminanceDeviation: Math.sqrt(Math.max(0, luminanceSquaredTotal / pixelCount - meanLuminance * meanLuminance)),
+      brightPixelRatio: brightPixels / pixelCount,
+    };
+  }, { source: frame.toString("base64"), sampleRegion: region });
+}
+
+export async function frameRegionDifference(
+  page: Page,
+  before: Buffer,
+  after: Buffer,
+  region: NormalizedFrameRegion,
+): Promise<FrameRegionDifference> {
+  return page.evaluate(async ({ beforeSource, afterSource, sampleRegion }) => {
+    const decode = async (source: string): Promise<HTMLImageElement> => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${source}`;
+      await image.decode();
+      return image;
+    };
+    const [beforeImage, afterImage] = await Promise.all([decode(beforeSource), decode(afterSource)]);
+    const width = Math.min(beforeImage.naturalWidth, afterImage.naturalWidth);
+    const height = Math.min(beforeImage.naturalHeight, afterImage.naturalHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("2D canvas context unavailable for frame comparison");
+    context.drawImage(beforeImage, 0, 0, width, height);
+    const beforePixels = context.getImageData(0, 0, width, height).data;
+    context.clearRect(0, 0, width, height);
+    context.drawImage(afterImage, 0, 0, width, height);
+    const afterPixels = context.getImageData(0, 0, width, height).data;
+    const left = Math.floor(width * sampleRegion.x);
+    const top = Math.floor(height * sampleRegion.y);
+    const right = Math.min(width, Math.ceil(width * (sampleRegion.x + sampleRegion.width)));
+    const bottom = Math.min(height, Math.ceil(height * (sampleRegion.y + sampleRegion.height)));
+    let channelDelta = 0;
+    let changedPixels = 0;
+    let pixelCount = 0;
+    for (let y = top; y < bottom; y += 1) {
+      for (let x = left; x < right; x += 1) {
+        const offset = (y * width + x) * 4;
+        const red = Math.abs((beforePixels[offset] ?? 0) - (afterPixels[offset] ?? 0));
+        const green = Math.abs((beforePixels[offset + 1] ?? 0) - (afterPixels[offset + 1] ?? 0));
+        const blue = Math.abs((beforePixels[offset + 2] ?? 0) - (afterPixels[offset + 2] ?? 0));
+        const delta = (red + green + blue) / 3;
+        channelDelta += delta;
+        if (delta >= 8) changedPixels += 1;
+        pixelCount += 1;
+      }
+    }
+    return {
+      meanChannelDelta: channelDelta / pixelCount,
+      changedPixelRatio: changedPixels / pixelCount,
+    };
+  }, {
+    beforeSource: before.toString("base64"),
+    afterSource: after.toString("base64"),
+    sampleRegion: region,
+  });
+}
+
 export async function measureFrameProfile(page: Page, sampleCount: number, warmupFrames: number): Promise<FrameProfile> {
   return page.evaluate(async ({ count, warmupFrames: warmupCount }) => new Promise<FrameProfile>((resolve) => {
     const samples: number[] = []; let previous: number | undefined; let warmup = warmupCount;

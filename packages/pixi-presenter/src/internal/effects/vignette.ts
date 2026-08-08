@@ -150,4 +150,49 @@ function parseColor(value: string): [number, number, number] {
 }
 
 const VERTEX = `in vec2 aPosition; out vec2 vTextureCoord; out vec2 vLocalCoord; uniform vec4 uInputSize; uniform vec4 uOutputFrame; uniform vec4 uOutputTexture; void main(void){vec2 p=aPosition*uOutputFrame.zw+uOutputFrame.xy;p.x=p.x*(2.0/uOutputTexture.x)-1.0;p.y=p.y*(2.0*uOutputTexture.z/uOutputTexture.y)-uOutputTexture.z;gl_Position=vec4(p,0,1);vTextureCoord=aPosition*(uOutputFrame.zw*uInputSize.zw);vLocalCoord=aPosition;}`;
-const FRAGMENT = `precision highp float; in vec2 vTextureCoord; in vec2 vLocalCoord; out vec4 finalColor; uniform sampler2D uTexture; uniform float uTime; uniform vec2 uResolution; uniform float uPower; uniform float uRadius; uniform float uSoftness; uniform vec3 uColor; uniform float uBreathe; uniform float uGrain; float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);} void main(void){vec4 s=texture(uTexture,vTextureCoord);vec2 p=(vLocalCoord-.5)*vec2(uResolution.x/max(1.,uResolution.y),1.);float r=uRadius+sin(uTime*.43)*uBreathe*.28;float v=smoothstep(r,max(r+.001,r+uSoftness),length(p));float g=(hash(vLocalCoord*uResolution+floor(uTime*12.))-.5)*2.*uGrain;vec3 c=mix(s.rgb,s.rgb*uColor,v*uPower);c*=1.+g*uPower*(.22+v*.78);finalColor=vec4(c,s.a);}`;
+export const VIGNETTE_FRAGMENT_SOURCE = `
+precision highp float;
+in vec2 vTextureCoord;
+in vec2 vLocalCoord;
+out vec4 finalColor;
+uniform sampler2D uTexture;
+uniform float uTime;
+uniform vec2 uResolution;
+uniform float uPower;
+uniform float uRadius;
+uniform float uSoftness;
+uniform vec3 uColor;
+uniform float uBreathe;
+uniform float uGrain;
+float hash21(vec2 point) {
+  return fract(sin(dot(point, vec2(127.1, 311.7)) + 73.13) * 43758.5453123);
+}
+float noise21(vec2 point) {
+  vec2 cell = floor(point);
+  vec2 local = fract(point);
+  local = local * local * (3.0 - 2.0 * local);
+  return mix(
+    mix(hash21(cell), hash21(cell + vec2(1.0, 0.0)), local.x),
+    mix(hash21(cell + vec2(0.0, 1.0)), hash21(cell + vec2(1.0)), local.x),
+    local.y
+  );
+}
+float luminance(vec3 color) { return dot(color, vec3(0.2126, 0.7152, 0.0722)); }
+void main(void) {
+  vec4 source = texture(uTexture, vTextureCoord);
+  vec2 point = (vLocalCoord - 0.5) * vec2(uResolution.x / max(1.0, uResolution.y), 1.0);
+  float organic = (noise21(point * 3.0 + vec2(0.17)) - 0.5) * uBreathe;
+  float breathe = sin(uTime * 0.43 + 1.0) * uBreathe * 0.28;
+  float vignette = smoothstep(
+    uRadius + organic + breathe,
+    max(uRadius + organic + breathe + 0.001, uRadius + organic + breathe + uSoftness),
+    length(point)
+  );
+  float grain = (hash21(vLocalCoord * uResolution + floor(uTime * 12.0)) - 0.5) * 2.0 * uGrain;
+  vec3 graded = mix(source.rgb, source.rgb * uColor, vignette * uPower);
+  graded *= 1.0 + grain * uPower * (0.22 + vignette * 0.78);
+  float lightness = luminance(graded);
+  graded = mix(graded, graded * (0.92 + 0.08 * lightness), vignette * uPower * 0.35);
+  finalColor = vec4(graded, source.a);
+}`;
+const FRAGMENT = VIGNETTE_FRAGMENT_SOURCE;

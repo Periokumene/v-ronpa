@@ -1064,7 +1064,7 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
 ];
 
 const implementedCommandDocs: Record<string, NaniCommandDocs> = {
-  afterimage: { zh: "捕获舞台或角色的边缘与高光，播放一次非等距色彩残影。", examples: ["@afterimage target:stage count:4 edge:0.55 time:0.65 wait!"] },
+  afterimage: { zh: "对舞台、镜头或当前存在的演员播放一次边缘与高光残影；该瞬时效果结束后自动清理。", examples: ["@afterimage target:stage power:0.7 count:4 offset:-1.5,0 decay:0.7 tint:#9fc2c7 edge:0.55 time:0.65 easing:easeOut wait!"] },
   append: { zh: "向当前文本框追加一段文本，不重置当前说话人或文本框状态。", examples: ['@append "继续显示的文本"'] },
   arrange: { zh: "按命名位置排列角色立绘，常用于快速把多个角色放到舞台预设位置。", examples: ["@arrange Felix.Left,Mira.Right wait!"] },
   back: { zh: "切换主背景或背景演员，并可附带转场、位置、缩放和等待控制。", examples: ["@back bg/classroom effect:fade time:0.5 wait!"] },
@@ -1081,12 +1081,12 @@ const implementedCommandDocs: Record<string, NaniCommandDocs> = {
   clearbacklog: { zh: "清空当前剧情回看记录。", examples: ["@clearBacklog"] },
   clearchoice: { zh: "清除当前待选项；提供 id 时只清除对应选项。", examples: ["@clearChoice id:door"] },
   end: { zh: "结束当前脚本执行。", examples: ["@end"] },
-  flicker: { zh: "播放一次不规则黑切、反相、闪白、色差和扫描撕裂组成的强冲击闪烁。", examples: ["@flicker bursts:4 tear:0.65 seed:1 time:0.45 wait!"] },
+  flicker: { zh: "播放一次不规则黑切、反相、闪白、色差和扫描撕裂组成的全屏瞬时闪烁；可能触发光敏不适。", examples: ["@flicker power:1 bursts:4 irregularity:0.65 invert:0.75 white:0.7 tear:0.65 chroma:0.35 seed:1 time:0.45 easing:linear wait!"] },
   flash: { zh: "播放一次屏幕闪光效果，可指定颜色、持续时间和是否等待。", examples: ["@flash color:#ffffff duration:160 wait!"] },
   gameplay: { zh: "发出玩法状态事件，例如物品、证据、角色状态或亲密度变化。", examples: ["@gameplay grant-item item:keycard quantity:1"] },
   glitch: { zh: "播放一次故障干扰效果，适合快速冲击演出。", examples: ["@glitch power:0.8 time:0.25"] },
   glitchfilter: { zh: "设置持久故障滤镜参数，适合一段场景内持续干扰；time 会插值连续参数，seed 等离散参数在 transition start 切换，power:0 time:x 会淡出移除。", examples: ["@glitchFilter power:0.35 speed:1.2 time:0.25 wait!", "@glitchFilter power:0 time:0.3 wait!"] },
-  impact: { zh: "播放一次方向性冲击、边缘扩张、色差和弹性回稳。", examples: ["@impact origin:50,50 smear:0.6 time:0.22 wait!"] },
+  impact: { zh: "播放一次全屏方向性冲击、边缘扩张、色差和弹性回稳；该瞬时效果结束后自动清理。", examples: ["@impact power:1 origin:50,50 direction:0 smear:0.6 chroma:0.25 time:0.22 easing:easeOut wait!"] },
   goto: { zh: "跳转到当前脚本内的本地标签。跨脚本跳转当前 runtime 尚未实现。", examples: ["@goto #Next"] },
   hidechars: { zh: "隐藏当前角色立绘，并可设置动画时间和等待。", examples: ["@hideChars time:0.3 wait!"] },
   hidecue: { zh: "隐藏中央演出文本 Surface；不会清除当前正文或回看内容。", examples: ["@hideCue time:0.4 wait!"] },
@@ -1099,27 +1099,27 @@ const implementedCommandDocs: Record<string, NaniCommandDocs> = {
     examples: ['@pinp thumb/evidence-keycard pos:50,50 height:20 ratio:16,9 alt:"门禁卡" effect:fade time:0.18', "@pinp visible:false effect:fade time:0.18"]
   },
   print: { zh: "显示一行文本，可指定说话人、文本框和文本显示速度。", examples: ['@print "你好" author:Felix speed:0.8'] },
-  pulse: { zh: "设置持续的双搏脉冲效果；只扩张提取出的轮廓和高光残影，不周期缩放底图。", examples: ["@pulse power:0.6 rate:92 echoes:3 time:0.6", "@pulse power:0 time:0.4 wait!"] },
+  pulse: { zh: "设置全屏持续双搏脉冲；只扩张提取出的轮廓和高光残影，不周期缩放底图；power:0 可移除。", examples: ["@pulse power:0.6 rate:92 origin:50,52 echoes:3 expansion:0.035 edge:0.65 distortion:0.35 chroma:0.18 decay:0.72 color:#b8d6d8 time:0.6", "@pulse power:0 time:0.4 wait!"] },
   rain: { zh: "设置雨天粒子效果参数；time 会把当前渲染中的 power、wind、hue、tint 插值到目标值，power:0 time:x 会淡出后清理雨层。", examples: ["@rain power:0.5 wind:-0.2 hue:215 tint:0.55 time:0.4", "@rain power:0 time:0.2 wait!"] },
   resettext: { zh: "重置文本框当前文本，保留默认文本框可见状态。", examples: ["@resetText"] },
   set: { zh: "设置剧情变量；支持动态变量名或表达式形式。", examples: ["@set route:left"] },
   sfx: { zh: "播放音效，可设置音量、循环、淡入淡出和分组。", examples: ["@sfx sfx/door volume:0.8"] },
   sfxfast: { zh: "播放快速音效，适合高频反馈；当前 runtime 只消费路径、音量和分组。", examples: ["@sfxFast sfx/click volume:0.8"] },
   shake: { zh: "对舞台或目标播放震动效果，可设置次数、强度、方向和等待。", examples: ["@shake target:stage power:0.5 count:3 duration:150 wait!"] },
-  shutter: { zh: "播放一次眼睑、虹膜或切片形态的非对称闭合快门。", examples: ["@shutter shape:eyelid hold:0.08 time:0.48 wait!"] },
-  signalmask: { zh: "对目标角色合成后的完整立绘、表情层与交叉淡化结果应用持续信号遮罩破坏。", examples: ["@signalMask target:alice power:0.7 time:0.35", "@signalMask target:alice power:0 time:0.3 wait!"] },
+  shutter: { zh: "播放一次全屏眼睑、虹膜或切片形态的非对称闭合快门；该瞬时效果结束后自动清理。", examples: ["@shutter power:1 shape:eyelid color:#020304 hold:0.08 skew:0.18 time:0.48 easing:linear wait!"] },
+  signalmask: { zh: "对必填 target 指向的当前角色完整合成容器应用持续信号遮罩，覆盖立绘、表情层和交叉淡化结果；power:0 可移除。", examples: ["@signalMask target:alice power:0.7 bands:0.8 noise:0.45 chroma:0.25 speed:0.6 threshold:0.5 seed:1 time:0.35", "@signalMask target:alice power:0 time:0.3 wait!"] },
   showprinter: { zh: "显示文本框或切换到指定文本打印器。", examples: ["@showPrinter default time:0.2"] },
   showui: { zh: "显示 runtime UI 组；未指定目标时显示所有 v1 UI 组。", examples: ["@showUI commandBar visible:true"] },
   slide: { zh: "让角色从一个位置滑动到另一个位置，并可控制可见性、缓动和等待。", examples: ["@slide Felix.Happy from:-0.5,0 to:0.5,0 wait!"] },
-  staticfilter: { zh: "设置持续模拟雪花墙、非均匀扫描线、扫描驱动变形和复古色调。", examples: ["@staticFilter power:0.6 palette:cold seed:1 time:0.5", "@staticFilter power:0 time:0.3 wait!"] },
+  staticfilter: { zh: "设置全屏持续模拟雪花墙、非均匀扫描线、扫描驱动变形和复古色调；power:0 可移除。", examples: ["@staticFilter power:0.6 density:0.7 scanline:0.65 jitter:0.45 warp:0.35 grainSize:1 speed:1 vignette:0.35 palette:cold seed:1 time:0.5", "@staticFilter power:0 time:0.3 wait!"] },
   snow: { zh: "设置雪天粒子效果参数；time 会插值连续粒子参数，seed 在 transition start 切换，power:0 time:x 会淡出后清理雪层。", examples: ["@snow power:0.8 density:0.7 flakeScale:1.1 time:0.4", "@snow power:0 time:0.2 wait!"] },
   stopbgm: { zh: "停止背景音乐，可指定路径、分组和淡出时间。", examples: ["@stopBgm group:music fade:1"] },
   stopsfx: { zh: "停止循环音效，可指定路径、分组和淡出时间。", examples: ["@stopSfx group:rain fade:0.5"] },
   sun: { zh: "设置阳光粒子或光效参数；time 会插值连续光效参数，power:0 time:x 会淡出后清理阳光层。", examples: ["@sun power:0.6 position:0.5,0 time:0.4", "@sun power:0 time:0.2 wait!"] },
   toast: { zh: "显示短暂 UI 提示，可指定文本、外观和显示时长。", examples: ['@toast "已保存" time:1.2'] },
-  trialkeyword: { zh: "向 Trial 表现层展示或登记论点关键词。", examples: ['@trialKeyword id:kw:door text:"门锁" speaker:Felix'] }
-  ,vignette: { zh: "设置持续的有色非均匀暗角和缓慢边缘呼吸。", examples: ["@vignette power:0.5 radius:0.62 time:0.4", "@vignette power:0 time:0.3 wait!"] }
-  ,waterveil: { zh: "设置持续的多尺度水流折射、水痕、冷色曲线和潮湿高光。", examples: ["@waterVeil power:0.5 ripple:0.35 time:0.8", "@waterVeil power:0 time:0.4 wait!"] }
+  trialkeyword: { zh: "向 Trial 表现层展示或登记论点关键词。", examples: ['@trialKeyword id:kw:door text:"门锁" speaker:Felix'] },
+  vignette: { zh: "设置全屏持续的有色非均匀暗角和缓慢边缘呼吸；power:0 可移除。", examples: ["@vignette power:0.5 radius:0.62 softness:0.3 color:#160a10 breathe:0.06 grain:0.03 time:0.4", "@vignette power:0 time:0.3 wait!"] },
+  waterveil: { zh: "设置全屏持续的多尺度水流折射、水痕、冷色曲线和潮湿高光；power:0 可移除。", examples: ["@waterVeil power:0.5 level:0.18 ripple:0.35 drift:-0.1 blur:0.12 tint:#6c8390 droplets:0.5 seed:1 time:0.8", "@waterVeil power:0 time:0.4 wait!"] }
 };
 
 const implementedCommandConsumedParams: Record<string, string[]> = {
@@ -1229,7 +1229,6 @@ const commonParamDocs: Record<string, NaniCommandParamDocs> = {
   handlerId: { zh: "选项处理器 ID。" },
   height: { zh: "画框高度占游戏区域高度的百分比。", recommendedRange: { min: 0, max: 100, unit: "percent" } },
   hide: { zh: "是否隐藏对应元素。", allowedValues: ["true", "false"] },
-  hold: { zh: "跳转时是否保留指定状态。", allowedValues: ["true", "false"] },
   hor: { zh: "是否启用水平震动。", allowedValues: ["true", "false"] },
   hue: { zh: "色相角度。", recommendedRange: { min: 0, max: 360, unit: "deg" } },
   id: { zh: "命令目标 ID、选项 ID 或状态事件 ID，语义取决于命令。", examples: ["door", "kw:door"] },
@@ -1295,6 +1294,144 @@ const commonParamDocs: Record<string, NaniCommandParamDocs> = {
 };
 
 const commandParamDocOverrides: Record<string, Record<string, Partial<NaniCommandParamDocs>>> = {
+  afterimage: {
+    target: { zh: "残影采样目标；可写 stage、camera，或当前存在的角色、背景 actor ID。", defaultValue: "stage", examples: ["stage", "camera", "alice"] },
+    power: { zh: "残影总体混合强度。", defaultValue: 0.7, recommendedRange: { min: 0, max: 1 } },
+    count: { zh: "同屏残影层数。", defaultValue: 4, recommendedRange: { min: 1, max: 6, unit: "integer" } },
+    offset: { zh: "相邻残影的二维偏移，使用 Nani 场景百分比坐标。", defaultValue: "-1.5,0", recommendedRange: { unit: "percent" }, examples: ["-1.5,0", "0.5,1"] },
+    decay: { zh: "后续残影逐层衰减的速度。", defaultValue: 0.7, recommendedRange: { min: 0, max: 1 } },
+    tint: { zh: "残影边缘与高光的十六进制着色。", defaultValue: "#9fc2c7", recommendedRange: { unit: "hex color" }, examples: ["#9fc2c7", "#ff5577"] },
+    edge: { zh: "边缘与高光提取强度。", defaultValue: 0.55, recommendedRange: { min: 0, max: 1 } },
+    time: { zh: "本次瞬时残影的总播放时间，必须大于 0。", defaultValue: 0.65, recommendedRange: { min: 0, unit: "seconds", noteZh: "必须大于 0。" } },
+    easing: { zh: "残影动画缓动。", defaultValue: "easeOut", allowedValues: ["linear", "easeIn", "easeOut", "easeInOut"] },
+    wait: { defaultValue: false }
+  },
+  flicker: {
+    power: { zh: "整组故障闪烁的总体强度。", defaultValue: 1, recommendedRange: { min: 0, max: 1 } },
+    bursts: { zh: "不规则闪烁脉冲次数。", defaultValue: 4, recommendedRange: { min: 1, max: 32, unit: "integer" } },
+    irregularity: { zh: "各次脉冲时序与强度的不规则程度。", defaultValue: 0.65, recommendedRange: { min: 0, max: 1 } },
+    invert: { zh: "反相脉冲所占强度。", defaultValue: 0.75, recommendedRange: { min: 0, max: 1 } },
+    white: { zh: "白色闪光脉冲所占强度。", defaultValue: 0.7, recommendedRange: { min: 0, max: 1 } },
+    tear: { zh: "扫描撕裂与分段位移强度。", defaultValue: 0.65, recommendedRange: { min: 0, max: 1 } },
+    chroma: { zh: "红蓝通道分离强度。", defaultValue: 0.35, recommendedRange: { min: 0, max: 1 } },
+    seed: { zh: "有限小数随机种子；相同值复现相同闪烁节奏。", defaultValue: 1, examples: ["1", "7.5"] },
+    time: { zh: "整组瞬时闪烁的总播放时间，必须大于 0。", defaultValue: 0.45, recommendedRange: { min: 0, unit: "seconds", noteZh: "必须大于 0；高频设置需要光敏风险复核。" } },
+    easing: { zh: "闪烁包络缓动。", defaultValue: "linear", allowedValues: ["linear", "easeIn", "easeOut", "easeInOut"] },
+    wait: { defaultValue: false }
+  },
+  goto: {
+    hold: { zh: "跳转时是否保留指定状态。", allowedValues: ["true", "false"] }
+  },
+  glitch: {
+    time: { zh: "本次瞬时故障的总播放时间。", defaultValue: 1, recommendedRange: { min: 0, unit: "seconds" } },
+    power: { zh: "故障滤镜的总体强度。", defaultValue: 1, recommendedRange: { min: 0, max: 1 } },
+    blockJump: { defaultValue: 1, recommendedRange: { min: 0, max: 2, noteZh: "超过 1 属于 overdrive。" } },
+    burstJump: { defaultValue: 1, recommendedRange: { min: 0, max: 2, noteZh: "超过 1 属于 overdrive。" } },
+    pixelScatter: { defaultValue: 1, recommendedRange: { min: 0, max: 2, noteZh: "超过 1 属于 overdrive。" } },
+    colorNoise: { defaultValue: 1, recommendedRange: { min: 0, max: 2, noteZh: "超过 1 属于 overdrive。" } },
+    speed: { zh: "故障噪声与块跳变随时间刷新的速度倍率。", defaultValue: 1, recommendedRange: { min: 0, unit: "multiplier" } },
+    seed: { zh: "有限小数随机种子；相同值复现相同故障结构。", defaultValue: 0, examples: ["0", "20.5"] },
+    wait: { defaultValue: false }
+  },
+  glitchfilter: {
+    time: { zh: "启用、更新或移除持续故障滤镜时的过渡时间。", defaultValue: 0, recommendedRange: { min: 0, unit: "seconds" } },
+    easing: { zh: "持续参数过渡缓动。", defaultValue: "easeOut", allowedValues: ["linear", "easeIn", "easeOut", "easeInOut"] },
+    power: { zh: "持续故障滤镜的总体强度；0 会移除效果。", defaultValue: 0, recommendedRange: { min: 0, max: 1 } },
+    blockJump: { defaultValue: 1, recommendedRange: { min: 0, max: 2, noteZh: "超过 1 属于 overdrive。" } },
+    burstJump: { defaultValue: 1, recommendedRange: { min: 0, max: 2, noteZh: "超过 1 属于 overdrive。" } },
+    pixelScatter: { defaultValue: 1, recommendedRange: { min: 0, max: 2, noteZh: "超过 1 属于 overdrive。" } },
+    colorNoise: { defaultValue: 1, recommendedRange: { min: 0, max: 2, noteZh: "超过 1 属于 overdrive。" } },
+    speed: { zh: "故障噪声与块跳变随时间刷新的速度倍率。", defaultValue: 1, recommendedRange: { min: 0, unit: "multiplier" } },
+    seed: { zh: "有限小数随机种子；相同值复现相同故障结构。", defaultValue: 0, examples: ["0", "23.5"] },
+    wait: { defaultValue: false }
+  },
+  impact: {
+    power: { zh: "冲击形变与曝光的总体强度。", defaultValue: 1, recommendedRange: { min: 0, max: 1 } },
+    origin: { zh: "冲击中心，使用 0..100 的 Nani 场景百分比坐标。", defaultValue: "50,50", recommendedRange: { min: 0, max: 100, unit: "percent" }, examples: ["50,50", "35,60"] },
+    direction: { zh: "方向性拖影角度。", defaultValue: 0, recommendedRange: { unit: "degrees" }, examples: ["-18", "0", "45"] },
+    smear: { zh: "冲击阶段的方向性拖影长度。", defaultValue: 0.6, recommendedRange: { min: 0, max: 1 } },
+    chroma: { zh: "冲击阶段的红蓝通道分离强度。", defaultValue: 0.25, recommendedRange: { min: 0, max: 1 } },
+    time: { zh: "冲击压缩、拖影与回稳的总播放时间，必须大于 0。", defaultValue: 0.22, recommendedRange: { min: 0, unit: "seconds", noteZh: "必须大于 0。" } },
+    easing: { zh: "冲击恢复阶段缓动。", defaultValue: "easeOut", allowedValues: ["linear", "easeIn", "easeOut", "easeInOut"] },
+    wait: { defaultValue: false }
+  },
+  pulse: {
+    power: { zh: "脉冲轮廓、折射与色差的总体强度；0 会移除效果。", defaultValue: 0.6, recommendedRange: { min: 0, max: 1 } },
+    rate: { zh: "双搏脉冲的节拍速度。", defaultValue: 92, recommendedRange: { min: 0, unit: "beats/minute", noteZh: "必须大于 0。" } },
+    origin: { zh: "脉冲扩张中心，使用 0..100 的 Nani 场景百分比坐标。", defaultValue: "50,52", recommendedRange: { min: 0, max: 100, unit: "percent" }, examples: ["50,52", "35,60"] },
+    echoes: { zh: "同屏保留的扩张轮廓层数。", defaultValue: 3, recommendedRange: { min: 1, max: 4, unit: "integer" } },
+    expansion: { zh: "每层轮廓相对画面的扩张步长。", defaultValue: 0.035, recommendedRange: { min: 0, max: 0.2, unit: "normalized viewport" } },
+    edge: { zh: "轮廓与高光提取强度。", defaultValue: 0.65, recommendedRange: { min: 0, max: 1 } },
+    distortion: { zh: "脉冲轮廓造成的局部折射强度。", defaultValue: 0.35, recommendedRange: { min: 0, max: 1 } },
+    chroma: { zh: "脉冲轮廓的红蓝通道分离强度。", defaultValue: 0.18, recommendedRange: { min: 0, max: 1 } },
+    decay: { zh: "旧轮廓随回波层数衰减的速度。", defaultValue: 0.72, recommendedRange: { min: 0, max: 1 } },
+    color: { zh: "脉冲轮廓的十六进制颜色。", defaultValue: "#b8d6d8", examples: ["#b8d6d8", "#ff5577"] },
+    time: { zh: "启用、更新或移除脉冲时的过渡时间。", defaultValue: 0, recommendedRange: { min: 0, unit: "seconds" } },
+    easing: { zh: "持续参数过渡缓动。", defaultValue: "easeOut", allowedValues: ["linear", "easeIn", "easeOut", "easeInOut"] },
+    wait: { defaultValue: false }
+  },
+  shutter: {
+    power: { zh: "快门闭合与边缘形变的总体强度。", defaultValue: 1, recommendedRange: { min: 0, max: 1 } },
+    shape: { zh: "快门闭合几何：眼睑、虹膜或切片。", defaultValue: "eyelid", allowedValues: ["eyelid", "iris", "slice"] },
+    color: { zh: "闭合遮罩的十六进制颜色。", defaultValue: "#020304", examples: ["#020304", "#240710"] },
+    hold: { zh: "完整闭合状态占总时长的比例。", defaultValue: 0.08, recommendedRange: { min: 0, max: 1, unit: "ratio" } },
+    skew: { zh: "闭合边缘的非对称倾斜强度。", defaultValue: 0.18, recommendedRange: { min: 0, max: 1 } },
+    time: { zh: "闭合、停留与重新开启的总播放时间，必须大于 0。", defaultValue: 0.48, recommendedRange: { min: 0, unit: "seconds", noteZh: "必须大于 0。" } },
+    easing: { zh: "快门开合包络缓动。", defaultValue: "linear", allowedValues: ["linear", "easeIn", "easeOut", "easeInOut"] },
+    wait: { defaultValue: false }
+  },
+  signalmask: {
+    target: { zh: "必填的当前角色 ID；效果应用于该角色合成后的完整外层容器。", examples: ["alice", "Felix"] },
+    power: { zh: "信号遮罩破坏的总体强度；0 会移除该角色的效果。", defaultValue: 0.7, recommendedRange: { min: 0, max: 1 } },
+    bands: { zh: "横向信号条带的密度与可见强度。", defaultValue: 0.8, recommendedRange: { min: 0, max: 1 } },
+    noise: { zh: "遮罩阈值中使用的随机噪声强度。", defaultValue: 0.45, recommendedRange: { min: 0, max: 1 } },
+    chroma: { zh: "角色红蓝通道分离强度。", defaultValue: 0.25, recommendedRange: { min: 0, max: 1 } },
+    speed: { zh: "条带和噪声随时间移动的速度倍率。", defaultValue: 0.6, recommendedRange: { min: 0, unit: "multiplier" } },
+    threshold: { zh: "决定哪些条带被信号遮罩截断的阈值。", defaultValue: 0.5, recommendedRange: { min: 0, max: 1 } },
+    seed: { zh: "有限小数随机种子；相同值复现相同遮罩分布。", defaultValue: 1, examples: ["1", "9.25"] },
+    time: { zh: "启用、更新或移除角色信号遮罩时的过渡时间。", defaultValue: 0, recommendedRange: { min: 0, unit: "seconds" } },
+    easing: { zh: "持续参数过渡缓动。", defaultValue: "easeOut", allowedValues: ["linear", "easeIn", "easeOut", "easeInOut"] },
+    wait: { defaultValue: false }
+  },
+  staticfilter: {
+    power: { zh: "静电干扰的总体强度；0 会移除效果。", defaultValue: 0.6, recommendedRange: { min: 0, max: 1 } },
+    density: { zh: "模拟雪花噪点覆盖密度。", defaultValue: 0.7, recommendedRange: { min: 0, max: 1 } },
+    scanline: { zh: "非均匀扫描线的可见强度。", defaultValue: 0.65, recommendedRange: { min: 0, max: 1 } },
+    jitter: { zh: "逐扫描带水平抖动强度。", defaultValue: 0.45, recommendedRange: { min: 0, max: 1 } },
+    warp: { zh: "扫描驱动的画面弯曲强度。", defaultValue: 0.35, recommendedRange: { min: 0, max: 1 } },
+    grainSize: { zh: "噪声颗粒尺寸，必须大于 0。", defaultValue: 1, recommendedRange: { min: 0, unit: "pixels", noteZh: "必须大于 0。" } },
+    speed: { zh: "噪点、扫描线和抖动随时间刷新的速度倍率。", defaultValue: 1, recommendedRange: { min: 0, unit: "multiplier" } },
+    vignette: { zh: "静电滤镜内部边缘压暗强度。", defaultValue: 0.35, recommendedRange: { min: 0, max: 1 } },
+    palette: { zh: "静电信号的复古调色预设。", defaultValue: "cold", allowedValues: ["cold", "sepia", "green", "mono"] },
+    seed: { zh: "有限小数随机种子；相同值复现相同噪点结构。", defaultValue: 1, examples: ["1", "8.5"] },
+    time: { zh: "启用、更新或移除静电滤镜时的过渡时间。", defaultValue: 0, recommendedRange: { min: 0, unit: "seconds" } },
+    easing: { zh: "持续参数过渡缓动。", defaultValue: "easeOut", allowedValues: ["linear", "easeIn", "easeOut", "easeInOut"] },
+    wait: { defaultValue: false }
+  },
+  vignette: {
+    power: { zh: "暗角的总体强度；0 会移除效果。", defaultValue: 0.5, recommendedRange: { min: 0, max: 1 } },
+    radius: { zh: "保持较亮中心区域的半径。", defaultValue: 0.62, recommendedRange: { min: 0, max: 1, unit: "normalized viewport" } },
+    softness: { zh: "暗角边界的羽化宽度。", defaultValue: 0.3, recommendedRange: { min: 0, max: 1 } },
+    color: { zh: "暗角覆盖的十六进制颜色。", defaultValue: "#160a10", examples: ["#160a10", "#000000"] },
+    breathe: { zh: "暗角边缘缓慢呼吸起伏的强度。", defaultValue: 0.06, recommendedRange: { min: 0, max: 1 } },
+    grain: { zh: "暗角区域附加的细颗粒强度。", defaultValue: 0.03, recommendedRange: { min: 0, max: 1 } },
+    time: { zh: "启用、更新或移除暗角时的过渡时间。", defaultValue: 0, recommendedRange: { min: 0, unit: "seconds" } },
+    easing: { zh: "持续参数过渡缓动。", defaultValue: "easeOut", allowedValues: ["linear", "easeIn", "easeOut", "easeInOut"] },
+    wait: { defaultValue: false }
+  },
+  waterveil: {
+    power: { zh: "水幕折射和潮湿高光的总体强度；0 会移除效果。", defaultValue: 0.5, recommendedRange: { min: 0, max: 1 } },
+    level: { zh: "画面下方积水与水幕覆盖高度。", defaultValue: 0.18, recommendedRange: { min: 0, max: 1, unit: "normalized viewport" } },
+    ripple: { zh: "多尺度波纹折射强度。", defaultValue: 0.35, recommendedRange: { min: 0, max: 1 } },
+    drift: { zh: "水痕纵向漂移的方向与速度；负值向下，正值向上。", defaultValue: -0.1, examples: ["-0.1", "0.2"] },
+    blur: { zh: "水幕折射采样的柔化强度。", defaultValue: 0.12, recommendedRange: { min: 0, max: 1 } },
+    tint: { zh: "水幕冷色曲线与潮湿高光的十六进制颜色。", defaultValue: "#6c8390", recommendedRange: { unit: "hex color" }, examples: ["#6c8390", "#557b8d"] },
+    droplets: { zh: "水滴和水痕细节的覆盖强度。", defaultValue: 0.5, recommendedRange: { min: 0, max: 1 } },
+    seed: { zh: "有限小数随机种子；相同值复现相同水滴分布。", defaultValue: 1, examples: ["1", "9.5"] },
+    time: { zh: "启用、更新或移除水幕时的过渡时间。", defaultValue: 0, recommendedRange: { min: 0, unit: "seconds" } },
+    easing: { zh: "持续参数过渡缓动。", defaultValue: "easeOut", allowedValues: ["linear", "easeIn", "easeOut", "easeInOut"] },
+    wait: { defaultValue: false }
+  },
   char: {
     visible: {
       defaultValue: true,

@@ -1,5 +1,5 @@
 import type { PixiActorSnapshot } from "@v-ronpa/contracts";
-import { BlurFilter, Container, Filter, Rectangle } from "pixi.js";
+import { BlurFilter, Container, Filter } from "pixi.js";
 import type { PixiPresenterSystemsOptions } from "../systemTypes";
 
 interface ActorBlurFilter {
@@ -10,7 +10,7 @@ interface ActorBlurFilter {
 export class ActorBlurController {
   private readonly filters = new WeakMap<Container, ActorBlurFilter>();
 
-  constructor(private readonly options: PixiPresenterSystemsOptions) {}
+  constructor(_options: PixiPresenterSystemsOptions) {}
 
   apply(container: Container, actor: PixiActorSnapshot, liveFilters: Partial<Record<string, number>> = { blur: actor.filters.blur, bokeh: actor.filters.bokeh }): void {
     const power = Math.max(0, liveFilters.blur ?? actor.filters.blur ?? 0);
@@ -19,8 +19,6 @@ export class ActorBlurController {
     const siblings = (container.filters ?? []).filter((filter) => filter !== previousBlur as unknown as Filter);
     const next = blur ? [blur as unknown as Filter, ...siblings] : siblings;
     container.filters = next.length > 0 ? next : null;
-    if (blur) container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
-    else (container as unknown as { filterArea: Rectangle | undefined }).filterArea = undefined;
   }
 
   release(container: Container): void {
@@ -28,12 +26,9 @@ export class ActorBlurController {
     this.destroyFilter(container);
     const siblings = (container.filters ?? []).filter((filter) => filter !== blur as unknown as Filter);
     container.filters = siblings.length > 0 ? siblings : null;
-    (container as unknown as { filterArea: Rectangle | undefined }).filterArea = undefined;
   }
 
-  relayout(container: Container): void {
-    if (container.filters?.length) container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
-  }
+  relayout(_container: Container): void {}
 
   private reconcile(container: Container, power: number): ActorBlurFilter | undefined {
     if (power <= 0.001) {

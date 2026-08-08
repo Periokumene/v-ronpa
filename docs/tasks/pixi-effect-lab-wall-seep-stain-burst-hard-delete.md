@@ -43,7 +43,7 @@ without compatibility behavior or replacement effects.
 - `scripts/validate-boundaries.mjs`
 - `docs/architecture/adding-pixi-effect.md`
 - `docs/architecture/pixi-effects.md`
-- `docs/design/pixi-effect-lab.md`
+- `docs/archive/design/pixi-effect-lab.md`
 - `docs/nani/command-catalog.md`
 - `docs/ccr/pixi-effect-lab.md`
 - `docs/ccr/pixi-effect-lab-wall-seep-stain-burst-hard-delete.md`

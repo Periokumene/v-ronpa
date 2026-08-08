@@ -1,4 +1,8 @@
-# Pixi Effect Lab: Visual Design And Implementation Notes
+# Archived: Pixi Effect Lab Visual Design And Implementation Notes
+
+> Archived on 2026-08-09. This is a historical batch design record, not active
+> architecture or Nani authoring documentation. The command catalog owns current
+> command usage; `docs/architecture/pixi-effects.md` owns current architecture.
 
 ## Purpose
 

@@ -258,4 +258,60 @@ function createStaticFilter(
   };
 }
 const VERTEX = `in vec2 aPosition;out vec2 vTextureCoord;out vec2 vLocalCoord;uniform vec4 uInputSize;uniform vec4 uOutputFrame;uniform vec4 uOutputTexture;void main(void){vec2 p=aPosition*uOutputFrame.zw+uOutputFrame.xy;p.x=p.x*(2.0/uOutputTexture.x)-1.0;p.y=p.y*(2.0*uOutputTexture.z/uOutputTexture.y)-uOutputTexture.z;gl_Position=vec4(p,0,1);vTextureCoord=aPosition*(uOutputFrame.zw*uInputSize.zw);vLocalCoord=aPosition;}`;
-const FRAGMENT = `precision highp float;in vec2 vTextureCoord;in vec2 vLocalCoord;out vec4 finalColor;uniform sampler2D uTexture;uniform vec4 uInputClamp;uniform float uTime;uniform vec2 uResolution;uniform float uPower;uniform float uDensity;uniform float uScanline;uniform float uJitter;uniform float uWarp;uniform float uGrainSize;uniform float uSpeed;uniform float uVignette;uniform float uPalette;uniform float uSeed;float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7))+uSeed*73.13)*43758.5453);}vec3 pal(vec3 c){float l=dot(c,vec3(.2126,.7152,.0722));if(uPalette<.5)return mix(vec3(l)*vec3(.72,.9,1.08),c*vec3(.84,.94,1.08),.55);if(uPalette<1.5)return vec3(l)*vec3(1.08,.87,.62)+c*.18;if(uPalette<2.5)return vec3(l*.48,l*1.02,l*.58)+c*.12;return vec3(l);}void main(void){vec2 uv=vLocalCoord;float line=floor(uv.y*uResolution.y/max(.5,uGrainSize));float r=hash(vec2(line,floor(uTime*mix(8.,28.,uJitter))));float scan=smoothstep(.15,.92,abs(sin(uv.y*uResolution.y*3.14159+r*6.28)))*uScanline;float tear=(r-.5)*uWarp*.035*uPower*(.18+scan*(.35+uJitter));vec2 w=clamp(vTextureCoord+vec2(tear,0),uInputClamp.xy,uInputClamp.zw);vec4 s=texture(uTexture,w);vec3 c=pal(s.rgb)+vec3((hash(floor(uv*uResolution/max(.5,uGrainSize))+uTime)-.5)*uDensity*.52-scan*.12)*uPower;float v=smoothstep(.35,.92,length((uv-.5)*vec2(1.,.74)))*uVignette;finalColor=vec4(mix(s.rgb,c*(1.-v*.42),uPower),s.a);}`;
+export const STATIC_FILTER_FRAGMENT_SOURCE = `
+precision highp float;
+in vec2 vTextureCoord;
+in vec2 vLocalCoord;
+out vec4 finalColor;
+uniform sampler2D uTexture;
+uniform vec4 uInputClamp;
+uniform float uTime;
+uniform vec2 uResolution;
+uniform float uPower;
+uniform float uDensity;
+uniform float uScanline;
+uniform float uJitter;
+uniform float uWarp;
+uniform float uGrainSize;
+uniform float uSpeed;
+uniform float uVignette;
+uniform float uPalette;
+uniform float uSeed;
+float hash11(float value) {
+  return fract(sin(value * 127.1 + uSeed * 311.7) * 43758.5453123);
+}
+float hash21(vec2 point) {
+  return fract(sin(dot(point, vec2(127.1, 311.7)) + uSeed * 73.13) * 43758.5453123);
+}
+float luminance(vec3 color) { return dot(color, vec3(0.2126, 0.7152, 0.0722)); }
+vec2 inputUv(vec2 localUv) {
+  vec2 frameScale = uInputClamp.xy + uInputClamp.zw;
+  return clamp(localUv * frameScale, uInputClamp.xy, uInputClamp.zw);
+}
+vec3 currentAt(vec2 localUv) { return texture(uTexture, inputUv(localUv)).rgb; }
+vec3 palette(vec3 color) {
+  float lightness = luminance(color);
+  if (uPalette < 0.5) return mix(vec3(lightness) * vec3(0.72, 0.9, 1.08), color * vec3(0.84, 0.94, 1.08), 0.55);
+  if (uPalette < 1.5) return vec3(lightness) * vec3(1.08, 0.87, 0.62) + color * 0.18;
+  if (uPalette < 2.5) return vec3(lightness * 0.48, lightness * 1.02, lightness * 0.58) + color * 0.12;
+  return vec3(lightness);
+}
+void main(void) {
+  vec2 uv = vLocalCoord;
+  vec4 source = texture(uTexture, vTextureCoord);
+  float line = floor(uv.y * uResolution.y / max(0.5, uGrainSize));
+  float lineRandom = hash11(line + floor(uTime * mix(8.0, 28.0, uJitter)));
+  float phase = sin(uv.y * uResolution.y * 3.14159 + lineRandom * 6.28);
+  float active = smoothstep(0.15, 0.92, abs(phase)) * uScanline;
+  float snow = hash21(floor(uv * uResolution / max(0.5, uGrainSize)) + floor(uTime * 47.0));
+  float tear = (lineRandom - 0.5) * uWarp * 0.035 * uPower * (0.18 + active * (0.35 + uJitter));
+  vec2 warped = clamp(uv + vec2(tear, 0.0), 0.0, 1.0);
+  vec3 color = currentAt(warped);
+  color.r = currentAt(warped + vec2(tear * 0.16, 0.0)).r;
+  color.b = currentAt(warped - vec2(tear * 0.22, 0.0)).b;
+  color = palette(color);
+  color += vec3((snow - 0.5) * uDensity * 0.52 - active * 0.12) * uPower;
+  float vignette = smoothstep(0.35, 0.92, length((uv - 0.5) * vec2(1.0, 0.74))) * uVignette;
+  finalColor = vec4(mix(source.rgb, color * (1.0 - vignette * 0.42), uPower), source.a);
+}`;
+const FRAGMENT = STATIC_FILTER_FRAGMENT_SOURCE;

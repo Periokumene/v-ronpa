@@ -380,5 +380,73 @@ function installHistory(
   };
 }
 const VERTEX = `in vec2 aPosition;out vec2 vTextureCoord;out vec2 vLocalCoord;uniform vec4 uInputSize;uniform vec4 uOutputFrame;uniform vec4 uOutputTexture;void main(void){vec2 p=aPosition*uOutputFrame.zw+uOutputFrame.xy;p.x=p.x*(2.0/uOutputTexture.x)-1.0;p.y=p.y*(2.0*uOutputTexture.z/uOutputTexture.y)-uOutputTexture.z;gl_Position=vec4(p,0,1);vTextureCoord=aPosition*(uOutputFrame.zw*uInputSize.zw);vLocalCoord=aPosition;}`;
-const FRAGMENT = `precision highp float;in vec2 vTextureCoord;in vec2 vLocalCoord;out vec4 finalColor;uniform sampler2D uTexture;uniform sampler2D uHistoryTexture;uniform vec4 uHistoryClamp;uniform float uPhase;uniform vec2 uResolution;uniform float uPower;uniform float uRate;uniform vec2 uOrigin;uniform float uEchoes;uniform float uExpansion;uniform float uEdge;uniform float uDistortion;uniform float uChroma;uniform float uDecay;uniform vec3 uColor;vec3 hist(vec2 uv){vec2 s=uHistoryClamp.xy+uHistoryClamp.zw;return texture(uHistoryTexture,clamp(uv*s,uHistoryClamp.xy,uHistoryClamp.zw)).rgb;}float beat(float p){float t=fract(p);float a=exp(-max(0.,t-.054)*9.13)*smoothstep(0.,.054,t);float b=.35*exp(-max(0.,t-.391)*11.74)*smoothstep(.330,.391,t);return clamp(a+b,0.,1.);}void main(void){vec4 source=texture(uTexture,vTextureCoord);float b=beat(uPhase)*uPower;vec3 c=source.rgb;for(int i=1;i<=4;i++){float f=float(i);if(f>uEchoes)break;vec2 radial=vLocalCoord-uOrigin;vec2 echo=uOrigin+radial*(1.-pow(b,.72)*uExpansion*f);vec3 h=hist(echo);float e=max(0.,dot(h,vec3(.2126,.7152,.0722))-.55)*pow(max(.01,uDecay),f-1.)*b;c+=mix(uColor,h,.34)*e*uEdge;}finalColor=vec4(clamp(c,0.,1.4),source.a);}`;
+export const PULSE_FRAGMENT_SOURCE = `
+precision highp float;
+in vec2 vTextureCoord;
+in vec2 vLocalCoord;
+out vec4 finalColor;
+uniform sampler2D uTexture;
+uniform sampler2D uHistoryTexture;
+uniform vec4 uHistoryClamp;
+uniform float uPhase;
+uniform vec2 uResolution;
+uniform float uPower;
+uniform float uRate;
+uniform vec2 uOrigin;
+uniform float uEchoes;
+uniform float uExpansion;
+uniform float uEdge;
+uniform float uDistortion;
+uniform float uChroma;
+uniform float uDecay;
+uniform vec3 uColor;
+float luminance(vec3 color) { return dot(color, vec3(0.2126, 0.7152, 0.0722)); }
+vec3 historyAt(vec2 localUv) {
+  vec2 frameScale = uHistoryClamp.xy + uHistoryClamp.zw;
+  return texture(uHistoryTexture, clamp(localUv * frameScale, uHistoryClamp.xy, uHistoryClamp.zw)).rgb;
+}
+float doubleBeat(float phase) {
+  float t = fract(phase);
+  float mainBeat = exp(-max(0.0, t - 0.054) * 9.13) * smoothstep(0.0, 0.054, t);
+  float secondary = 0.35 * exp(-max(0.0, t - 0.391) * 11.74) * smoothstep(0.330, 0.391, t);
+  return clamp(mainBeat + secondary, 0.0, 1.0);
+}
+void main(void) {
+  vec2 uv = vLocalCoord;
+  vec4 source = texture(uTexture, vTextureCoord);
+  float beat = doubleBeat(uPhase) * uPower;
+  vec3 result = source.rgb;
+  for (int index = 1; index <= 4; index++) {
+    float echoIndex = float(index);
+    if (echoIndex > uEchoes) break;
+    float shell = pow(beat, 0.72) * uExpansion * echoIndex * (0.52 + 0.28 * echoIndex);
+    vec2 radial = uv - uOrigin;
+    vec2 tangent = normalize(vec2(-radial.y, radial.x) + vec2(0.0001));
+    float angularWarp = sin(
+      atan(radial.y, radial.x) * 7.0 + echoIndex * 2.1 + uPhase * 6.28318
+    ) * uDistortion * beat * 0.004 * echoIndex;
+    vec2 echoUv = uOrigin + radial * (1.0 - shell) + tangent * angularWarp;
+    vec2 pixelStep = vec2(1.0 + echoIndex) / max(vec2(1.0), uResolution);
+    vec3 history0 = historyAt(echoUv + pixelStep);
+    vec3 history1 = historyAt(echoUv - pixelStep);
+    vec3 history2 = historyAt(echoUv + vec2(pixelStep.x, -pixelStep.y));
+    vec3 history3 = historyAt(echoUv + vec2(-pixelStep.x, pixelStep.y));
+    vec3 historyColor = (history0 + history1 + history2 + history3) * 0.25;
+    float gradientX = luminance(history0) - luminance(history1);
+    float gradientY = luminance(history2) - luminance(history3);
+    float edge = clamp(
+      length(vec2(gradientX, gradientY)) * 4.5 + max(0.0, luminance(historyColor) - 0.7) * 1.7,
+      0.0,
+      1.0
+    ) * pow(max(0.0, beat), 0.55) * pow(max(0.01, uDecay), echoIndex - 1.0);
+    vec3 shifted = mix(
+      historyColor,
+      historyAt(echoUv + vec2(uChroma * 0.003 * echoIndex, 0.0)),
+      uChroma
+    );
+    result += mix(uColor, shifted, 0.34) * edge * uEdge;
+  }
+  finalColor = vec4(clamp(result, 0.0, 1.4), source.a);
+}`;
+const FRAGMENT = PULSE_FRAGMENT_SOURCE;
 const COPY_FRAGMENT = `precision highp float;in vec2 vTextureCoord;out vec4 finalColor;uniform sampler2D uTexture;void main(void){finalColor=texture(uTexture,vTextureCoord);}`;

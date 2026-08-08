@@ -258,4 +258,72 @@ function createWaterVeilFilter(
   };
 }
 const VERTEX = `in vec2 aPosition;out vec2 vTextureCoord;out vec2 vLocalCoord;uniform vec4 uInputSize;uniform vec4 uOutputFrame;uniform vec4 uOutputTexture;void main(void){vec2 p=aPosition*uOutputFrame.zw+uOutputFrame.xy;p.x=p.x*(2.0/uOutputTexture.x)-1.0;p.y=p.y*(2.0*uOutputTexture.z/uOutputTexture.y)-uOutputTexture.z;gl_Position=vec4(p,0,1);vTextureCoord=aPosition*(uOutputFrame.zw*uInputSize.zw);vLocalCoord=aPosition;}`;
-const FRAGMENT = `precision highp float;in vec2 vTextureCoord;in vec2 vLocalCoord;out vec4 finalColor;uniform sampler2D uTexture;uniform vec4 uInputClamp;uniform float uTime;uniform vec2 uResolution;uniform float uPower;uniform float uLevel;uniform float uRipple;uniform float uDrift;uniform float uBlur;uniform vec3 uTint;uniform float uDroplets;uniform float uSeed;float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7))+uSeed*73.13)*43758.5453);}void main(void){vec2 uv=vLocalCoord;float flow=hash(floor(uv*vec2(17.,11.))+uTime*.2);vec2 cells=uv*vec2(14.,4.);vec2 id=floor(cells);vec2 q=fract(cells);float rnd=hash(id);float y=fract(uTime*mix(.08,.19,rnd)+rnd);float head=1.-smoothstep(.035,.095,length(vec2((q.x-.5)*.72,q.y-y)));float track=head*step(1.-uDroplets,rnd);vec2 d=vec2((flow-.5)*uRipple+track*.28,(hash(id+uTime)-.5)*uRipple*.28+head*.12)*.018*uPower;vec2 w=clamp(vTextureCoord+d,uInputClamp.xy,uInputClamp.zw);vec4 s=texture(uTexture,w);vec3 c=mix(s.rgb,s.rgb*uTint+vec3(track*.26),uPower*(.16+uLevel*.22));finalColor=vec4(c,s.a);}`;
+export const WATER_VEIL_FRAGMENT_SOURCE = `
+precision highp float;
+in vec2 vTextureCoord;
+in vec2 vLocalCoord;
+out vec4 finalColor;
+uniform sampler2D uTexture;
+uniform vec4 uInputClamp;
+uniform float uTime;
+uniform vec2 uResolution;
+uniform float uPower;
+uniform float uLevel;
+uniform float uRipple;
+uniform float uDrift;
+uniform float uBlur;
+uniform vec3 uTint;
+uniform float uDroplets;
+uniform float uSeed;
+float hash21(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed * 73.13) * 43758.5453123);
+}
+float noise21(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
+    mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0)), f.x),
+    f.y
+  );
+}
+vec2 inputUv(vec2 localUv) {
+  vec2 frameScale = uInputClamp.xy + uInputClamp.zw;
+  return clamp(localUv * frameScale, uInputClamp.xy, uInputClamp.zw);
+}
+vec3 currentAt(vec2 localUv) { return texture(uTexture, inputUv(localUv)).rgb; }
+void main(void) {
+  vec2 uv = vLocalCoord;
+  vec4 source = texture(uTexture, vTextureCoord);
+  float driftPhase = uTime * uDrift;
+  float flow = noise21(vec2(uv.x * 5.0 + driftPhase, uv.y * 3.0 - uTime * 0.08))
+    + 0.5 * noise21(vec2(uv.x * 17.0 - uTime * 0.03, uv.y * 11.0 + driftPhase));
+  vec2 dropCells = vec2(uv.x * 14.0, uv.y * 4.0);
+  vec2 dropId = floor(dropCells);
+  vec2 dropUv = fract(dropCells);
+  float dropRnd = hash21(dropId + vec2(17.0, 31.0));
+  float dropY = fract(uTime * mix(0.08, 0.19, dropRnd) + dropRnd);
+  float dropX = dropUv.x - 0.5 + sin(uTime * 0.31 + dropRnd * 9.0) * 0.06;
+  float dropDelta = dropUv.y - dropY;
+  float head = 1.0 - smoothstep(0.035, 0.095, length(vec2(dropX * 0.72, dropDelta)));
+  float trail = (1.0 - smoothstep(0.012, 0.038, abs(dropX)))
+    * smoothstep(0.0, 0.06, dropDelta)
+    * (1.0 - smoothstep(0.08, 0.72, dropDelta));
+  float track = (head + trail * 0.72) * step(1.0 - uDroplets, dropRnd);
+  vec2 displacement = vec2(
+    (flow - 0.75) * uRipple + track * 0.28,
+    (noise21(uv * 13.0 + uTime) - 0.5) * uRipple * 0.28 + head * 0.12
+  ) * 0.018 * uPower;
+  vec2 wetUv = clamp(uv + displacement, 0.0, 1.0);
+  vec3 wet = currentAt(wetUv);
+  vec2 blurStep = vec2(
+    displacement.x * 0.45,
+    (0.8 + track * 2.0) / max(1.0, uResolution.y)
+  ) * uBlur * uPower;
+  vec3 directional = (currentAt(wetUv + blurStep) + currentAt(wetUv - blurStep * 0.65)) * 0.5;
+  wet = mix(wet, directional, clamp(uBlur * uPower, 0.0, 0.72));
+  wet = mix(wet, wet * uTint + vec3(track * 0.26), uPower * (0.16 + uLevel * 0.22));
+  finalColor = vec4(wet, source.a);
+}`;
+const FRAGMENT = WATER_VEIL_FRAGMENT_SOURCE;

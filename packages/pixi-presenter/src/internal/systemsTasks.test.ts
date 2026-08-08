@@ -81,6 +81,7 @@ describe("pixi presentation task system integration", () => {
     filters.applyActorFilters(container, actor);
     expect(container.filters).toHaveLength(2);
     expect(container.filters).toContain(transient);
+    expect(container.filterArea).toBeUndefined();
     filters.applyActorFilters(container, { ...actor, filters: {} });
     expect(container.filters).toEqual([transient]);
     filters.releaseActorFilters(container);
@@ -105,6 +106,7 @@ describe("pixi presentation task system integration", () => {
     expect(container.filters).toHaveLength(3);
     expect(allFilterResourceNames(container)[0]).toBe("signalMaskUniforms");
     expect(container.filters?.[2]).toBe(transient);
+    expect(container.filterArea).toBeUndefined();
     filters.releaseActorFilters(container);
     expect(container.filters).toEqual([transient]);
     expect(() => filters.destroy()).not.toThrow();

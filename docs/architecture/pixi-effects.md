@@ -106,6 +106,20 @@ that survives unrelated revisions, reversal when re-enabled during removal,
 immediate `animate:false` restore, and idempotent owned-resource cleanup. Pure
 waiting is not synthesized from an identical terminal command.
 
+## Authoring Documentation
+
+`packages/contracts` command and parameter `docs` metadata is the single
+authoring-documentation authority. The generated effect reference in
+[VN Command Catalog](../nani/command-catalog.md) renders every implemented Pixi
+effect—existing and newly added—with the same description, examples, required
+parameters, defaults, ranges, enums, units, and runtime notes. Editor completion
+and hover consume the same metadata.
+
+Development `.nani` scripts are executable smoke and visual demonstrations, not
+an alternative specification. Batch design records belong in `docs/archive` and
+cannot define live command syntax, defaults, validation, lifecycle, or filter
+order.
+
 ## Dependencies And Risk Removal
 
 Contracts, compiler, Stage Model, and runtime remain renderer-independent.
@@ -126,6 +140,7 @@ explicit declaration/normalizer/reducer/family registration touchpoints.
 | Harness/Playwright | terminal snapshot readout, active motion, cleanup, and screenshot evidence |
 
 Pixel-difference smoke assertions prove that continuous animation is running;
-they are not visual-style baselines. Static appearance is verified through
-precise Presenter properties, terminal Harness readouts, and retained review
-screenshots.
+region-level assertions additionally protect effect scope and source visibility.
+Shader-strategy tests protect effect-specific processing invariants without
+making shader source a public contract. These checks are not visual-style
+baselines; retained screenshots remain human review evidence.

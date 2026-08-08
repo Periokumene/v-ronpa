@@ -25,8 +25,10 @@ not mutate another controller.
 For a new public `.nani` command, change these boundaries in order:
 
 1. `packages/contracts`: declare the command, execution owner, parameters,
-   defaults, consumed-parameter metadata, and command documentation. Add a CCR
-   when the public contract changes.
+   defaults, consumed-parameter metadata, and structured Chinese command and
+   parameter documentation. Document defaults, accepted values, units, ranges,
+   target/removal semantics, and runnable examples in the catalog metadata. Add
+   a CCR when the public contract changes.
 2. `packages/nani-runtime-compiler`: add one normalizer that emits resolved
    `RuntimeCommand` values. Do not put rendering behavior here.
 3. `packages/pixi-stage-model`: add a pure reducer under `src/effects/` and one
@@ -44,6 +46,13 @@ do not create a public command merely to expose a private implementation choice.
 Hard removal uses the same four touchpoints in reverse. Do not leave aliases,
 deprecated stubs, hidden no-ops, or orphaned reducers/controllers unless a CCR
 explicitly requires compatibility.
+
+The generated effect reference in [VN Command Catalog](../nani/command-catalog.md)
+is the authoring authority for both existing and newly added effects. It is
+rendered from `commandCatalog`, which is also used by diagnostics, completion,
+and hover. Batch design notes and development `.nani` demonstrations are not
+command documentation and must not become a second source of defaults or
+validation rules.
 
 ## Presenter Registration By Family
 
@@ -138,8 +147,9 @@ Actor, Weather, Persistent screen, Transient, and Trial lifecycles.
 
 ## Test Placement And Completion Checklist
 
-- Contracts/compiler tests: catalog metadata, normalized command, invalid input,
-  and exact diagnostics.
+- Contracts/compiler tests: catalog metadata (including non-placeholder Chinese
+  docs, defaults, ranges, enums, units, and examples), normalized command,
+  invalid input, and exact diagnostics.
 - Stage effect test beside `pixi-stage-model/src/effects/`: snapshot or hint,
   wait task, removal/no-op, clamp, and unsupported parameters.
 - Presenter leaf test beside the controller: creation, live interpolation,

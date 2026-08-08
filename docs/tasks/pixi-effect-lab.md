@@ -41,7 +41,7 @@ composed usage.
 
 - `docs/tasks/pixi-effect-lab.md`
 - `docs/ccr/pixi-effect-lab.md`
-- `docs/design/pixi-effect-lab.md`
+- `docs/archive/design/pixi-effect-lab.md`
 - `docs/architecture/adding-pixi-effect.md`
 - `docs/architecture/pixi-effects.md`
 - `docs/nani/command-catalog.md`
@@ -137,7 +137,7 @@ BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tas
 - Separate development-only `pixi-effect-lab.nani` and
   `pixi-effect-compositions.nani` scenes, read-only Devtools diagnostics,
   generated command documentation, CCR, architecture updates, and the detailed
-  professional processing-chain note in `docs/design/pixi-effect-lab.md`.
+  historical processing-chain note in `docs/archive/design/pixi-effect-lab.md`.
 - No dependency, package manifest, lockfile, production Nani, or App manifest
   changes.
 
@@ -159,7 +159,7 @@ BASE_REF=integration/v-ronpa-baseline pnpm validate:subsystem -- --task docs/tas
   `test-results/game-a-effects-composition-*`.
 - The smoke records Domestic Pressure and full persistent-stack frame profiles
   in `test-results/game-a-effects-performance.json`; methodology is documented
-  in `docs/design/pixi-effect-lab.md`.
+  in `docs/archive/design/pixi-effect-lab.md`.
 - Browser console/page errors were empty; final screen/weather/actor snapshots,
   hints, and presentation tasks were empty.
 

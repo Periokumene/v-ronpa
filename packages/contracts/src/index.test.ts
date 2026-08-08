@@ -1349,6 +1349,42 @@ describe("contracts", () => {
     expect(getNaniCommandDefinition("snow")?.docs?.zh).toContain("seed");
   });
 
+  it("documents every added Pixi effect with concrete authoring metadata", () => {
+    const addedEffectIds = [
+      "impact", "afterimage", "shutter", "flicker", "vignette",
+      "staticfilter", "waterveil", "signalmask", "pulse"
+    ];
+
+    for (const commandId of addedEffectIds) {
+      const definition = getNaniCommandDefinition(commandId);
+      expect(definition?.docs?.zh, commandId).toBeTruthy();
+      expect(definition?.docs?.examples?.length, commandId).toBeGreaterThan(0);
+      for (const paramSpec of definition?.params ?? []) {
+        expect(paramSpec.docs?.runtimeSupport, `${commandId}.${paramSpec.name}`).toBe("consumed");
+        expect(paramSpec.docs?.zh, `${commandId}.${paramSpec.name}`).not.toBe(
+          `${paramSpec.name} 参数，类型为 ${paramSpec.type}。`
+        );
+      }
+    }
+
+    expect(getNaniCommandDefinition("impact")?.params.find((param) => param.name === "origin")?.docs).toMatchObject({
+      defaultValue: "50,50",
+      recommendedRange: { min: 0, max: 100, unit: "percent" }
+    });
+    expect(getNaniCommandDefinition("shutter")?.params.find((param) => param.name === "shape")?.docs).toMatchObject({
+      defaultValue: "eyelid",
+      allowedValues: ["eyelid", "iris", "slice"]
+    });
+    expect(getNaniCommandDefinition("staticFilter")?.params.find((param) => param.name === "palette")?.docs).toMatchObject({
+      defaultValue: "cold",
+      allowedValues: ["cold", "sepia", "green", "mono"]
+    });
+    expect(getNaniCommandDefinition("signalMask")?.params.find((param) => param.name === "target")).toMatchObject({
+      required: true,
+      docs: { runtimeSupport: "consumed" }
+    });
+  });
+
   it("marks declared but currently unconsumed implemented params in command docs", () => {
     expect(getNaniCommandDefinition("bgm")?.params.find((paramSpec) => paramSpec.name === "intro")?.docs).toMatchObject({
       runtimeSupport: "declared-not-consumed",

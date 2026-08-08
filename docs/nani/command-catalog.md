@@ -65,6 +65,11 @@ combined wait correctness. The generated matrix below is authoritative; use
 `pnpm generate:command-docs` after catalog changes and
 `pnpm validate:command-docs` in freshness gates.
 
+The generated Pixi effect reference following the matrix uses the same catalog
+metadata as editor completion and hover. It documents existing and newly added
+effects at one level; development labs and historical design notes are not
+authoring authorities.
+
 ## Categories
 
 - `text`: dialogue printer, backlog, and text formatting commands.
@@ -256,6 +261,442 @@ order never implies navigation, and `@end` completes the whole entry.
 | `trialkeyword` | `trialkeyword` | ui | pixi-presentation | id:string, text:string, speaker:string, evidence:string | none | no | implemented |
 | `vignette` | `vignette` | effect | pixi-presentation | power:decimal, radius:decimal, softness:decimal, color:string, breathe:decimal, grain:decimal, time:decimal, easing:string, wait:boolean | none | no | implemented |
 | `waterVeil` | `waterveil` | effect | pixi-presentation | power:decimal, level:decimal, ripple:decimal, drift:decimal, blur:decimal, tint:string, droplets:decimal, seed:decimal, time:decimal, easing:string, wait:boolean | none | no | implemented |
+
+### Implemented Pixi effect command reference
+
+This section is generated from the same `commandCatalog` metadata used by parser diagnostics, editor completion, and hover. Existing and newly added effects use one format and one authority.
+
+#### `@afterimage`
+
+对舞台、镜头或当前存在的演员播放一次边缘与高光残影；该瞬时效果结束后自动清理。
+
+**示例**
+
+```nani
+@afterimage target:stage power:0.7 count:4 offset:-1.5,0 decay:0.7 tint:#9fc2c7 edge:0.55 time:0.65 easing:easeOut wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `target` | string | 否 | `stage` | — | — | 残影采样目标；可写 stage、camera，或当前存在的角色、背景 actor ID。 |
+| `power` | decimal | 否 | `0.7` | 0..1 | — | 残影总体混合强度。 |
+| `count` | integer | 否 | `4` | 1..6 integer | — | 同屏残影层数。 |
+| `offset` | decimal list | 否 | `-1.5,0` | percent | — | 相邻残影的二维偏移，使用 Nani 场景百分比坐标。 |
+| `decay` | decimal | 否 | `0.7` | 0..1 | — | 后续残影逐层衰减的速度。 |
+| `tint` | string | 否 | `#9fc2c7` | hex color | — | 残影边缘与高光的十六进制着色。 |
+| `edge` | decimal | 否 | `0.55` | 0..1 | — | 边缘与高光提取强度。 |
+| `time` | decimal | 否 | `0.65` | >= 0 seconds；必须大于 0。 | — | 本次瞬时残影的总播放时间，必须大于 0。 |
+| `easing` | string | 否 | `easeOut` | — | `linear`, `easeIn`, `easeOut`, `easeInOut` | 残影动画缓动。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@blur`
+
+对舞台或演员应用模糊效果，通常用于焦点转移或回忆演出；time 会插值 actor/stage blur 强度，power:0 time:x 会淡出后移除 blur。
+
+**示例**
+
+```nani
+@blur stage power:0.4 time:0.3 wait!
+@blur actorId:MainBackground power:0 time:0.2 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `actorId` | string | 否 | — | — | — | 目标演员或舞台对象 ID。 |
+| `power` | decimal | 否 | — | 0..1 | — | 效果强度。 |
+| `time` | decimal | 否 | — | >= 0 seconds | — | 命令动画、媒体或 UI 过渡时间。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@bokeh`
+
+应用景深虚化效果，可调焦点、距离和强度；time 会插值 bokeh 强度，power:0 time:x 会淡出 overlay/root blur 后清理。
+
+**示例**
+
+```nani
+@bokeh focus:Felix power:0.6 time:0.4
+@bokeh power:0 time:0.2 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `focus` | string | 否 | — | — | — | 聚焦目标或景深焦点。 |
+| `dist` | decimal | 否 | — | >= 0 | — | 景深距离参数。 |
+| `power` | decimal | 否 | — | 0..1 | — | 效果强度。 |
+| `time` | decimal | 否 | — | >= 0 seconds | — | 命令动画、媒体或 UI 过渡时间。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@charTone`
+
+为当前脚本中的全部角色应用代码级多色环境光预设；amount 是无量纲强度倍率，time 使用内部固定缓动插值，none 或 amount:0 会移除效果。
+
+**示例**
+
+```nani
+@charTone rain
+@charTone fog amount:1.25 time:0.4 wait!
+@charTone none time:0.3 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `preset` | string | 否 | — | — | `rain`, `fog`, `sunset`, `night`, `alert`, `fluorescent`, `none` | 代码级预设名称。 |
+| `amount` | decimal | 否 | `1` | 0..2 multiplier；不设硬上限；0 会移除效果，超过 2 属于 overdrive。 | — | 无量纲效果强度倍率。 |
+| `time` | decimal | 否 | `0` | >= 0 seconds | — | 命令动画、媒体或 UI 过渡时间。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@flash`
+
+播放一次屏幕闪光效果，可指定颜色、持续时间和是否等待。
+
+**示例**
+
+```nani
+@flash color:#ffffff duration:160 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `color` | string | 否 | — | — | — | 颜色值，建议使用十六进制颜色。 |
+| `duration` | decimal | 否 | `160` | >= 0 ms | — | 持续时间。不同命令可能使用毫秒或 runtime 专用单位。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@flicker`
+
+播放一次不规则黑切、反相、闪白、色差和扫描撕裂组成的全屏瞬时闪烁；可能触发光敏不适。
+
+**示例**
+
+```nani
+@flicker power:1 bursts:4 irregularity:0.65 invert:0.75 white:0.7 tear:0.65 chroma:0.35 seed:1 time:0.45 easing:linear wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `power` | decimal | 否 | `1` | 0..1 | — | 整组故障闪烁的总体强度。 |
+| `bursts` | integer | 否 | `4` | 1..32 integer | — | 不规则闪烁脉冲次数。 |
+| `irregularity` | decimal | 否 | `0.65` | 0..1 | — | 各次脉冲时序与强度的不规则程度。 |
+| `invert` | decimal | 否 | `0.75` | 0..1 | — | 反相脉冲所占强度。 |
+| `white` | decimal | 否 | `0.7` | 0..1 | — | 白色闪光脉冲所占强度。 |
+| `tear` | decimal | 否 | `0.65` | 0..1 | — | 扫描撕裂与分段位移强度。 |
+| `chroma` | decimal | 否 | `0.35` | 0..1 | — | 红蓝通道分离强度。 |
+| `seed` | decimal | 否 | `1` | — | — | 有限小数随机种子；相同值复现相同闪烁节奏。 |
+| `time` | decimal | 否 | `0.45` | >= 0 seconds；必须大于 0；高频设置需要光敏风险复核。 | — | 整组瞬时闪烁的总播放时间，必须大于 0。 |
+| `easing` | string | 否 | `linear` | — | `linear`, `easeIn`, `easeOut`, `easeInOut` | 闪烁包络缓动。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@glitch`
+
+播放一次故障干扰效果，适合快速冲击演出。
+
+**示例**
+
+```nani
+@glitch power:0.8 time:0.25
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `time` | decimal | 否 | `1` | >= 0 seconds | — | 本次瞬时故障的总播放时间。 |
+| `power` | decimal | 否 | `1` | 0..1 | — | 故障滤镜的总体强度。 |
+| `blockJump` | decimal | 否 | `1` | 0..2；超过 1 属于 overdrive。 | — | 故障块跳动强度。 |
+| `burstJump` | decimal | 否 | `1` | 0..2；超过 1 属于 overdrive。 | — | 故障爆发跳动强度。 |
+| `pixelScatter` | decimal | 否 | `1` | 0..2；超过 1 属于 overdrive。 | — | 故障像素散布强度。 |
+| `colorNoise` | decimal | 否 | `1` | 0..2；超过 1 属于 overdrive。 | — | 故障色彩噪声强度。 |
+| `speed` | decimal | 否 | `1` | >= 0 multiplier | — | 故障噪声与块跳变随时间刷新的速度倍率。 |
+| `seed` | decimal | 否 | `0` | — | — | 有限小数随机种子；相同值复现相同故障结构。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@glitchFilter`
+
+设置持久故障滤镜参数，适合一段场景内持续干扰；time 会插值连续参数，seed 等离散参数在 transition start 切换，power:0 time:x 会淡出移除。
+
+**示例**
+
+```nani
+@glitchFilter power:0.35 speed:1.2 time:0.25 wait!
+@glitchFilter power:0 time:0.3 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `time` | decimal | 否 | `0` | >= 0 seconds | — | 启用、更新或移除持续故障滤镜时的过渡时间。 |
+| `easing` | string | 否 | `easeOut` | — | `linear`, `easeIn`, `easeOut`, `easeInOut` | 持续参数过渡缓动。 |
+| `power` | decimal | 否 | `0` | 0..1 | — | 持续故障滤镜的总体强度；0 会移除效果。 |
+| `blockJump` | decimal | 否 | `1` | 0..2；超过 1 属于 overdrive。 | — | 故障块跳动强度。 |
+| `burstJump` | decimal | 否 | `1` | 0..2；超过 1 属于 overdrive。 | — | 故障爆发跳动强度。 |
+| `pixelScatter` | decimal | 否 | `1` | 0..2；超过 1 属于 overdrive。 | — | 故障像素散布强度。 |
+| `colorNoise` | decimal | 否 | `1` | 0..2；超过 1 属于 overdrive。 | — | 故障色彩噪声强度。 |
+| `speed` | decimal | 否 | `1` | >= 0 multiplier | — | 故障噪声与块跳变随时间刷新的速度倍率。 |
+| `seed` | decimal | 否 | `0` | — | — | 有限小数随机种子；相同值复现相同故障结构。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@impact`
+
+播放一次全屏方向性冲击、边缘扩张、色差和弹性回稳；该瞬时效果结束后自动清理。
+
+**示例**
+
+```nani
+@impact power:1 origin:50,50 direction:0 smear:0.6 chroma:0.25 time:0.22 easing:easeOut wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `power` | decimal | 否 | `1` | 0..1 | — | 冲击形变与曝光的总体强度。 |
+| `origin` | decimal list | 否 | `50,50` | 0..100 percent | — | 冲击中心，使用 0..100 的 Nani 场景百分比坐标。 |
+| `direction` | decimal | 否 | `0` | degrees | — | 方向性拖影角度。 |
+| `smear` | decimal | 否 | `0.6` | 0..1 | — | 冲击阶段的方向性拖影长度。 |
+| `chroma` | decimal | 否 | `0.25` | 0..1 | — | 冲击阶段的红蓝通道分离强度。 |
+| `time` | decimal | 否 | `0.22` | >= 0 seconds；必须大于 0。 | — | 冲击压缩、拖影与回稳的总播放时间，必须大于 0。 |
+| `easing` | string | 否 | `easeOut` | — | `linear`, `easeIn`, `easeOut`, `easeInOut` | 冲击恢复阶段缓动。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@pulse`
+
+设置全屏持续双搏脉冲；只扩张提取出的轮廓和高光残影，不周期缩放底图；power:0 可移除。
+
+**示例**
+
+```nani
+@pulse power:0.6 rate:92 origin:50,52 echoes:3 expansion:0.035 edge:0.65 distortion:0.35 chroma:0.18 decay:0.72 color:#b8d6d8 time:0.6
+@pulse power:0 time:0.4 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `power` | decimal | 否 | `0.6` | 0..1 | — | 脉冲轮廓、折射与色差的总体强度；0 会移除效果。 |
+| `rate` | decimal | 否 | `92` | >= 0 beats/minute；必须大于 0。 | — | 双搏脉冲的节拍速度。 |
+| `origin` | decimal list | 否 | `50,52` | 0..100 percent | — | 脉冲扩张中心，使用 0..100 的 Nani 场景百分比坐标。 |
+| `echoes` | integer | 否 | `3` | 1..4 integer | — | 同屏保留的扩张轮廓层数。 |
+| `expansion` | decimal | 否 | `0.035` | 0..0.2 normalized viewport | — | 每层轮廓相对画面的扩张步长。 |
+| `edge` | decimal | 否 | `0.65` | 0..1 | — | 轮廓与高光提取强度。 |
+| `distortion` | decimal | 否 | `0.35` | 0..1 | — | 脉冲轮廓造成的局部折射强度。 |
+| `chroma` | decimal | 否 | `0.18` | 0..1 | — | 脉冲轮廓的红蓝通道分离强度。 |
+| `decay` | decimal | 否 | `0.72` | 0..1 | — | 旧轮廓随回波层数衰减的速度。 |
+| `color` | string | 否 | `#b8d6d8` | — | — | 脉冲轮廓的十六进制颜色。 |
+| `time` | decimal | 否 | `0` | >= 0 seconds | — | 启用、更新或移除脉冲时的过渡时间。 |
+| `easing` | string | 否 | `easeOut` | — | `linear`, `easeIn`, `easeOut`, `easeInOut` | 持续参数过渡缓动。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@rain`
+
+设置雨天粒子效果参数；time 会把当前渲染中的 power、wind、hue、tint 插值到目标值，power:0 time:x 会淡出后清理雨层。
+
+**示例**
+
+```nani
+@rain power:0.5 wind:-0.2 hue:215 tint:0.55 time:0.4
+@rain power:0 time:0.2 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `power` | decimal | 否 | — | 0..1 | — | 效果强度。 |
+| `wind` | decimal | 否 | — | -1..1 | — | 雨或粒子的横向风力。 |
+| `hue` | decimal | 否 | — | 0..360 deg | — | 色相角度。 |
+| `tint` | decimal | 否 | — | 0..2 | — | 着色强度或颜色值，语义取决于命令。 |
+| `time` | decimal | 否 | — | >= 0 seconds | — | 命令动画、媒体或 UI 过渡时间。 |
+| `easing` | string | 否 | — | — | — | 缓动函数名称。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@shake`
+
+对舞台或目标播放震动效果，可设置次数、强度、方向和等待。
+
+**示例**
+
+```nani
+@shake target:stage power:0.5 count:3 duration:150 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `actorId` | string | 否 | — | — | — | 目标演员或舞台对象 ID。 |
+| `count` | integer | 否 | — | >= 1 | — | 重复次数或震动次数。 |
+| `loop` | boolean | 否 | — | — | `true`, `false` | 是否循环播放。 |
+| `time` | decimal | 否 | — | >= 0 seconds | — | 命令动画、媒体或 UI 过渡时间。 |
+| `deltaTime` | decimal | 否 | — | >= 0 seconds | — | 震动子步骤间隔。 |
+| `power` | decimal | 否 | — | 0..1 | — | 效果强度。 |
+| `deltaPower` | decimal | 否 | — | — | — | 震动强度每次变化量。 |
+| `hor` | boolean | 否 | — | — | `true`, `false` | 是否启用水平震动。 |
+| `ver` | boolean | 否 | — | — | `true`, `false` | 是否启用垂直震动。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+| `target` | string | 否 | — | — | — | 目标 UI、舞台或演员 ID。 |
+| `intensity` | decimal | 否 | — | 0..1 | — | 效果强度。 |
+| `duration` | decimal | 否 | — | >= 0 | — | 持续时间。不同命令可能使用毫秒或 runtime 专用单位。 |
+
+#### `@shutter`
+
+播放一次全屏眼睑、虹膜或切片形态的非对称闭合快门；该瞬时效果结束后自动清理。
+
+**示例**
+
+```nani
+@shutter power:1 shape:eyelid color:#020304 hold:0.08 skew:0.18 time:0.48 easing:linear wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `power` | decimal | 否 | `1` | 0..1 | — | 快门闭合与边缘形变的总体强度。 |
+| `shape` | string | 否 | `eyelid` | — | `eyelid`, `iris`, `slice` | 快门闭合几何：眼睑、虹膜或切片。 |
+| `color` | string | 否 | `#020304` | — | — | 闭合遮罩的十六进制颜色。 |
+| `hold` | decimal | 否 | `0.08` | 0..1 ratio | — | 完整闭合状态占总时长的比例。 |
+| `skew` | decimal | 否 | `0.18` | 0..1 | — | 闭合边缘的非对称倾斜强度。 |
+| `time` | decimal | 否 | `0.48` | >= 0 seconds；必须大于 0。 | — | 闭合、停留与重新开启的总播放时间，必须大于 0。 |
+| `easing` | string | 否 | `linear` | — | `linear`, `easeIn`, `easeOut`, `easeInOut` | 快门开合包络缓动。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@signalMask`
+
+对必填 target 指向的当前角色完整合成容器应用持续信号遮罩，覆盖立绘、表情层和交叉淡化结果；power:0 可移除。
+
+**示例**
+
+```nani
+@signalMask target:alice power:0.7 bands:0.8 noise:0.45 chroma:0.25 speed:0.6 threshold:0.5 seed:1 time:0.35
+@signalMask target:alice power:0 time:0.3 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `target` | string | 是 | — | — | — | 必填的当前角色 ID；效果应用于该角色合成后的完整外层容器。 |
+| `power` | decimal | 否 | `0.7` | 0..1 | — | 信号遮罩破坏的总体强度；0 会移除该角色的效果。 |
+| `bands` | decimal | 否 | `0.8` | 0..1 | — | 横向信号条带的密度与可见强度。 |
+| `noise` | decimal | 否 | `0.45` | 0..1 | — | 遮罩阈值中使用的随机噪声强度。 |
+| `chroma` | decimal | 否 | `0.25` | 0..1 | — | 角色红蓝通道分离强度。 |
+| `speed` | decimal | 否 | `0.6` | >= 0 multiplier | — | 条带和噪声随时间移动的速度倍率。 |
+| `threshold` | decimal | 否 | `0.5` | 0..1 | — | 决定哪些条带被信号遮罩截断的阈值。 |
+| `seed` | decimal | 否 | `1` | — | — | 有限小数随机种子；相同值复现相同遮罩分布。 |
+| `time` | decimal | 否 | `0` | >= 0 seconds | — | 启用、更新或移除角色信号遮罩时的过渡时间。 |
+| `easing` | string | 否 | `easeOut` | — | `linear`, `easeIn`, `easeOut`, `easeInOut` | 持续参数过渡缓动。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@snow`
+
+设置雪天粒子效果参数；time 会插值连续粒子参数，seed 在 transition start 切换，power:0 time:x 会淡出后清理雪层。
+
+**示例**
+
+```nani
+@snow power:0.8 density:0.7 flakeScale:1.1 time:0.4
+@snow power:0 time:0.2 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `power` | decimal | 否 | — | 0..1 | — | 效果强度。 |
+| `time` | decimal | 否 | — | >= 0 seconds | — | 命令动画、媒体或 UI 过渡时间。 |
+| `xSpeed` | decimal | 否 | — | — | — | 粒子横向速度。 |
+| `ySpeed` | decimal | 否 | — | — | — | 粒子纵向速度。 |
+| `density` | decimal | 否 | — | 0..1 | — | 雪花密度。 |
+| `flakeScale` | decimal | 否 | — | >= 0 | — | 雪花粒子缩放。 |
+| `sway` | decimal | 否 | — | 0..1 | — | 雪花横向摆动强度。 |
+| `fog` | decimal | 否 | — | 0..1 | — | 雪景雾化强度。 |
+| `noise` | decimal | 否 | — | 0..1 | — | 粒子或滤镜噪声强度。 |
+| `seed` | decimal | 否 | — | — | — | 随机种子，用于稳定粒子或滤镜结果。 |
+| `pos` | decimal list | 否 | — | — | — | 位置参数，通常是二维坐标或预设位置。 |
+| `position` | decimal list | 否 | — | — | — | 位置向量。 |
+| `rotation` | decimal list | 否 | — | — | — | 旋转向量或角度列表。 |
+| `scale` | decimal list | 否 | — | >= 0 | — | 缩放向量或倍率。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@staticFilter`
+
+设置全屏持续模拟雪花墙、非均匀扫描线、扫描驱动变形和复古色调；power:0 可移除。
+
+**示例**
+
+```nani
+@staticFilter power:0.6 density:0.7 scanline:0.65 jitter:0.45 warp:0.35 grainSize:1 speed:1 vignette:0.35 palette:cold seed:1 time:0.5
+@staticFilter power:0 time:0.3 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `power` | decimal | 否 | `0.6` | 0..1 | — | 静电干扰的总体强度；0 会移除效果。 |
+| `density` | decimal | 否 | `0.7` | 0..1 | — | 模拟雪花噪点覆盖密度。 |
+| `scanline` | decimal | 否 | `0.65` | 0..1 | — | 非均匀扫描线的可见强度。 |
+| `jitter` | decimal | 否 | `0.45` | 0..1 | — | 逐扫描带水平抖动强度。 |
+| `warp` | decimal | 否 | `0.35` | 0..1 | — | 扫描驱动的画面弯曲强度。 |
+| `grainSize` | decimal | 否 | `1` | >= 0 pixels；必须大于 0。 | — | 噪声颗粒尺寸，必须大于 0。 |
+| `speed` | decimal | 否 | `1` | >= 0 multiplier | — | 噪点、扫描线和抖动随时间刷新的速度倍率。 |
+| `vignette` | decimal | 否 | `0.35` | 0..1 | — | 静电滤镜内部边缘压暗强度。 |
+| `palette` | string | 否 | `cold` | — | `cold`, `sepia`, `green`, `mono` | 静电信号的复古调色预设。 |
+| `seed` | decimal | 否 | `1` | — | — | 有限小数随机种子；相同值复现相同噪点结构。 |
+| `time` | decimal | 否 | `0` | >= 0 seconds | — | 启用、更新或移除静电滤镜时的过渡时间。 |
+| `easing` | string | 否 | `easeOut` | — | `linear`, `easeIn`, `easeOut`, `easeInOut` | 持续参数过渡缓动。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@sun`
+
+设置阳光粒子或光效参数；time 会插值连续光效参数，power:0 time:x 会淡出后清理阳光层。
+
+**示例**
+
+```nani
+@sun power:0.6 position:0.5,0 time:0.4
+@sun power:0 time:0.2 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `power` | decimal | 否 | — | 0..1 | — | 效果强度。 |
+| `time` | decimal | 否 | — | >= 0 seconds | — | 命令动画、媒体或 UI 过渡时间。 |
+| `pos` | decimal list | 否 | — | — | — | 位置参数，通常是二维坐标或预设位置。 |
+| `position` | decimal list | 否 | — | — | — | 位置向量。 |
+| `rotation` | decimal list | 否 | — | — | — | 旋转向量或角度列表。 |
+| `scale` | decimal list | 否 | — | >= 0 | — | 缩放向量或倍率。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@vignette`
+
+设置全屏持续的有色非均匀暗角和缓慢边缘呼吸；power:0 可移除。
+
+**示例**
+
+```nani
+@vignette power:0.5 radius:0.62 softness:0.3 color:#160a10 breathe:0.06 grain:0.03 time:0.4
+@vignette power:0 time:0.3 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `power` | decimal | 否 | `0.5` | 0..1 | — | 暗角的总体强度；0 会移除效果。 |
+| `radius` | decimal | 否 | `0.62` | 0..1 normalized viewport | — | 保持较亮中心区域的半径。 |
+| `softness` | decimal | 否 | `0.3` | 0..1 | — | 暗角边界的羽化宽度。 |
+| `color` | string | 否 | `#160a10` | — | — | 暗角覆盖的十六进制颜色。 |
+| `breathe` | decimal | 否 | `0.06` | 0..1 | — | 暗角边缘缓慢呼吸起伏的强度。 |
+| `grain` | decimal | 否 | `0.03` | 0..1 | — | 暗角区域附加的细颗粒强度。 |
+| `time` | decimal | 否 | `0` | >= 0 seconds | — | 启用、更新或移除暗角时的过渡时间。 |
+| `easing` | string | 否 | `easeOut` | — | `linear`, `easeIn`, `easeOut`, `easeInOut` | 持续参数过渡缓动。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
+#### `@waterVeil`
+
+设置全屏持续的多尺度水流折射、水痕、冷色曲线和潮湿高光；power:0 可移除。
+
+**示例**
+
+```nani
+@waterVeil power:0.5 level:0.18 ripple:0.35 drift:-0.1 blur:0.12 tint:#6c8390 droplets:0.5 seed:1 time:0.8
+@waterVeil power:0 time:0.4 wait!
+```
+
+| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |
+|---|---|---|---|---|---|---|
+| `power` | decimal | 否 | `0.5` | 0..1 | — | 水幕折射和潮湿高光的总体强度；0 会移除效果。 |
+| `level` | decimal | 否 | `0.18` | 0..1 normalized viewport | — | 画面下方积水与水幕覆盖高度。 |
+| `ripple` | decimal | 否 | `0.35` | 0..1 | — | 多尺度波纹折射强度。 |
+| `drift` | decimal | 否 | `-0.1` | — | — | 水痕纵向漂移的方向与速度；负值向下，正值向上。 |
+| `blur` | decimal | 否 | `0.12` | 0..1 | — | 水幕折射采样的柔化强度。 |
+| `tint` | string | 否 | `#6c8390` | hex color | — | 水幕冷色曲线与潮湿高光的十六进制颜色。 |
+| `droplets` | decimal | 否 | `0.5` | 0..1 | — | 水滴和水痕细节的覆盖强度。 |
+| `seed` | decimal | 否 | `1` | — | — | 有限小数随机种子；相同值复现相同水滴分布。 |
+| `time` | decimal | 否 | `0` | >= 0 seconds | — | 启用、更新或移除水幕时的过渡时间。 |
+| `easing` | string | 否 | `easeOut` | — | `linear`, `easeIn`, `easeOut`, `easeInOut` | 持续参数过渡缓动。 |
+| `wait` | boolean | 否 | `false` | — | `true`, `false` | 是否等待表现层或播放流程完成。 |
+
 <!-- END GENERATED COMMAND CATALOG -->
 
 Shared shorthand:
