@@ -460,17 +460,26 @@ const commandExecutions: Partial<Record<string, NaniCommandExecution>> = {
   bokeh: "pixi-presentation",
   char: "pixi-presentation",
   chartone: "pixi-presentation",
+  afterimage: "pixi-presentation",
   flash: "pixi-presentation",
+  flicker: "pixi-presentation",
   glitch: "pixi-presentation",
   glitchfilter: "pixi-presentation",
+  impact: "pixi-presentation",
   hidechars: "pixi-presentation",
   hidecue: "ui-output",
   inback: "pixi-presentation",
   rain: "pixi-presentation",
+  pulse: "pixi-presentation",
   shake: "pixi-presentation",
+  shutter: "pixi-presentation",
+  signalmask: "pixi-presentation",
+  staticfilter: "pixi-presentation",
   slide: "pixi-presentation",
   snow: "pixi-presentation",
   sun: "pixi-presentation",
+  vignette: "pixi-presentation",
+  waterveil: "pixi-presentation",
   choice: "story-control",
   append: "story-control",
   cue: "story-control",
@@ -640,6 +649,14 @@ const glitchFilterShaderParams = [
   param("seed", "decimal"),
   param("wait", "boolean")
 ];
+
+const effectTimingParams = [
+  param("time", "decimal"),
+  param("easing", "string"),
+  param("wait", "boolean")
+];
+
+const seededEffectParams = [param("seed", "decimal")];
 
 const audioParams = [
   param("volume", "decimal"),
@@ -923,6 +940,66 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
     primaryParam: "text"
   },
   vRonpa("end", "flow"),
+  {
+    ...vRonpa("afterimage", "effect", [
+      param("target", "string"), param("power", "decimal"), param("count", "integer"),
+      param("offset", "decimal list"), param("decay", "decimal"), param("tint", "string"),
+      param("edge", "decimal"), ...effectTimingParams
+    ]),
+    canonicalName: "afterimage"
+  },
+  vRonpa("flicker", "effect", [
+    param("power", "decimal"), param("bursts", "integer"), param("irregularity", "decimal"),
+    param("invert", "decimal"), param("white", "decimal"), param("tear", "decimal"),
+    param("chroma", "decimal"), ...seededEffectParams, ...effectTimingParams
+  ]),
+  vRonpa("impact", "effect", [
+    param("power", "decimal"), param("origin", "decimal list"), param("direction", "decimal"),
+    param("smear", "decimal"), param("chroma", "decimal"), ...effectTimingParams
+  ]),
+  {
+    ...vRonpa("pulse", "effect", [
+      param("power", "decimal"), param("rate", "decimal"), param("origin", "decimal list"),
+      param("echoes", "integer"), param("expansion", "decimal"), param("edge", "decimal"),
+      param("distortion", "decimal"), param("chroma", "decimal"), param("decay", "decimal"),
+      param("color", "string"), ...effectTimingParams
+    ]),
+    canonicalName: "pulse"
+  },
+  vRonpa("shutter", "effect", [
+    param("power", "decimal"), param("shape", "string"), param("color", "string"),
+    param("hold", "decimal"), param("skew", "decimal"), ...effectTimingParams
+  ]),
+  {
+    ...vRonpa("signalmask", "effect", [
+      param("target", "string"), param("region", "string"), param("power", "decimal"),
+      param("bands", "decimal"), param("noise", "decimal"), param("chroma", "decimal"),
+      param("speed", "decimal"), param("threshold", "decimal"), ...seededEffectParams, ...effectTimingParams
+    ]),
+    canonicalName: "signalMask"
+  },
+  {
+    ...vRonpa("staticfilter", "effect", [
+      param("power", "decimal"), param("density", "decimal"), param("scanline", "decimal"),
+      param("jitter", "decimal"), param("warp", "decimal"), param("grainSize", "decimal"),
+      param("speed", "decimal"), param("vignette", "decimal"), param("palette", "string"),
+      ...seededEffectParams, ...effectTimingParams
+    ]),
+    canonicalName: "staticFilter"
+  },
+  vRonpa("vignette", "effect", [
+    param("power", "decimal"), param("radius", "decimal"), param("softness", "decimal"),
+    param("color", "string"), param("breathe", "decimal"), param("grain", "decimal"),
+    ...effectTimingParams
+  ]),
+  {
+    ...vRonpa("waterveil", "effect", [
+      param("power", "decimal"), param("level", "decimal"), param("ripple", "decimal"),
+      param("drift", "decimal"), param("blur", "decimal"), param("tint", "string"),
+      param("droplets", "decimal"), ...seededEffectParams, ...effectTimingParams
+    ]),
+    canonicalName: "waterVeil"
+  },
   vRonpa(
     "gameplay",
     "state",
@@ -989,6 +1066,7 @@ const baseNaniCommandCatalog: NaniCommandDefinition[] = [
 ];
 
 const implementedCommandDocs: Record<string, NaniCommandDocs> = {
+  afterimage: { zh: "捕获舞台或角色的边缘与高光，播放一次非等距色彩残影。", examples: ["@afterimage target:stage count:4 edge:0.55 time:0.65 wait!"] },
   append: { zh: "向当前文本框追加一段文本，不重置当前说话人或文本框状态。", examples: ['@append "继续显示的文本"'] },
   arrange: { zh: "按命名位置排列角色立绘，常用于快速把多个角色放到舞台预设位置。", examples: ["@arrange Felix.Left,Mira.Right wait!"] },
   back: { zh: "切换主背景或背景演员，并可附带转场、位置、缩放和等待控制。", examples: ["@back bg/classroom effect:fade time:0.5 wait!"] },
@@ -1005,10 +1083,12 @@ const implementedCommandDocs: Record<string, NaniCommandDocs> = {
   clearbacklog: { zh: "清空当前剧情回看记录。", examples: ["@clearBacklog"] },
   clearchoice: { zh: "清除当前待选项；提供 id 时只清除对应选项。", examples: ["@clearChoice id:door"] },
   end: { zh: "结束当前脚本执行。", examples: ["@end"] },
+  flicker: { zh: "播放一次不规则黑切、反相、闪白、色差和扫描撕裂组成的强冲击闪烁。", examples: ["@flicker bursts:4 tear:0.65 seed:1 time:0.45 wait!"] },
   flash: { zh: "播放一次屏幕闪光效果，可指定颜色、持续时间和是否等待。", examples: ["@flash color:#ffffff duration:160 wait!"] },
   gameplay: { zh: "发出玩法状态事件，例如物品、证据、角色状态或亲密度变化。", examples: ["@gameplay grant-item item:keycard quantity:1"] },
   glitch: { zh: "播放一次故障干扰效果，适合快速冲击演出。", examples: ["@glitch power:0.8 time:0.25"] },
   glitchfilter: { zh: "设置持久故障滤镜参数，适合一段场景内持续干扰；time 会插值连续参数，seed 等离散参数在 transition start 切换，power:0 time:x 会淡出移除。", examples: ["@glitchFilter power:0.35 speed:1.2 time:0.25 wait!", "@glitchFilter power:0 time:0.3 wait!"] },
+  impact: { zh: "播放一次方向性冲击、边缘扩张、色差和弹性回稳。", examples: ["@impact origin:50,50 smear:0.6 time:0.22 wait!"] },
   goto: { zh: "跳转到当前脚本内的本地标签。跨脚本跳转当前 runtime 尚未实现。", examples: ["@goto #Next"] },
   hidechars: { zh: "隐藏当前角色立绘，并可设置动画时间和等待。", examples: ["@hideChars time:0.3 wait!"] },
   hidecue: { zh: "隐藏中央演出文本 Surface；不会清除当前正文或回看内容。", examples: ["@hideCue time:0.4 wait!"] },
@@ -1021,24 +1101,31 @@ const implementedCommandDocs: Record<string, NaniCommandDocs> = {
     examples: ['@pinp thumb/evidence-keycard pos:50,50 height:20 ratio:16,9 alt:"门禁卡" effect:fade time:0.18', "@pinp visible:false effect:fade time:0.18"]
   },
   print: { zh: "显示一行文本，可指定说话人、文本框和文本显示速度。", examples: ['@print "你好" author:Felix speed:0.8'] },
+  pulse: { zh: "设置持续的双搏脉冲效果；只扩张提取出的轮廓和高光残影，不周期缩放底图。", examples: ["@pulse power:0.6 rate:92 echoes:3 time:0.6", "@pulse power:0 time:0.4 wait!"] },
   rain: { zh: "设置雨天粒子效果参数；time 会把当前渲染中的 power、wind、hue、tint 插值到目标值，power:0 time:x 会淡出后清理雨层。", examples: ["@rain power:0.5 wind:-0.2 hue:215 tint:0.55 time:0.4", "@rain power:0 time:0.2 wait!"] },
   resettext: { zh: "重置文本框当前文本，保留默认文本框可见状态。", examples: ["@resetText"] },
   set: { zh: "设置剧情变量；支持动态变量名或表达式形式。", examples: ["@set route:left"] },
   sfx: { zh: "播放音效，可设置音量、循环、淡入淡出和分组。", examples: ["@sfx sfx/door volume:0.8"] },
   sfxfast: { zh: "播放快速音效，适合高频反馈；当前 runtime 只消费路径、音量和分组。", examples: ["@sfxFast sfx/click volume:0.8"] },
   shake: { zh: "对舞台或目标播放震动效果，可设置次数、强度、方向和等待。", examples: ["@shake target:stage power:0.5 count:3 duration:150 wait!"] },
+  shutter: { zh: "播放一次眼睑、虹膜或切片形态的非对称闭合快门。", examples: ["@shutter shape:eyelid hold:0.08 time:0.48 wait!"] },
+  signalmask: { zh: "为目标角色的头部或全身设置持续信号遮罩破坏。", examples: ["@signalMask target:alice region:head power:0.7 time:0.35", "@signalMask target:alice power:0 time:0.3 wait!"] },
   showprinter: { zh: "显示文本框或切换到指定文本打印器。", examples: ["@showPrinter default time:0.2"] },
   showui: { zh: "显示 runtime UI 组；未指定目标时显示所有 v1 UI 组。", examples: ["@showUI commandBar visible:true"] },
   slide: { zh: "让角色从一个位置滑动到另一个位置，并可控制可见性、缓动和等待。", examples: ["@slide Felix.Happy from:-0.5,0 to:0.5,0 wait!"] },
+  staticfilter: { zh: "设置持续模拟雪花墙、非均匀扫描线、扫描驱动变形和复古色调。", examples: ["@staticFilter power:0.6 palette:cold seed:1 time:0.5", "@staticFilter power:0 time:0.3 wait!"] },
   snow: { zh: "设置雪天粒子效果参数；time 会插值连续粒子参数，seed 在 transition start 切换，power:0 time:x 会淡出后清理雪层。", examples: ["@snow power:0.8 density:0.7 flakeScale:1.1 time:0.4", "@snow power:0 time:0.2 wait!"] },
   stopbgm: { zh: "停止背景音乐，可指定路径、分组和淡出时间。", examples: ["@stopBgm group:music fade:1"] },
   stopsfx: { zh: "停止循环音效，可指定路径、分组和淡出时间。", examples: ["@stopSfx group:rain fade:0.5"] },
   sun: { zh: "设置阳光粒子或光效参数；time 会插值连续光效参数，power:0 time:x 会淡出后清理阳光层。", examples: ["@sun power:0.6 position:0.5,0 time:0.4", "@sun power:0 time:0.2 wait!"] },
   toast: { zh: "显示短暂 UI 提示，可指定文本、外观和显示时长。", examples: ['@toast "已保存" time:1.2'] },
   trialkeyword: { zh: "向 Trial 表现层展示或登记论点关键词。", examples: ['@trialKeyword id:kw:door text:"门锁" speaker:Felix'] }
+  ,vignette: { zh: "设置持续的有色非均匀暗角和缓慢边缘呼吸。", examples: ["@vignette power:0.5 radius:0.62 time:0.4", "@vignette power:0 time:0.3 wait!"] }
+  ,waterveil: { zh: "设置持续的多尺度水流折射、水痕、冷色曲线和潮湿高光。", examples: ["@waterVeil power:0.5 ripple:0.35 time:0.8", "@waterVeil power:0 time:0.4 wait!"] }
 };
 
 const implementedCommandConsumedParams: Record<string, string[]> = {
+  afterimage: ["target", "power", "count", "offset", "decay", "tint", "edge", "time", "easing", "wait"],
   append: ["text", "speaker", "author", "printer"],
   arrange: ["characterPositions", "look", "time", "wait"],
   back: ["appearanceAndTransition", "id", "appearance", "pose", "via", "params", "dissolve", "pos", "position", "rotation", "scale", "tint", "easing", "time", "lazy", "wait", "visible", "effect"],
@@ -1052,10 +1139,12 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   clearbacklog: [],
   clearchoice: ["id"],
   end: [],
+  flicker: ["power", "bursts", "irregularity", "invert", "white", "tear", "chroma", "seed", "time", "easing", "wait"],
   flash: ["color", "duration", "wait"],
   gameplay: ["type", "quantity", "item", "itemId", "id", "evidence", "evidenceId", "character", "characterId", "status", "skill", "skillId", "delta", "affinityDelta"],
   glitch: ["time", "power", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"],
   glitchfilter: ["time", "easing", "power", "blockJump", "burstJump", "pixelScatter", "colorNoise", "speed", "seed", "wait"],
+  impact: ["power", "origin", "direction", "smear", "chroma", "time", "easing", "wait"],
   goto: ["path"],
   hidechars: ["time", "lazy", "wait"],
   hidecue: ["time", "wait"],
@@ -1065,21 +1154,27 @@ const implementedCommandConsumedParams: Record<string, string[]> = {
   movie: ["moviePath", "time", "block"],
   pinp: ["assetId", "pos", "height", "ratio", "alt", "effect", "time", "visible"],
   print: ["text", "speaker", "author", "as", "printer", "speed", "textId", "autoNext", "reset", "append"],
+  pulse: ["power", "rate", "origin", "echoes", "expansion", "edge", "distortion", "chroma", "decay", "color", "time", "easing", "wait"],
   rain: ["power", "wind", "hue", "tint", "time", "easing", "wait"],
   resettext: ["printerId"],
   set: ["expression"],
   sfx: ["sfxPath", "volume", "loop", "fade", "time", "group"],
   sfxfast: ["sfxPath", "volume", "group"],
   shake: ["actorId", "target", "count", "loop", "time", "deltaTime", "power", "deltaPower", "hor", "ver", "wait", "intensity", "duration"],
+  shutter: ["power", "shape", "color", "hold", "skew", "time", "easing", "wait"],
+  signalmask: ["target", "region", "power", "bands", "noise", "chroma", "speed", "threshold", "seed", "time", "easing", "wait"],
   showprinter: ["printerId", "time"],
   showui: ["uINames", "target", "visible", "time", "wait"],
   slide: ["idAndAppearance", "from", "to", "visible", "easing", "time", "lazy", "wait"],
+  staticfilter: ["power", "density", "scanline", "jitter", "warp", "grainSize", "speed", "vignette", "palette", "seed", "time", "easing", "wait"],
   snow: ["power", "time", "xSpeed", "ySpeed", "density", "flakeScale", "sway", "fog", "noise", "seed", "pos", "position", "rotation", "scale", "wait"],
   stopbgm: ["bgmPath", "fade", "group"],
   stopsfx: ["sfxPath", "fade", "group"],
   sun: ["power", "time", "pos", "position", "rotation", "scale", "wait"],
   toast: ["text", "appearance", "time"],
-  trialkeyword: ["id", "text", "speaker", "evidence"]
+  trialkeyword: ["id", "text", "speaker", "evidence"],
+  vignette: ["power", "radius", "softness", "color", "breathe", "grain", "time", "easing", "wait"],
+  waterveil: ["power", "level", "ripple", "drift", "blur", "tint", "droplets", "seed", "time", "easing", "wait"]
 };
 
 const commonParamDocs: Record<string, NaniCommandParamDocs> = {
@@ -1818,10 +1913,23 @@ export type PixiVector2 = z.infer<typeof PixiVector2Schema>;
 export const PixiVector3Schema = z.tuple([z.number(), z.number(), z.number()]);
 export type PixiVector3 = z.infer<typeof PixiVector3Schema>;
 
+const PixiEffectColorSchema = z.string().regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/u);
+
 export const PixiActorFilterSnapshotSchema = z
   .object({
     blur: z.number().nonnegative().optional(),
-    bokeh: z.number().nonnegative().optional()
+    bokeh: z.number().nonnegative().optional(),
+    signalMask: z.object({
+      region: z.enum(["head", "full"]).default("head"),
+      power: z.number().min(0).max(1),
+      bands: z.number().min(0).max(1),
+      noise: z.number().min(0).max(1),
+      chroma: z.number().min(0).max(1),
+      speed: z.number().nonnegative(),
+      threshold: z.number().min(0).max(1),
+      seed: z.number().int(),
+      transition: z.lazy(() => PixiActorTransitionSnapshotSchema)
+    }).strict().optional()
   })
   .default({});
 export type PixiActorFilterSnapshot = z.infer<typeof PixiActorFilterSnapshotSchema>;
@@ -1960,6 +2068,33 @@ export const PixiScreenFiltersSnapshotSchema = z
         seed: z.number().optional(),
         transition: PixiActorTransitionSnapshotSchema
       })
+      .optional(),
+    vignette: z.object({
+      power: z.number().min(0).max(1), radius: z.number().min(0).max(1),
+      softness: z.number().min(0).max(1), color: PixiEffectColorSchema,
+      breathe: z.number().min(0).max(1), grain: z.number().min(0).max(1),
+      transition: PixiActorTransitionSnapshotSchema
+    }).strict().optional(),
+    staticFilter: z.object({
+      power: z.number().min(0).max(1), density: z.number().min(0).max(1),
+      scanline: z.number().min(0).max(1), jitter: z.number().min(0).max(1),
+      warp: z.number().min(0).max(1), grainSize: z.number().positive(), speed: z.number().nonnegative(),
+      vignette: z.number().min(0).max(1), palette: z.enum(["cold", "sepia", "green", "mono"]),
+      seed: z.number().int(), transition: PixiActorTransitionSnapshotSchema
+    }).strict().optional(),
+    waterVeil: z.object({
+      power: z.number().min(0).max(1), level: z.number().min(0).max(1),
+      ripple: z.number().min(0).max(1), drift: z.number().finite(), blur: z.number().min(0).max(1),
+      tint: PixiEffectColorSchema, droplets: z.number().min(0).max(1), seed: z.number().int(),
+      transition: PixiActorTransitionSnapshotSchema
+    }).strict().optional(),
+    pulse: z.object({
+      power: z.number().min(0).max(1), rate: z.number().positive(), origin: PixiVector2Schema,
+      echoes: z.number().int().min(1).max(4), expansion: z.number().min(0).max(0.2),
+      edge: z.number().min(0).max(1), distortion: z.number().min(0).max(1),
+      chroma: z.number().min(0).max(1), decay: z.number().min(0).max(1), color: PixiEffectColorSchema,
+      transition: PixiActorTransitionSnapshotSchema
+    }).strict()
       .optional()
   })
   .default({});
@@ -2146,9 +2281,13 @@ export const PixiPresentationTaskKindSchema = z.enum([
   "character-tone-transition",
   "screen-filter-transition",
   "weather-transition",
+  "afterimage",
   "flash",
+  "flicker",
   "shake",
-  "glitch"
+  "glitch",
+  "impact",
+  "shutter"
 ]);
 export type PixiPresentationTaskKind = z.infer<typeof PixiPresentationTaskKindSchema>;
 

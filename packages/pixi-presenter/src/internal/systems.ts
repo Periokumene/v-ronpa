@@ -19,7 +19,8 @@ import { pixiAssetLoadFailed, resolvePixiAsset } from "./assetResolver";
 import {
   CharacterSystem,
   type CharacterPreparationResult,
-  type CharacterPresentation
+  type CharacterPresentation,
+  type CharacterSignalMaskState
 } from "./characters";
 import { CharacterToneController } from "./effects/characterToneController";
 import { ActorBlurController } from "./effects/blur";
@@ -85,7 +86,7 @@ export class ActorFilterSystem {
     this.actorBlur = new ActorBlurController(options);
   }
 
-  applyActorFilters(container: Container, actor: PixiActorSnapshot, liveFilters: Partial<Record<string, number>> = actor.filters): void {
+  applyActorFilters(container: Container, actor: PixiActorSnapshot, liveFilters: Partial<Record<string, number>> = { blur: actor.filters.blur, bokeh: actor.filters.bokeh }): void {
     this.actorBlur.apply(container, actor, liveFilters);
   }
 
@@ -160,6 +161,12 @@ export class ActorSystem {
     return this.characters.preload(plan);
   }
 
+  tick(ticker: Ticker): void {
+    for (const record of this.actors.values()) {
+      if (record.layout?.kind === "character") record.layout.presentation.tick(Math.max(0, ticker.deltaMS));
+    }
+  }
+
   clear(): void {
     for (const id of [...this.actors.keys()]) this.remove(id);
   }
@@ -190,7 +197,11 @@ export class ActorSystem {
     const contentKey = actor.kind === "character"
       ? `${actor.kind}:${actor.id}:${actor.appearanceExpression}:${actor.pose ?? ""}`
       : `${actor.kind}:${actor.appearance ?? "missing"}:${actor.pose ?? ""}`;
-    const shouldAnimate = animate && actor.transition.durationMs > 0;
+    // Terminal actor transitions remain in the snapshot after their command.
+    // Reference identity tells us whether this actor family was actually
+    // updated, preventing unrelated screen/weather revisions from replaying it.
+    const transitionIssued = isNewActor || previous.transition !== actor.transition || !sameActorVisual(previous, actor);
+    const shouldAnimate = animate && actor.transition.durationMs > 0 && transitionIssued;
     const transition = shouldAnimate ? this.createActorTransitionScheduler(actor, revision) : undefined;
     const filtersChanged = !sameActorFilters(actor.filters, previous.filters);
     if (record.contentKey !== contentKey) {
@@ -228,25 +239,44 @@ export class ActorSystem {
       }
       record.contentKey = contentKey;
     }
-    this.applyTransform(record, actor, previous, animate, transition);
+    this.applyTransform(record, actor, previous, shouldAnimate, transition);
     if (shouldAnimate && filtersChanged) {
       transition?.tween(
         record.filterLive,
-        { blur: actor.filters.blur ?? 0 },
+        { blur: actor.filters.blur ?? 0, ...signalMaskLive(actor) },
         actor.transition.durationMs,
         actor.transition.easing,
         undefined,
-        () => this.filters.applyActorFilters(record.container, actor, record.filterLive)
+        () => this.applyActorVisualFilters(record, actor, previous)
       );
     } else {
       record.filterLive.blur = actor.filters.blur ?? 0;
+      Object.assign(record.filterLive, signalMaskLive(actor));
     }
     if (shouldAnimate && actor.transition.wait && transition && !transition.hasWork()) {
       transition.tween({ value: 0 }, { value: 1 }, actor.transition.durationMs, actor.transition.easing);
     }
     record.actor = actor;
-    this.filters.applyActorFilters(record.container, actor, record.filterLive);
+    this.applyActorVisualFilters(record, actor, previous);
     if (record.layout?.kind === "character") record.layout.presentation.syncOutlineTransform();
+  }
+
+  private applyActorVisualFilters(record: ActorRecord, actor: PixiActorSnapshot, previous: PixiActorSnapshot): void {
+    this.filters.applyActorFilters(record.container, actor, record.filterLive);
+    if (record.layout?.kind !== "character") return;
+    const config = actor.filters.signalMask ?? previous.filters.signalMask;
+    const power = record.filterLive.signalPower ?? 0;
+    const state: CharacterSignalMaskState | undefined = config && power > 0.001 ? {
+      region: config.region,
+      power,
+      bands: record.filterLive.signalBands ?? config.bands,
+      noise: record.filterLive.signalNoise ?? config.noise,
+      chroma: record.filterLive.signalChroma ?? config.chroma,
+      speed: record.filterLive.signalSpeed ?? config.speed,
+      threshold: record.filterLive.signalThreshold ?? config.threshold,
+      seed: config.seed
+    } : undefined;
+    record.layout.presentation.setSignalMask(state);
   }
 
   private ensure(actor: PixiActorSnapshot): ActorRecord {
@@ -264,7 +294,7 @@ export class ActorSystem {
       container,
       contentKey: "",
       backgroundGeneration: 0,
-      filterLive: { blur: actor.filters.blur ?? 0 }
+      filterLive: { blur: actor.filters.blur ?? 0, ...signalMaskLive(actor) }
     };
     this.actors.set(actor.id, record);
     return record;
@@ -509,7 +539,7 @@ export class ActorSystem {
     record: ActorRecord,
     actor: PixiActorSnapshot,
     previous: PixiActorSnapshot,
-    animate: boolean,
+    shouldAnimate: boolean,
     transition?: ReturnType<ActorSystem["createActorTransitionScheduler"]>
   ): void {
     const container = record.container;
@@ -526,7 +556,6 @@ export class ActorSystem {
       }
     };
     const target = this.toScreenPosition(actor, actor.pos);
-    const shouldAnimate = animate && actor.transition.durationMs > 0;
     const targetAlpha = actor.visible ? actor.alpha : 0;
     if (shouldAnimate && !actor.transition.lazy) {
       const previousTarget = this.toScreenPosition(previous, previous.pos);
@@ -637,7 +666,27 @@ function sameVector2(left: [number, number] | undefined, right: [number, number]
 }
 
 function sameActorFilters(left: PixiActorSnapshot["filters"], right: PixiActorSnapshot["filters"]): boolean {
-  return Math.abs((left.blur ?? 0) - (right.blur ?? 0)) < 0.0001 && Math.abs((left.bokeh ?? 0) - (right.bokeh ?? 0)) < 0.0001;
+  return Math.abs((left.blur ?? 0) - (right.blur ?? 0)) < 0.0001 &&
+    Math.abs((left.bokeh ?? 0) - (right.bokeh ?? 0)) < 0.0001 &&
+    JSON.stringify(left.signalMask ?? null) === JSON.stringify(right.signalMask ?? null);
+}
+
+function sameActorVisual(left: PixiActorSnapshot, right: PixiActorSnapshot): boolean {
+  const { transition: _leftTransition, ...leftVisual } = left;
+  const { transition: _rightTransition, ...rightVisual } = right;
+  return JSON.stringify(leftVisual) === JSON.stringify(rightVisual);
+}
+
+function signalMaskLive(actor: PixiActorSnapshot): NumericLiveState {
+  const value = actor.filters.signalMask;
+  return {
+    signalPower: value?.power ?? 0,
+    signalBands: value?.bands ?? 0,
+    signalNoise: value?.noise ?? 0,
+    signalChroma: value?.chroma ?? 0,
+    signalSpeed: value?.speed ?? 0,
+    signalThreshold: value?.threshold ?? 0
+  };
 }
 
 function fitBackgroundSprite(sprite: Sprite, texture: Texture, width: number, height: number): void {

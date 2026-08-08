@@ -115,7 +115,7 @@ test("Game A traverses, saves, previews, restores, and completes its production 
   const scriptPicker = workbench.locator("details.vn-devtools-script-picker");
   await scriptPicker.locator("summary").click();
   await expect(workbench.getByRole("listbox", { name: "VN scripts" })).toBeVisible();
-  await expect(workbench.getByRole("option")).toHaveCount(3);
+  await expect.poll(async () => workbench.getByRole("option").count()).toBeGreaterThanOrEqual(4);
   await expect(workbench.getByRole("option", { name: /home-quarrel\.nani/ })).toContainText("development");
   await page.screenshot({ path: "test-results/game-a-multi-nani-script-selector-504.png", fullPage: true });
   await workbench.getByRole("option", { name: /chapter-02\.nani/ }).click();

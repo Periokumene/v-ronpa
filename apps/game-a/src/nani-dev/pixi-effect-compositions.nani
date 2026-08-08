@@ -1,0 +1,76 @@
+#Start
+@showUI dialog
+@showUI commandBar visible:true
+@back bg/home-kitchen effect:fade time:0.2 wait!
+@char alice.eye1,mouth0,armR4,armL1 pos:50 time:0.2 wait!
+nar: PIXI EFFECT COMPOSITIONS / DEVELOPMENT ONLY
+nar: 本脚本只展示多个独立效果共同构成的复合视觉，不重复单效果的低、中、高强度演示。
+nar: 复合效果脚本包含高频闪烁、反相和强烈闪白。光敏风险人群请结束演示。
+@choice "开始复合效果演示（包含 Flicker）" goto:#Compositions
+@choice "结束演示" goto:#End
+
+#Compositions
+nar: CHECKPOINT COMPOSITION 01 DOMESTIC PRESSURE
+nar: 家庭压力组合：暗角和脉冲持续收紧视线；对白后再依次加入冲击和故障闪烁。
+@vignette power:0.68 radius:0.53 softness:0.25 color:#20070d breathe:0.08 grain:0.05 time:0.5
+@pulse power:0.62 rate:98 origin:50,54 echoes:3 expansion:0.045 edge:0.72 distortion:0.54 chroma:0.26 decay:0.72 color:#c5dcdf time:0.5 wait!
+alice: 你能不能不要再问了。
+@impact power:0.85 origin:52,47 direction:-12 smear:0.76 chroma:0.38 time:0.24 wait!
+@flicker power:0.72 bursts:5 irregularity:0.78 invert:0.62 white:0.58 tear:0.72 chroma:0.5 seed:21 time:0.48 wait!
+@vignette power:0 time:0.3
+@pulse power:0 time:0.3 wait!
+
+nar: CHECKPOINT COMPOSITION 02 BROKEN TELEVISION
+nar: 损坏电视组合：全屏静电干扰和角色头部信号遮罩同时运行，让环境与人物共享失真语汇；对白后用故障闪烁完成信号崩溃。
+@staticFilter power:0.74 density:0.82 scanline:0.78 jitter:0.68 warp:0.58 grainSize:1 speed:1.35 vignette:0.46 palette:green seed:23 time:0.45
+@signalMask target:alice region:head power:0.9 bands:0.92 noise:0.72 chroma:0.62 speed:1.25 threshold:0.38 seed:29 time:0.45 wait!
+alice: 在身边的人变成都市怪谈里的电波头之前。
+@flicker power:0.8 bursts:6 irregularity:0.85 invert:0.75 white:0.62 tear:0.9 chroma:0.65 seed:31 time:0.52 wait!
+@signalMask target:alice power:0 time:0.3
+@staticFilter power:0 time:0.4 wait!
+
+nar: CHECKPOINT COMPOSITION 03 DROWNING
+nar: 溺水组合：雨、前景水幕和角色冷雨色调同时建立空间湿冷感，再以全舞台残像和眼睑快门表现意识下沉与闭合。
+@rain power:0.72 wind:-0.35 hue:214 tint:0.65 time:0.5
+@waterVeil power:0.72 level:0.28 ripple:0.64 drift:-0.14 blur:0.24 tint:#55788b droplets:0.78 seed:33 time:0.65
+@charTone rain amount:1.4 time:0.5 wait!
+alice: 我只是很想在雨声里寻找一场可以把自己淹没的好梦。
+@afterimage target:stage power:0.75 count:5 offset:-1.8,0.3 decay:0.74 tint:#91bdc8 edge:0.72 time:0.72 wait!
+@shutter power:0.82 shape:eyelid color:#020609 hold:0.1 skew:0.2 time:0.55 wait!
+@waterVeil power:0 time:0.4
+@rain power:0 time:0.4
+@charTone none time:0.4 wait!
+
+nar: CHECKPOINT COMPOSITION 04 STRESS AND ISOLATION
+nar: 压力与隔离组合：一次叠加六层屏幕效果，用于观察固定滤镜顺序、并行过渡、性能压力，以及逐项移除时的兄弟效果隔离。
+@bokeh power:0.18 time:0.2
+@waterVeil power:0.35 ripple:0.42 droplets:0.4 seed:41 time:0.2
+@pulse power:0.38 rate:88 echoes:3 expansion:0.03 edge:0.55 distortion:0.35 chroma:0.16 decay:0.66 time:0.2
+@staticFilter power:0.34 density:0.42 scanline:0.48 jitter:0.35 warp:0.25 palette:cold seed:43 time:0.2
+@glitchFilter power:0.2 speed:0.7 seed:47 time:0.2
+@vignette power:0.42 radius:0.58 softness:0.3 color:#15090f time:0.2 wait!
+nar: 所有屏幕效果同时存在；下面逐项移除，其他效果必须保留。
+@bokeh power:0 time:0.2
+@waterVeil power:0 time:0.2
+@pulse power:0 time:0.2
+@staticFilter power:0 time:0.2
+@glitchFilter power:0 time:0.2
+@vignette power:0 time:0.2 wait!
+
+#Cleanup
+@rain power:0
+@snow power:0
+@vignette power:0
+@staticFilter power:0
+@waterVeil power:0
+@pulse power:0
+@glitchFilter power:0
+@signalMask target:alice power:0
+@charTone none
+nar: CHECKPOINT COMPOSITION COMPLETE — 复合效果、持续状态和 presentation tasks 均已清理。
+@choice "重新开始" goto:#Start
+@choice "结束演示" goto:#End
+
+#End
+@hideChars time:0.2 wait!
+@end

@@ -179,8 +179,10 @@ export class LiveParamTransition {
 
 function resolveEasing(name: string | undefined): (amount: number) => number {
   if (name === "linear") return Easing.Linear.None;
-  if (name === "easeIn") return Easing.Cubic.In;
-  if (name === "easeInOut") return Easing.Cubic.InOut;
+  if (name === "easeIn" || name === "inCubic") return Easing.Cubic.In;
+  if (name === "easeInOut" || name === "inOutCubic") return Easing.Cubic.InOut;
+  if (name === "outExpo") return Easing.Exponential.Out;
+  if (name === "outQuint") return Easing.Quintic.Out;
   return Easing.Cubic.Out;
 }
 

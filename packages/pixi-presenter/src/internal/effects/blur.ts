@@ -12,17 +12,22 @@ export class ActorBlurController {
 
   constructor(private readonly options: PixiPresenterSystemsOptions) {}
 
-  apply(container: Container, actor: PixiActorSnapshot, liveFilters: Partial<Record<string, number>> = actor.filters): void {
+  apply(container: Container, actor: PixiActorSnapshot, liveFilters: Partial<Record<string, number>> = { blur: actor.filters.blur, bokeh: actor.filters.bokeh }): void {
     const power = Math.max(0, liveFilters.blur ?? actor.filters.blur ?? 0);
+    const previousBlur = this.filters.get(container);
     const blur = this.reconcile(container, power);
-    container.filters = blur ? [blur as unknown as Filter] : null;
+    const siblings = (container.filters ?? []).filter((filter) => filter !== previousBlur as unknown as Filter);
+    const next = blur ? [blur as unknown as Filter, ...siblings] : siblings;
+    container.filters = next.length > 0 ? next : null;
     if (blur) container.filterArea = new Rectangle(0, 0, this.options.width(), this.options.height());
     else (container as unknown as { filterArea: Rectangle | undefined }).filterArea = undefined;
   }
 
   release(container: Container): void {
+    const blur = this.filters.get(container);
     this.destroyFilter(container);
-    container.filters = null;
+    const siblings = (container.filters ?? []).filter((filter) => filter !== blur as unknown as Filter);
+    container.filters = siblings.length > 0 ? siblings : null;
     (container as unknown as { filterArea: Rectangle | undefined }).filterArea = undefined;
   }
 

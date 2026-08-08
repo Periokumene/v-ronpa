@@ -21,6 +21,48 @@ function diagnosticSummaries(diagnostics: ReturnType<typeof compileRuntimeScript
 }
 
 describe("nani runtime compiler", () => {
+  it("normalizes all remaining Pixi effect lab commands to semantic runtime values", () => {
+    const sourceText = [
+      "@impact origin:50,45 time:0.22 wait!",
+      "@afterimage target:stage count:4 offset:-1.5,0 time:0.65", "@shutter shape:iris time:0.48",
+      "@flicker bursts:5 seed:7 time:0.45", "@vignette power:0.5 time:0.4",
+      "@staticFilter palette:sepia seed:2 time:0.5", "@waterVeil drift:-0.1 time:0.8",
+      "@signalMask target:alice region:head time:0.35",
+      "@pulse rate:92 echoes:3 origin:50,52 time:0.6"
+    ].join("\n");
+    const result = compileRuntimeScript(parseScenario({ scriptPath: "effect-lab.nani", sourceText }));
+    expect(withoutDiagnosticLocations(result.diagnostics)).toEqual([]);
+    expect(result.script.commands.map((command) => command.commandId)).toEqual([
+      "impact", "afterimage", "shutter", "flicker", "vignette",
+      "staticfilter", "waterveil", "signalmask", "pulse"
+    ]);
+    expect(result.script.commands[0]?.params).toMatchObject({ origin: [50, 45], durationMs: 220, wait: true });
+    expect(result.script.commands[5]?.params).toMatchObject({ palette: "sepia", seed: 2, durationMs: 500 });
+    expect(result.script.commands[8]?.params).toMatchObject({ rate: 92, echoes: 3, origin: [50, 52], durationMs: 600 });
+  });
+
+  it("rejects out-of-range and unsupported effect lab controls", () => {
+    const result = compileRuntimeScript(parseScenario({
+      scriptPath: "effect-lab-invalid.nani",
+      sourceText: ["@pulse power:2 echoes:9", "@shutter shape:door", "@staticFilter palette:violet", "@flicker seed:1.5"].join("\n")
+    }));
+    expect(result.script.commands).toHaveLength(0);
+    expect(result.diagnostics.filter((item) => item.severity === "error")).toHaveLength(5);
+  });
+
+  it("rejects malformed effect colors, counts, durations, and easing before emitting IR", () => {
+    const result = compileRuntimeScript(parseScenario({
+      scriptPath: "effect-lab-invalid-semantic.nani",
+      sourceText: [
+        "@afterimage tint:#zz0011 count:7",
+        "@pulse rate:0 expansion:0.3 easing:bounce",
+        "@impact time:0"
+      ].join("\n")
+    }));
+    expect(result.script.commands).toHaveLength(0);
+    expect(result.diagnostics.filter((item) => item.severity === "error").length).toBeGreaterThanOrEqual(6);
+  });
+
   it("normalizes strict pinp show and hide forms with stable defaults", () => {
     const result = compileRuntimeScript(parseScenario({
       scriptPath: "pinp.nani",
@@ -1285,6 +1327,20 @@ describe("nani runtime compiler", () => {
         severity: "error"
       }
     ]);
+  });
+
+  it.each(["stainBurst", "wallSeep"])("hard-rejects removed @%s without emitting runtime output", (commandName) => {
+    const result = compileRuntimeScript(parseScenario({
+      sourceText: `@${commandName} power:0.5 time:0.4 wait!`,
+      scriptPath: `removed-${commandName}.nani`
+    }));
+
+    expect(result.script.commands).toEqual([]);
+    expect(diagnosticSummaries(result.diagnostics)).toEqual([{
+      code: "unknown-command",
+      message: `Unknown .nani command: @${commandName.toLowerCase()}.`,
+      severity: "error"
+    }]);
   });
 
   it("diagnoses only @set parameters that its selected dynamic assignment does not consume", () => {

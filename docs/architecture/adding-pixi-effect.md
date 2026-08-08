@@ -114,6 +114,8 @@ Every effect implementation must account for:
 
 - first creation and immediate `animate:false` restore;
 - parameter update and interruption from the current live value;
+- family-update detection so an unrelated Stage revision does not replay a
+  transition retained in terminal state;
 - timed and immediate removal/no-op behavior;
 - wait task completion and stale-handle cancellation;
 - viewport resize without restarting the effect;
@@ -122,6 +124,13 @@ Every effect implementation must account for:
   family-attached resources;
 - isolation: removing the effect does not clear a sibling, Trial overlay, actor,
   or unrelated root filter.
+
+If an effect captures filter input, the capture is Presenter-private. Prefer a
+bounded or half-resolution pooled RenderTexture, request a new capture only at
+the semantic event boundary or resize, and return every texture exactly once on
+replacement, settle, clear, and destroy. Actor filter owners must edit only the
+filter they own; assigning `container.filters` from scratch can silently remove
+an actor-targeted transient.
 
 The family owns macro order and layer placement. The leaf owns resources and
 visual behavior. Top-level `createPixiPresenter` must continue to call only
@@ -140,6 +149,9 @@ Actor, Weather, Persistent screen, Transient, and Trial lifecycles.
 - Runtime/Harness test when save/restore, wait observation, or real WebGL output
   changes. Continuous animation needs a before/after frame-change assertion;
   screenshots remain review evidence rather than the only automated oracle.
+- Every test or development `.nani` script that demonstrates a newly added
+  effect must include an in-script Chinese explanation of the intended visual
+  result and the key parameters being exercised.
 
 Before handoff, run the narrow tests first, then:
 
@@ -153,6 +165,11 @@ pnpm --filter @v-ronpa/game-a build
 pnpm --filter @v-ronpa/game-harness build
 pnpm test:smoke
 ```
+
+High-end effect labs may additionally record a hardware-qualified frame profile.
+Keep hard budgets behind an explicit environment switch so software WebGL and
+uncontrolled CI hardware still run functional smoke without pretending to be
+the declared benchmark machine.
 
 No new top-level tick/reconcile/resize/clear call is expected for an effect that
 fits an existing family. If one appears necessary, stop and review the ownership

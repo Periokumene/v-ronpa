@@ -237,16 +237,25 @@ order never implies navigation, and `@end` completes the whole entry.
 
 | Command | Runtime id | Category | Execution | Params | Primary | Children | Status |
 |---|---|---|---|---|---|---|---|
+| `afterimage` | `afterimage` | effect | pixi-presentation | target:string, power:decimal, count:integer, offset:decimal list, decay:decimal, tint:string, edge:decimal, time:decimal, easing:string, wait:boolean | none | no | implemented |
 | `charenter` | `charenter` | actor | declared-only | character:string, appearanceExpression:string, effect:string | none | no | stubbed |
 | `charTone` | `chartone` | effect | pixi-presentation | preset:string, amount:decimal, time:decimal, wait:boolean | preset | no | implemented |
 | `cue` | `cue` | text | story-control | text:string (V-Ronpa), author:string (V-Ronpa), speed:decimal (V-Ronpa), textId:string (V-Ronpa), autoNext:boolean (V-Ronpa) | text | no | implemented |
 | `end` | `end` | flow | story-control | none | none | no | implemented |
 | `flash` | `flash` | effect | pixi-presentation | color:string, duration:decimal, wait:boolean | none | no | implemented |
+| `flicker` | `flicker` | effect | pixi-presentation | power:decimal, bursts:integer, irregularity:decimal, invert:decimal, white:decimal, tear:decimal, chroma:decimal, seed:decimal, time:decimal, easing:string, wait:boolean | none | no | implemented |
 | `gameplay` | `gameplay` | state | gameplay | type:string, id:string, quantity:integer, item:string, itemId:string, evidence:string, evidenceId:string, character:string, characterId:string, status:string, skill:string, skillId:string, delta:integer, affinityDelta:integer | none | no | implemented |
 | `hideCue` | `hidecue` | ui | ui-output | time:decimal (V-Ronpa), wait:boolean (V-Ronpa) | none | no | implemented |
+| `impact` | `impact` | effect | pixi-presentation | power:decimal, origin:decimal list, direction:decimal, smear:decimal, chroma:decimal, time:decimal, easing:string, wait:boolean | none | no | implemented |
 | `inback` | `inback` | scene | pixi-presentation | appearanceAndTransition:named string, appearance:string, via:string, effect:string, visible:boolean, easing:string, time:decimal, wait:boolean | none | no | implemented |
 | `pinp` | `pinp` | ui | ui-output | assetId:string (V-Ronpa), pos:decimal list (V-Ronpa), height:decimal (V-Ronpa), ratio:decimal list (V-Ronpa), alt:string (V-Ronpa), effect:string (V-Ronpa), time:decimal (V-Ronpa), visible:boolean (V-Ronpa) | assetId | no | implemented |
+| `pulse` | `pulse` | effect | pixi-presentation | power:decimal, rate:decimal, origin:decimal list, echoes:integer, expansion:decimal, edge:decimal, distortion:decimal, chroma:decimal, decay:decimal, color:string, time:decimal, easing:string, wait:boolean | none | no | implemented |
+| `shutter` | `shutter` | effect | pixi-presentation | power:decimal, shape:string, color:string, hold:decimal, skew:decimal, time:decimal, easing:string, wait:boolean | none | no | implemented |
+| `signalMask` | `signalmask` | effect | pixi-presentation | target:string, region:string, power:decimal, bands:decimal, noise:decimal, chroma:decimal, speed:decimal, threshold:decimal, seed:decimal, time:decimal, easing:string, wait:boolean | none | no | implemented |
+| `staticFilter` | `staticfilter` | effect | pixi-presentation | power:decimal, density:decimal, scanline:decimal, jitter:decimal, warp:decimal, grainSize:decimal, speed:decimal, vignette:decimal, palette:string, seed:decimal, time:decimal, easing:string, wait:boolean | none | no | implemented |
 | `trialkeyword` | `trialkeyword` | ui | pixi-presentation | id:string, text:string, speaker:string, evidence:string | none | no | implemented |
+| `vignette` | `vignette` | effect | pixi-presentation | power:decimal, radius:decimal, softness:decimal, color:string, breathe:decimal, grain:decimal, time:decimal, easing:string, wait:boolean | none | no | implemented |
+| `waterVeil` | `waterveil` | effect | pixi-presentation | power:decimal, level:decimal, ripple:decimal, drift:decimal, blur:decimal, tint:string, droplets:decimal, seed:decimal, time:decimal, easing:string, wait:boolean | none | no | implemented |
 <!-- END GENERATED COMMAND CATALOG -->
 
 Shared shorthand:

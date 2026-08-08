@@ -117,6 +117,7 @@ export function createPixiPresenter(options: PixiPresenterOptions): PixiPresente
   const tick = (ticker: Ticker) => {
     tweens.tick(ticker);
     tasks.tick(ticker.deltaMS);
+    actors?.tick(ticker);
     persistentScreen?.tick(ticker);
     weather?.tick(ticker);
   };

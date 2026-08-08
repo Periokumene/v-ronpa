@@ -27,8 +27,9 @@ The Presenter has fixed, family-specific registries:
 | Family | Entries | Macro ownership |
 |---|---|---|
 | Weather | `rain`, `snow`, `sun` | back/front weather layers, lifecycle traversal |
-| Persistent screen | `bokeh`, `glitch` | root-filter order: bokeh then persistent glitch |
-| Transient | `flash`, `shake`, `glitch` | hint dispatch and transient filter/overlay cleanup |
+| Persistent screen | `bokeh`, `waterVeil`, `pulse`, `staticFilter`, `glitch`, `vignette` | fixed root-filter order and isolated removal |
+| Transient | `flash`, `shake`, `glitch`, `impact`, `afterimage`, `shutter`, `flicker` | hint dispatch and transient filter/overlay cleanup |
+| Actor effect | blur, tone, `signalMask`, actor-targeted Afterimage | explicit composition/filter-stack ownership |
 | Trial overlay | Trial keyword/subtitle | zIndex 31; independent of effect cleanup |
 
 These are static tables, not a generic plugin host. Registration is deliberately
@@ -44,11 +45,12 @@ The private implementation map is intentionally concrete:
 
 | Scope | Owner |
 |---|---|
-| Actor composition | `systems.ts` plus dedicated `effects/blur.ts` and `effects/characterToneController.ts` |
-| Weather family | `effects/weather/system.ts`, with separate `rain.ts`, `snow.ts`, and `sun.ts` renderers |
-| Persistent screen | `effects/persistentScreen.ts`, `bokeh.ts`, and `persistentGlitch.ts` |
-| Transient family | `effects/transient/system.ts`, with separate `flash.ts`, `shake.ts`, and `glitch.ts` controllers |
+| Actor composition | `systems.ts`, `characters.ts`, and dedicated blur/tone/signal-mask integration |
+| Weather family | `effects/weather/system.ts`, with separate rain/snow/sun renderers |
+| Persistent screen | `effects/persistentScreen.ts` and its fixed controller registry |
+| Transient family | `effects/transient/system.ts` and per-family finite controllers |
 | Shared glitch mechanics | `effects/glitchShader.ts`; it contains no persistent or transient lifecycle |
+| Effect-lab mechanics | `effects/effectLabShader.ts`; Presenter-private shader/history construction only |
 | Trial | `effects/trialOverlay.ts`; it is not registered as an effect |
 
 The bokeh controller owns root blur and overlay together, so both consume one
@@ -76,6 +78,18 @@ Weather back/front zIndex, persistent filter order, and transient/Trial zIndex
 are family policy. Individual effects cannot change these macro relationships.
 Cross-effect behavior such as future wind affecting rain and snow requires an
 explicit family composition policy rather than private state mutation.
+
+The current root-filter order is:
+
+```text
+bokeh -> waterVeil -> pulse -> staticFilter -> glitch -> vignette -> transient filters
+```
+
+Actor filters are a composed stack: a controller may add or remove only its own
+filter. Reconciliation must preserve actor-local transient filters and other
+controller-owned filters. Persistent controllers must also avoid replaying the
+transition stored in an unchanged terminal snapshot when an unrelated Stage
+family advances the global revision.
 
 ## Dependencies And Risk Removal
 

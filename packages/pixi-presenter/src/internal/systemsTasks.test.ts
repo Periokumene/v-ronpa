@@ -59,6 +59,34 @@ describe("pixi presentation task system integration", () => {
     expect(tasks.snapshot()).toEqual([]);
   });
 
+  it("does not replay terminal actor transitions on a screen-only revision", () => {
+    const { actors, tasks, tweens } = createSystems();
+    const actor = backgroundActor({ durationMs: 100, wait: true });
+    actors.reconcile(stageWithActor(actor, 1), false);
+    actors.reconcile(stageWithActor(actor, 2), true);
+
+    expect(tasks.snapshot()).toEqual([]);
+    tick(tweens, 120);
+    expect(tasks.snapshot()).toEqual([]);
+  });
+
+  it("preserves actor-local transient filters while blur is reconciled and removed", () => {
+    const root = new Container();
+    const filters = new ActorFilterSystem({ root, width: () => 960, height: () => 540 });
+    const actor = { ...backgroundActor({ durationMs: 0 }), filters: { blur: 0.7 } };
+    const container = new Container();
+    const transient = { destroy: vi.fn() } as unknown as Filter;
+    container.filters = [transient];
+
+    filters.applyActorFilters(container, actor);
+    expect(container.filters).toHaveLength(2);
+    expect(container.filters).toContain(transient);
+    filters.applyActorFilters(container, { ...actor, filters: {} });
+    expect(container.filters).toEqual([transient]);
+    filters.releaseActorFilters(container);
+    expect(container.filters).toEqual([transient]);
+  });
+
   it("preloads character packs before ActorSystem starts synchronous reconciliation", async () => {
     const load = vi.spyOn(Assets, "load").mockResolvedValue(Texture.EMPTY as never);
     const fetch = installCharacterPackFetch();

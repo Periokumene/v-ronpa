@@ -67,7 +67,7 @@ export default defineConfig({
     },
     {
       name: "game-a-product",
-      testMatch: /game-a-multi-nani\.spec\.ts/u,
+      testMatch: /game-a-(?:multi-nani|effects-lab)\.spec\.ts/u,
       use: { ...devices["Desktop Chrome"], baseURL: gameAProductURL, launchOptions: chromiumLaunchOptions }
     }
   ]

@@ -1,0 +1,84 @@
+#Start
+@showUI dialog
+@showUI commandBar visible:true
+@back bg/home-kitchen effect:fade time:0.2 wait!
+@char alice.eye1,mouth0,armR4,armL1 pos:50 time:0.2 wait!
+nar: PIXI EFFECT LAB / DEVELOPMENT ONLY
+nar: 本脚本包含高频闪烁、反相和强烈闪白。光敏风险人群请选择跳过 Flicker。
+@choice "完整实验（包含高频 Flicker）" goto:#TransientLab
+@choice "跳过 Flicker，进入持续效果" goto:#PersistentLab
+
+#TransientLab
+nar: IMPACT（冲击）：模拟瞬间受击；画面会沿 direction 指定方向挤压拖影，并随 power 增强色差。下面依次观察低、中、高强度。
+nar: CHECKPOINT LAB 01 IMPACT LOW
+@impact power:0.28 origin:50,48 direction:-8 smear:0.3 chroma:0.1 time:0.22 wait!
+nar: CHECKPOINT LAB 02 IMPACT MID
+@impact power:0.62 origin:47,54 direction:12 smear:0.58 chroma:0.24 time:0.22 wait!
+nar: CHECKPOINT LAB 03 IMPACT HIGH
+@impact power:1 origin:52,48 direction:-18 smear:0.85 chroma:0.5 time:0.26 wait!
+
+nar: AFTERIMAGE（残像）：复制舞台或角色的历史画面并按 offset 错位叠放；count 决定残像数量，decay 决定逐层衰减速度。
+nar: CHECKPOINT LAB 04 AFTERIMAGE LOW
+@afterimage target:stage power:0.3 count:2 offset:-0.7,0 decay:0.5 tint:#9fc2c7 edge:0.35 time:0.5 wait!
+nar: CHECKPOINT LAB 05 AFTERIMAGE MID
+@afterimage target:stage power:0.65 count:4 offset:-1.5,0.2 decay:0.7 tint:#8ebbc4 edge:0.58 time:0.65 wait!
+nar: CHECKPOINT LAB 06 AFTERIMAGE HIGH
+@afterimage target:alice power:1 count:6 offset:-2.4,0.5 decay:0.78 tint:#b7dce0 edge:0.85 time:0.8 wait!
+
+nar: SHUTTER（快门）：用黑色遮罩快速闭合再开启画面；下面分别观察眼睑式、虹膜式和切片式三种闭合形状。
+nar: CHECKPOINT LAB 07 SHUTTER EYELID
+@shutter power:0.45 shape:eyelid color:#020304 hold:0.04 skew:0.1 time:0.42 wait!
+nar: CHECKPOINT LAB 08 SHUTTER IRIS
+@shutter power:0.7 shape:iris color:#08040a hold:0.08 skew:0.16 time:0.5 wait!
+nar: CHECKPOINT LAB 09 SHUTTER SLICE
+@shutter power:1 shape:slice color:#000000 hold:0.12 skew:0.34 time:0.58 wait!
+
+nar: FLICKER（故障闪烁）：以不规则节奏组合反相、闪白、画面撕裂和色差；bursts 是闪烁次数，irregularity 控制节奏随机程度。
+nar: CHECKPOINT LAB 10 FLICKER LOW
+@flicker power:0.28 bursts:3 irregularity:0.35 invert:0.2 white:0.2 tear:0.25 chroma:0.15 seed:3 time:0.4 wait!
+nar: CHECKPOINT LAB 11 FLICKER MID
+@flicker power:0.65 bursts:5 irregularity:0.65 invert:0.55 white:0.5 tear:0.62 chroma:0.4 seed:7 time:0.48 wait!
+nar: CHECKPOINT LAB 12 FLICKER HIGH
+@flicker power:1 bursts:9 irregularity:0.9 invert:0.9 white:0.9 tear:1 chroma:0.8 seed:13 time:0.62 wait!
+@goto #PersistentLab
+
+#PersistentLab
+nar: VIGNETTE（暗角）：持续压暗画面边缘、保留中心视线；radius 和 softness 控制暗角范围与羽化，breathe 和 grain 增加呼吸与颗粒感。
+nar: CHECKPOINT LAB 13 VIGNETTE
+@vignette power:0.72 radius:0.52 softness:0.24 color:#240710 breathe:0.09 grain:0.08 time:0.7 wait!
+nar: VIGNETTE ACTIVE — 当前只有暗角效果；观察完成后会先移除，再进入下一种效果。
+@vignette power:0 time:0.35 wait!
+
+nar: STATIC FILTER（静电干扰）：持续叠加噪点、扫描线、横向抖动和扭曲，模拟失真的模拟电视信号；palette 控制整体色调。
+nar: CHECKPOINT LAB 14 STATIC FILTER
+@staticFilter power:0.68 density:0.72 scanline:0.7 jitter:0.58 warp:0.48 grainSize:1 speed:1.2 vignette:0.42 palette:green seed:8 time:0.7 wait!
+nar: STATIC FILTER ACTIVE — 当前只有静电干扰；观察完成后会先移除，再进入下一种效果。
+@staticFilter power:0 time:0.4 wait!
+
+nar: WATER VEIL（水幕）：在画面前方覆盖缓慢漂移的水层、波纹和水滴；level 控制水位，ripple、drift 和 blur 控制流动与折射感。
+nar: CHECKPOINT LAB 15 WATER VEIL
+@waterVeil power:0.72 level:0.3 ripple:0.68 drift:-0.16 blur:0.28 tint:#557b8d droplets:0.82 seed:9 time:0.8 wait!
+nar: WATER VEIL ACTIVE — 当前只有水幕效果；观察完成后会先移除，再进入下一种效果。
+@waterVeil power:0 time:0.45 wait!
+
+nar: SIGNAL MASK（信号遮罩）：只破坏目标角色的指定区域；条带、噪声和色差会跟随角色，并在表情切换的交叉淡化期间保持连续。
+nar: CHECKPOINT LAB 16 SIGNAL MASK
+@signalMask target:alice region:head power:0.82 bands:0.88 noise:0.64 chroma:0.52 speed:1.1 threshold:0.42 seed:9 time:0.6 wait!
+nar: SIGNAL MASK ACTIVE — 当前只有角色头部信号遮罩，不在此脚本叠加表情切换或其他效果。
+@signalMask target:alice power:0 time:0.35 wait!
+
+nar: PULSE（脉冲）：从 origin 周期性向外扩散环形回波，并对历史画面产生折射和色差；rate 控制频率，echoes 控制同屏回波数量。
+nar: CHECKPOINT LAB 17 PULSE
+@pulse power:0.72 rate:104 origin:50,54 echoes:4 expansion:0.055 edge:0.82 distortion:0.68 chroma:0.42 decay:0.78 color:#d0eef0 time:0.8 wait!
+nar: PULSE ACTIVE — 当前只有脉冲效果；观察完成后会先移除，再结束单效果脚本。
+@pulse power:0 time:0.45 wait!
+@goto #Cleanup
+
+#Cleanup
+nar: CHECKPOINT LAB INDIVIDUAL COMPLETE — 单效果演示已结束，持续状态和 presentation tasks 均已清理。
+@choice "重新开始" goto:#Start
+@choice "结束实验" goto:#End
+
+#End
+@hideChars time:0.2 wait!
+@end

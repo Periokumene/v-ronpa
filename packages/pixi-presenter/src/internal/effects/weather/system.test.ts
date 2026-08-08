@@ -35,6 +35,7 @@ describe("WeatherSystem family", () => {
       suite.weather.destroy();
     }).not.toThrow();
   });
+
 });
 
 function createSuite() {

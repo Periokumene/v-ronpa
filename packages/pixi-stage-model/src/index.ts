@@ -14,6 +14,10 @@ import { reduceBokeh as reduceBokehEffect } from "./effects/bokeh";
 import { reduceCharacterTone as reduceCharacterToneEffect } from "./effects/characterTone";
 import { reduceFlash as reduceFlashEffect } from "./effects/flash";
 import {
+  reduceAfterimage, reduceFlicker, reduceImpact, reducePulse, reduceShutter, reduceSignalMask,
+  reduceStaticFilter, reduceVignette, reduceWaterVeil
+} from "./effects/effectLab";
+import {
   reduceGlitchFilter as reduceGlitchFilterEffect,
   reduceTransientGlitch as reduceTransientGlitchEffect
 } from "./effects/glitch";
@@ -72,6 +76,7 @@ type PixiCommandReducer = (
 ) => PixiRuntimeCommandReduction;
 
 const pixiCommandReducerRegistry: Readonly<Record<string, PixiCommandReducer>> = Object.freeze({
+  afterimage: reduceAfterimage,
   arrange: reduceArrange,
   back: reduceBack,
   blur: reduceBlurEffect,
@@ -79,15 +84,23 @@ const pixiCommandReducerRegistry: Readonly<Record<string, PixiCommandReducer>> =
   char: reduceChar,
   chartone: reduceCharacterToneEffect,
   flash: reduceFlashEffect,
+  flicker: reduceFlicker,
   glitch: reduceTransientGlitchEffect,
   glitchfilter: reduceGlitchFilterEffect,
+  impact: reduceImpact,
   hidechars: reduceHideChars,
   inback: reduceInback,
   rain: reduceRainEffect,
+  pulse: reducePulse,
   shake: reduceShakeEffect,
+  shutter: reduceShutter,
+  signalmask: reduceSignalMask,
   slide: reduceSlide,
   snow: reduceSnowEffect,
+  staticfilter: reduceStaticFilter,
   sun: reduceSunEffect,
+  vignette: reduceVignette,
+  waterveil: reduceWaterVeil,
   trialkeyword: reduceTrialKeyword
 });
 

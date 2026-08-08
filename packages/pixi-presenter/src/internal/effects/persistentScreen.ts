@@ -6,6 +6,7 @@ import type { PixiPresenterSystemsOptions } from "../systemTypes";
 import type { TweenSystem } from "./animation";
 import { BokehEffectController } from "./bokeh";
 import { PersistentGlitchEffectController } from "./persistentGlitch";
+import { EffectLabPersistentScreenController } from "./effectLabPersistent";
 import { PERSISTENT_SCREEN_EFFECT_KEYS } from "./registries";
 import type { RootFilterStack } from "./rootFilterStack";
 
@@ -21,7 +22,11 @@ export class PersistentScreenEffectSystem {
   ) {
     this.registry = Object.freeze({
       bokeh: new BokehEffectController(options, rootFilters, tweens, tasks),
-      glitch: new PersistentGlitchEffectController(options, rootFilters, tweens, tasks)
+      waterVeil: new EffectLabPersistentScreenController("waterVeil", options, rootFilters, tweens, tasks),
+      pulse: new EffectLabPersistentScreenController("pulse", options, rootFilters, tweens, tasks),
+      staticFilter: new EffectLabPersistentScreenController("staticFilter", options, rootFilters, tweens, tasks),
+      glitch: new PersistentGlitchEffectController(options, rootFilters, tweens, tasks),
+      vignette: new EffectLabPersistentScreenController("vignette", options, rootFilters, tweens, tasks)
     } satisfies Record<PersistentScreenEffectKey, PersistentScreenEffectController>);
   }
 

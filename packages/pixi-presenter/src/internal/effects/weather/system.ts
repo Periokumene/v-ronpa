@@ -16,6 +16,7 @@ interface WeatherRecord {
   live: NumericLiveState;
   transition: LiveParamTransition;
   renderer: WeatherEffectRenderer;
+  removing: boolean;
 }
 
 type RendererFactory = (container: Container, options: PixiPresenterSystemsOptions) => WeatherEffectRenderer;
@@ -87,6 +88,7 @@ export class WeatherSystem {
 
   private upsert(kind: PixiWeatherKind, snapshot: PixiWeatherSnapshot, animate: boolean, revision: number): void {
     let record = this.records.get(kind);
+    const isNew = !record;
     const targetLive = weatherLiveParams(snapshot);
     if (!record) {
       const container = new Container({ label: `weather:${kind}` });
@@ -99,11 +101,16 @@ export class WeatherSystem {
         container,
         live,
         transition: new LiveParamTransition(this.tweens, this.tasks),
-        renderer: weatherRendererRegistry[kind](container, this.options)
+        renderer: weatherRendererRegistry[kind](container, this.options),
+        removing: false
       };
       this.records.set(kind, record);
     }
+    const isUpdate = isNew || record.snapshot.transition !== snapshot.transition ||
+      !sameTerminalWeather(record.snapshot, snapshot);
+    if (!isUpdate) return;
     record.snapshot = snapshot;
+    record.removing = false;
     record.transition.start({
       state: record.live,
       to: targetLive,
@@ -129,6 +136,8 @@ export class WeatherSystem {
   ): void {
     const record = this.records.get(kind);
     if (!record) return;
+    if (record.removing) return;
+    record.removing = true;
     const cleanup = () => this.remove(kind, false);
     record.transition.start({
       state: record.live,
@@ -182,3 +191,9 @@ function weatherLiveParams(snapshot: PixiWeatherSnapshot): NumericLiveState {
 }
 
 function clamp01(value: number): number { return Math.max(0, Math.min(1, value)); }
+
+function sameTerminalWeather(left: PixiWeatherSnapshot, right: PixiWeatherSnapshot): boolean {
+  const { transition: _leftTransition, ...leftVisual } = left;
+  const { transition: _rightTransition, ...rightVisual } = right;
+  return JSON.stringify(leftVisual) === JSON.stringify(rightVisual);
+}

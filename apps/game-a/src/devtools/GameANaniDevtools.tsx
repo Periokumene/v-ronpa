@@ -101,6 +101,8 @@ export function GameANaniDevtools({
   useEffect(() => {
     window.render_game_to_text = () => {
       const current = renderStateRef.current;
+      const pixiRuntime = current.runtime.presentation.pixiStageRuntime;
+      const pixiSnapshot = pixiRuntime.snapshot;
       const checkpoint = current.runtime.lifecycle.createVnSaveCheckpoint({ allowInactive: true });
       return JSON.stringify({
         coordinateSystem: "DOM viewport; origin top-left; x right; y down",
@@ -135,10 +137,21 @@ export function GameANaniDevtools({
           choices: current.runtime.shell.storyRuntime.state.pendingChoices.map((choice) => choice.text)
         },
         pixi: {
-          revision: current.runtime.presentation.pixiStageRuntime.snapshot.revision,
-          backgrounds: Object.keys(current.runtime.presentation.pixiStageRuntime.snapshot.backgroundsById),
-          characters: Object.keys(current.runtime.presentation.pixiStageRuntime.snapshot.charactersById),
-          weather: Object.keys(current.runtime.presentation.pixiStageRuntime.snapshot.weather)
+          revision: pixiSnapshot.revision,
+          animate: pixiRuntime.animate,
+          backgrounds: Object.keys(pixiSnapshot.backgroundsById),
+          characters: Object.keys(pixiSnapshot.charactersById),
+          weather: Object.keys(pixiSnapshot.weather),
+          weatherEffects: pixiSnapshot.weather,
+          screenFilters: pixiSnapshot.screenFilters,
+          actorEffects: Object.fromEntries(
+            Object.entries(pixiSnapshot.charactersById)
+              .filter(([, actor]) => Object.keys(actor.filters).length > 0)
+              .map(([actorId, actor]) => [actorId, actor.filters])
+          ),
+          hints: pixiRuntime.hints,
+          hintSequence: pixiRuntime.hintSequence,
+          presentationTasks: pixiRuntime.presentationTasks
         },
         stableCheckpoint: checkpoint.ok
           ? {

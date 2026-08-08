@@ -265,6 +265,7 @@ function validatePixiEffectIsolation() {
   const effectsRoot = join(presenterRoot, "internal/effects");
   const sharedModules = new Set([
     "animation.ts",
+    "effectLabShader.ts",
     "glitchShader.ts",
     "registries.ts",
     "rootFilterStack.ts",
@@ -272,8 +273,8 @@ function validatePixiEffectIsolation() {
     "weather/types.ts"
   ]);
   const dispatcherImports = new Map([
-    ["persistentScreen.ts", new Set(["bokeh.ts", "persistentGlitch.ts"])],
-    ["transient/system.ts", new Set(["transient/flash.ts", "transient/glitch.ts", "transient/shake.ts"])],
+    ["persistentScreen.ts", new Set(["bokeh.ts", "effectLabPersistent.ts", "persistentGlitch.ts"])],
+    ["transient/system.ts", new Set(["transient/effectLab.ts", "transient/flash.ts", "transient/glitch.ts", "transient/shake.ts"])],
     ["weather/system.ts", new Set(["weather/rain.ts", "weather/snow.ts", "weather/sun.ts"])]
   ]);
 

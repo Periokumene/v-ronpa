@@ -240,6 +240,114 @@ export function diagnoseExecutionBoundaryParams(
 
 const characterTonePresetIds = new Set<string>([...CHARACTER_TONE_PRESET_IDS, "none"]);
 
+const effectLabIds = new Set([
+  "afterimage", "flicker", "impact", "pulse", "shutter", "signalmask",
+  "staticfilter", "vignette", "waterveil"
+]);
+const transientEffectLabIds = new Set(["afterimage", "flicker", "impact", "shutter"]);
+const effectLabEasings = new Set([
+  "linear", "easeIn", "easeOut", "easeInOut", "inCubic", "outCubic", "inOutCubic", "outExpo", "outQuint"
+]);
+const unitEffectParams = new Set([
+  "power", "smear", "chroma", "decay", "edge", "irregularity",
+  "invert", "white", "tear", "hold", "skew", "radius", "softness", "breathe", "grain",
+  "density", "scanline", "jitter", "warp", "vignette", "level", "ripple", "blur",
+  "bands", "noise", "threshold", "distortion"
+]);
+
+export function diagnoseEffectLabParams(
+  bound: BoundCommand,
+  definition: NaniCommandDefinition,
+  context: CommandDiagnosticContext
+): RuntimeCompilerDiagnostic[] {
+  if (!effectLabIds.has(definition.id)) return [];
+  const diagnostics: RuntimeCompilerDiagnostic[] = [];
+  for (const key of Object.keys(bound.shape.params)) {
+    const value = staticScalarValue(getCommandParam(bound.shape, key));
+    if (value === undefined) continue;
+    if (typeof value === "number" && !Number.isFinite(value)) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} ${key} must be finite.`));
+      continue;
+    }
+    if (unitEffectParams.has(key) && (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} ${key} must be a finite number from 0 to 1.`));
+    }
+    if (definition.id === "waterveil" && key === "droplets" &&
+      (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} droplets must be a finite number from 0 to 1.`));
+    }
+    if (["time", "speed"].includes(key) &&
+      (typeof value !== "number" || !Number.isFinite(value) || value < 0)) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} ${key} must be a finite non-negative number.`));
+    }
+    if (["rate", "grainSize"].includes(key) &&
+      (typeof value !== "number" || !Number.isFinite(value) || value <= 0)) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} ${key} must be a finite positive number.`));
+    }
+    if (key === "expansion" &&
+      (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 0.2)) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} expansion must be from 0 to 0.2.`));
+    }
+    if (["direction", "drift"].includes(key) && typeof value !== "number") {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} ${key} must be a finite number.`));
+    }
+    if (["count", "bursts", "echoes"].includes(key) &&
+      (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > (key === "bursts" ? 32 : key === "count" ? 6 : 4))) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} ${key} is outside the supported integer range.`));
+    }
+    if (key === "seed" && (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value))) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} seed must be a finite integer.`));
+    }
+    if (["color", "tint"].includes(key) &&
+      (typeof value !== "string" || !/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/u.test(value))) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} ${key} must be a #RGB or #RRGGBB color.`));
+    }
+    if (key === "easing" && (typeof value !== "string" || !effectLabEasings.has(value))) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} easing is not supported.`));
+    }
+    if (key === "time" && transientEffectLabIds.has(definition.id) && value === 0) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} time must be positive for a finite effect.`));
+    }
+  }
+  validateEffectEnum(bound, context, diagnostics, definition, "shape", ["eyelid", "iris", "slice"]);
+  validateEffectEnum(bound, context, diagnostics, definition, "palette", ["cold", "sepia", "green", "mono"]);
+  validateEffectEnum(bound, context, diagnostics, definition, "region", ["head", "full"]);
+  for (const key of ["origin", "offset"] as const) {
+    const raw = getCommandParam(bound.shape, key);
+    if (!raw || raw.type === "expression") continue;
+    const values = raw.type === "list" ? raw.value : [raw];
+    const valid = values.length === 2 && values.every((item) => item.type === "number" && Number.isFinite(item.value));
+    const withinStage = key !== "origin" || values.every((item) => item.type === "number" && item.value >= 0 && item.value <= 100);
+    if (!valid || !withinStage) {
+      diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} ${key} must contain exactly two finite${key === "origin" ? " 0..100" : ""} numbers.`));
+    }
+  }
+  return diagnostics;
+}
+
+function validateEffectEnum(
+  bound: BoundCommand,
+  context: CommandDiagnosticContext,
+  diagnostics: RuntimeCompilerDiagnostic[],
+  definition: NaniCommandDefinition,
+  key: string,
+  allowed: string[]
+): void {
+  const raw = getCommandParam(bound.shape, key);
+  const value = staticScalarValue(raw);
+  if (value === undefined || (typeof value === "string" && allowed.includes(value))) return;
+  diagnostics.push(effectParamDiagnostic(bound, context, key, `@${definition.canonicalName} ${key} must be one of ${allowed.join(", ")}.`));
+}
+
+function effectParamDiagnostic(
+  bound: BoundCommand,
+  context: CommandDiagnosticContext,
+  key: string,
+  message: string
+): RuntimeCompilerDiagnostic {
+  return createArgumentDiagnostic(context, paramOrigin(bound, key), "value", "invalid-command-param", message, "error");
+}
+
 export function diagnoseCharacterToneParams(
   bound: BoundCommand,
   definition: NaniCommandDefinition,
