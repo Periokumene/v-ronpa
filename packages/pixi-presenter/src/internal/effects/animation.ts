@@ -152,6 +152,7 @@ export class LiveParamTransition {
     if (!record) return;
     record.handle.stop();
     this.active = undefined;
+    if (record.task?.isCurrent()) record.task.cancel();
     if (applyTarget) {
       assignLiveState(record.state, record.to);
       record.onUpdate?.();

@@ -1,0 +1,164 @@
+#Start
+@showUI dialog
+@showUI commandBar visible:true
+@back bg/home-kitchen effect:fade time:0.2 wait!
+@char alice.eye1,mouth0,armR4,armL1 pos:50 time:0.2 wait!
+nar: PIXI EFFECT COMMAND CONSOLE / DEVELOPMENT ONLY
+nar: 本调试台逐项展示全部 19 个 Pixi 效果命令（既有命令与新增命令）；任何时刻只运行一个效果，不包含复合演出。
+nar: 本脚本包含高频闪烁、反相和强烈闪白。光敏风险人群请勿开始完整展示。
+@choice "开始完整命令展示（包含 Flicker）" goto:#TransientLab
+@choice "结束展示" goto:#End
+
+#TransientLab
+nar: IMPACT（冲击）：模拟瞬间受击；画面会沿 direction 指定方向挤压拖影，并随 power 增强色差。下面依次观察低、中、高强度。
+nar: CHECKPOINT LAB 01 IMPACT LOW
+@impact power:0.28 origin:50,48 direction:-8 smear:0.3 chroma:0.1 time:0.22 wait!
+nar: CHECKPOINT LAB 02 IMPACT MID
+@impact power:0.62 origin:47,54 direction:12 smear:0.58 chroma:0.24 time:0.22 wait!
+nar: CHECKPOINT LAB 03 IMPACT HIGH
+@impact power:1 origin:52,48 direction:-18 smear:0.85 chroma:0.5 time:0.26 wait!
+
+nar: AFTERIMAGE（残像）：复制舞台或角色的历史画面并按 offset 错位叠放；count 决定残像数量，decay 决定逐层衰减速度。
+nar: CHECKPOINT LAB 04 AFTERIMAGE LOW
+@afterimage target:stage power:0.3 count:2 offset:-0.7,0 decay:0.5 tint:#9fc2c7 edge:0.35 time:0.5 wait!
+nar: CHECKPOINT LAB 05 AFTERIMAGE MID
+@afterimage target:stage power:0.65 count:4 offset:-1.5,0.2 decay:0.7 tint:#8ebbc4 edge:0.58 time:0.65 wait!
+nar: CHECKPOINT LAB 06 AFTERIMAGE HIGH
+@afterimage target:alice power:1 count:6 offset:-2.4,0.5 decay:0.78 tint:#b7dce0 edge:0.85 time:0.8 wait!
+
+nar: SHUTTER（快门）：用黑色遮罩快速闭合再开启画面；下面分别观察眼睑式、虹膜式和切片式三种闭合形状。
+nar: CHECKPOINT LAB 07 SHUTTER EYELID
+@shutter power:0.45 shape:eyelid color:#020304 hold:0.04 skew:0.1 time:0.42 wait!
+nar: CHECKPOINT LAB 08 SHUTTER IRIS
+@shutter power:0.7 shape:iris color:#08040a hold:0.08 skew:0.16 time:0.5 wait!
+nar: CHECKPOINT LAB 09 SHUTTER SLICE
+@shutter power:1 shape:slice color:#000000 hold:0.12 skew:0.34 time:0.58 wait!
+
+nar: FLICKER（故障闪烁）：以不规则节奏组合反相、闪白、画面撕裂和色差；bursts 是闪烁次数，irregularity 控制节奏随机程度。
+nar: CHECKPOINT LAB 10 FLICKER LOW
+@flicker power:0.28 bursts:3 irregularity:0.35 invert:0.2 white:0.2 tear:0.25 chroma:0.15 seed:3 time:0.4 wait!
+nar: CHECKPOINT LAB 11 FLICKER MID
+@flicker power:0.65 bursts:5 irregularity:0.65 invert:0.55 white:0.5 tear:0.62 chroma:0.4 seed:7 time:0.48 wait!
+nar: CHECKPOINT LAB 12 FLICKER HIGH
+@flicker power:1 bursts:9 irregularity:0.9 invert:0.9 white:0.9 tear:1 chroma:0.8 seed:13 time:0.62 wait!
+@goto #PersistentLab
+
+#PersistentLab
+nar: VIGNETTE（暗角）：持续压暗画面边缘、保留中心视线；radius 和 softness 控制暗角范围与羽化，breathe 和 grain 增加呼吸与颗粒感。
+nar: CHECKPOINT LAB 13 VIGNETTE
+@vignette power:0.72 radius:0.52 softness:0.24 color:#240710 breathe:0.09 grain:0.08 time:0.7 wait!
+nar: VIGNETTE ACTIVE — 当前只有暗角效果；观察完成后会先移除，再进入下一种效果。
+@vignette power:0 time:0.35 wait!
+
+nar: STATIC FILTER（静电干扰）：持续叠加噪点、扫描线、横向抖动和扭曲，模拟失真的模拟电视信号；palette 控制整体色调。
+nar: CHECKPOINT LAB 14 STATIC FILTER
+@staticFilter power:0.68 density:0.72 scanline:0.7 jitter:0.58 warp:0.48 grainSize:1 speed:1.2 vignette:0.42 palette:green seed:8 time:0.7 wait!
+nar: STATIC FILTER ACTIVE — 当前只有静电干扰；观察完成后会先移除，再进入下一种效果。
+@staticFilter power:0 time:0.4 wait!
+
+nar: WATER VEIL（水幕）：在画面前方覆盖缓慢漂移的水层、波纹和水滴；level 控制水位，ripple、drift 和 blur 控制流动与折射感。
+nar: CHECKPOINT LAB 15 WATER VEIL
+@waterVeil power:0.72 level:0.3 ripple:0.68 drift:-0.16 blur:0.28 tint:#557b8d droplets:0.82 seed:9 time:0.8 wait!
+nar: WATER VEIL ACTIVE — 当前只有水幕效果；观察完成后会先移除，再进入下一种效果。
+@waterVeil power:0 time:0.45 wait!
+
+nar: SIGNAL MASK（信号遮罩）：对目标角色合成后的完整立绘应用条带、噪声和色差；表情层和交叉淡化结果共用同一个外层效果。
+nar: CHECKPOINT LAB 16 SIGNAL MASK
+@signalMask target:alice power:0.82 bands:0.88 noise:0.64 chroma:0.52 speed:1.1 threshold:0.42 seed:9.25 time:0.6 wait!
+nar: SIGNAL MASK ACTIVE — 当前只有完整角色信号遮罩，不在此脚本叠加表情切换或其他效果。
+@signalMask target:alice power:0 time:0.35 wait!
+
+nar: PULSE（脉冲）：从 origin 周期性向外扩散环形回波，并对历史画面产生折射和色差；rate 控制频率，echoes 控制同屏回波数量。
+nar: CHECKPOINT LAB 17 PULSE
+@pulse power:0.72 rate:104 origin:50,54 echoes:4 expansion:0.055 edge:0.82 distortion:0.68 chroma:0.42 decay:0.78 color:#d0eef0 time:0.8 wait!
+nar: PULSE ACTIVE — 当前只有脉冲效果；观察完成后会先移除，再结束单效果脚本。
+@pulse power:0 time:0.45 wait!
+nar: CHECKPOINT LAB INDIVIDUAL COMPLETE — 九个新增效果命令均已逐项展示并清理；继续进入十个既有效果命令。
+@goto #LegacyCommands
+
+#LegacyCommands
+nar: FLASH（屏幕闪光）：播放一次纯色全屏闪光；color 指定颜色，duration 以毫秒指定持续时间。
+nar: CHECKPOINT CONSOLE 18 FLASH
+@flash color:#8fd3ff duration:320 wait!
+nar: FLASH COMPLETE — 蓝白闪光已播放完成，瞬时效果没有写入持续快照。
+
+nar: SHAKE（震动）：对角色或整个舞台播放有限次数的震动；actorId 选择目标，power、count、hor 和 ver 控制强度、次数与方向。
+nar: CHECKPOINT CONSOLE 19 SHAKE
+@shake actorId:alice power:0.5 time:0.12 count:5 deltaPower:0.04 hor! ver! wait!
+nar: SHAKE COMPLETE — Alice 的水平与垂直震动已经完成，舞台本身保持稳定。
+
+nar: GLITCH（瞬时故障）：播放一次限时故障冲击；blockJump、burstJump、pixelScatter 和 colorNoise 分别控制块跳变、突发跳变、像素散射与色噪。
+nar: CHECKPOINT CONSOLE 20 GLITCH
+@glitch power:0.78 time:0.8 blockJump:1.1 burstJump:0.65 pixelScatter:1 colorNoise:0.62 speed:1.2 seed:20.5 wait!
+nar: GLITCH COMPLETE — 瞬时故障已播放完成，root transient filter 应已清理。
+
+nar: BLUR（角色模糊）：对指定 actor 的完整合成容器应用持续模糊；actorId 选择目标，power 控制模糊强度，power:0 负责移除。
+nar: CHECKPOINT CONSOLE 21 BLUR
+@blur actorId:alice power:0.55 time:0.5 wait!
+nar: BLUR ACTIVE — 当前只有 Alice 的完整立绘被模糊，背景与 DOM 对话框不受影响。
+@blur actorId:alice power:0 time:0.35 wait!
+nar: BLUR CLEARED — 角色模糊已移除。
+
+nar: BOKEH（景深虚化）：按 focus 指定焦点，并用 dist 与 power 控制景深距离和虚化强度；power:0 会移除滤镜与光斑层。
+nar: CHECKPOINT CONSOLE 22 BOKEH
+@bokeh focus:alice dist:10 power:0.62 time:0.5 wait!
+nar: BOKEH ACTIVE — 当前只有景深虚化和光斑效果。
+@bokeh power:0 time:0.35 wait!
+nar: BOKEH CLEARED — 景深虚化已移除。
+
+nar: GLITCH FILTER（持续故障滤镜）：把与 @glitch 相同语义的故障参数保持在持续快照中；speed 控制持续刷新速度，power:0 负责移除。
+nar: CHECKPOINT CONSOLE 23 GLITCH FILTER
+@glitchFilter power:0.54 blockJump:0.95 burstJump:0.55 pixelScatter:0.95 colorNoise:0.58 speed:2.4 seed:23.5 time:0.5 easing:linear wait!
+nar: GLITCH FILTER ACTIVE — 当前只有持续故障滤镜；不叠加瞬时 @glitch。
+@glitchFilter power:0 time:0.35 easing:linear wait!
+nar: GLITCH FILTER CLEARED — 持续故障滤镜已移除。
+
+nar: RAIN（雨）：创建持续雨层；power 控制雨势，wind 控制倾斜方向，hue 与 tint 控制雨线颜色，power:0 负责移除。
+nar: CHECKPOINT CONSOLE 24 RAIN
+@rain power:0.75 wind:-0.4 hue:215 tint:0.7 time:0.5 easing:linear wait!
+nar: RAIN ACTIVE — 当前只有雨层，观察雨线密度、风向和蓝色染色。
+@rain power:0 time:0.35 wait!
+nar: RAIN CLEARED — 雨层已移除。
+
+nar: SNOW（雪）：创建持续雪层；density、flakeScale、xSpeed、ySpeed、sway、fog 和 noise 控制雪量、尺寸、速度、摆动、雾与噪声。
+nar: CHECKPOINT CONSOLE 25 SNOW
+@snow power:0.78 density:1.2 flakeScale:1.2 xSpeed:-0.16 ySpeed:0.9 sway:0.76 fog:0.28 noise:0.025 seed:25.5 time:0.5 wait!
+nar: SNOW ACTIVE — 当前只有雪层，角色应保持在天气前层可辨识。
+@snow power:0 time:0.35 wait!
+nar: SNOW CLEARED — 雪层已移除。
+
+nar: SUN（阳光）：创建持续的后层阳光与光束；pos 控制光源位置，scale 控制光效尺度，power:0 负责移除。
+nar: CHECKPOINT CONSOLE 26 SUN
+@sun power:0.62 pos:18,82 scale:1.15,1.15,1 time:0.5 wait!
+nar: SUN ACTIVE — 当前只有阳光效果，观察右上光源与背景洗亮。
+@sun power:0 time:0.35 wait!
+nar: SUN CLEARED — 阳光效果已移除。
+
+nar: CHAR TONE（角色色调）：对全部角色的内部合成结果应用统一色调预设；preset 决定色调，amount 控制强度，none 负责移除。
+nar: CHECKPOINT CONSOLE 27 CHAR TONE
+@charTone fog amount:1.2 time:0.5 wait!
+nar: CHAR TONE ACTIVE — 当前只有 Alice 使用 fog 色调，背景、白色描边与 DOM 对话框不应被整体染色。
+@charTone none time:0.35 wait!
+nar: CHAR TONE CLEARED — 角色色调已移除。
+@goto #Cleanup
+
+#Cleanup
+@blur actorId:alice power:0
+@bokeh power:0
+@glitchFilter power:0
+@rain power:0
+@snow power:0
+@sun power:0
+@vignette power:0
+@staticFilter power:0
+@waterVeil power:0
+@signalMask target:alice power:0
+@pulse power:0
+@charTone none
+nar: CHECKPOINT PIXI COMMAND CONSOLE COMPLETE — 全部 19 个 Pixi 效果命令均已独立展示，持续状态和 presentation tasks 均已清理。
+@choice "重新开始" goto:#Start
+@choice "结束展示" goto:#End
+
+#End
+@hideChars time:0.2 wait!
+@end

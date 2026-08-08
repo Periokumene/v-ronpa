@@ -27,6 +27,7 @@ import {
   NaviRuntimeStateSchema,
   PIXI_INNER_BACKGROUND_ID,
   PIXI_MAIN_BACKGROUND_ID,
+  PixiPresentationTaskKindSchema,
   PixiStageSnapshotSchema,
   RichTextDocumentSchema,
   RuntimeCommandSchema,
@@ -1105,7 +1106,7 @@ describe("contracts", () => {
     const officialCommands = naniCommandCatalog.filter((command) => command.source === "naninovel");
 
     expect(officialCommands).toHaveLength(78);
-    expect(naniCommandCatalog).toHaveLength(88);
+    expect(naniCommandCatalog).toHaveLength(97);
     expect(naniCommandCatalog.map((command) => command.id)).not.toContain("focus");
     expect(() => NaniCommandDefinitionSchema.array().parse(naniCommandCatalog)).not.toThrow();
   });
@@ -1127,6 +1128,101 @@ describe("contracts", () => {
       source: "v-ronpa",
       status: "stubbed"
     });
+  });
+
+  it("declares independent Pixi effect commands and parses their terminal snapshot fields", () => {
+    const ids = [
+      "impact", "afterimage", "shutter", "flicker", "vignette",
+      "staticFilter", "waterVeil", "signalMask", "pulse"
+    ];
+    for (const id of ids) {
+      expect(getNaniCommandDefinition(id)).toMatchObject({ status: "implemented", execution: "pixi-presentation" });
+    }
+    expect(getNaniCommandDefinition("signalMask")?.params).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "target", type: "string", required: true })
+    ]));
+    expect(getNaniCommandDefinition("signalMask")?.params.map((param) => param.name)).not.toContain("region");
+    expect(PixiStageSnapshotSchema.parse({
+      version: 6, revision: 3, backgroundsById: {}, innerBackgroundsById: {}, actorOrder: [],
+      charactersById: { alice: {
+        id: "alice", kind: "character", appearanceExpression: "eye1", visible: true, alpha: 1, z: 0,
+        filters: { signalMask: { power: 0.7, bands: 0.8, noise: 0.45, chroma: 0.25, speed: 0.6, threshold: 0.5, seed: 1.25 } },
+        transition: { durationMs: 350 }
+      } },
+      weather: {},
+      screenFilters: {
+        vignette: { power: 0.5, radius: 0.62, softness: 0.3, color: "#160a10", breathe: 0.06, grain: 0.03, transition: { durationMs: 0 } },
+        pulse: { power: 0.6, rate: 92, origin: [0.5, 0.52], echoes: 3, expansion: 0.035, edge: 0.65, distortion: 0.35, chroma: 0.18, decay: 0.72, color: "#b8d6d8", transition: { durationMs: 0 } }
+      }
+    })).toMatchObject({ version: 6, revision: 3 });
+  });
+
+  it("hard-removes both rejected effects from commands, tasks, and terminal weather", () => {
+    const transientName = ["stain", "Burst"].join("");
+    const weatherName = ["wall", "Seep"].join("");
+    const transientKind = ["stain", "burst"].join("-");
+    const weatherKind = ["wall", "seep"].join("-");
+    expect(getNaniCommandDefinition(transientName)).toBeUndefined();
+    expect(getNaniCommandDefinition(weatherName)).toBeUndefined();
+    expect(PixiPresentationTaskKindSchema.safeParse(transientKind).success).toBe(false);
+    expect(PixiStageSnapshotSchema.safeParse({
+      version: 6,
+      revision: 0,
+      backgroundsById: {},
+      innerBackgroundsById: {},
+      charactersById: {},
+      actorOrder: [],
+      weather: {
+        [weatherKind]: {
+          kind: weatherKind,
+          power: 0.5,
+          color: "#601a28",
+          density: 0.35,
+          branch: 0.6,
+          speed: 0.08,
+          wetness: 0.7,
+          seed: 1,
+          transition: { durationMs: 0 }
+        }
+      },
+      screenFilters: {}
+    }).success).toBe(false);
+  });
+
+  it("rejects non-canonical effect colors and accepts only finite decimal seeds", () => {
+    const base = {
+      version: 6, revision: 0, backgroundsById: {}, innerBackgroundsById: {},
+      charactersById: {}, actorOrder: [], weather: {}
+    } as const;
+    expect(PixiStageSnapshotSchema.safeParse({
+      ...base,
+      screenFilters: {
+        vignette: {
+          power: 0.5, radius: 0.6, softness: 0.3, color: "darkred", breathe: 0.04, grain: 0.03,
+          transition: { durationMs: 0 }
+        }
+      }
+    }).success).toBe(false);
+    expect(PixiStageSnapshotSchema.safeParse({
+      ...base,
+      screenFilters: {
+        staticFilter: {
+          power: 0.5, density: 0.5, scanline: 0.5, jitter: 0.5, warp: 0.5,
+          grainSize: 1, speed: 1, vignette: 0.3, palette: "cold", seed: Number.POSITIVE_INFINITY,
+          transition: { durationMs: 0 }
+        }
+      }
+    }).success).toBe(false);
+    expect(PixiStageSnapshotSchema.safeParse({
+      ...base,
+      screenFilters: {
+        staticFilter: {
+          power: 0.5, density: 0.5, scanline: 0.5, jitter: 0.5, warp: 0.5,
+          grainSize: 1, speed: 1, vignette: 0.3, palette: "cold", seed: 1.5,
+          transition: { durationMs: 0 }
+        }
+      }
+    }).success).toBe(true);
   });
 
   it("declares pinp as an opaque, non-blocking UI asset command", () => {
@@ -1251,6 +1347,42 @@ describe("contracts", () => {
     }
     expect(getNaniCommandDefinition("glitchFilter")?.docs?.zh).toContain("seed");
     expect(getNaniCommandDefinition("snow")?.docs?.zh).toContain("seed");
+  });
+
+  it("documents every added Pixi effect with concrete authoring metadata", () => {
+    const addedEffectIds = [
+      "impact", "afterimage", "shutter", "flicker", "vignette",
+      "staticfilter", "waterveil", "signalmask", "pulse"
+    ];
+
+    for (const commandId of addedEffectIds) {
+      const definition = getNaniCommandDefinition(commandId);
+      expect(definition?.docs?.zh, commandId).toBeTruthy();
+      expect(definition?.docs?.examples?.length, commandId).toBeGreaterThan(0);
+      for (const paramSpec of definition?.params ?? []) {
+        expect(paramSpec.docs?.runtimeSupport, `${commandId}.${paramSpec.name}`).toBe("consumed");
+        expect(paramSpec.docs?.zh, `${commandId}.${paramSpec.name}`).not.toBe(
+          `${paramSpec.name} 参数，类型为 ${paramSpec.type}。`
+        );
+      }
+    }
+
+    expect(getNaniCommandDefinition("impact")?.params.find((param) => param.name === "origin")?.docs).toMatchObject({
+      defaultValue: "50,50",
+      recommendedRange: { min: 0, max: 100, unit: "percent" }
+    });
+    expect(getNaniCommandDefinition("shutter")?.params.find((param) => param.name === "shape")?.docs).toMatchObject({
+      defaultValue: "eyelid",
+      allowedValues: ["eyelid", "iris", "slice"]
+    });
+    expect(getNaniCommandDefinition("staticFilter")?.params.find((param) => param.name === "palette")?.docs).toMatchObject({
+      defaultValue: "cold",
+      allowedValues: ["cold", "sepia", "green", "mono"]
+    });
+    expect(getNaniCommandDefinition("signalMask")?.params.find((param) => param.name === "target")).toMatchObject({
+      required: true,
+      docs: { runtimeSupport: "consumed" }
+    });
   });
 
   it("marks declared but currently unconsumed implemented params in command docs", () => {

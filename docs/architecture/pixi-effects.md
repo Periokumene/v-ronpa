@@ -27,8 +27,9 @@ The Presenter has fixed, family-specific registries:
 | Family | Entries | Macro ownership |
 |---|---|---|
 | Weather | `rain`, `snow`, `sun` | back/front weather layers, lifecycle traversal |
-| Persistent screen | `bokeh`, `glitch` | root-filter order: bokeh then persistent glitch |
-| Transient | `flash`, `shake`, `glitch` | hint dispatch and transient filter/overlay cleanup |
+| Persistent screen | `bokeh`, `waterVeil`, `pulse`, `staticFilter`, `glitch`, `vignette` | fixed root-filter order and isolated removal |
+| Transient | `flash`, `shake`, `glitch`, `impact`, `afterimage`, `shutter`, `flicker` | hint dispatch and transient filter/overlay cleanup |
+| Actor effect | blur, tone, `signalMask`, actor-targeted Afterimage | explicit composition/filter-stack ownership |
 | Trial overlay | Trial keyword/subtitle | zIndex 31; independent of effect cleanup |
 
 These are static tables, not a generic plugin host. Registration is deliberately
@@ -44,10 +45,10 @@ The private implementation map is intentionally concrete:
 
 | Scope | Owner |
 |---|---|
-| Actor composition | `systems.ts` plus dedicated `effects/blur.ts` and `effects/characterToneController.ts` |
-| Weather family | `effects/weather/system.ts`, with separate `rain.ts`, `snow.ts`, and `sun.ts` renderers |
-| Persistent screen | `effects/persistentScreen.ts`, `bokeh.ts`, and `persistentGlitch.ts` |
-| Transient family | `effects/transient/system.ts`, with separate `flash.ts`, `shake.ts`, and `glitch.ts` controllers |
+| Actor composition | `systems.ts`, `characters.ts`, `effects/actorFilters.ts`, and independent blur, tone, and signal-mask leaves |
+| Weather family | `effects/weather/system.ts`, with separate rain/snow/sun renderers |
+| Persistent screen | `effects/persistentScreen.ts` and its fixed controller registry |
+| Transient family | `effects/transient/system.ts` and per-family finite controllers |
 | Shared glitch mechanics | `effects/glitchShader.ts`; it contains no persistent or transient lifecycle |
 | Trial | `effects/trialOverlay.ts`; it is not registered as an effect |
 
@@ -77,6 +78,48 @@ are family policy. Individual effects cannot change these macro relationships.
 Cross-effect behavior such as future wind affecting rain and snow requires an
 explicit family composition policy rather than private state mutation.
 
+The current root-filter order is:
+
+```text
+bokeh -> waterVeil -> pulse -> staticFilter -> glitch -> vignette -> transient filters
+```
+
+Actor filters are a composed stack: a controller may add or remove only its own
+filter. Reconciliation must preserve actor-local transient filters and other
+controller-owned filters. Persistent controllers must also avoid replaying the
+transition stored in an unchanged terminal snapshot when an unrelated Stage
+family advances the global revision.
+
+The fixed actor processing order is:
+
+```text
+character-internal tone/outline -> SignalMask -> Blur -> actor-local transient
+```
+
+SignalMask is attached once to the actor's outer composited container. Expression
+crossfade carriers do not own copies, so outgoing and incoming expression layers
+share one continuous full-character effect.
+
+Every persistent controller uses the same lifecycle contract: typed terminal
+comparison, strict no-op reconciliation, live-value interruption, timed removal
+that survives unrelated revisions, reversal when re-enabled during removal,
+immediate `animate:false` restore, and idempotent owned-resource cleanup. Pure
+waiting is not synthesized from an identical terminal command.
+
+## Authoring Documentation
+
+`packages/contracts` command and parameter `docs` metadata is the single
+authoring-documentation authority. The generated effect reference in
+[VN Command Catalog](../nani/command-catalog.md) renders every implemented Pixi
+effect—existing and newly added—with the same description, examples, required
+parameters, defaults, ranges, enums, units, and runtime notes. Editor completion
+and hover consume the same metadata.
+
+Development `.nani` scripts are executable smoke and visual demonstrations, not
+an alternative specification. Batch design records belong in `docs/archive` and
+cannot define live command syntax, defaults, validation, lifecycle, or filter
+order.
+
 ## Dependencies And Risk Removal
 
 Contracts, compiler, Stage Model, and runtime remain renderer-independent.
@@ -97,6 +140,7 @@ explicit declaration/normalizer/reducer/family registration touchpoints.
 | Harness/Playwright | terminal snapshot readout, active motion, cleanup, and screenshot evidence |
 
 Pixel-difference smoke assertions prove that continuous animation is running;
-they are not visual-style baselines. Static appearance is verified through
-precise Presenter properties, terminal Harness readouts, and retained review
-screenshots.
+region-level assertions additionally protect effect scope and source visibility.
+Shader-strategy tests protect effect-specific processing invariants without
+making shader source a public contract. These checks are not visual-style
+baselines; retained screenshots remain human review evidence.

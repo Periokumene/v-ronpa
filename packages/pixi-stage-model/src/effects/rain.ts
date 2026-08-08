@@ -17,6 +17,7 @@ import {
   booleanParam,
   changedSnapshot,
   durationMsParam,
+  emptyReduction,
   numberParam,
   stringParam,
   timingTransition,
@@ -29,12 +30,12 @@ export function reduceRain(snapshot: PixiStageSnapshot, command: RuntimeCommand)
   const { params, diagnostics } = normalizeRainCommandParams(command);
   if (params.power <= 0) {
     const hadWeather = Boolean(snapshot.weather.rain);
+    if (!hadWeather) return { ...emptyReduction(snapshot), diagnostics };
     const weather = { ...snapshot.weather };
     delete weather.rain;
     const reduction = changedSnapshot({ ...snapshot, weather });
     const durationMs = durationMsParam(command, 0);
     const withDiagnostics = { ...reduction, diagnostics: [...reduction.diagnostics, ...diagnostics] };
-    if (!hadWeather) return withDiagnostics;
     const easing = stringParam(command, "easing");
     return {
       ...withWaitTasks(command, withDiagnostics, "weather-transition", ["rain"]),
@@ -46,6 +47,12 @@ export function reduceRain(snapshot: PixiStageSnapshot, command: RuntimeCommand)
         wait: booleanParam(command, "wait", false)
       }] : []
     };
+  }
+
+  const current = snapshot.weather.rain;
+  if (current && current.commandParams.power === params.power && current.commandParams.wind === params.wind &&
+    current.commandParams.hue === params.hue && current.commandParams.tint === params.tint) {
+    return { ...emptyReduction(snapshot), diagnostics };
   }
 
   return withWaitTasks(command, {

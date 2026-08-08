@@ -137,6 +137,20 @@ export function validateCommandAgainstCatalog(
     }
   }
 
+  if (definition.id === "signalmask" && bound.origins.primary?.promoted) {
+    const origin = bound.origins.primary;
+    const argument = context.command.args[origin.argumentIndex];
+    const key = argument?.kind === "param" ? argument.key : "primary";
+    diagnostics.push(createArgumentDiagnostic(
+      context,
+      origin,
+      "whole",
+      "invalid-command-param",
+      `@signalMask does not declare parameter ${key}; commandCatalog is the authority.`,
+      "error"
+    ));
+  }
+
   return diagnostics;
 }
 
@@ -222,23 +236,193 @@ export function diagnoseExecutionBoundaryParams(
   definition: NaniCommandDefinition,
   context: CommandDiagnosticContext
 ): RuntimeCompilerDiagnostic[] {
+  const diagnostics: RuntimeCompilerDiagnostic[] = [];
   const command = bound.shape;
   if (definition.id === "shake" && runtimeParam(command, "loop") === true) {
-    return [
-      createArgumentDiagnostic(
-        context,
-        bound.origins.params.loop ?? bound.origins.flags.loop,
-        "whole",
-        "unsupported-command-param",
-        "@shake loop! is declared by Naninovel, but this Pixi runtime does not implement indefinite loop effects in the main story track; the command is diagnosed instead of approximated.",
-        "warning"
-      )
-    ];
+    diagnostics.push(createArgumentDiagnostic(
+      context,
+      bound.origins.params.loop ?? bound.origins.flags.loop,
+      "whole",
+      "unsupported-command-param",
+      "@shake loop! is declared by Naninovel, but this Pixi runtime does not implement indefinite loop effects in the main story track; the command is diagnosed instead of approximated.",
+      "warning"
+    ));
   }
-  return [];
+  const unit = (...keys: string[]) => keys.forEach((key) => validatePixiNumber(bound, definition, context, diagnostics, key, 0, 1));
+  const nonNegative = (...keys: string[]) => keys.forEach((key) => validatePixiNumber(bound, definition, context, diagnostics, key, 0));
+  const finite = (...keys: string[]) => keys.forEach((key) => validatePixiNumber(bound, definition, context, diagnostics, key));
+  const timing = (finiteEffect = false) => {
+    validatePixiNumber(bound, definition, context, diagnostics, "time", finiteEffect ? Number.MIN_VALUE : 0);
+    validatePixiEnum(bound, definition, context, diagnostics, "easing", ["linear", "easeIn", "easeOut", "easeInOut"]);
+  };
+
+  switch (definition.id) {
+    case "afterimage":
+      unit("power", "decay", "edge");
+      validatePixiInteger(bound, definition, context, diagnostics, "count", 1, 6);
+      validatePixiVector2(bound, definition, context, diagnostics, "offset", false);
+      validatePixiColor(bound, definition, context, diagnostics, "tint");
+      timing(true);
+      break;
+    case "flicker":
+      unit("power", "irregularity", "invert", "white", "tear", "chroma");
+      validatePixiInteger(bound, definition, context, diagnostics, "bursts", 1, 32);
+      finite("seed");
+      timing(true);
+      break;
+    case "impact":
+      unit("power", "smear", "chroma");
+      finite("direction");
+      validatePixiVector2(bound, definition, context, diagnostics, "origin", true);
+      timing(true);
+      break;
+    case "pulse":
+      unit("power", "edge", "distortion", "chroma", "decay");
+      validatePixiNumber(bound, definition, context, diagnostics, "rate", Number.MIN_VALUE);
+      validatePixiNumber(bound, definition, context, diagnostics, "expansion", 0, 0.2);
+      validatePixiInteger(bound, definition, context, diagnostics, "echoes", 1, 4);
+      validatePixiVector2(bound, definition, context, diagnostics, "origin", true);
+      validatePixiColor(bound, definition, context, diagnostics, "color");
+      timing();
+      break;
+    case "shutter":
+      unit("power", "hold", "skew");
+      validatePixiEnum(bound, definition, context, diagnostics, "shape", ["eyelid", "iris", "slice"]);
+      validatePixiColor(bound, definition, context, diagnostics, "color");
+      timing(true);
+      break;
+    case "signalmask":
+      unit("power", "bands", "noise", "chroma", "threshold");
+      nonNegative("speed");
+      finite("seed");
+      timing();
+      break;
+    case "staticfilter":
+      unit("power", "density", "scanline", "jitter", "warp", "vignette");
+      validatePixiNumber(bound, definition, context, diagnostics, "grainSize", Number.MIN_VALUE);
+      nonNegative("speed");
+      finite("seed");
+      validatePixiEnum(bound, definition, context, diagnostics, "palette", ["cold", "sepia", "green", "mono"]);
+      timing();
+      break;
+    case "vignette":
+      unit("power", "radius", "softness", "breathe", "grain");
+      validatePixiColor(bound, definition, context, diagnostics, "color");
+      timing();
+      break;
+    case "waterveil":
+      unit("power", "level", "ripple", "blur", "droplets");
+      finite("drift", "seed");
+      validatePixiColor(bound, definition, context, diagnostics, "tint");
+      timing();
+      break;
+  }
+  return diagnostics;
 }
 
 const characterTonePresetIds = new Set<string>([...CHARACTER_TONE_PRESET_IDS, "none"]);
+
+function validatePixiNumber(
+  bound: BoundCommand,
+  definition: NaniCommandDefinition,
+  context: CommandDiagnosticContext,
+  diagnostics: RuntimeCompilerDiagnostic[],
+  key: string,
+  minimum?: number,
+  maximum?: number
+): void {
+  const value = staticScalarValue(getCommandParam(bound.shape, key));
+  if (value === undefined) return;
+  if (typeof value === "number" && Number.isFinite(value) &&
+    (minimum === undefined || value >= minimum) && (maximum === undefined || value <= maximum)) return;
+  const range = minimum === undefined
+    ? "a finite number"
+    : maximum === undefined
+      ? `a finite number greater than or equal to ${minimum}`
+      : `a finite number from ${minimum} to ${maximum}`;
+  diagnostics.push(pixiParamDiagnostic(bound, definition, context, key, `${key} must be ${range}.`));
+}
+
+function validatePixiInteger(
+  bound: BoundCommand,
+  definition: NaniCommandDefinition,
+  context: CommandDiagnosticContext,
+  diagnostics: RuntimeCompilerDiagnostic[],
+  key: string,
+  minimum: number,
+  maximum: number
+): void {
+  const value = staticScalarValue(getCommandParam(bound.shape, key));
+  if (value === undefined) return;
+  if (typeof value === "number" && Number.isInteger(value) && value >= minimum && value <= maximum) return;
+  diagnostics.push(pixiParamDiagnostic(
+    bound, definition, context, key, `${key} must be an integer from ${minimum} to ${maximum}.`
+  ));
+}
+
+function validatePixiEnum(
+  bound: BoundCommand,
+  definition: NaniCommandDefinition,
+  context: CommandDiagnosticContext,
+  diagnostics: RuntimeCompilerDiagnostic[],
+  key: string,
+  allowed: readonly string[]
+): void {
+  const value = staticScalarValue(getCommandParam(bound.shape, key));
+  if (value === undefined || (typeof value === "string" && allowed.includes(value))) return;
+  diagnostics.push(pixiParamDiagnostic(
+    bound, definition, context, key, `${key} must be one of ${allowed.join(", ")}.`
+  ));
+}
+
+function validatePixiColor(
+  bound: BoundCommand,
+  definition: NaniCommandDefinition,
+  context: CommandDiagnosticContext,
+  diagnostics: RuntimeCompilerDiagnostic[],
+  key: string
+): void {
+  const value = staticScalarValue(getCommandParam(bound.shape, key));
+  if (value === undefined || (typeof value === "string" && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/u.test(value))) return;
+  diagnostics.push(pixiParamDiagnostic(bound, definition, context, key, `${key} must be a #RGB or #RRGGBB color.`));
+}
+
+function validatePixiVector2(
+  bound: BoundCommand,
+  definition: NaniCommandDefinition,
+  context: CommandDiagnosticContext,
+  diagnostics: RuntimeCompilerDiagnostic[],
+  key: string,
+  percent: boolean
+): void {
+  const raw = getCommandParam(bound.shape, key);
+  if (!raw || raw.type === "expression") return;
+  const values = raw.type === "list" ? raw.value : [raw];
+  const valid = values.length === 2 && values.every((item) =>
+    item.type === "number" && Number.isFinite(item.value) && (!percent || (item.value >= 0 && item.value <= 100))
+  );
+  if (valid) return;
+  diagnostics.push(pixiParamDiagnostic(
+    bound, definition, context, key, `${key} must contain exactly two finite${percent ? " 0..100" : ""} numbers.`
+  ));
+}
+
+function pixiParamDiagnostic(
+  bound: BoundCommand,
+  definition: NaniCommandDefinition,
+  context: CommandDiagnosticContext,
+  key: string,
+  message: string
+): RuntimeCompilerDiagnostic {
+  return createArgumentDiagnostic(
+    context,
+    paramOrigin(bound, key),
+    "value",
+    "invalid-command-param",
+    `@${definition.canonicalName} ${message}`,
+    "error"
+  );
+}
 
 export function diagnoseCharacterToneParams(
   bound: BoundCommand,

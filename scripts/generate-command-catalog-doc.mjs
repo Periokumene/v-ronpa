@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { commandCatalog } from "../packages/contracts/src/index.ts";
 
 const docPath = fileURLToPath(new URL("../docs/nani/command-catalog.md", import.meta.url));
@@ -19,6 +20,8 @@ export function renderCommandCatalogBlock() {
     "### V-Ronpa project declarations",
     "",
     renderTable(project),
+    "",
+    renderEffectReference(commandCatalog),
     endMarker
   ].join("\n");
 }
@@ -71,6 +74,62 @@ function renderTable(definitions) {
   ].join("\n");
 }
 
+export function renderEffectReference(definitions) {
+  const effects = definitions
+    .filter((definition) => definition.category === "effect" && definition.status === "implemented")
+    .slice()
+    .sort((left, right) => left.canonicalName.localeCompare(right.canonicalName));
+  return [
+    "### Implemented Pixi effect command reference",
+    "",
+    "This section is generated from the same `commandCatalog` metadata used by parser diagnostics, editor completion, and hover. Existing and newly added effects use one format and one authority.",
+    "",
+    ...effects.flatMap((definition) => renderEffectCommand(definition))
+  ].join("\n");
+}
+
+function renderEffectCommand(definition) {
+  const examples = definition.docs?.examples ?? [];
+  return [
+    `#### \`@${definition.canonicalName}\``,
+    "",
+    definition.docs?.zh ?? "No authoring description is available.",
+    "",
+    ...(examples.length > 0
+      ? ["**示例**", "", "```nani", ...examples, "```", ""]
+      : []),
+    "| 参数 | 类型 | 必填 | 默认值 | 建议范围 | 可选值 | 中文说明 |",
+    "|---|---|---|---|---|---|---|",
+    ...definition.params.map((paramSpec) => {
+      const docs = paramSpec.docs;
+      const description = [docs?.zh, docs?.runtimeNoteZh].filter(Boolean).join(" ");
+      return `| ${[
+        `\`${paramSpec.name}\``,
+        paramSpec.type,
+        paramSpec.required ? "是" : "否",
+        docs?.defaultValue === undefined ? "—" : `\`${String(docs.defaultValue)}\``,
+        formatRecommendedRange(docs?.recommendedRange),
+        docs?.allowedValues?.map((value) => `\`${value}\``).join(", ") ?? "—",
+        description || "—"
+      ].map(escapeTableCell).join(" | ")} |`;
+    }),
+    ""
+  ];
+}
+
+function formatRecommendedRange(range) {
+  if (!range) return "—";
+  const bounds = range.min !== undefined && range.max !== undefined
+    ? `${range.min}..${range.max}`
+    : range.min !== undefined
+      ? `>= ${range.min}`
+      : range.max !== undefined
+        ? `<= ${range.max}`
+        : "";
+  const value = [bounds, range.unit].filter(Boolean).join(" ");
+  return [value, range.noteZh].filter(Boolean).join("；") || "—";
+}
+
 function escapeTableCell(value) {
   return String(value).replaceAll("|", "\\|").replaceAll("\n", " ");
 }
@@ -79,15 +138,21 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
-const current = readFileSync(docPath, "utf8");
-const next = updateCommandCatalogDoc(current);
-if (process.argv.includes("--check")) {
-  if (current !== next) {
-    console.error("docs/nani/command-catalog.md is stale. Run pnpm generate:command-docs.");
-    process.exit(1);
+if (isDirectExecution(import.meta.url, process.argv[1])) {
+  const current = readFileSync(docPath, "utf8");
+  const next = updateCommandCatalogDoc(current);
+  if (process.argv.includes("--check")) {
+    if (current !== next) {
+      console.error("docs/nani/command-catalog.md is stale. Run pnpm generate:command-docs.");
+      process.exit(1);
+    }
+    console.log("Nani command catalog documentation is fresh.");
+  } else {
+    writeFileSync(docPath, next);
+    console.log("Updated docs/nani/command-catalog.md from commandCatalog.");
   }
-  console.log("Nani command catalog documentation is fresh.");
-} else {
-  writeFileSync(docPath, next);
-  console.log("Updated docs/nani/command-catalog.md from commandCatalog.");
+}
+
+function isDirectExecution(moduleUrl, argvPath) {
+  return Boolean(argvPath) && moduleUrl === pathToFileURL(resolve(argvPath)).href;
 }

@@ -3,6 +3,7 @@ import {
   booleanParam,
   changedSnapshot,
   durationMsParam,
+  emptyReduction,
   numberParam,
   stringParam,
   timingTransition,
@@ -38,10 +39,10 @@ export function reduceGlitchFilter(snapshot: PixiStageSnapshot, command: Runtime
   const power = numberParam(command, "power", 0);
   if (power <= 0) {
     const hadGlitch = Boolean(snapshot.screenFilters.glitch);
+    if (!hadGlitch) return emptyReduction(snapshot);
     const { glitch: _glitch, ...screenFilters } = snapshot.screenFilters;
     const reduction = changedSnapshot({ ...snapshot, screenFilters });
     const durationMs = durationMsParam(command, 0);
-    if (!hadGlitch) return reduction;
     const easing = stringParam(command, "easing");
     return {
       ...withWaitTasks(command, reduction, "screen-filter-transition", ["glitch"]),
@@ -63,8 +64,19 @@ export function reduceGlitchFilter(snapshot: PixiStageSnapshot, command: Runtime
     const value = numberParam(command, key);
     if (value !== undefined) glitch[key] = value;
   }
+  const current = snapshot.screenFilters.glitch;
+  if (current && sameGlitch(current, glitch)) return emptyReduction(snapshot);
   return withWaitTasks(command, changedSnapshot({
     ...snapshot,
     screenFilters: { ...snapshot.screenFilters, glitch }
   }), "screen-filter-transition", ["glitch"]);
+}
+
+function sameGlitch(
+  left: NonNullable<PixiStageSnapshot["screenFilters"]["glitch"]>,
+  right: NonNullable<PixiStageSnapshot["screenFilters"]["glitch"]>
+): boolean {
+  return left.power === right.power && left.blockJump === right.blockJump && left.burstJump === right.burstJump &&
+    left.pixelScatter === right.pixelScatter && left.colorNoise === right.colorNoise && left.speed === right.speed &&
+    left.seed === right.seed;
 }

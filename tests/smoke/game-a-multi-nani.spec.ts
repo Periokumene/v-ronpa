@@ -115,7 +115,14 @@ test("Game A traverses, saves, previews, restores, and completes its production 
   const scriptPicker = workbench.locator("details.vn-devtools-script-picker");
   await scriptPicker.locator("summary").click();
   await expect(workbench.getByRole("listbox", { name: "VN scripts" })).toBeVisible();
-  await expect(workbench.getByRole("option")).toHaveCount(3);
+  await expect.poll(async () => workbench.getByRole("option").count()).toBe(5);
+  expect((await readSnapshot(page)).workbench.scriptPaths.sort()).toEqual([
+    "game-a/chapter-02.nani",
+    "game-a/dev/home-quarrel.nani",
+    "game-a/dev/pixi-effect-compositions.nani",
+    "game-a/dev/pixi-effect-lab.nani",
+    "game-a/opening.nani"
+  ]);
   await expect(workbench.getByRole("option", { name: /home-quarrel\.nani/ })).toContainText("development");
   await page.screenshot({ path: "test-results/game-a-multi-nani-script-selector-504.png", fullPage: true });
   await workbench.getByRole("option", { name: /chapter-02\.nani/ }).click();
@@ -146,8 +153,8 @@ test("Game A traverses, saves, previews, restores, and completes its production 
   const afterNavigation = await readSnapshot(page);
   expect(afterNavigation.workbench.runtimeScriptPath).toBe("game-a/chapter-02.nani");
   expect(afterNavigation.stableCheckpoint?.media).toEqual(beforeNavigation.stableCheckpoint?.media);
-  expect(afterNavigation.pixi.characters).toContain("alice");
-  expect(afterNavigation.pixi.weather).toContain("rain");
+  expect(Object.keys(afterNavigation.pixi.snapshot.charactersById)).toContain("alice");
+  expect(Object.keys(afterNavigation.pixi.snapshot.weather)).toContain("rain");
 
   await expect(page.getByTestId("vn-command-save")).toBeEnabled();
   await clickByTestId(page, "vn-command-save");
@@ -405,6 +412,7 @@ interface GameASnapshot {
     message: string | null;
     viewedScriptPath: string;
     runtimeScriptPath: string;
+    scriptPaths: string[];
     lineCount: number;
     previewableLineCount: number;
     blockedLineCount: number;
@@ -413,9 +421,11 @@ interface GameASnapshot {
     materializationModeLocked: boolean;
   };
   pixi: {
-    revision: number;
-    characters: string[];
-    weather: string[];
+    snapshot: {
+      revision: number;
+      charactersById: Record<string, unknown>;
+      weather: Record<string, unknown>;
+    };
   };
   story: {
     storySession: number;

@@ -8,12 +8,20 @@ import type { RootFilterStack } from "../rootFilterStack";
 import { FlashEffectController } from "./flash";
 import { TransientGlitchEffectController } from "./glitch";
 import { ShakeEffectController } from "./shake";
+import { AfterimageEffectController } from "./afterimage";
+import { FlickerEffectController } from "./flicker";
+import { ImpactEffectController } from "./impact";
+import { ShutterEffectController } from "./shutter";
 import type { TransientActorTargetResolver, TransientEffectController } from "./types";
 
 type FlashHint = Extract<PixiStageRenderHint, { type: "flash" }>;
 type ShakeHint = Extract<PixiStageRenderHint, { type: "shake" }>;
 type GlitchHint = Extract<PixiStageRenderHint, { type: "glitch" }>;
-type TransientHint = FlashHint | ShakeHint | GlitchHint;
+type ImpactHint = Extract<PixiStageRenderHint, { type: "impact" }>;
+type AfterimageHint = Extract<PixiStageRenderHint, { type: "afterimage" }>;
+type ShutterHint = Extract<PixiStageRenderHint, { type: "shutter" }>;
+type FlickerHint = Extract<PixiStageRenderHint, { type: "flicker" }>;
+type TransientHint = FlashHint | ShakeHint | GlitchHint | ImpactHint | AfterimageHint | ShutterHint | FlickerHint;
 type TransientHintType = (typeof TRANSIENT_EFFECT_HINT_TYPES)[number];
 
 interface TransientEffectRegistration {
@@ -39,10 +47,18 @@ export class TransientEffectSystem {
     const flash = new FlashEffectController(options, this.layer, tweens, tasks);
     const shake = new ShakeEffectController(options, actors, tweens, tasks);
     const glitch = new TransientGlitchEffectController(options, rootFilters, tweens, tasks);
+    const impact = new ImpactEffectController(options, rootFilters, tweens, tasks);
+    const afterimage = new AfterimageEffectController(options, actors, rootFilters, tweens, tasks);
+    const shutter = new ShutterEffectController(options, rootFilters, tweens, tasks);
+    const flicker = new FlickerEffectController(rootFilters, tweens, tasks);
     this.registry = Object.freeze({
       flash: { controller: flash, run: (hint, revision) => flash.run(hint as FlashHint, revision) },
       shake: { controller: shake, run: (hint, revision) => shake.run(hint as ShakeHint, revision) },
-      glitch: { controller: glitch, run: (hint, revision) => glitch.run(hint as GlitchHint, revision) }
+      glitch: { controller: glitch, run: (hint, revision) => glitch.run(hint as GlitchHint, revision) },
+      impact: { controller: impact, run: (hint, revision) => impact.run(hint as ImpactHint, revision) },
+      afterimage: { controller: afterimage, run: (hint, revision) => afterimage.run(hint as AfterimageHint, revision) },
+      shutter: { controller: shutter, run: (hint, revision) => shutter.run(hint as ShutterHint, revision) },
+      flicker: { controller: flicker, run: (hint, revision) => flicker.run(hint as FlickerHint, revision) }
     } satisfies Record<TransientHintType, TransientEffectRegistration>);
   }
 

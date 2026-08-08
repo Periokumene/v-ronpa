@@ -10,7 +10,7 @@ import type {
 export type PixiStageRenderHint =
   | { type: "flash"; color: string; durationMs: number; wait?: boolean }
   | { type: "character-tone-remove"; durationMs: number; scopeScriptPath: string; wait?: boolean }
-  | { type: "screen-filter-remove"; kind: "bokeh" | "glitch"; durationMs: number; easing?: string; wait?: boolean }
+  | { type: "screen-filter-remove"; kind: "bokeh" | "glitch" | "vignette" | "staticFilter" | "waterVeil" | "pulse"; durationMs: number; easing?: string; wait?: boolean }
   | { type: "weather-remove"; kind: PixiWeatherKind; durationMs: number; easing?: string; wait?: boolean }
   | {
       type: "shake";
@@ -36,6 +36,22 @@ export type PixiStageRenderHint =
       speed?: number;
       seed?: number;
       wait?: boolean;
+    }
+  | {
+      type: "impact"; power: number; origin: [number, number]; direction: number; smear: number;
+      chroma: number; durationMs: number; easing?: string; wait?: boolean;
+    }
+  | {
+      type: "afterimage"; target: string; power: number; count: number; offset: [number, number];
+      decay: number; tint: string; edge: number; durationMs: number; easing?: string; wait?: boolean;
+    }
+  | {
+      type: "shutter"; power: number; shape: "eyelid" | "iris" | "slice"; color: string;
+      hold: number; skew: number; durationMs: number; easing?: string; wait?: boolean;
+    }
+  | {
+      type: "flicker"; power: number; bursts: number; irregularity: number; invert: number; white: number;
+      tear: number; chroma: number; seed: number; durationMs: number; easing?: string; wait?: boolean;
     }
   | { type: "trial-keyword"; keywordId: string; text: string; evidenceId?: string; speakerId?: string }
   | {
@@ -150,15 +166,11 @@ export function durationMsParam(command: RuntimeCommand, fallback: number): numb
 
 export function sceneVector2Param(
   command: RuntimeCommand,
-  key: string,
-  fallback?: [number, number]
+  key: string
 ): [number, number] | undefined {
   const list = numericList(command.params[key]);
-  if (list.length === 0) return undefined;
-  const x = list[0] !== undefined ? list[0] / 100 : fallback?.[0];
-  const y = list[1] !== undefined ? list[1] / 100 : fallback?.[1];
-  if (x === undefined || y === undefined) return undefined;
-  return [x, y];
+  if (list.length !== 2) return undefined;
+  return [list[0]! / 100, list[1]! / 100];
 }
 
 export function vector3Param(command: RuntimeCommand, key: string): [number, number, number] | undefined {

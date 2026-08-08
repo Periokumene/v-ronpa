@@ -1,4 +1,4 @@
-import { Container } from "pixi.js";
+import { Container, type Filter } from "pixi.js";
 import { describe, expect, it } from "vitest";
 import { PresentationTaskController } from "../presentationTasks";
 import { TweenSystem } from "./animation";
@@ -99,7 +99,65 @@ describe("TransientEffectSystem", () => {
     expect([felix.x, felix.y]).toEqual([70, 90]);
     expect(suite.tasks.snapshot()).toEqual([]);
   });
+
+  it("runs and cleans every independent transient with semantic shader resources", () => {
+    const suite = createTransientSuite(() => undefined);
+    suite.effects.run([
+      { type: "impact", power: 1, origin: [0.5, 0.5], direction: 0, smear: 0.6, chroma: 0.25, durationMs: 60, wait: true },
+      { type: "afterimage", target: "stage", power: 0.7, count: 4, offset: [-0.015, 0], decay: 0.7, tint: "#9fc2c7", edge: 0.55, durationMs: 60, wait: true },
+      { type: "shutter", power: 1, shape: "eyelid", color: "#020304", hold: 0.08, skew: 0.18, durationMs: 60, wait: true },
+      { type: "flicker", power: 1, bursts: 4, irregularity: 0.65, invert: 0.75, white: 0.7, tear: 0.65, chroma: 0.35, seed: 1, durationMs: 60, wait: true }
+    ], 9);
+    expect(suite.tasks.snapshot().map((task) => task.kind)).toEqual(["impact", "afterimage", "shutter", "flicker"]);
+    expect(effectResourceNames(suite.root.filters)).toEqual([
+      "impactUniforms", "afterimageUniforms", "shutterUniforms", "flickerUniforms"
+    ]);
+    for (let index = 0; index < 8; index += 1) suite.tweens.tick({ deltaMS: 20 } as never);
+    expect(suite.tasks.snapshot()).toEqual([]);
+    expect(suite.root.filters).toBeNull();
+  });
+
+  it("replaces one transient family while preserving independent families", () => {
+    const suite = createTransientSuite(() => undefined);
+    const impact = {
+      type: "impact" as const, power: 0.8, origin: [0.5, 0.5] as [number, number],
+      direction: 0, smear: 0.6, chroma: 0.25, durationMs: 600, wait: true
+    };
+    suite.effects.run([impact, {
+      type: "flicker", power: 0.7, bursts: 4, irregularity: 0.6, invert: 0.7,
+      white: 0.6, tear: 0.6, chroma: 0.3, seed: 1, durationMs: 600, wait: true
+    }], 1);
+    suite.effects.run([{ ...impact, direction: 20 }], 2);
+
+    expect(suite.tasks.snapshot()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "flicker", revision: 1 }),
+      expect.objectContaining({ kind: "impact", revision: 2 })
+    ]));
+    expect(suite.tasks.snapshot().filter((task) => task.kind === "impact")).toHaveLength(1);
+    expect(effectResourceNames(suite.root.filters)).toEqual(["flickerUniforms", "impactUniforms"]);
+    suite.effects.destroy();
+  });
+
+  it("keeps actor afterimage local and expands its padding", () => {
+    const actor = new Container();
+    const suite = createTransientSuite((id) => id === "alice" ? actor : undefined);
+    suite.effects.run([{
+      type: "afterimage", target: "alice", power: 1, count: 6, offset: [-0.024, 0.005],
+      decay: 0.78, tint: "#b7dce0", edge: 0.85, durationMs: 800, wait: true
+    }], 4);
+
+    expect(suite.root.filters).toBeUndefined();
+    expect(actor.filters).toHaveLength(1);
+    expect((actor.filters?.[0] as Filter).padding).toBeGreaterThan(32);
+    suite.effects.destroy();
+    expect(actor.filters).toBeNull();
+  });
 });
+
+function effectResourceNames(filters: Container["filters"]): string[] {
+  return (filters ?? []).flatMap((filter) => Object.keys((filter as unknown as { resources: object }).resources)
+    .filter((key) => key.endsWith("Uniforms")));
+}
 
 function createTransientSuite(resolve: (id: string) => Container | undefined) {
   const root = new Container();

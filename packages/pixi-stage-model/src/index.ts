@@ -13,15 +13,24 @@ import { reduceBlur as reduceBlurEffect } from "./effects/blur";
 import { reduceBokeh as reduceBokehEffect } from "./effects/bokeh";
 import { reduceCharacterTone as reduceCharacterToneEffect } from "./effects/characterTone";
 import { reduceFlash as reduceFlashEffect } from "./effects/flash";
+import { reduceAfterimage } from "./effects/afterimage";
+import { reduceFlicker } from "./effects/flicker";
 import {
   reduceGlitchFilter as reduceGlitchFilterEffect,
   reduceTransientGlitch as reduceTransientGlitchEffect
 } from "./effects/glitch";
+import { reduceImpact } from "./effects/impact";
+import { reducePulse } from "./effects/pulse";
 import { reduceRain as reduceRainEffect } from "./effects/rain";
 import type { PixiRuntimeCommandReduction, PixiStageRenderHint } from "./effects/reduction";
 import { reduceShake as reduceShakeEffect } from "./effects/shake";
+import { reduceShutter } from "./effects/shutter";
+import { reduceSignalMask } from "./effects/signalMask";
 import { reduceSnow as reduceSnowEffect } from "./effects/snow";
+import { reduceStaticFilter } from "./effects/staticFilter";
 import { reduceSun as reduceSunEffect } from "./effects/sun";
+import { reduceVignette } from "./effects/vignette";
+import { reduceWaterVeil } from "./effects/waterVeil";
 
 export {
   DEFAULT_RAIN_COMMAND_PARAMS,
@@ -72,6 +81,7 @@ type PixiCommandReducer = (
 ) => PixiRuntimeCommandReduction;
 
 const pixiCommandReducerRegistry: Readonly<Record<string, PixiCommandReducer>> = Object.freeze({
+  afterimage: reduceAfterimage,
   arrange: reduceArrange,
   back: reduceBack,
   blur: reduceBlurEffect,
@@ -79,15 +89,23 @@ const pixiCommandReducerRegistry: Readonly<Record<string, PixiCommandReducer>> =
   char: reduceChar,
   chartone: reduceCharacterToneEffect,
   flash: reduceFlashEffect,
+  flicker: reduceFlicker,
   glitch: reduceTransientGlitchEffect,
   glitchfilter: reduceGlitchFilterEffect,
+  impact: reduceImpact,
   hidechars: reduceHideChars,
   inback: reduceInback,
   rain: reduceRainEffect,
+  pulse: reducePulse,
   shake: reduceShakeEffect,
+  shutter: reduceShutter,
+  signalmask: reduceSignalMask,
   slide: reduceSlide,
   snow: reduceSnowEffect,
+  staticfilter: reduceStaticFilter,
   sun: reduceSunEffect,
+  vignette: reduceVignette,
+  waterveil: reduceWaterVeil,
   trialkeyword: reduceTrialKeyword
 });
 

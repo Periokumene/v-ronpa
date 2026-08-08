@@ -272,8 +272,14 @@ function validatePixiEffectIsolation() {
     "weather/types.ts"
   ]);
   const dispatcherImports = new Map([
-    ["persistentScreen.ts", new Set(["bokeh.ts", "persistentGlitch.ts"])],
-    ["transient/system.ts", new Set(["transient/flash.ts", "transient/glitch.ts", "transient/shake.ts"])],
+    ["actorFilters.ts", new Set(["blur.ts", "signalMask.ts"])],
+    ["persistentScreen.ts", new Set([
+      "bokeh.ts", "persistentGlitch.ts", "pulse.ts", "staticFilter.ts", "vignette.ts", "waterVeil.ts"
+    ])],
+    ["transient/system.ts", new Set([
+      "transient/afterimage.ts", "transient/flash.ts", "transient/flicker.ts", "transient/glitch.ts",
+      "transient/impact.ts", "transient/shake.ts", "transient/shutter.ts"
+    ])],
     ["weather/system.ts", new Set(["weather/rain.ts", "weather/snow.ts", "weather/sun.ts"])]
   ]);
 
@@ -303,7 +309,7 @@ function validatePixiEffectIsolation() {
 
   validatePixiPresenterEffectImports(
     join(presenterRoot, "internal/systems.ts"),
-    new Set(["animation.ts", "blur.ts", "characterToneController.ts"]),
+    new Set(["actorFilters.ts", "animation.ts", "characterToneController.ts"]),
     "ActorSystem"
   );
   validatePixiPresenterEffectImports(
